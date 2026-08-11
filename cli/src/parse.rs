@@ -1,9 +1,9 @@
 //! Heuristic parser for TLHdig / AOxml manuscript documents.
 //!
-//! Hot path is SIMD-accelerated (`memchr` SSE2/AVX2/NEON via [`crate::simd_scan`]):
-//! no regex, no full-DOM, zero-copy header slices. Missing fields → `—`.
+//! Locates a small set of tags and attributes in the first few KiB of each
+//! document (via [`crate::xml_scan`]). No full DOM, no regex. Missing fields → `—`.
 
-use crate::simd_scan::{
+use crate::xml_scan::{
     attr_value, eq_ci, find_close_tag, find_cth_number, find_open_tag, find_year,
     for_each_start_tag, strip_tags_bytes, tag_text,
 };
@@ -39,7 +39,6 @@ pub struct ManuscriptRecord {
 pub const HEADER_READ_LIMIT: usize = 16 * 1024;
 
 /// Truncate `s` to at most `max` bytes on a UTF-8 char boundary (never panics).
-#[inline]
 pub fn floor_char_boundary(s: &str, max: usize) -> &str {
     if s.len() <= max {
         return s;
@@ -87,10 +86,8 @@ pub fn parse_manuscript(path: &str, xml: &str) -> ManuscriptRecord {
 }
 
 /// Parse `CTH 547` / `CTH 12.1` → integer major number for sort (547 / 12).
-#[inline]
 pub fn parse_cth_num(cth: &str) -> Option<u32> {
     let b = cth.as_bytes();
-    // skip non-digits
     let mut i = 0usize;
     while i < b.len() && !b[i].is_ascii_digit() {
         i += 1;
@@ -106,11 +103,9 @@ pub fn parse_cth_num(cth: &str) -> Option<u32> {
 }
 
 /// Sort key label for grouping (stable display).
-#[inline]
 pub fn group_label(rec: &ManuscriptRecord) -> &str {
     rec.cth.as_deref().unwrap_or(MISSING)
 }
-
 
 fn format_title(sigla: &str, cth: &Option<String>) -> String {
     match cth {
@@ -121,7 +116,7 @@ fn format_title(sigla: &str, cth: &Option<String>) -> String {
     }
 }
 
-/// Prefer the AOHeader / teiHeader block; otherwise first 8 KiB. Zero-copy `&str`.
+/// Prefer the AOHeader / teiHeader block; otherwise first 8 KiB.
 fn extract_header_slice(xml: &str) -> &str {
     let b = xml.as_bytes();
     if let Some(h) = slice_between_tags(b, b"AOHeader") {
@@ -139,17 +134,16 @@ fn slice_between_tags<'a>(hay: &'a [u8], local: &[u8]) -> Option<&'a [u8]> {
     match find_close_tag(hay, content, local) {
         Some(close) => Some(&hay[content..close]),
         None => {
-            // Malformed: take rest of window from content start (capped).
             let end = (content + 8192).min(hay.len());
             Some(&hay[content..end])
         }
     }
 }
 
-#[inline]
 fn bytes_to_str<'a>(owner: &'a str, slice: &'a [u8]) -> &'a str {
     // `slice` is always a subslice of `owner.as_bytes()`.
     let start = slice.as_ptr() as usize - owner.as_ptr() as usize;
+    debug_assert!(start + slice.len() <= owner.len());
     &owner[start..start + slice.len()]
 }
 
@@ -186,7 +180,6 @@ fn extract_cth(header: &str, xml: &str, path: &str) -> Option<String> {
     if let Some(n) = find_cth_number(path.as_bytes()) {
         return Some(format!("CTH {}", path_utf8(n)));
     }
-    // <cth neu="CTH 786" …>
     let mut found: Option<String> = None;
     for_each_start_tag(header.as_bytes(), |local, attrs| {
         if !eq_local(local, b"cth") {
@@ -198,7 +191,6 @@ fn extract_cth(header: &str, xml: &str, path: &str) -> Option<String> {
                     found = Some(format!("CTH {}", path_utf8(num)));
                     return true;
                 }
-                // value may be bare number
                 if !v.is_empty() && v[0].is_ascii_digit() {
                     found = Some(format!("CTH {}", path_utf8(v)));
                     return true;
@@ -217,17 +209,14 @@ fn extract_cth(header: &str, xml: &str, path: &str) -> Option<String> {
     find_cth_number(early).map(|n| format!("CTH {}", path_utf8(n)))
 }
 
-#[inline]
 fn eq_local(a: &[u8], b: &[u8]) -> bool {
     eq_ci(a, b)
 }
 
-#[inline]
 fn path_utf8(b: &[u8]) -> &str {
     std::str::from_utf8(b).unwrap_or("")
 }
 
-/// Priority for authorship roles (Übernahme / transliteration first).
 const EDITOR_ROLE_PRIORITY: &[&[u8]] = &[
     b"uebern",
     b"trlst",
@@ -246,7 +235,6 @@ const EDITOR_ROLE_PRIORITY: &[&[u8]] = &[
 ];
 
 fn extract_editor_and_year(header: &str) -> (Option<String>, Option<String>) {
-    // TEI-like name / author elements first (full names).
     for tag in [b"name".as_slice(), b"persName", b"author"] {
         if let Some(v) = first_tag_text(header, tag) {
             let n = normalize_ws(&v);
@@ -273,7 +261,6 @@ fn extract_editor_and_year(header: &str) -> (Option<String>, Option<String>) {
             .position(|r| eq_local(local, r))
             .unwrap_or(EDITOR_ROLE_PRIORITY.len() + 10);
 
-        // Special-case übern (UTF-8) — local name may be multi-byte; already handled as uebern.
         let replace = match &best {
             None => true,
             Some((bp, _, by)) => prio < *bp || (prio == *bp && by.is_none() && year.is_some()),
@@ -281,7 +268,7 @@ fn extract_editor_and_year(header: &str) -> (Option<String>, Option<String>) {
         if replace {
             best = Some((prio, editor, year));
         }
-        false // continue scanning for better priority
+        false
     });
 
     match best {
@@ -296,7 +283,6 @@ fn is_auto_editor(s: &str) -> bool {
 }
 
 fn extract_year_fallback(header: &str, xml: &str) -> Option<String> {
-    // Prefer date= on known meta tags.
     let mut year: Option<String> = None;
     for_each_start_tag(header.as_bytes(), |local, attrs| {
         let interesting = eq_local(local, b"creation-date")
@@ -312,13 +298,11 @@ fn extract_year_fallback(header: &str, xml: &str) -> Option<String> {
             year = Some(d);
             return true;
         }
-        // TEI <date>2019</date> text content handled below
         false
     });
     if year.is_some() {
         return year;
     }
-    // <date>…</date> element text
     if let Some(t) = first_tag_text(header, b"date") {
         if let Some(y) = year_from_date_value(&t).or_else(|| {
             find_year(t.as_bytes()).map(|y| path_utf8(&y).to_string())
@@ -361,7 +345,6 @@ fn normalize_ws(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-
 fn extract_inv(header: &str, xml: &str) -> String {
     for tag in [b"InvNr".as_slice(), b"invNr", b"inv"] {
         if let Some(v) = first_tag_text(header, tag).or_else(|| first_tag_text(xml, tag)) {
@@ -374,7 +357,6 @@ fn extract_inv(header: &str, xml: &str) -> String {
     MISSING.to_string()
 }
 
-/// Dominant `lg="…"` on line elements in the early body window.
 fn extract_lang(xml: &str) -> String {
     let b = xml.as_bytes();
     let end = b.len().min(12 * 1024);
@@ -428,10 +410,8 @@ fn extract_lang(xml: &str) -> String {
     }
 }
 
-/// Series token from path segment `CTH …_XML_<CORPUS>/…`.
 fn extract_corpus(path: &str) -> String {
     let b = path.as_bytes();
-    // Find "_XML_"
     let mut i = 0usize;
     while i + 5 < b.len() {
         if b[i] == b'_'
@@ -457,10 +437,8 @@ fn extract_corpus(path: &str) -> String {
     MISSING.to_string()
 }
 
-/// Returns true if the archive path looks like an XML manuscript we should index.
 pub fn is_manuscript_xml(path: &str) -> bool {
     let bytes = path.as_bytes();
-    // Fast reject: must end with .xml / .XML — SIMD-backed end check
     if bytes.len() < 4 {
         return false;
     }
@@ -479,7 +457,6 @@ pub fn is_manuscript_xml(path: &str) -> bool {
     if nb.len() >= 8 && eq_ci(&nb[nb.len() - 8..], b".css.xml") {
         return false;
     }
-    // Optional: skip pure directories (zip stores trailing slash)
     if bytes.last() == Some(&b'/') {
         return false;
     }
@@ -638,5 +615,19 @@ mod tests {
         let r = parse_manuscript("CTH 786_XML_HFR/KBo 17.86+.xml", &xml);
         assert_eq!(r.authorship, "FB");
         assert_eq!(r.year, "2017");
+    }
+
+    /// Regression: an unclosed `<AOHeader>` makes the header fallback cut the
+    /// window at a fixed byte offset. When that offset lands inside a multi-byte
+    /// character (cuneiform is 4 bytes), slicing must not panic.
+    #[test]
+    fn unclosed_header_with_cuneiform_at_cut_offset() {
+        const OPEN: &str = "<AOHeader>";
+        let mut xml = String::from(OPEN);
+        xml.push_str(&"x".repeat(8192 - 2));
+        xml.push_str(&"𒀀".repeat(64));
+        assert!(!xml.is_char_boundary(OPEN.len() + 8192));
+        let r = parse_manuscript("CTH 5_XML_HFR/broken.xml", &xml);
+        assert_eq!(r.title, "broken · CTH 5");
     }
 }
