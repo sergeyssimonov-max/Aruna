@@ -1,21 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Hittite clay tablet">
-  <rect width="1024" height="1024" rx="220" fill="#F3EDE3"/>
-  <!-- Single tablet outline, original proportions -->
-  <rect x="250" y="160" width="524" height="704" rx="40"
-        fill="none" stroke="#B89A6E" stroke-width="18" stroke-linejoin="round"/>
-  <!-- Wedges: same stroke width as frame -->
-  <g fill="none" stroke="#A08058" stroke-width="18" stroke-linejoin="round" stroke-linecap="round">
-    <path d="M360 300 h100 l-50 72z"/>
-    <path d="M490 300 h100 l-50 72z"/>
-    <path d="M620 300 h74 l-37 72z"/>
-    <path d="M360 420 h100 l-50 72z"/>
-    <path d="M490 420 h100 l-50 72z"/>
-    <path d="M620 420 h74 l-37 72z"/>
-    <path d="M360 540 h100 l-50 72z"/>
-    <path d="M490 540 h100 l-50 72z"/>
-    <path d="M620 540 h74 l-37 72z"/>
-    <path d="M425 660 h100 l-50 72z"/>
-    <path d="M555 660 h100 l-50 72z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Cuneiform clay tablet">
+  <!-- Full-bleed warm clay field (macOS masks to squircle) -->
+  <rect width="1024" height="1024" fill="#EFE6D8"/>
+
+  <!-- Single clay-brown for all contours -->
+  <g fill="none" stroke="#9A6B3F" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Tablet body — slightly irregular, worn lower-left like the photo -->
+    <path d="
+      M 268 168
+      Q 250 168 250 190
+      L 250 780
+      Q 250 820 288 848
+      L 340 900
+      Q 360 918 390 910
+      L 740 910
+      Q 790 910 790 860
+      L 790 190
+      Q 790 168 768 168
+      Z"/>
+
+    <!-- Register lines (ruled tablet) -->
+    <path d="M 310 320 L 730 320"/>
+    <path d="M 310 460 L 730 460"/>
+    <path d="M 310 600 L 730 600"/>
+    <path d="M 310 740 L 730 740"/>
+
+    <!-- Row 1 — wedges / angular signs -->
+    <path d="M 340 230 L 340 295 M 340 230 L 395 255 M 340 230 L 300 255"/>
+    <path d="M 430 245 L 490 245 M 430 245 L 455 290 M 490 245 L 465 290"/>
+    <path d="M 530 235 L 530 300 M 510 260 L 560 260"/>
+    <path d="M 600 250 L 680 250 M 640 250 L 640 295 M 615 275 L 665 275"/>
+    <path d="M 700 240 L 750 270 M 750 240 L 700 270"/>
+
+    <!-- Row 2 -->
+    <path d="M 335 360 L 380 420 M 380 360 L 335 420"/>
+    <path d="M 420 370 L 500 370 M 460 370 L 460 430"/>
+    <path d="M 530 365 L 590 365 L 560 430 Z"/>
+    <path d="M 620 375 L 700 375 M 640 375 L 620 430 M 680 375 L 700 430"/>
+    <path d="M 720 365 L 760 400 M 760 365 L 720 400"/>
+
+    <!-- Row 3 -->
+    <path d="M 340 500 L 400 500 M 340 500 L 355 560 M 400 500 L 385 560"/>
+    <path d="M 440 510 L 440 570 M 420 540 L 480 540 M 430 520 L 470 560 M 470 520 L 430 560"/>
+    <path d="M 520 505 L 600 505 M 560 505 L 540 570 M 560 505 L 580 570"/>
+    <path d="M 630 515 L 710 515 M 650 515 L 650 565 M 690 515 L 690 565"/>
+    <path d="M 730 510 L 770 550 M 770 510 L 730 550"/>
+
+    <!-- Row 4 -->
+    <path d="M 350 640 L 410 640 M 380 640 L 380 710"/>
+    <path d="M 450 650 L 520 650 L 485 715 Z"/>
+    <path d="M 550 645 L 620 645 M 550 645 L 570 710 M 620 645 L 600 710"/>
+    <path d="M 650 655 L 720 655 M 685 655 L 665 715 M 685 655 L 705 715"/>
+    <path d="M 740 650 L 770 700 M 770 650 L 740 700"/>
+
+    <!-- Row 5 (shorter, damaged corner area) -->
+    <path d="M 400 790 L 480 790 M 440 790 L 440 870"/>
+    <path d="M 520 800 L 600 800 M 540 800 L 520 870 M 580 800 L 600 870"/>
+    <path d="M 640 795 L 720 795 M 680 795 L 680 865"/>
   </g>
 </svg>

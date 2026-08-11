@@ -145,7 +145,10 @@ sips -z 1024 1024 "${MASTER_PNG}" --out "${MASTER_PNG}" >/dev/null
 make_icon() {
   local size="$1"
   local name="$2"
-  sips -z "${size}" "${size}" "${MASTER_PNG}" --out "${ICONSET}/${name}" >/dev/null
+  # sips warns on @2x if suffix not .png intermediate — write via temp
+  local tmp="${WORK}/icon_${size}.png"
+  sips -z "${size}" "${size}" "${MASTER_PNG}" --out "${tmp}" >/dev/null
+  mv -f "${tmp}" "${ICONSET}/${name}"
 }
 
 make_icon 16   icon_16x16.png

@@ -46,43 +46,6 @@ const IconChevron = memo(function IconChevron({ className = "" }: { className?: 
   );
 });
 
-const IconClayTablet = memo(function IconClayTablet({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <rect width="32" height="32" rx="8" fill="#F3EDE3" />
-      <rect
-        x="7.5"
-        y="4"
-        width="17"
-        height="24"
-        rx="2"
-        stroke="#B89A6E"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-      />
-      <g
-        fill="none"
-        stroke="#A08058"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      >
-        <path d="M11.2 9h3.2l-1.6 2.3z" />
-        <path d="M15.4 9h3.2l-1.6 2.3z" />
-        <path d="M19.6 9h3.2l-1.6 2.3z" />
-        <path d="M11.2 13.4h3.2l-1.6 2.3z" />
-        <path d="M15.4 13.4h3.2l-1.6 2.3z" />
-        <path d="M19.6 13.4h3.2l-1.6 2.3z" />
-        <path d="M11.2 17.8h3.2l-1.6 2.3z" />
-        <path d="M15.4 17.8h3.2l-1.6 2.3z" />
-        <path d="M19.6 17.8h3.2l-1.6 2.3z" />
-        <path d="M13.3 22.2h3.2l-1.6 2.3z" />
-        <path d="M17.5 22.2h3.2l-1.6 2.3z" />
-      </g>
-    </svg>
-  );
-});
-
 const GroupRow = memo(function GroupRow({
   c,
   n,
@@ -275,18 +238,13 @@ function InventoryPage() {
     <div className="min-h-screen bg-[#fafafa] text-[#1a1a1a]">
       <div className="mx-auto max-w-4xl px-4 pt-[calc(var(--grok-banner-h,0px)+1.5rem)] pb-10 sm:px-6">
         <header className="mb-6 sm:mb-8">
-          <div className="mb-3 flex items-start gap-3">
-            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg">
-              <IconClayTablet className="h-10 w-10" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-[1.25rem] font-semibold leading-snug tracking-tight sm:text-[1.35rem]">
-                Thesaurus Linguarum Hethaeorum Digitalis
-              </h1>
-              <p className="mt-1 text-[0.8125rem] leading-relaxed text-[#666]">
-                {data.source}
-              </p>
-            </div>
+          <div className="mb-3 min-w-0">
+            <h1 className="text-[1.25rem] font-semibold leading-snug tracking-tight sm:text-[1.35rem]">
+              Thesaurus Linguarum Hethaeorum Digitalis
+            </h1>
+            <p className="mt-1 text-[0.8125rem] leading-relaxed text-[#666]">
+              {data.source}
+            </p>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8125rem] text-[#666]">
             <span>
