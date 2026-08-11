@@ -44,3 +44,13 @@ Search: Web Worker + WASM over the ARUN catalog.
 ## License
 
 MIT (see `cli/` package metadata).
+
+## CI / automatic DMG
+
+GitHub Actions: `.github/workflows/release-dmg.yml`  
+Подробности: [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
+
+- каждый push/PR — Linux `Aruna.dmg` + zip (artifacts)
+- tag `v*` или ручной Run workflow — + macOS Universal DMG
+- tag `v*` — публикация GitHub Release
+

@@ -20,5 +20,10 @@ Aruna — TLHdig inventory generator
 Downloads Zenodo TLHdig, parses XML, writes HTML to ~/Downloads.
 macOS Universal .app: run ./build_app.sh on macOS 13+.
 EOT
+# pycdlib required (CI: pip install --user pycdlib)
+if ! python3 -c "import pycdlib" 2>/dev/null; then
+  pip install --user pycdlib
+  export PATH="$HOME/.local/bin:$PATH"
+fi
 python3 "$ROOT/scripts/pack_dmg.py"
 ls -lah "$REL"
