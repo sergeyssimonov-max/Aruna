@@ -4,7 +4,7 @@
 //! no regex, no full-DOM, zero-copy header slices. Missing fields → `—`.
 
 use crate::simd_scan::{
-    attr_value, find_close_tag, find_cth_number, find_open_tag, find_year,
+    attr_value, eq_ci, find_close_tag, find_cth_number, find_open_tag, find_year,
     for_each_start_tag, strip_tags_bytes, tag_text,
 };
 use std::path::Path;
@@ -219,7 +219,7 @@ fn extract_cth(header: &str, xml: &str, path: &str) -> Option<String> {
 
 #[inline]
 fn eq_local(a: &[u8], b: &[u8]) -> bool {
-    crate::simd_scan::eq_ci(a, b)
+    eq_ci(a, b)
 }
 
 #[inline]
@@ -465,7 +465,7 @@ pub fn is_manuscript_xml(path: &str) -> bool {
         return false;
     }
     let ext = &bytes[bytes.len() - 4..];
-    if !crate::simd_scan::eq_ci(ext, b".xml") {
+    if !eq_ci(ext, b".xml") {
         return false;
     }
     let name = Path::new(path)
@@ -476,7 +476,7 @@ pub fn is_manuscript_xml(path: &str) -> bool {
         return false;
     }
     let nb = name.as_bytes();
-    if nb.len() >= 8 && crate::simd_scan::eq_ci(&nb[nb.len() - 8..], b".css.xml") {
+    if nb.len() >= 8 && eq_ci(&nb[nb.len() - 8..], b".css.xml") {
         return false;
     }
     // Optional: skip pure directories (zip stores trailing slash)

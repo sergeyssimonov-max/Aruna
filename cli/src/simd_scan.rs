@@ -439,4 +439,11 @@ mod tests {
         let out = strip_tags_bytes(b"a<b>c</b>d");
         assert_eq!(out, b"acd");
     }
+
+    #[test]
+    fn eq_ci_equal() {
+        assert!(eq_ci(b".xml", b".XML"));
+        assert!(eq_ci(b"AbC", b"abc"));
+        assert!(!eq_ci(b"a", b"ab"));
+    }
 }
