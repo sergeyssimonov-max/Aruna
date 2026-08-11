@@ -98,37 +98,53 @@ pub fn render_html(
     let _ = writeln!(html, "      <span>Manuscripts: {count}</span>");
     let _ = writeln!(html, "      <span>Groups (CTH): {groups}</span>");
     html.push_str("    </p>\n");
-    html.push_str("    <table>\n");
-    html.push_str("      <thead>
-");
-    html.push_str("        <tr>
-");
-    html.push_str("          <th scope=\"col\">№</th>
-");
-    html.push_str("          <th scope=\"col\">Siglum</th>
-");
-    html.push_str("          <th scope=\"col\">Lang</th>
-");
-    html.push_str("          <th scope=\"col\">Editor</th>
-");
-    html.push_str("          <th scope=\"col\">Year</th>
-");
-    html.push_str("          <th scope=\"col\">Inv.</th>
-");
-    html.push_str("          <th scope=\"col\">Corpus</th>
-");
-    html.push_str("        </tr>
-");
-    html.push_str("      </thead>
-");
+
+    // Legend
+    html.push_str("    <section class=\"legend\" aria-label=\"Column legend\">\n");
+    html.push_str("      <p class=\"legend-title\">Columns</p>\n");
+    html.push_str("      <ul class=\"legend-list\">\n");
+    html.push_str("        <li><span class=\"k\">№</span><span class=\"d\">row number</span></li>\n");
+    html.push_str("        <li><span class=\"k\">Siglum</span><span class=\"d\">publication id (e.g. KBo 3.22)</span></li>\n");
+    html.push_str("        <li><span class=\"k\">Lang</span><span class=\"d\">dominant language (Hit, Hur, Akk…)</span></li>\n");
+    html.push_str("        <li><span class=\"k\">Corpus</span><span class=\"d\">edition series (HFR, TLH, HAnn…)</span></li>\n");
+    html.push_str("        <li><span class=\"k\">Editor</span><span class=\"d\">transliteration / edition author</span></li>\n");
+    html.push_str("        <li><span class=\"k\">Year</span><span class=\"d\">edition year</span></li>\n");
+    html.push_str("      </ul>\n");
+    html.push_str("    </section>\n");
+
+    // Search filter
+    html.push_str("    <div class=\"toolbar\">\n");
+    html.push_str("      <input type=\"search\" id=\"q\" placeholder=\"Search CTH, siglum, lang, corpus, editor, year…\" autocomplete=\"off\" spellcheck=\"false\" />\n");
+    html.push_str("      <span class=\"hint\" id=\"hint\"></span>\n");
+    html.push_str("    </div>\n");
+
+    html.push_str("    <table id=\"inv\">\n");
+    html.push_str("      <colgroup>\n");
+    html.push_str("        <col class=\"c-num\" /><col class=\"c-sig\" /><col class=\"c-lang\" />\n");
+    html.push_str("        <col class=\"c-corp\" /><col class=\"c-ed\" /><col class=\"c-year\" />\n");
+    html.push_str("      </colgroup>\n");
+    html.push_str("      <thead>\n");
+    html.push_str("        <tr>\n");
+    html.push_str("          <th scope=\"col\">№</th>\n");
+    html.push_str("          <th scope=\"col\">Siglum</th>\n");
+    html.push_str("          <th scope=\"col\">Lang</th>\n");
+    html.push_str("          <th scope=\"col\">Corpus</th>\n");
+    html.push_str("          <th scope=\"col\">Editor</th>\n");
+    html.push_str("          <th scope=\"col\">Year</th>\n");
+    html.push_str("        </tr>\n");
+    html.push_str("      </thead>\n");
     html.push_str("      <tbody>\n");
     html.push_str(&body_rows);
     html.push_str("      </tbody>\n");
     html.push_str("    </table>\n");
     html.push_str("  </main>\n");
+    html.push_str("  <script>\n");
+    html.push_str(include_str!("html_filter.js"));
+    html.push_str("  </script>\n");
     html.push_str("</body>\n");
     html.push_str("</html>\n");
     html
+
 }
 
 #[cfg(test)]

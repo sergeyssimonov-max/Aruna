@@ -49,41 +49,35 @@ const IconChevron = memo(function IconChevron({ className = "" }: { className?: 
 const IconClayTablet = memo(function IconClayTablet({ className = "" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <rect width="32" height="32" rx="7" fill="#F3EDE3" />
+      <rect width="32" height="32" rx="8" fill="#F3EDE3" />
       <rect
-        x="6.5"
+        x="7.5"
         y="4"
-        width="19"
+        width="17"
         height="24"
-        rx="1.6"
+        rx="2"
         stroke="#B89A6E"
-        strokeWidth="1.15"
+        strokeWidth="1.1"
         strokeLinejoin="round"
       />
-      <g fill="#A08058">
-        <path d="M9.1 7.8l2.9-.55.44 1.3-2.9.55z" />
-        <path d="M13.1 7.75l.88 2.75-1.38.25-.88-2.75z" />
-        <path d="M15.3 7.55l3 .38-.38 1.38-3-.38z" />
-        <path d="M19.2 7.8l.7 2.7-1.32.38-.7-2.7z" />
-        <path d="M21.3 8.35l2.25 1.25-.75 1.12-2.25-1.25z" />
-        <path d="M9.4 11.25l.75 2.8-1.38.32-.75-2.8z" />
-        <path d="M11.5 11l2.75-.5.5 1.38-2.75.5z" />
-        <path d="M15.4 10.9l1.25 1.12 1.12-1.25 1.25 1.12-.75.88-1.12-1-1.12 1z" />
-        <path d="M19.4 11.15l2.8.44-.32 1.3-2.8-.44z" />
-        <path d="M23.1 11.5l.56 2.44-1.25.38-.56-2.44z" />
-        <path d="M9 14.75l3.05.25-.25 1.32-3.05-.25z" />
-        <path d="M13 14.6l.62 2.7-1.32.38-.62-2.7z" />
-        <path d="M15 14.4l2.7-.62.56 1.25-2.7.62z" />
-        <path d="M18.8 14.7l2.2 1.5-.88 1-2.2-1.5z" />
-        <path d="M21.9 14.5l.82 2.8-1.38.25-.82-2.8z" />
-        <path d="M9.5 18.1l.7 2.62-1.25.38-.7-2.62z" />
-        <path d="M11.6 17.85l2.95.32-.32 1.25-2.95-.32z" />
-        <path d="M15.6 17.75l1.06 1.06 1.06-1.06 1.06 1.06-.7.82-1.06-.88-1.06.88z" />
-        <path d="M20 18l2.5-.56.5 1.32-2.5.56z" />
-        <path d="M10 21.5l2.8.38-.38 1.25-2.8-.38z" />
-        <path d="M13.8 21.4l.75 2.55-1.32.32-.75-2.55z" />
-        <path d="M16 21.2l2.75-.44.44 1.25-2.75.44z" />
-        <path d="M20 21.55l2 1.38-.82.94-2-1.38z" />
+      <g
+        fill="none"
+        stroke="#A08058"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      >
+        <path d="M11.2 9h3.2l-1.6 2.3z" />
+        <path d="M15.4 9h3.2l-1.6 2.3z" />
+        <path d="M19.6 9h3.2l-1.6 2.3z" />
+        <path d="M11.2 13.4h3.2l-1.6 2.3z" />
+        <path d="M15.4 13.4h3.2l-1.6 2.3z" />
+        <path d="M19.6 13.4h3.2l-1.6 2.3z" />
+        <path d="M11.2 17.8h3.2l-1.6 2.3z" />
+        <path d="M15.4 17.8h3.2l-1.6 2.3z" />
+        <path d="M19.6 17.8h3.2l-1.6 2.3z" />
+        <path d="M13.3 22.2h3.2l-1.6 2.3z" />
+        <path d="M17.5 22.2h3.2l-1.6 2.3z" />
       </g>
     </svg>
   );
@@ -144,6 +138,7 @@ function InventoryPage() {
   const deferredQuery = useDeferredValue(query);
   const [openAll, setOpenAll] = useState(true);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
   const rangeRef = useRef({ y0: 0, y1: 720 });
   const [range, setRange] = useState({ y0: 0, y1: 720 });
@@ -209,10 +204,18 @@ function InventoryPage() {
       });
     };
 
+    const syncSb = () => {
+      const sb = el.offsetWidth - el.clientWidth;
+      if (frameRef.current) {
+        frameRef.current.style.setProperty("--vl-sb", `${Math.max(0, sb)}px`);
+      }
+    };
     const ro = new ResizeObserver(() => {
+      syncSb();
       publish(el.scrollTop, el.clientHeight);
     });
     ro.observe(el);
+    syncSb();
     publish(el.scrollTop, el.clientHeight || 600);
 
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -363,6 +366,7 @@ function InventoryPage() {
         </div>
 
         <div
+          ref={frameRef}
           className="vl-frame overflow-hidden rounded-md border border-[#e8e8e8] bg-white"
           style={{ height: "min(70vh, 720px)" }}
         >

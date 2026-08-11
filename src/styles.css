@@ -27,18 +27,12 @@ body {
   box-sizing: border-box;
 }
 
-/* ── table frame: head + body share width via scrollbar-gutter ── */
-
+/* № | Siglum | Lang | Corpus | Editor | Year */
 .vl-frame {
   --vl-pad-x: 0.75rem;
-  --vl-gap: 0.65rem;
-  --vl-cols:
-    2.5rem
-    minmax(0, 1.55fr)
-    2.75rem
-    4.25rem
-    minmax(0, 1.15fr)
-    3.25rem;
+  --vl-gap: 0.5rem;
+  --vl-cols: 2.75rem minmax(7rem, 1.4fr) 3rem 4.5rem minmax(6rem, 1.1fr) 3.5rem;
+  --vl-sb: 0px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -47,45 +41,33 @@ body {
 @media (min-width: 640px) {
   .vl-frame {
     --vl-pad-x: 1rem;
-    --vl-gap: 0.75rem;
-    --vl-cols:
-      2.75rem
-      minmax(0, 1.6fr)
-      3rem
-      4.75rem
-      minmax(0, 1.2fr)
-      3.5rem;
+    --vl-gap: 0.65rem;
+    --vl-cols: 3rem minmax(8rem, 1.5fr) 3.25rem 5rem minmax(7rem, 1.15fr) 3.75rem;
   }
 }
 
-@media (min-width: 900px) {
-  .vl-frame {
-    --vl-cols:
-      3rem
-      minmax(0, 1.7fr)
-      3.25rem
-      5.25rem
-      minmax(0, 1.25fr)
-      3.75rem;
-  }
-}
-
-/* Reserve the same gutter as the scroller so columns line up. */
 .vl-head-bar {
   flex: none;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
   border-bottom: 1px solid #e5e5e5;
   background: #fff;
+  /* Match scroller content width when a classic scrollbar appears */
+  padding-right: var(--vl-sb);
 }
 
-.vl-head {
+.vl-head,
+.vl-item {
   display: grid;
   grid-template-columns: var(--vl-cols);
   column-gap: var(--vl-gap);
   align-items: center;
-  padding: 0.55rem var(--vl-pad-x);
+  box-sizing: border-box;
+  padding-left: var(--vl-pad-x);
+  padding-right: var(--vl-pad-x);
+}
+
+.vl-head {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.05em;
@@ -98,7 +80,6 @@ body {
   flex: 1 1 auto;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -111,8 +92,7 @@ body {
   position: absolute;
   left: 0;
   width: 100%;
-  padding: 0 var(--vl-pad-x);
-  will-change: transform;
+  box-sizing: border-box;
 }
 
 .vl-group {
@@ -120,15 +100,13 @@ body {
   align-items: center;
   height: var(--vl-group-h);
   gap: 0.5rem;
+  padding-left: var(--vl-pad-x);
+  padding-right: var(--vl-pad-x);
   border-bottom: 1px solid #e5e5e5;
   background: #fff;
 }
 
 .vl-item {
-  display: grid;
-  grid-template-columns: var(--vl-cols);
-  column-gap: var(--vl-gap);
-  align-items: center;
   height: var(--vl-row-h);
   border-bottom: 1px solid #f0f0f0;
   font-size: 0.8125rem;
@@ -153,23 +131,25 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.vl-c-sig,
+.vl-c-ed {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 639px) {
   .vl-frame {
-    --vl-cols:
-      2.25rem
-      minmax(0, 1.45fr)
-      2.5rem
-      3.75rem
-      3rem;
-    --vl-gap: 0.45rem;
+    --vl-cols: 2.4rem minmax(0, 1.4fr) 2.6rem 3.75rem 3.1rem;
+    --vl-gap: 0.4rem;
   }
   .vl-c-ed {
     display: none;
   }
 }
 
-/* ── column legend ────────────────────────────────────────── */
-
+/* legend */
 .col-legend {
   border: 1px solid #ececec;
   border-radius: 0.5rem;

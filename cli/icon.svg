@@ -1,44 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Hittite clay tablet">
-  <!-- Soft squircle field -->
-  <rect width="1024" height="1024" rx="224" fill="#F3EDE3"/>
-
-  <!-- Single tablet outline — rounded, fills the mark well -->
-  <rect x="208" y="128" width="608" height="768" rx="52" ry="52"
-        fill="none" stroke="#B89A6E" stroke-width="20" stroke-linejoin="round"/>
-
-  <!--
-    Cuneiform as classic impressed wedges (filled), one visual weight.
-    Mix of horizontal, vertical and Winkelhaken — rows read as text, not a grid.
-  -->
-  <g fill="#A08058">
-    <!-- Row 1 -->
-    <path d="M292 250 l92-18 14 42-92 18z"/>
-    <path d="M418 248 l28 88-44 8-28-88z"/>
-    <path d="M488 242 l96 12-12 44-96-12z"/>
-    <path d="M612 250 l22 86-42 12-22-86z"/>
-    <path d="M678 268 l72 40-24 36-72-40z"/>
-    <!-- Row 2 -->
-    <path d="M300 360 l24 90-44 10-24-90z"/>
-    <path d="M368 352 l88-16 16 44-88 16z"/>
-    <path d="M492 348 l40 36 36-40 40 36-24 28-36-32-36 32z"/>
-    <path d="M620 356 l90 14-10 42-90-14z"/>
-    <path d="M740 368 l18 78-40 12-18-78z"/>
-    <!-- Row 3 -->
-    <path d="M288 472 l98 8-8 42-98-8z"/>
-    <path d="M416 468 l20 86-42 12-20-86z"/>
-    <path d="M480 460 l86-20 18 40-86 20z"/>
-    <path d="M600 470 l70 48-28 32-70-48z"/>
-    <path d="M700 464 l26 90-44 8-26-90z"/>
-    <!-- Row 4 -->
-    <path d="M304 580 l22 84-40 12-22-84z"/>
-    <path d="M370 572 l94 10-10 40-94-10z"/>
-    <path d="M500 568 l34 34 34-34 34 34-22 26-34-28-34 28z"/>
-    <path d="M640 576 l80-18 16 42-80 18z"/>
-    <!-- Row 5 (shorter, like line end) -->
-    <path d="M320 688 l90 12-12 40-90-12z"/>
-    <path d="M440 684 l24 82-42 10-24-82z"/>
-    <path d="M512 678 l88-14 14 40-88 14z"/>
-    <path d="M640 690 l64 44-26 30-64-44z"/>
+  <rect width="1024" height="1024" rx="220" fill="#F3EDE3"/>
+  <!-- Single tablet outline, original proportions -->
+  <rect x="250" y="160" width="524" height="704" rx="40"
+        fill="none" stroke="#B89A6E" stroke-width="18" stroke-linejoin="round"/>
+  <!-- Wedges: same stroke width as frame -->
+  <g fill="none" stroke="#A08058" stroke-width="18" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M360 300 h100 l-50 72z"/>
+    <path d="M490 300 h100 l-50 72z"/>
+    <path d="M620 300 h74 l-37 72z"/>
+    <path d="M360 420 h100 l-50 72z"/>
+    <path d="M490 420 h100 l-50 72z"/>
+    <path d="M620 420 h74 l-37 72z"/>
+    <path d="M360 540 h100 l-50 72z"/>
+    <path d="M490 540 h100 l-50 72z"/>
+    <path d="M620 540 h74 l-37 72z"/>
+    <path d="M425 660 h100 l-50 72z"/>
+    <path d="M555 660 h100 l-50 72z"/>
   </g>
 </svg>
