@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# build_app.sh — produce a macOS Universal Binary .app bundle for Aruna.
-# Requires: macOS 13+, Xcode CLT, rustup targets, iconutil, sips, lipo.
+# build_app.sh — macOS Universal Binary .app for Aruna.
+# Requires: macOS 13+, Xcode CLT, rustup, lipo, sips, iconutil, plutil.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -9,8 +9,7 @@ cd "$ROOT"
 APP_NAME="Aruna"
 BUNDLE_ID="com.sergeyssimonov.aruna"
 MIN_SYSTEM="13.0"
-EXPORT_DIR="${ROOT}"
-APP_DIR="${EXPORT_DIR}/${APP_NAME}.app"
+APP_DIR="${ROOT}/${APP_NAME}.app"
 ICON_SVG="${ROOT}/icon.svg"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/aruna-app.XXXXXX")"
 trap 'rm -rf "${WORK}"' EXIT
@@ -29,6 +28,11 @@ for cmd in rustup cargo lipo sips iconutil plutil; do
     exit 1
   fi
 done
+
+if [[ ! -f "${ICON_SVG}" ]]; then
+  echo "error: missing ${ICON_SVG}" >&2
+  exit 1
+fi
 
 export MACOSX_DEPLOYMENT_TARGET="${MIN_SYSTEM}"
 
@@ -58,42 +62,84 @@ lipo -info "${UNI_BIN}"
 echo "==> Converting SVG icon → .icns"
 ICONSET="${WORK}/Aruna.iconset"
 mkdir -p "${ICONSET}"
-
-# Rasterise SVG via sips when possible; fall back to qlmanage / rsvg-convert.
 MASTER_PNG="${WORK}/icon-1024.png"
-if command -v rsvg-convert >/dev/null 2>&1; then
-  rsvg-convert -w 1024 -h 1024 "${ICON_SVG}" -o "${MASTER_PNG}"
-elif command -v qlmanage >/dev/null 2>&1; then
-  # qlmanage writes <name>.png next to source copy
-  cp "${ICON_SVG}" "${WORK}/icon.svg"
-  qlmanage -t -s 1024 -o "${WORK}" "${WORK}/icon.svg" >/dev/null
-  # Output name: icon.svg.png
-  if [[ -f "${WORK}/icon.svg.png" ]]; then
-    mv "${WORK}/icon.svg.png" "${MASTER_PNG}"
-  else
-    echo "error: qlmanage did not produce PNG" >&2
-    exit 1
+
+rasterise_svg() {
+  if command -v rsvg-convert >/dev/null 2>&1; then
+    rsvg-convert -w 1024 -h 1024 "${ICON_SVG}" -o "${MASTER_PNG}"
+    return 0
   fi
-else
-  # Last resort: use Python + AppKit if available, else fail with guidance
-  if python3 - <<'PY' "${ICON_SVG}" "${MASTER_PNG}" 2>/dev/null; then
-    :
-  else
-    cat >&2 <<'EOF'
-error: cannot rasterise icon.svg — install librsvg (rsvg-convert) or ensure qlmanage works.
-  brew install librsvg
-EOF
-    exit 1
+
+  # qlmanage is always present with Xcode CLT
+  if command -v qlmanage >/dev/null 2>&1; then
+    cp "${ICON_SVG}" "${WORK}/icon.svg"
+    # produces icon.svg.png in -o directory
+    qlmanage -t -s 1024 -o "${WORK}" "${WORK}/icon.svg" >/dev/null 2>&1 || true
+    if [[ -f "${WORK}/icon.svg.png" ]]; then
+      mv "${WORK}/icon.svg.png" "${MASTER_PNG}"
+      return 0
+    fi
   fi
+
+  # Python + Quartz (system Python on macOS often has no PyObjC; try anyway)
+  if python3 - "${ICON_SVG}" "${MASTER_PNG}" <<'PY'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+try:
+    import Cocoa  # type: ignore
+    import Quartz  # type: ignore
+except Exception:
+    sys.exit(2)
+url = Cocoa.NSURL.fileURLWithPath_(src)
+img = Quartz.CIImage.imageWithContentsOfURL_(url)
+if img is None:
+    # fallback: NSImage
+    nsimg = Cocoa.NSImage.alloc().initWithContentsOfFile_(src)
+    if nsimg is None:
+        sys.exit(3)
+    rep = nsimg.representations_representations_representations if False else None
+    tiff = nsimg.TIFFRepresentation()
+    rep = Cocoa.NSBitmapImageRep.imageRepWithData_(tiff)
+    data = rep.representationUsingType_properties_(Cocoa.NSBitmapImageFileTypePNG, None)
+    data.writeToFile_atomically_(dst, True)
+    sys.exit(0)
+sys.exit(4)
+PY
+  then
+    return 0
+  fi
+
+  return 1
+}
+
+if ! rasterise_svg; then
+  # Last resort: solid-color PNG via sips from a tiny generated PNG with Python stdlib only
+  python3 - "${MASTER_PNG}" <<'PY'
+import struct, zlib, sys
+path = sys.argv[1]
+w = h = 1024
+# warm clay #F3EDE3
+r, g, b = 0xF3, 0xED, 0xE3
+raw = b"".join(b"\x00" + bytes([r, g, b]) * w for _ in range(h))
+
+def chunk(tag, data):
+    return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+png = b"\x89PNG\r\n\x1a\n"
+png += chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+png += chunk(b"IDAT", zlib.compress(raw, 9))
+png += chunk(b"IEND", b"")
+open(path, "wb").write(png)
+print("wrote placeholder PNG", path)
+PY
+  echo "warning: used placeholder icon (install librsvg for full SVG: brew install librsvg)" >&2
 fi
 
-# Optional python path using CoreGraphics is skipped; require master PNG.
 if [[ ! -f "${MASTER_PNG}" ]]; then
   echo "error: master icon PNG missing" >&2
   exit 1
 fi
 
-# Ensure 1024×1024
 sips -z 1024 1024 "${MASTER_PNG}" --out "${MASTER_PNG}" >/dev/null
 
 make_icon() {
@@ -125,10 +171,6 @@ cp "${UNI_BIN}" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 chmod +x "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 cp "${ICNS_OUT}" "${APP_DIR}/Contents/Resources/AppIcon.icns"
 
-# Double-click launcher wrapper: open Terminal-less but still print via log if needed.
-# Binary itself is a CLI that writes to Downloads; for GUI double-click we keep the
-# same binary — stdout goes nowhere visible, but the HTML is written and a
-# notification is not required. Optionally wrap with a tiny script that logs.
 cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -156,8 +198,6 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
   <string>1</string>
   <key>LSMinimumSystemVersion</key>
   <string>${MIN_SYSTEM}</string>
-  <key>LSUIElement</key>
-  <false/>
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>CFBundleSupportedPlatforms</key>
@@ -169,11 +209,8 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
 PLIST
 
 plutil -lint "${APP_DIR}/Contents/Info.plist" >/dev/null
-
-# PkgInfo
 echo -n "APPL????" > "${APP_DIR}/Contents/PkgInfo"
 
-# ad-hoc sign so Gatekeeper is happier on local builds
 if command -v codesign >/dev/null 2>&1; then
   echo "==> Ad-hoc codesign"
   codesign --force --deep --sign - "${APP_DIR}" || true
@@ -181,8 +218,6 @@ fi
 
 echo ""
 echo "Готово: ${APP_DIR}"
-echo "Universal binary:"
 lipo -info "${APP_DIR}/Contents/MacOS/${APP_NAME}"
-echo ""
 echo "Запуск: open \"${APP_DIR}\""
 echo "CLI:    \"${APP_DIR}/Contents/MacOS/${APP_NAME}\""
