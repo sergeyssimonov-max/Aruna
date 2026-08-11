@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Hittite clay tablet">
-  <!-- Full-bleed clay field (Dock squircle) -->
-  <rect width="1024" height="1024" fill="#E6CFA8"/>
-  <!-- Single tablet outline -->
-  <rect x="250" y="160" width="524" height="704" rx="40"
+  <!--
+    Outer plate: continuous-corner radius ~22.5% (Apple app-icon grid).
+    Full opaque field so Dock squircle doesn’t leave sharp corners.
+  -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="#E6CFA8"/>
+
+  <!-- Tablet — evenly rounded, single contour -->
+  <rect x="248" y="156" width="528" height="712" rx="56" ry="56"
         fill="none" stroke="#9A6B3F" stroke-width="18" stroke-linejoin="round"/>
-  <!-- Original triangle wedges, same stroke weight & color -->
+
+  <!-- Triangle wedges, same stroke -->
   <g fill="none" stroke="#9A6B3F" stroke-width="18" stroke-linejoin="round" stroke-linecap="round">
     <path d="M360 300 h100 l-50 72z"/>
     <path d="M490 300 h100 l-50 72z"/>
