@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-paper: #fafafa;
+  --color-ink: #1a1a1a;
+  --vl-row-h: 40px;
+  --vl-group-h: 44px;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ── table frame: head + body share width via scrollbar-gutter ── */
+
+.vl-frame {
+  --vl-pad-x: 0.75rem;
+  --vl-gap: 0.65rem;
+  --vl-cols:
+    2.5rem
+    minmax(0, 1.55fr)
+    2.75rem
+    4.25rem
+    minmax(0, 1.15fr)
+    3.25rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@media (min-width: 640px) {
+  .vl-frame {
+    --vl-pad-x: 1rem;
+    --vl-gap: 0.75rem;
+    --vl-cols:
+      2.75rem
+      minmax(0, 1.6fr)
+      3rem
+      4.75rem
+      minmax(0, 1.2fr)
+      3.5rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .vl-frame {
+    --vl-cols:
+      3rem
+      minmax(0, 1.7fr)
+      3.25rem
+      5.25rem
+      minmax(0, 1.25fr)
+      3.75rem;
+  }
+}
+
+/* Reserve the same gutter as the scroller so columns line up. */
+.vl-head-bar {
+  flex: none;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  border-bottom: 1px solid #e5e5e5;
+  background: #fff;
+}
+
+.vl-head {
+  display: grid;
+  grid-template-columns: var(--vl-cols);
+  column-gap: var(--vl-gap);
+  align-items: center;
+  padding: 0.55rem var(--vl-pad-x);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.vl-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vl-spacer {
+  position: relative;
+  width: 100%;
+}
+
+.vl-row {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  padding: 0 var(--vl-pad-x);
+  will-change: transform;
+}
+
+.vl-group {
+  display: flex;
+  align-items: center;
+  height: var(--vl-group-h);
+  gap: 0.5rem;
+  border-bottom: 1px solid #e5e5e5;
+  background: #fff;
+}
+
+.vl-item {
+  display: grid;
+  grid-template-columns: var(--vl-cols);
+  column-gap: var(--vl-gap);
+  align-items: center;
+  height: var(--vl-row-h);
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.8125rem;
+  background: #fff;
+}
+
+.vl-c-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vl-c-lang,
+.vl-c-corp,
+.vl-c-year {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vl-c-year {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 639px) {
+  .vl-frame {
+    --vl-cols:
+      2.25rem
+      minmax(0, 1.45fr)
+      2.5rem
+      3.75rem
+      3rem;
+    --vl-gap: 0.45rem;
+  }
+  .vl-c-ed {
+    display: none;
+  }
+}
+
+/* ── column legend ────────────────────────────────────────── */
+
+.col-legend {
+  border: 1px solid #ececec;
+  border-radius: 0.5rem;
+  background: #fff;
+  padding: 0.65rem 0.85rem 0.7rem;
+}
+
+.col-legend-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #999;
+}
+
+.col-legend-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.col-legend-list li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.18rem 0.5rem 0.18rem 0.38rem;
+  border-radius: 999px;
+  background: #f6f6f6;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #555;
+}
+
+.col-legend-key {
+  flex: none;
+  font-weight: 600;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+
+.col-legend-def {
+  color: #666;
+}

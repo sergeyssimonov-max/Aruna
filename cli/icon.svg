@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Hittite clay tablet">
+  <!-- Warm paper field -->
+  <rect width="1024" height="1024" rx="220" fill="#F3EDE3"/>
+  <!-- Contour tablet -->
+  <rect x="250" y="160" width="524" height="704" rx="40"
+        fill="none" stroke="#B89A6E" stroke-width="22"/>
+  <!-- Inner margin -->
+  <rect x="310" y="230" width="404" height="564" rx="16"
+        fill="none" stroke="#C4A882" stroke-width="8" opacity="0.85"/>
+  <!-- Graphic cuneiform wedges (airy, not edge-hugging) -->
+  <g fill="none" stroke="#A08058" stroke-width="14" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M360 300 h100 l-50 72 z"/>
+    <path d="M490 300 h100 l-50 72 z"/>
+    <path d="M620 300 h74 l-37 72 z"/>
+    <path d="M360 420 h100 l-50 72 z"/>
+    <path d="M490 420 h100 l-50 72 z"/>
+    <path d="M620 420 h74 l-37 72 z"/>
+    <path d="M360 540 h100 l-50 72 z"/>
+    <path d="M490 540 h100 l-50 72 z"/>
+    <path d="M620 540 h74 l-37 72 z"/>
+    <path d="M425 660 h100 l-50 72 z"/>
+    <path d="M555 660 h100 l-50 72 z"/>
+  </g>
+</svg>

@@ -1,0 +1,6 @@
+/target/
+/dist/
+*.app/
+.DS_Store
+*.icns
+/work/
