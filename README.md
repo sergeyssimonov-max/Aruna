@@ -14,11 +14,14 @@ Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (H
 
 ## CLI (Aruna)
 
+Prebuilt packages: [`cli/releases/`](cli/releases/) (`Aruna.dmg`, zip).
+
 ```bash
 cd cli
 cargo test
 cargo build --release
 ./target/release/aruna          # no args: download + parse + write HTML to ~/Downloads
+bash scripts/make_release.sh    # rebuild Aruna.dmg + zip
 ./build_app.sh                  # macOS 13+ only → Aruna.app (Universal Binary + icon)
 ```
 
