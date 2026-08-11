@@ -1,61 +1,85 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Cuneiform clay tablet">
-  <!-- Full-bleed warm clay field (macOS masks to squircle) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Hittite cuneiform clay tablet">
+  <!-- Full-bleed clay field (Dock applies squircle) -->
   <rect width="1024" height="1024" fill="#EFE6D8"/>
 
-  <!-- Single clay-brown for all contours -->
-  <g fill="none" stroke="#9A6B3F" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Tablet body — slightly irregular, worn lower-left like the photo -->
-    <path d="
-      M 268 168
-      Q 250 168 250 190
-      L 250 780
-      Q 250 820 288 848
-      L 340 900
-      Q 360 918 390 910
-      L 740 910
-      Q 790 910 790 860
-      L 790 190
-      Q 790 168 768 168
-      Z"/>
+  <!--
+    Hittite cuneiform = Mesopotamian-style impressed wedges:
+    • horizontal (→)  • vertical (↓)  • Winkelhaken (corner)
+    Contour logo, single clay-brown. No hieroglyphic silhouettes.
+  -->
+  <g fill="none" stroke="#9A6B3F" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Tablet outline -->
+    <rect x="248" y="152" width="528" height="720" rx="36" ry="36"/>
+  </g>
 
-    <!-- Register lines (ruled tablet) -->
-    <path d="M 310 320 L 730 320"/>
-    <path d="M 310 460 L 730 460"/>
-    <path d="M 310 600 L 730 600"/>
-    <path d="M 310 740 L 730 740"/>
+  <!-- Wedges as filled nail-heads (classic cuneiform impression look) -->
+  <g fill="#9A6B3F">
+    <!-- ===== Row 1 ===== -->
+    <!-- 𒀸-like: vertical wedge -->
+    <path d="M300 210 l18 0 -9 62 z"/>
+    <!-- horizontal wedge -->
+    <path d="M340 220 l70 0 -12 22 -58 0 z"/>
+    <!-- Winkelhaken -->
+    <path d="M430 218 l48 0 0 18 -30 0 0 36 -18 0 z"/>
+    <!-- two stacked horizontals (ME-like) -->
+    <path d="M500 212 l64 0 -10 16 -54 0 z"/>
+    <path d="M500 242 l64 0 -10 16 -54 0 z"/>
+    <!-- vertical + Winkelhaken -->
+    <path d="M590 210 l16 0 -8 64 z"/>
+    <path d="M620 220 l58 0 0 16 -40 0 0 28 -18 0 z"/>
+    <!-- diagonal pair -->
+    <path d="M700 218 l52 14 -14 20 -52 -14 z"/>
 
-    <!-- Row 1 — wedges / angular signs -->
-    <path d="M 340 230 L 340 295 M 340 230 L 395 255 M 340 230 L 300 255"/>
-    <path d="M 430 245 L 490 245 M 430 245 L 455 290 M 490 245 L 465 290"/>
-    <path d="M 530 235 L 530 300 M 510 260 L 560 260"/>
-    <path d="M 600 250 L 680 250 M 640 250 L 640 295 M 615 275 L 665 275"/>
-    <path d="M 700 240 L 750 270 M 750 240 L 700 270"/>
+    <!-- ===== Row 2 ===== -->
+    <path d="M305 310 l72 0 -12 20 -60 0 z"/>
+    <path d="M395 300 l18 0 -9 68 z"/>
+    <path d="M430 312 l28 0 0 48 -28 0 z"/>
+    <!-- AŠ / multi-wedge cluster -->
+    <path d="M480 308 l60 0 -10 18 -50 0 z"/>
+    <path d="M495 300 l14 0 -7 58 z"/>
+    <path d="M560 310 l68 0 -12 20 -56 0 z"/>
+    <path d="M650 300 l16 0 -8 66 z"/>
+    <path d="M685 315 l55 0 0 16 -36 0 0 26 -19 0 z"/>
 
-    <!-- Row 2 -->
-    <path d="M 335 360 L 380 420 M 380 360 L 335 420"/>
-    <path d="M 420 370 L 500 370 M 460 370 L 460 430"/>
-    <path d="M 530 365 L 590 365 L 560 430 Z"/>
-    <path d="M 620 375 L 700 375 M 640 375 L 620 430 M 680 375 L 700 430"/>
-    <path d="M 720 365 L 760 400 M 760 365 L 720 400"/>
+    <!-- ===== Row 3 ===== -->
+    <path d="M300 400 l16 0 -8 68 z"/>
+    <path d="M335 415 l66 0 -12 20 -54 0 z"/>
+    <path d="M420 408 l50 0 0 16 -32 0 0 36 -18 0 z"/>
+    <!-- three verticals (small) -->
+    <path d="M500 400 l12 0 -6 64 z"/>
+    <path d="M528 400 l12 0 -6 64 z"/>
+    <path d="M556 400 l12 0 -6 64 z"/>
+    <path d="M590 412 l70 0 -12 20 -58 0 z"/>
+    <path d="M680 405 l16 0 -8 66 z"/>
+    <path d="M715 418 l50 12 -12 18 -50 -12 z"/>
 
-    <!-- Row 3 -->
-    <path d="M 340 500 L 400 500 M 340 500 L 355 560 M 400 500 L 385 560"/>
-    <path d="M 440 510 L 440 570 M 420 540 L 480 540 M 430 520 L 470 560 M 470 520 L 430 560"/>
-    <path d="M 520 505 L 600 505 M 560 505 L 540 570 M 560 505 L 580 570"/>
-    <path d="M 630 515 L 710 515 M 650 515 L 650 565 M 690 515 L 690 565"/>
-    <path d="M 730 510 L 770 550 M 770 510 L 730 550"/>
+    <!-- ===== Row 4 ===== -->
+    <path d="M310 512 l68 0 -12 20 -56 0 z"/>
+    <path d="M310 548 l68 0 -12 20 -56 0 z"/>
+    <path d="M400 505 l18 0 -9 70 z"/>
+    <path d="M440 518 l58 0 0 16 -38 0 0 30 -20 0 z"/>
+    <path d="M525 512 l64 0 -11 20 -53 0 z"/>
+    <path d="M610 505 l16 0 -8 68 z"/>
+    <path d="M645 515 l55 14 -14 18 -55 -14 z"/>
+    <path d="M720 510 l18 0 -9 66 z"/>
 
-    <!-- Row 4 -->
-    <path d="M 350 640 L 410 640 M 380 640 L 380 710"/>
-    <path d="M 450 650 L 520 650 L 485 715 Z"/>
-    <path d="M 550 645 L 620 645 M 550 645 L 570 710 M 620 645 L 600 710"/>
-    <path d="M 650 655 L 720 655 M 685 655 L 665 715 M 685 655 L 705 715"/>
-    <path d="M 740 650 L 770 700 M 770 650 L 740 700"/>
+    <!-- ===== Row 5 ===== -->
+    <path d="M305 620 l16 0 -8 64 z"/>
+    <path d="M340 632 l62 0 -11 18 -51 0 z"/>
+    <path d="M425 625 l48 0 0 15 -30 0 0 34 -18 0 z"/>
+    <path d="M500 620 l14 0 -7 66 z"/>
+    <path d="M535 632 l66 0 -11 18 -55 0 z"/>
+    <path d="M620 622 l14 0 -7 64 z"/>
+    <path d="M655 630 l58 0 0 16 -38 0 0 28 -20 0 z"/>
+    <path d="M735 628 l40 10 -10 16 -40 -10 z"/>
 
-    <!-- Row 5 (shorter, damaged corner area) -->
-    <path d="M 400 790 L 480 790 M 440 790 L 440 870"/>
-    <path d="M 520 800 L 600 800 M 540 800 L 520 870 M 580 800 L 600 870"/>
-    <path d="M 640 795 L 720 795 M 680 795 L 680 865"/>
+    <!-- ===== Row 6 (shorter bottom) ===== -->
+    <path d="M320 730 l70 0 -12 20 -58 0 z"/>
+    <path d="M410 722 l16 0 -8 60 z"/>
+    <path d="M450 735 l55 0 0 14 -34 0 0 26 -21 0 z"/>
+    <path d="M530 728 l62 0 -11 18 -51 0 z"/>
+    <path d="M615 722 l16 0 -8 60 z"/>
+    <path d="M655 732 l60 0 -10 18 -50 0 z"/>
   </g>
 </svg>
