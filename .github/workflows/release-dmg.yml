@@ -1,13 +1,5 @@
-# Automatic packaging for Aruna
-#
-# - pull_request / push to main → Linux binary + ISO-style Aruna.dmg (any runner)
-# - tag v* → GitHub Release with Linux packages
-# - tag v* on macOS runner → Universal Binary .app + real UDIF .dmg (needs macOS)
-#
-# Secrets: none required for public builds.
-# Optional: for signed macOS builds, add APPLE_* secrets later.
-
-name: Release DMG
+# macOS-only: Universal Binary .app + UDIF DMG
+name: Release macOS DMG
 
 on:
   push:
@@ -21,44 +13,9 @@ permissions:
   contents: write
 
 jobs:
-  # ── Linux: release binary + pack_dmg.py image ──────────────────
-  linux-dmg:
-    name: Linux package (Aruna.dmg + zip)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: cli → target
-
-      - name: Install pycdlib
-        run: pip install --user pycdlib
-
-      - name: Build release + DMG
-        working-directory: cli
-        run: bash scripts/make_release.sh
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: aruna-linux-x86_64
-          path: |
-            cli/releases/Aruna.dmg
-            cli/releases/Aruna-linux-x86_64.zip
-            cli/releases/SHA256SUMS
-          if-no-files-found: error
-
-  # ── macOS: Universal Binary .app + real UDIF DMG ───────────────
-  macos-dmg:
-    name: macOS Universal .app + UDIF DMG
+  macos:
+    name: Universal .app + DMG
     runs-on: macos-14
-    # Only on version tags or manual dispatch (saves macOS minutes on every push)
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
@@ -72,72 +29,36 @@ jobs:
         with:
           workspaces: cli → target
 
-      - name: Build Universal .app
+      - name: Build .app + DMG
         working-directory: cli
-        run: bash build_app.sh
+        run: bash scripts/make_release.sh
 
-      - name: Create UDIF DMG with hdiutil
-        working-directory: cli
-        run: |
-          set -euo pipefail
-          APP="Aruna.app"
-          test -d "$APP"
-          VOL="Aruna"
-          DMG_RW="releases/Aruna-macos-rw.dmg"
-          DMG="releases/Aruna-macos-universal.dmg"
-          mkdir -p releases stage-dmg
-          rm -rf stage-dmg/* "$DMG_RW" "$DMG"
-          cp -R "$APP" stage-dmg/
-          # optional Applications symlink for drag-install UX
-          ln -s /Applications stage-dmg/Applications
-          hdiutil create \
-            -volname "$VOL" \
-            -srcfolder stage-dmg \
-            -ov -format UDRW \
-            "$DMG_RW"
-          hdiutil convert "$DMG_RW" -format ULMO -o "$DMG"
-          rm -f "$DMG_RW"
-          shasum -a 256 "$DMG" | tee releases/SHA256SUMS-macos.txt
-          ls -lah releases/
-
-      - name: Upload macOS artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: aruna-macos-universal
           path: |
             cli/Aruna.app
             cli/releases/Aruna-macos-universal.dmg
-            cli/releases/SHA256SUMS-macos.txt
+            cli/releases/SHA256SUMS
           if-no-files-found: error
 
-  # ── Publish GitHub Release on tag v* ───────────────────────────
   publish:
-    name: Publish GitHub Release
-    needs: [linux-dmg, macos-dmg]
+    name: GitHub Release
+    needs: [macos]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Linux artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: aruna-linux-x86_64
-          path: dist/linux
-
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
           name: aruna-macos-universal
-          path: dist/macos
+          path: dist
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            dist/linux/Aruna.dmg
-            dist/linux/Aruna-linux-x86_64.zip
-            dist/linux/SHA256SUMS
-            dist/macos/releases/Aruna-macos-universal.dmg
-            dist/macos/releases/SHA256SUMS-macos.txt
+            dist/releases/Aruna-macos-universal.dmg
+            dist/releases/SHA256SUMS

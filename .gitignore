@@ -36,3 +36,4 @@ server/
 src/components/created-with-grok-banner.tsx
 scripts/migrate.mjs
 cli/stage/
+cli/stage-dmg/

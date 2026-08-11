@@ -1,45 +1,47 @@
-# Автоматическая сборка DMG
+# Автоматическая сборка macOS DMG
 
-## Два формата
+Только **macOS Universal Binary** (Apple Silicon + Intel). Linux-сборки нет.
 
-| Артефакт | Где собирается | Формат |
-|----------|----------------|--------|
-| `Aruna.dmg` | Linux CI (`pack_dmg.py`) | ISO9660 + Joliet + Rock Ridge |
-| `Aruna-macos-universal.dmg` | **macOS** runner (`hdiutil`) | Настоящий UDIF + Universal `.app` |
+## Артефакты
 
-Настоящий macOS-DMG **нельзя** надёжно собрать на Linux: нужны `lipo`, `iconutil`, `hdiutil`.
+| Файл | Описание |
+|------|----------|
+| `Aruna.app` | Universal Binary + `.icns` из `icon.svg` |
+| `releases/Aruna-macos-universal.dmg` | UDIF DMG (drag to Applications) |
+
+## Требования
+
+- macOS 13+ (локально) **или** GitHub Actions runner `macos-14`
+- Xcode CLT: `lipo`, `sips`, `iconutil`, `hdiutil`, `plutil`
+- Rust targets: `aarch64-apple-darwin`, `x86_64-apple-darwin`
 
 ## GitHub Actions
 
-Workflow: [`.github/workflows/release-dmg.yml`](../../.github/workflows/release-dmg.yml)
+[`.github/workflows/release-dmg.yml`](../../.github/workflows/release-dmg.yml)
 
-| Событие | Что происходит |
-|---------|----------------|
-| `push` / PR в `main` | Linux: `cargo build --release` → `make_release.sh` → artifact |
-| `workflow_dispatch` | Linux + **macOS** Universal `.app` + UDIF DMG |
-| tag `v1.0.0` | Оба пакета + **GitHub Release** с файлами |
-
-### Включить
-
-1. Запушить workflow (уже в репозитории).
-2. GitHub → **Actions** → разрешить workflows при запросе.
-3. Проверка без релиза: Actions → *Release DMG* → **Run workflow**.
-4. Релиз:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-
-### Локально
+| Событие | Действие |
+|---------|----------|
+| push / PR в `main` | Сборка на `macos-14` → artifact DMG |
+| `workflow_dispatch` | То же вручную |
+| tag `v1.0.0` | DMG + **GitHub Release** |
 
 ```bash
-# Linux / CI-совместимый DMG
-cd cli && bash scripts/make_release.sh
+# ручной запуск
+gh workflow run release-dmg.yml
 
-# Только macOS 13+:
-cd cli && ./build_app.sh
+# релиз
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-### Подпись (опционально)
+## Локально
 
-Для Gatekeeper: Apple Developer ID + `codesign` / `notarytool` и secrets `APPLE_*` в job `macos-dmg`.
+```bash
+cd cli
+bash scripts/make_release.sh
+open releases/Aruna-macos-universal.dmg
+```
+
+## Подпись (опционально)
+
+Apple Developer ID + `codesign` / `notarytool` — для тихой установки без Gatekeeper warning.

@@ -1,30 +1,28 @@
-# Aruna release packages
+# Aruna — macOS releases only
+
+This folder holds **macOS** packages produced on a Mac or by GitHub Actions (`macos-14`):
 
 | File | Description |
 |------|-------------|
-| **Aruna.dmg** | Disk image (ISO9660 + Joliet + Rock Ridge) with `aruna` binary, icon, docs |
-| **Aruna-linux-x86_64.zip** | Same contents as a zip archive |
+| **Aruna-macos-universal.dmg** | UDIF disk image with `Aruna.app` (Universal: Apple Silicon + Intel) |
 | **SHA256SUMS** | Checksums |
 
-## Contents of the image
+> Linux binaries are **not** published.
 
-- `aruna` — optimized Linux x86_64 release binary (`cargo build --release`)
-- `icon.svg` — app icon (contour clay tablet)
-- `README.md`, `INSTALL.txt`
-
-## Rebuild
+## Build (macOS 13+)
 
 ```bash
 cd cli
 bash scripts/make_release.sh
+# → Aruna.app + releases/Aruna-macos-universal.dmg
 ```
 
-## macOS Universal `.app`
-
-On macOS 13+ only:
+Or CI:
 
 ```bash
-cd cli && ./build_app.sh
+gh workflow run release-dmg.yml
+# tag release:
+git tag v1.0.0 && git push origin v1.0.0
 ```
 
-That produces a true UDIF `.app` bundle with `.icns` from `icon.svg`.
+See [docs/AUTO_DMG.md](../docs/AUTO_DMG.md).

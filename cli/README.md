@@ -199,12 +199,14 @@ git push -u origin main
 
 MIT
 
-## Автосборка DMG
-
-См. [docs/AUTO_DMG.md](docs/AUTO_DMG.md) и workflow `.github/workflows/release-dmg.yml`.
+## macOS release (only)
 
 ```bash
-# тег → GitHub Release с Linux + macOS DMG
-git tag v1.0.0 && git push origin v1.0.0
+bash scripts/make_release.sh   # Universal .app + UDIF DMG
 ```
 
+CI / tags: [docs/AUTO_DMG.md](docs/AUTO_DMG.md)
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```

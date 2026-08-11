@@ -1,29 +1,50 @@
 #!/usr/bin/env bash
-# Build release binary + Aruna.dmg + zip. Run from repo: bash cli/scripts/make_release.sh
+# Build macOS Universal Binary .app + UDIF DMG.
+# Must run on macOS 13+ (local or GitHub Actions macos-14).
 set -euo pipefail
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-cargo build --release
-STAGE="$ROOT/stage/Aruna"
-REL="$ROOT/releases"
-rm -rf "$STAGE"
-mkdir -p "$STAGE" "$REL"
-cp target/release/aruna "$STAGE/aruna"
-chmod +x "$STAGE/aruna"
-cp icon.svg README.md "$STAGE/"
-cat > "$STAGE/INSTALL.txt" <<'EOT'
-Aruna — TLHdig inventory generator
 
-  chmod +x ./aruna
-  ./aruna
-
-Downloads Zenodo TLHdig, parses XML, writes HTML to ~/Downloads.
-macOS Universal .app: run ./build_app.sh on macOS 13+.
-EOT
-# pycdlib required (CI: pip install --user pycdlib)
-if ! python3 -c "import pycdlib" 2>/dev/null; then
-  pip install --user pycdlib
-  export PATH="$HOME/.local/bin:$PATH"
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "error: macOS-only release. Use GitHub Actions (macos-14) or a Mac." >&2
+  echo "  gh workflow run release-dmg.yml" >&2
+  echo "  # or: git tag v1.0.0 && git push origin v1.0.0" >&2
+  exit 1
 fi
-python3 "$ROOT/scripts/pack_dmg.py"
-ls -lah "$REL"
+
+echo "==> Universal .app"
+bash "$ROOT/build_app.sh"
+
+APP="$ROOT/Aruna.app"
+test -d "$APP"
+
+REL="$ROOT/releases"
+mkdir -p "$REL"
+STAGE="$ROOT/stage-dmg"
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+cp -R "$APP" "$STAGE/"
+ln -sf /Applications "$STAGE/Applications"
+
+DMG_RW="$REL/Aruna-rw.dmg"
+DMG="$REL/Aruna-macos-universal.dmg"
+rm -f "$DMG_RW" "$DMG"
+
+echo "==> UDIF DMG"
+hdiutil create \
+  -volname "Aruna" \
+  -srcfolder "$STAGE" \
+  -ov -format UDRW \
+  "$DMG_RW"
+hdiutil convert "$DMG_RW" -format ULMO -o "$DMG"
+rm -f "$DMG_RW"
+rm -rf "$STAGE"
+
+(
+  cd "$REL"
+  shasum -a 256 "Aruna-macos-universal.dmg" | tee SHA256SUMS
+)
+
+ls -lah "$REL" "$APP"
+echo "==> Done: $DMG"

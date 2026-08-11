@@ -12,20 +12,19 @@ Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (H
 | [`public/data/`](public/data/) | ARUN v3 binary catalog (`inventory.bin` / `.gz`) |
 | [`scripts/build-inventory-bin.mjs`](scripts/build-inventory-bin.mjs) | Rebuild ARUN from `inventory.json` |
 
-## CLI (Aruna)
+## CLI (Aruna) — macOS only
 
-Prebuilt packages: [`cli/releases/`](cli/releases/) (`Aruna.dmg`, zip).
+Prebuilt: GitHub Actions → `Aruna-macos-universal.dmg` (Universal Binary).
 
 ```bash
 cd cli
-cargo test
-cargo build --release
-./target/release/aruna          # no args: download + parse + write HTML to ~/Downloads
-bash scripts/make_release.sh    # rebuild Aruna.dmg + zip
-./build_app.sh                  # macOS 13+ only → Aruna.app (Universal Binary + icon)
+# on macOS 13+:
+bash scripts/make_release.sh   # Aruna.app + releases/Aruna-macos-universal.dmg
+./build_app.sh                 # .app only
 ```
 
-Icon: [`cli/icon.svg`](cli/icon.svg) (contour clay tablet).
+CI: `.github/workflows/release-dmg.yml` (runner `macos-14`).  
+Docs: [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
 ## Web app
 
@@ -45,12 +44,10 @@ Search: Web Worker + WASM over the ARUN catalog.
 
 MIT (see `cli/` package metadata).
 
-## CI / automatic DMG
+## CI — macOS DMG
 
-GitHub Actions: `.github/workflows/release-dmg.yml`  
-Подробности: [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
+`.github/workflows/release-dmg.yml` · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
-- каждый push/PR — Linux `Aruna.dmg` + zip (artifacts)
-- tag `v*` или ручной Run workflow — + macOS Universal DMG
-- tag `v*` — публикация GitHub Release
-
+```bash
+git tag v1.0.0 && git push origin v1.0.0   # → GitHub Release with DMG
+```
