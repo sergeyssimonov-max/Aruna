@@ -13,8 +13,42 @@ permissions:
   contents: write
 
 jobs:
+  check:
+    name: Tests + clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            cli → target
+            wasm/search → target
+
+      - name: Clippy (CLI)
+        run: cargo clippy --manifest-path cli/Cargo.toml --all-targets -- -D warnings
+
+      - name: Clippy (wasm search)
+        run: cargo clippy --manifest-path wasm/search/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test (CLI)
+        run: cargo test --manifest-path cli/Cargo.toml
+
+      - name: Test (wasm search)
+        run: cargo test --manifest-path wasm/search/Cargo.toml
+
+      - name: Build wasm module for its real target
+        run: cargo build --release --target wasm32-unknown-unknown --manifest-path wasm/search/Cargo.toml
+
   macos:
     name: Universal .app + DMG
+    needs: [check]
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4

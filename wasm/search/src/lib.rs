@@ -12,8 +12,9 @@
 //! table and no bloom prefilter here. Anything reintroduced must come with
 //! before/after numbers from `examples/bench_search.rs`.
 //!
-//! `unsafe` appears only in the four `extern "C"` entry points, where it is
-//! unavoidable — everything below the boundary is safe Rust.
+//! `unsafe` appears only in the five `extern "C"` entry points (`alloc`,
+//! `dealloc`, `init`, `reset`, `search`), where it is unavoidable — everything
+//! below the boundary is safe Rust.
 //!
 //! # Index layout (TLH2, little-endian)
 //!

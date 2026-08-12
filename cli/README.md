@@ -129,29 +129,27 @@ brew install librsvg
 
 ---
 
-## Производительность (SIMD)
+## Стратегия производительности
 
-Парсер XML — **zero-copy + SIMD**:
+Единая на весь репозиторий — [../PERFORMANCE.md](../PERFORMANCE.md): принципы
+в порядке приоритета, порядок замеров и уже принятые решения. Кратко:
+корректность и читаемость важнее скорости, оптимизация без цифр до/после
+подлежит откату, `unsafe` — только на границе FFI / WASM ABI.
 
-- `memchr` (SSE2 / AVX2 / NEON) для поиска `<`, тегов, `editor=`, годов, CTH;
-- только первые 16 KiB каждого XML (AOHeader всегда в начале);
-- параллельный разбор записей через Rayon;
-- без regex в hot path.
-
-На полном корпусе TLHdig Beta 0.3 (~24k XML) полный цикл parse→HTML обычно **несколько секунд** после скачивания ZIP.
+Замеры: `cargo run --release --example bench_parse -- fixtures/…zip`.
 
 ## Структура проекта
 
 ```text
 Aruna/
-├── Cargo.toml          # release: LTO, codegen-units=1, strip, opt-level=3, panic=abort
+├── Cargo.toml          # release: LTO, codegen-units=1, strip, opt-level=3
 ├── src/
 │   ├── main.rs         # CLI, zero args
 │   ├── lib.rs          # pipeline
 │   ├── download.rs     # Zenodo HTTPS
 │   ├── archive.rs      # ZIP → records
-│   ├── parse.rs        # heuristic AOxml / TEI parser (SIMD hot path)
-│   ├── simd_scan.rs    # memchr SIMD scanners
+│   ├── parse.rs        # heuristic AOxml / TEI parser
+│   ├── xml_scan.rs     # tag / attribute scanners
 │   ├── html.rs         # Scandinavian HTML
 │   ├── paths.rs        # ~/Downloads via dirs
 │   └── error.rs        # thiserror
@@ -172,10 +170,10 @@ lto = true
 codegen-units = 1
 strip = true
 opt-level = 3
-panic = "abort"
 ```
 
-В основном пути нет `unwrap()` — только `Result` + `?` / `map_err`.
+Без `panic = "abort"`: паника обязана печатать, где она произошла. В основном
+пути нет `unwrap()` — только `Result` + `?` / `map_err`.
 
 ---
 

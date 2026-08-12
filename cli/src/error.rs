@@ -21,6 +21,8 @@ pub enum ArunaError {
     #[error("ZIP archive is empty or contains no XML documents")]
     EmptyArchive,
 
+    /// Every I/O failure carries the path it happened at — there is deliberately
+    /// no bare `#[from] io::Error` variant, so a path can never be dropped.
     #[error("I/O error at {path}: {source}")]
     Io {
         path: PathBuf,
@@ -28,14 +30,8 @@ pub enum ArunaError {
         source: std::io::Error,
     },
 
-    #[error("I/O error: {0}")]
-    IoSimple(#[from] std::io::Error),
-
     #[error("could not resolve Downloads directory")]
     DownloadsDir,
-
-    #[error("invalid UTF-8 in archive entry {0}")]
-    Utf8(String),
 }
 
 pub type Result<T> = std::result::Result<T, ArunaError>;
