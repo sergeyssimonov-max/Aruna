@@ -17,7 +17,9 @@
   function run() {
     var q = (input.value || "").trim().toLowerCase();
     if (!q) {
-      for (var i = 0; i < meta.length; i++) meta[i].tr.hidden = false;
+      // `var` is function-scoped, so this counter must not reuse the name of
+      // the cursor declared below — it is the same binding, not a fresh one.
+      for (var r = 0; r < meta.length; r++) meta[r].tr.hidden = false;
       hint.textContent = "";
       return;
     }

@@ -46,6 +46,31 @@ jobs:
       - name: Build wasm module for its real target
         run: cargo build --release --target wasm32-unknown-unknown --manifest-path wasm/search/Cargo.toml
 
+  web:
+    name: Typecheck + lint (web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # Currently matches no files; kept so the first test added to scripts/
+      # runs in CI without anyone remembering to wire it up.
+      - name: Test
+        run: npm test
+
   macos:
     name: Universal .app + DMG
     needs: [check]
