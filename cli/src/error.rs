@@ -25,6 +25,16 @@ pub enum ArunaError {
         got: u64,
     },
 
+    /// The bytes arrived intact by length but hash to something else. Zenodo
+    /// publishes an MD5 per file, so a silently corrupted or republished archive
+    /// is caught here instead of surfacing as an obscure parse failure.
+    #[error("checksum mismatch for {url}: expected MD5 {expected}, got {got}")]
+    ChecksumMismatch {
+        url: String,
+        expected: String,
+        got: String,
+    },
+
     #[error("failed to read ZIP archive: {0}")]
     Zip(#[from] zip::result::ZipError),
 

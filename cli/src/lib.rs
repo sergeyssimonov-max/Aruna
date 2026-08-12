@@ -7,6 +7,7 @@ pub mod xml_scan;
 pub mod download;
 pub mod error;
 pub mod html;
+pub mod md5;
 pub mod parse;
 pub mod paths;
 
@@ -34,7 +35,11 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
         None => {
             let dest = work_dir.join("TLHbasisONLINE25_1_ZENODO_Beta_03.zip");
             eprintln!("Downloading TLHdig archive from Zenodo…");
-            download::download_file(download::ZENODO_ZIP_URL, &dest)?;
+            download::download_verified(
+                download::ZENODO_ZIP_URL,
+                &dest,
+                Some(download::ZENODO_ZIP_MD5),
+            )?;
             dest
         }
     };
