@@ -125,8 +125,7 @@ fn extract_header_slice(xml: &str) -> &str {
     if let Some(h) = slice_between_tags(b, b"teiHeader") {
         return bytes_to_str(xml, h);
     }
-    let end = xml.len().min(8192);
-    &xml[..end]
+    floor_char_boundary(xml, 8192)
 }
 
 fn slice_between_tags<'a>(hay: &'a [u8], local: &[u8]) -> Option<&'a [u8]> {
@@ -134,17 +133,55 @@ fn slice_between_tags<'a>(hay: &'a [u8], local: &[u8]) -> Option<&'a [u8]> {
     match find_close_tag(hay, content, local) {
         Some(close) => Some(&hay[content..close]),
         None => {
-            let end = (content + 8192).min(hay.len());
+            // Walk back to a UTF-8 char boundary so bytes_to_str never panics
+            // on multi-byte cuneiform at the cut (e.g. U+12000 𒀀).
+            let mut end = (content + 8192).min(hay.len());
+            while end > content && (hay[end - 1] & 0b1100_0000) == 0b1000_0000 {
+                end -= 1;
+            }
+            // If we landed mid-sequence start, step back one more.
+            while end > content && (hay[end - 1] & 0b1100_0000) == 0b1000_0000 {
+                end -= 1;
+            }
+            if end > content && hay[end - 1] >= 0x80 && (hay[end - 1] & 0b1100_0000) != 0b1000_0000 {
+                // end-1 is a leading byte of an incomplete char — drop it
+                let lead = hay[end - 1];
+                let need = if lead & 0b1111_0000 == 0b1111_0000 {
+                    4
+                } else if lead & 0b1110_0000 == 0b1110_0000 {
+                    3
+                } else if lead & 0b1100_0000 == 0b1100_0000 {
+                    2
+                } else {
+                    1
+                };
+                if end - 1 + need > (content + 8192).min(hay.len()) {
+                    end -= 1;
+                    while end > content && (hay[end - 1] & 0b1100_0000) == 0b1000_0000 {
+                        end -= 1;
+                    }
+                }
+            }
             Some(&hay[content..end])
         }
     }
 }
 
 fn bytes_to_str<'a>(owner: &'a str, slice: &'a [u8]) -> &'a str {
-    // `slice` is always a subslice of `owner.as_bytes()`.
+    // `slice` is always a subslice of `owner.as_bytes()`; clamp to char boundaries.
     let start = slice.as_ptr() as usize - owner.as_ptr() as usize;
-    debug_assert!(start + slice.len() <= owner.len());
-    &owner[start..start + slice.len()]
+    let mut end = start + slice.len();
+    if end > owner.len() {
+        end = owner.len();
+    }
+    while end > start && !owner.is_char_boundary(end) {
+        end -= 1;
+    }
+    let mut s = start;
+    while s < end && !owner.is_char_boundary(s) {
+        s += 1;
+    }
+    &owner[s..end]
 }
 
 fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
