@@ -2,18 +2,34 @@
 
 use crate::error::{ArunaError, Result};
 use crate::parse::{is_manuscript_xml, parse_manuscript, ManuscriptRecord, HEADER_READ_LIMIT};
-use rayon::prelude::*;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 
-/// Open `zip_path`, parse every manuscript XML, return records grouped by CTH.
+/// One archive entry worth indexing: its path and the header window read from it.
+pub struct ManuscriptSource {
+    pub path: String,
+    pub xml: String,
+}
+
+/// Open `zip_path`, parse every manuscript XML, return records ordered for display.
 ///
-/// Reads at most [`HEADER_READ_LIMIT`] bytes per entry (AOHeader always fits) and
-/// parses with the SIMD heuristic engine. CPU-bound parsing is parallelised with
-/// Rayon after sequential ZIP inflation.
+/// The three stages are separate so each can be timed on its own — see
+/// `examples/bench_parse.rs`.
 pub fn parse_zip(zip_path: &Path) -> Result<Vec<ManuscriptRecord>> {
+    let sources = read_sources(zip_path)?;
+    let mut records = parse_sources(&sources);
+    sort_records(&mut records);
+    Ok(records)
+}
+
+/// Inflate the header window of every manuscript XML in the archive.
+///
+/// Reads at most [`HEADER_READ_LIMIT`] bytes per entry — the AOHeader always
+/// fits within it, while bodies run to hundreds of KiB of cuneiform that nothing
+/// downstream looks at.
+pub fn read_sources(zip_path: &Path) -> Result<Vec<ManuscriptSource>> {
     let file = File::open(zip_path).map_err(|source| ArunaError::Io {
         path: zip_path.to_path_buf(),
         source,
@@ -25,58 +41,67 @@ pub fn parse_zip(zip_path: &Path) -> Result<Vec<ManuscriptRecord>> {
         return Err(ArunaError::EmptyArchive);
     }
 
-    let mut entries: Vec<(String, String)> = Vec::with_capacity(archive.len().min(32_768));
-
+    let mut sources = Vec::new();
     for i in 0..archive.len() {
         let entry = archive.by_index(i)?;
-        let name = entry.name().to_string();
-        if !is_manuscript_xml(&name) {
+        let path = entry.name().to_string();
+        if !is_manuscript_xml(&path) {
             continue;
         }
 
-        // Only inflate the header window — bodies are huge and unused.
-        let mut limited = entry.take(HEADER_READ_LIMIT as u64);
-        let mut bytes = Vec::with_capacity(8 * 1024);
-        limited
+        let mut bytes = Vec::new();
+        entry
+            .take(HEADER_READ_LIMIT as u64)
             .read_to_end(&mut bytes)
             .map_err(|source| ArunaError::Io {
-                path: Path::new(&name).to_path_buf(),
+                path: PathBuf::from(&path),
                 source,
             })?;
 
-        let xml = match String::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(e) => String::from_utf8_lossy(e.as_bytes()).into_owned(),
-        };
-        entries.push((name, xml));
+        // Lossy conversion is correct here rather than lenient: cutting the
+        // entry at HEADER_READ_LIMIT routinely splits a multi-byte character,
+        // so invalid UTF-8 at the tail is expected, not a corrupt archive.
+        let xml = String::from_utf8_lossy(&bytes).into_owned();
+        sources.push(ManuscriptSource { path, xml });
     }
 
-    if entries.is_empty() {
+    if sources.is_empty() {
         return Err(ArunaError::EmptyArchive);
     }
+    Ok(sources)
+}
 
-    let records: Vec<ManuscriptRecord> = entries
-        .par_iter()
-        .map(|(name, xml)| parse_manuscript(name, xml))
+/// Parse every source into a record. Pure CPU work, one source at a time.
+///
+/// Sequential on purpose: on a real TLHdig archive this stage takes ~115 ms
+/// against ~18 ms with a thread pool, but the whole run only moves from 1.50 s
+/// to 1.39 s — 1.07×, well under the 1.5–2× a dependency has to earn. Inflating
+/// the ZIP is ~91 % of the run and is not parallelisable through a single
+/// `ZipArchive` reader. See `PERFORMANCE.md`.
+pub fn parse_sources(sources: &[ManuscriptSource]) -> Vec<ManuscriptRecord> {
+    sources
+        .iter()
+        .map(|source| parse_manuscript(&source.path, &source.xml))
+        .collect()
+}
+
+/// Order records for display: by CTH number, then natural-order sigla
+/// (`KBo 3.22` before `KBo 22.5`), then editor and year.
+pub fn sort_records(records: &mut Vec<ManuscriptRecord>) {
+    // Sigla keys are built once per record rather than on every comparison.
+    let mut keyed: Vec<(u32, Vec<NatPart>, ManuscriptRecord)> = std::mem::take(records)
+        .into_iter()
+        .map(|r| (r.cth_num, natural_sigla_key(&r.sigla), r))
         .collect();
 
-    // Group by CTH number, then natural-order sigla (KBo 3.22 before KBo 22.5).
-    let mut keyed: Vec<(u32, Vec<NatPart>, ManuscriptRecord)> = records
-        .into_par_iter()
-        .map(|r| {
-            let key = natural_sigla_key(&r.sigla);
-            (r.cth_num, key, r)
-        })
-        .collect();
-    keyed.par_sort_unstable_by(|a, b| {
+    keyed.sort_unstable_by(|a, b| {
         a.0.cmp(&b.0)
             .then_with(|| a.1.cmp(&b.1))
             .then_with(|| a.2.authorship.cmp(&b.2.authorship))
             .then_with(|| a.2.year.cmp(&b.2.year))
     });
-    let records: Vec<ManuscriptRecord> = keyed.into_iter().map(|(_, _, r)| r).collect();
 
-    Ok(records)
+    *records = keyed.into_iter().map(|(_, _, r)| r).collect();
 }
 
 
