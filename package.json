@@ -16,7 +16,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "build:analyze": "vite build --mode production",
-    "build:wasm": "cargo build --release --target wasm32-unknown-unknown --manifest-path wasm/search/Cargo.toml && cp wasm/search/target/wasm32-unknown-unknown/release/tlhdig_search.wasm public/wasm/search.wasm",
+    "build:wasm": "cd wasm/search && rm -rf target/artifact && CARGO_TARGET_DIR=target/artifact cargo build --release --target wasm32-unknown-unknown && cp target/artifact/wasm32-unknown-unknown/release/tlhdig_search.wasm ../../public/wasm/search.wasm",
     "build:data": "node scripts/build-inventory-bin.mjs",
     "compress:data": "npm run build:data"
   },

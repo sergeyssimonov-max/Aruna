@@ -1,0 +1,12 @@
+# Pinned so `public/wasm/search.wasm` can be verified byte-for-byte against this
+# source. The build is already path-independent (same digest from any directory)
+# and free of embedded paths, so the compiler version is the only variable left;
+# without pinning it, CI would rebuild with whatever `stable` is that week and
+# the comparison would fail for reasons that have nothing to do with the change.
+#
+# Bumping this means rebuilding and committing the artifact in the same commit:
+#   npm run build:wasm
+[toolchain]
+channel = "1.97.1"
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

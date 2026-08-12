@@ -46,6 +46,27 @@ jobs:
       - name: Build wasm module for its real target
         run: cargo build --release --target wasm32-unknown-unknown --manifest-path wasm/search/Cargo.toml
 
+      # public/wasm/search.wasm is served to every visitor, so it must be the
+      # module this commit actually contains.
+      #
+      # Two conditions make the comparison meaningful. The compiler is pinned by
+      # wasm/search/rust-toolchain.toml (rustup reads it because this step runs
+      # from inside the crate) — otherwise CI would rebuild with whatever
+      # `stable` is that week. And the build goes to a fresh CARGO_TARGET_DIR:
+      # rebuilding over a populated target directory — which the cache restores —
+      # yields different bytes from the same sources, so the check would fail for
+      # reasons unrelated to the change.
+      - name: Committed wasm artifact matches its source
+        working-directory: wasm/search
+        run: |
+          export CARGO_TARGET_DIR="$(mktemp -d)"
+          cargo build --release --target wasm32-unknown-unknown
+          built="$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/tlhdig_search.wasm"
+          if ! cmp -s "$built" ../../public/wasm/search.wasm; then
+            echo "::error file=public/wasm/search.wasm::Stale artifact — run 'npm run build:wasm' and commit the result"
+            exit 1
+          fi
+
   web:
     name: Typecheck + lint (web)
     runs-on: ubuntu-latest
