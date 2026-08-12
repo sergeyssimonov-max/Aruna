@@ -276,6 +276,8 @@ pub unsafe extern "C" fn dealloc(ptr: *mut u8, n: usize) {
 
 /// Load a TLH2 index. Returns 1 on success, 0 if the blob is malformed.
 ///
+/// Calling it again replaces the loaded index; the previous one is dropped.
+///
 /// # Safety
 ///
 /// `ptr` must point to `len` readable bytes.
@@ -290,18 +292,32 @@ pub unsafe extern "C" fn init(ptr: *const u8, len: usize) -> u32 {
     // the index keeps no pointer into JavaScript's memory.
     let bytes = core::slice::from_raw_parts(ptr, len).to_vec();
     match IndexView::parse(bytes) {
-        Ok(view) => {
-            INDEX.with(|cell| *cell.borrow_mut() = Some(view));
-            1
-        }
+        // `try_borrow_mut` rather than `borrow_mut`: a re-entrant call from
+        // JavaScript while a search holds the borrow would panic, and a panic
+        // crossing `extern "C"` aborts the module — the page would lose search
+        // altogether instead of seeing one call fail. Report 0 instead.
+        Ok(view) => INDEX.with(|cell| match cell.try_borrow_mut() {
+            Ok(mut slot) => {
+                *slot = Some(view);
+                1
+            }
+            Err(_) => 0,
+        }),
         Err(_) => 0,
     }
 }
 
 /// Drop the loaded index.
+///
+/// A no-op while the index is busy — same reasoning as [`init`], except there is
+/// no return value to carry the refusal. The caller can retry.
 #[no_mangle]
 pub extern "C" fn reset() {
-    INDEX.with(|cell| *cell.borrow_mut() = None);
+    INDEX.with(|cell| {
+        if let Ok(mut slot) = cell.try_borrow_mut() {
+            *slot = None;
+        }
+    });
 }
 
 /// Search the loaded index, writing `count` followed by `count` 12-byte entries
@@ -338,9 +354,14 @@ pub unsafe extern "C" fn search(
         core::slice::from_raw_parts(q_ptr, q_len)
     };
 
-    INDEX.with(|cell| match cell.borrow().as_ref() {
-        Some(index) => run_search(index, query, out),
-        None => 0,
+    // Same reason as `init`: a borrow conflict must mean "no results", not an
+    // aborted module.
+    INDEX.with(|cell| match cell.try_borrow() {
+        Ok(slot) => match slot.as_ref() {
+            Some(index) => run_search(index, query, out),
+            None => 0,
+        },
+        Err(_) => 0,
     })
 }
 
@@ -539,6 +560,50 @@ mod tests {
 
     #[test]
     fn search_without_index_returns_zero() {
+        reset();
+        assert_eq!(search_hits(b"kbo"), 0);
+    }
+
+    /// Loading a second index over a live one must succeed and leave a working
+    /// index behind — the page re-inits whenever the inventory is rebuilt.
+    #[test]
+    fn init_over_a_loaded_index_replaces_it() {
+        let blob = build_tiny();
+        reset();
+        assert_eq!(unsafe { init(blob.as_ptr(), blob.len()) }, 1);
+        let before = search_hits(b"kbo");
+        assert!(before > 0);
+
+        // No `reset` in between: this is the path JavaScript actually takes.
+        assert_eq!(unsafe { init(blob.as_ptr(), blob.len()) }, 1);
+        assert_eq!(search_hits(b"kbo"), before);
+    }
+
+    /// A rejected blob must not take the working index down with it: the page
+    /// keeps searching the data it already had.
+    #[test]
+    fn failed_init_keeps_the_previous_index() {
+        load_tiny();
+        let before = search_hits(b"kbo");
+        assert!(before > 0);
+
+        let garbage = [0u8; 64];
+        assert_eq!(unsafe { init(garbage.as_ptr(), garbage.len()) }, 0);
+        assert_eq!(
+            search_hits(b"kbo"),
+            before,
+            "a malformed blob must not clear the loaded index"
+        );
+
+        assert_eq!(unsafe { init(core::ptr::null(), 8) }, 0);
+        assert_eq!(search_hits(b"kbo"), before);
+    }
+
+    /// `reset` is idempotent — the JS side calls it before every load.
+    #[test]
+    fn reset_twice_is_harmless() {
+        load_tiny();
+        reset();
         reset();
         assert_eq!(search_hits(b"kbo"), 0);
     }
