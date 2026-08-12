@@ -10,7 +10,8 @@
 //! ~25 000 short strings, so the budget is a single frame. Plain substring
 //! matching meets it; there is deliberately no hand-rolled automaton, no skip
 //! table and no bloom prefilter here. Anything reintroduced must come with
-//! before/after numbers from `examples/bench_search.rs`.
+//! before/after keystroke latency measured in the browser (Performance profile
+//! of the tab) — see `PERFORMANCE.md`.
 //!
 //! `unsafe` appears only in the five `extern "C"` entry points (`alloc`,
 //! `dealloc`, `init`, `reset`, `search`), where it is unavoidable — everything

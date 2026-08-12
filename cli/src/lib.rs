@@ -135,6 +135,8 @@ mod tests {
 
     #[test]
     fn civil_known_date() {
+        // 2026-08-10 00:00:00 UTC
+        // unix for 2026-01-01 00:00:00 = 1767225600 (approx) — compute via known
         // 2020-01-01 00:00:00 UTC = 1577836800
         let (y, m, d, ..) = civil_from_unix(1_577_836_800);
         assert_eq!((y, m, d), (2020, 1, 1));

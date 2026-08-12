@@ -14,7 +14,6 @@ categories = ["command-line-utilities", "text-processing"]
 [dependencies]
 dirs = "5"
 memchr = "2"
-rayon = "1"
 thiserror = "2"
 ureq = { version = "2.12", default-features = true, features = ["tls"] }
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
@@ -27,7 +26,8 @@ lto = true
 codegen-units = 1
 strip = true
 opt-level = 3
-panic = "abort"
+# No `panic = "abort"`: a panic here must print where it happened. Aborting
+# turned a parser bug into a silent crash with no message for the user.
 
 [profile.dev]
 opt-level = 1

@@ -5,7 +5,7 @@
 //! are located with `memchr`; everything after that is a plain scalar loop.
 //!
 //! Design priorities (in order):
-//! 1. Correctness and total behaviour (malformed input yields None / empty, never panics)
+//! 1. Correctness and total behaviour (malformed input → None / empty, never panic)
 //! 2. Readability
 //! 3. Acceptable performance on short fragments
 //!
@@ -14,28 +14,46 @@
 use memchr::{memchr, memchr2, memmem};
 
 /// ASCII case-fold for A–Z only.
-pub const fn ascii_lower(b: u8) -> u8 {
+fn ascii_lower(b: u8) -> u8 {
     b | 0x20
 }
 
-/// True when `b` is ASCII alphabetic (A–Z / a–z).
+/// True when `b` is ASCII alphabetic.
 fn is_ascii_alpha(b: u8) -> bool {
     ascii_lower(b).wrapping_sub(b'a') < 26
 }
 
-/// True when `b` may appear inside an XML Name (local or prefix).
+/// Characters allowed inside an XML Name (local part or prefix).
+///
+/// `:` is included, so a scanned name still carries its prefix — use
+/// [`local_part`] to drop it.
 fn is_name_char(b: u8) -> bool {
     is_ascii_alpha(b)
         || b.is_ascii_digit()
-        || b == b':'
-        || b == b'-'
-        || b == b'_'
-        || b == b'.'
+        || matches!(b, b':' | b'-' | b'_' | b'.')
 }
 
-/// Case-insensitive ASCII search for `needle` in `hay`.
+/// Local part of a possibly prefixed XML Name (`AO:docID` → `docID`).
+fn local_part(name: &[u8]) -> &[u8] {
+    match memchr(b':', name) {
+        Some(colon) => &name[colon + 1..],
+        None => name,
+    }
+}
+
+/// Case-insensitive equality of two equal-length byte slices (ASCII).
+pub fn eq_ci(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter()
+        .zip(b.iter())
+        .all(|(&x, &y)| ascii_lower(x) == ascii_lower(y))
+}
+
+/// Case-insensitive search for `needle` in `hay`.
 ///
-/// First-byte candidates are located with `memchr2` (upper+lower).
+/// Uses `memchr2` for the first byte (upper + lower) then verifies.
 pub fn find_ci(hay: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);
@@ -43,13 +61,13 @@ pub fn find_ci(hay: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.len() > hay.len() {
         return None;
     }
+
     let first = needle[0];
     let first_lo = ascii_lower(first);
     let first_up = first_lo.wrapping_sub(b'a').wrapping_add(b'A');
-    // For non-alpha first bytes, upper==lower after fold — use single memchr.
     let use_pair = first_lo != first_up && is_ascii_alpha(first);
 
-    let mut pos = 0usize;
+    let mut pos = 0;
     while pos + needle.len() <= hay.len() {
         let rel = if use_pair {
             memchr2(first_lo, first_up, &hay[pos..])?
@@ -68,296 +86,188 @@ pub fn find_ci(hay: &[u8], needle: &[u8]) -> Option<usize> {
     None
 }
 
-/// Case-insensitive equality of two equal-length slices (ASCII).
-pub fn eq_ci(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    a.iter()
-        .zip(b.iter())
-        .all(|(&x, &y)| ascii_lower(x) == ascii_lower(y))
-}
-
-/// Find `needle` with substring search (case-sensitive).
+/// Exact (case-sensitive) substring search.
 pub fn find_exact(hay: &[u8], needle: &[u8]) -> Option<usize> {
     memmem::find(hay, needle)
 }
 
-/// Find first `needle` among several exact needles; returns (offset, which).
-pub fn find_first_of(hay: &[u8], needles: &[&[u8]]) -> Option<(usize, usize)> {
-    let mut best: Option<(usize, usize)> = None;
-    for (idx, n) in needles.iter().enumerate() {
-        if let Some(pos) = memmem::find(hay, n) {
-            best = match best {
-                None => Some((pos, idx)),
-                Some((bp, _)) if pos < bp => Some((pos, idx)),
-                other => other,
-            };
-        }
-    }
-    best
-}
-
-/// Locate an opening tag whose local name equals `local`
-/// (optional `prefix:` is accepted).
-///
-/// Returns `(tag_open_at, content_start)` where `content_start` is the index
-/// just after the closing `>` of the start-tag.
+/// Find the opening tag `<…local…>` (with optional namespace prefix).
+/// Returns `(start_of_tag, end_of_opening_tag)` so the caller can slice attributes or text.
 pub fn find_open_tag(hay: &[u8], local: &[u8]) -> Option<(usize, usize)> {
-    let mut pos = 0usize;
-    while pos < hay.len() {
-        let rel = memchr(b'<', &hay[pos..])?;
+    let mut pos = 0;
+    while let Some(rel) = memchr(b'<', &hay[pos..]) {
         let i = pos + rel;
-        // Skip closing tags, comments, PI, declarations.
-        let next = *hay.get(i + 1)?;
-        if next == b'/' || next == b'!' || next == b'?' {
-            pos = i + 2;
-            continue;
-        }
-        // Parse name
-        let name_start = i + 1;
-        let mut name_end = name_start;
-        while name_end < hay.len() && is_name_char(hay[name_end]) {
-            name_end += 1;
-        }
-        if name_end == name_start {
+        // Skip closing tags and comments / declarations roughly.
+        if i + 1 < hay.len() && (hay[i + 1] == b'/' || hay[i + 1] == b'!' || hay[i + 1] == b'?') {
             pos = i + 1;
             continue;
         }
-        let name = &hay[name_start..name_end];
-        let local_part = match memchr(b':', name) {
-            Some(c) => &name[c + 1..],
-            None => name,
-        };
-        if eq_ci(local_part, local) {
-            // Find end of start-tag `>`, aware of quotes.
-            let gt = find_tag_close(hay, name_end)?;
-            return Some((i, gt + 1));
+
+        // Read the name, then compare only its local part.
+        let mut j = i + 1;
+        while j < hay.len() && is_name_char(hay[j]) {
+            j += 1;
         }
-        pos = name_end;
+        if eq_ci(local_part(&hay[i + 1..j]), local) {
+            // Find the end of the opening tag.
+            if let Some(end) = memchr(b'>', &hay[j..]) {
+                return Some((i, j + end + 1));
+            }
+            return None;
+        }
+        pos = i + 1;
     }
     None
 }
 
-/// Find `>` that closes a start/end tag, skipping quoted attribute values.
-pub fn find_tag_close(hay: &[u8], mut i: usize) -> Option<usize> {
-    let mut quote: Option<u8> = None;
-    while i < hay.len() {
-        let b = hay[i];
-        if let Some(q) = quote {
-            if b == q {
-                quote = None;
-            }
-        } else {
-            match b {
-                b'"' | b'\'' => quote = Some(b),
-                b'>' => return Some(i),
-                _ => {}
-            }
-        }
-        i += 1;
-    }
-    None
-}
-
-/// Find a matching end-tag `</local>` or `</prefix:local>` (case-insensitive local).
-/// Search starts at `from`. Returns byte index of `'<'` of the end-tag.
+/// Find the matching closing tag `</…local…>` starting search from `from`.
 pub fn find_close_tag(hay: &[u8], from: usize, local: &[u8]) -> Option<usize> {
-    let slice = hay.get(from..)?;
-    let mut pos = 0usize;
-    while pos < slice.len() {
-        let rel = memchr(b'<', &slice[pos..])?;
+    let mut pos = from;
+    while let Some(rel) = memchr(b'<', &hay[pos..]) {
         let i = pos + rel;
-        if slice.get(i + 1) != Some(&b'/') {
-            pos = i + 1;
-            continue;
+        if i + 1 < hay.len() && hay[i + 1] == b'/' {
+            let name_start = i + 2;
+            let mut j = name_start;
+            while j < hay.len() && is_name_char(hay[j]) {
+                j += 1;
+            }
+            if eq_ci(local_part(&hay[name_start..j]), local) {
+                return Some(i);
+            }
         }
-        let name_start = i + 2;
-        let mut name_end = name_start;
-        while name_end < slice.len() && is_name_char(slice[name_end]) {
-            name_end += 1;
-        }
-        if name_end == name_start {
-            pos = i + 1;
-            continue;
-        }
-        let name = &slice[name_start..name_end];
-        let local_part = match memchr(b':', name) {
-            Some(c) => &name[c + 1..],
-            None => name,
-        };
-        if eq_ci(local_part, local) {
-            return Some(from + i);
-        }
-        pos = name_end;
+        pos = i + 1;
     }
     None
 }
 
-/// Extract text content of the first element with the given local name.
+/// Convenience: text content of the first occurrence of an element.
 pub fn tag_text<'a>(hay: &'a [u8], local: &[u8]) -> Option<&'a [u8]> {
-    let (_, content_start) = find_open_tag(hay, local)?;
-    let close = find_close_tag(hay, content_start, local)?;
-    Some(&hay[content_start..close])
+    let (_open_start, open_end) = find_open_tag(hay, local)?;
+    let close = find_close_tag(hay, open_end, local)?;
+    Some(&hay[open_end..close])
 }
 
-/// Strip tags from a small fragment, keeping only text content.
+/// Strip all tags, keeping only text content. Allocates a new buffer.
 pub fn strip_tags_bytes(hay: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(hay.len());
-    let mut i = 0usize;
+    let mut i = 0;
     while i < hay.len() {
-        if let Some(rel) = memchr(b'<', &hay[i..]) {
-            let lt = i + rel;
-            out.extend_from_slice(&hay[i..lt]);
-            match memchr(b'>', &hay[lt..]) {
-                Some(r) => i = lt + r + 1,
-                None => {
-                    // unclosed tag: drop the rest
-                    return out;
-                }
+        if hay[i] == b'<' {
+            if let Some(end) = memchr(b'>', &hay[i..]) {
+                i += end + 1;
+                continue;
             }
-        } else {
-            out.extend_from_slice(&hay[i..]);
-            break;
+            break; // unclosed tag → stop
         }
+        out.push(hay[i]);
+        i += 1;
     }
     out
 }
 
-/// For each start-tag in `hay`, call `f(local_name, attrs)`.
-/// Stops early if `f` returns `true`.
+/// Call `f(local_name, attributes_slice)` for every start tag.
+/// If `f` returns `true`, scanning stops early.
 pub fn for_each_start_tag(hay: &[u8], mut f: impl FnMut(&[u8], &[u8]) -> bool) {
-    let mut pos = 0usize;
-    while pos < hay.len() {
-        let Some(rel) = memchr(b'<', &hay[pos..]) else {
-            break;
-        };
+    let mut pos = 0;
+    while let Some(rel) = memchr(b'<', &hay[pos..]) {
         let i = pos + rel;
-        let next = match hay.get(i + 1) {
-            Some(b) => *b,
-            None => break,
-        };
+        if i + 1 >= hay.len() {
+            break;
+        }
+        let next = hay[i + 1];
         if next == b'/' || next == b'!' || next == b'?' {
-            pos = i + 2;
-            continue;
-        }
-        let name_start = i + 1;
-        let mut name_end = name_start;
-        while name_end < hay.len() && is_name_char(hay[name_end]) {
-            name_end += 1;
-        }
-        if name_end == name_start {
             pos = i + 1;
             continue;
         }
-        let Some(gt) = find_tag_close(hay, name_end) else {
-            break;
+
+        let mut j = i + 1;
+        while j < hay.len() && is_name_char(hay[j]) {
+            j += 1;
+        }
+        let local = local_part(&hay[i + 1..j]);
+
+        // attributes run until '>' or '/>'
+        let end = match memchr(b'>', &hay[j..]) {
+            Some(e) => j + e,
+            None => break,
         };
-        // attrs between name_end and gt (trim leading whitespace)
-        let mut attr_start = name_end;
-        while attr_start < gt && hay[attr_start].is_ascii_whitespace() {
+        let mut attr_start = j;
+        while attr_start < end && hay[attr_start].is_ascii_whitespace() {
             attr_start += 1;
         }
-        let name = &hay[name_start..name_end];
-        let local = match memchr(b':', name) {
-            Some(c) => &name[c + 1..],
-            None => name,
-        };
-        let attrs = &hay[attr_start..gt];
+        let attrs = &hay[attr_start..end];
+
         if f(local, attrs) {
             return;
         }
-        pos = gt + 1;
+        pos = end + 1;
     }
 }
 
-/// Extract `attr="value"` or `attr='value'` (case-insensitive attribute name).
+/// Extract the value of an attribute `name="value"` or `name='value'` (case-insensitive name).
 pub fn attr_value<'a>(attrs: &'a [u8], name: &[u8]) -> Option<&'a [u8]> {
-    let mut pos = 0usize;
+    let mut pos = 0;
     while pos < attrs.len() {
+        // skip whitespace
         while pos < attrs.len() && attrs[pos].is_ascii_whitespace() {
             pos += 1;
         }
         if pos >= attrs.len() {
             break;
         }
+
         let name_start = pos;
         while pos < attrs.len() && is_name_char(attrs[pos]) {
             pos += 1;
         }
-        if pos == name_start {
-            pos += 1;
-            continue;
-        }
-        let aname = &attrs[name_start..pos];
-        while pos < attrs.len() && attrs[pos].is_ascii_whitespace() {
-            pos += 1;
-        }
-        if pos >= attrs.len() || attrs[pos] != b'=' {
-            continue;
-        }
-        pos += 1;
-        while pos < attrs.len() && attrs[pos].is_ascii_whitespace() {
+        let found_name = &attrs[name_start..pos];
+
+        // skip whitespace and '='
+        while pos < attrs.len() && (attrs[pos].is_ascii_whitespace() || attrs[pos] == b'=') {
             pos += 1;
         }
         if pos >= attrs.len() {
             break;
         }
-        let q = attrs[pos];
-        if q != b'"' && q != b'\'' {
-            // unquoted value
-            let vstart = pos;
-            while pos < attrs.len() && !attrs[pos].is_ascii_whitespace() && attrs[pos] != b'/' {
+
+        let quote = attrs[pos];
+        if quote != b'"' && quote != b'\'' {
+            // malformed or boolean attribute
+            while pos < attrs.len() && !attrs[pos].is_ascii_whitespace() && attrs[pos] != b'>' {
                 pos += 1;
-            }
-            if eq_ci(aname, name) {
-                return Some(&attrs[vstart..pos]);
             }
             continue;
         }
-        pos += 1;
-        let vstart = pos;
-        while pos < attrs.len() && attrs[pos] != q {
+        pos += 1; // skip opening quote
+        let value_start = pos;
+        while pos < attrs.len() && attrs[pos] != quote {
             pos += 1;
         }
-        let vend = pos;
+        let value = &attrs[value_start..pos];
         if pos < attrs.len() {
-            pos += 1;
+            pos += 1; // skip closing quote
         }
-        if eq_ci(aname, name) {
-            return Some(&attrs[vstart..vend]);
+
+        if eq_ci(found_name, name) {
+            return Some(value);
         }
     }
     None
 }
 
-/// Find first year 19xx / 20xx.
+/// Find a standalone `19xx` / `20xx` year.
+///
+/// The century check is what keeps sigla out of the result: `Bo 1234` is a
+/// publication number, not a year.
 pub fn find_year(hay: &[u8]) -> Option<[u8; 4]> {
-    let mut i = 0usize;
-    while i + 4 <= hay.len() {
-        let Some(rel) = memchr2(b'1', b'2', &hay[i..]) else {
-            return None;
-        };
-        i += rel;
-        if i + 4 > hay.len() {
-            return None;
-        }
-        let b0 = hay[i];
-        let b1 = hay[i + 1];
-        let b2 = hay[i + 2];
-        let b3 = hay[i + 3];
-        if b0 == b'1' && b1 == b'9' && b2.is_ascii_digit() && b3.is_ascii_digit() {
+    let mut i = 0;
+    while i + 3 < hay.len() {
+        let century = matches!((hay[i], hay[i + 1]), (b'1', b'9') | (b'2', b'0'));
+        if century && hay[i + 2].is_ascii_digit() && hay[i + 3].is_ascii_digit() {
             let prev_ok = i == 0 || !hay[i - 1].is_ascii_digit();
             let next_ok = i + 4 >= hay.len() || !hay[i + 4].is_ascii_digit();
             if prev_ok && next_ok {
-                return Some([b0, b1, b2, b3]);
-            }
-        }
-        if b0 == b'2' && b1 == b'0' && b2.is_ascii_digit() && b3.is_ascii_digit() {
-            let prev_ok = i == 0 || !hay[i - 1].is_ascii_digit();
-            let next_ok = i + 4 >= hay.len() || !hay[i + 4].is_ascii_digit();
-            if prev_ok && next_ok {
-                return Some([b0, b1, b2, b3]);
+                return Some([hay[i], hay[i + 1], hay[i + 2], hay[i + 3]]);
             }
         }
         i += 1;
@@ -365,14 +275,11 @@ pub fn find_year(hay: &[u8]) -> Option<[u8; 4]> {
     None
 }
 
-/// Locate `CTH` + optional whitespace + number; returns the number slice.
+/// Locate `CTH` + optional whitespace + number; return the number slice.
 pub fn find_cth_number(hay: &[u8]) -> Option<&[u8]> {
-    let mut pos = 0usize;
+    let mut pos = 0;
     while pos + 3 <= hay.len() {
-        let Some(rel) = find_ci(&hay[pos..], b"CTH") else {
-            return None;
-        };
-        let i = pos + rel;
+        let i = pos + find_ci(&hay[pos..], b"CTH")?;
         let mut j = i + 3;
         while j < hay.len() && hay[j].is_ascii_whitespace() {
             j += 1;
@@ -428,15 +335,9 @@ mod tests {
 
     #[test]
     fn strip_tags() {
-        let out = strip_tags_bytes(b"a<b>c</b>d");
-        assert_eq!(out, b"acd");
-    }
-
-    #[test]
-    fn eq_ci_equal() {
-        assert!(eq_ci(b".xml", b".XML"));
-        assert!(eq_ci(b"AbC", b"abc"));
-        assert!(!eq_ci(b"a", b"ab"));
+        assert_eq!(strip_tags_bytes(b"a<b>c</b>d"), b"acd");
+        assert_eq!(strip_tags_bytes(b"a<b"), b"a");
+        assert_eq!(strip_tags_bytes(b"plain"), b"plain");
     }
 
     #[test]
@@ -478,5 +379,12 @@ mod tests {
             true
         });
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn eq_ci_equal() {
+        assert!(eq_ci(b".xml", b".XML"));
+        assert!(eq_ci(b"AbC", b"abc"));
+        assert!(!eq_ci(b"a", b"ab"));
     }
 }
