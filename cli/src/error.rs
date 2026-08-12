@@ -15,6 +15,16 @@ pub enum ArunaError {
     #[error("HTTP {status} while downloading {url}")]
     Http { url: String, status: u16 },
 
+    /// The server announced `expected` bytes and delivered fewer. Caught here
+    /// rather than downstream, where a short ZIP surfaces as a confusing
+    /// "invalid archive" long after the real failure.
+    #[error("truncated download of {url}: expected {expected} bytes, got {got}")]
+    Truncated {
+        url: String,
+        expected: u64,
+        got: u64,
+    },
+
     #[error("failed to read ZIP archive: {0}")]
     Zip(#[from] zip::result::ZipError),
 

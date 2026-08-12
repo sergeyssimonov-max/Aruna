@@ -23,7 +23,7 @@ pub const SOURCE_LABEL: &str =
 ///
 /// When `local_zip` is `Some`, the download step is skipped (tests / offline).
 pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
-    let work_dir = std::env::temp_dir().join("aruna-work");
+    let work_dir = work_dir_for_process();
     fs::create_dir_all(&work_dir).map_err(|source| ArunaError::Io {
         path: work_dir.clone(),
         source,
@@ -48,12 +48,26 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
 
     let out = paths::output_html_path()?;
     paths::ensure_output_parent(&out)?;
-    fs::write(&out, html.as_bytes()).map_err(|source| ArunaError::Io {
-        path: out.clone(),
-        source,
-    })?;
+    // Atomic: a failure here must not destroy the inventory an earlier run left
+    // in place — see `paths::write_atomic`.
+    paths::write_atomic(&out, html.as_bytes())?;
+
+    if local_zip.is_none() {
+        // The archive is downloaded fresh on every run, so keeping a 71 MiB copy
+        // per process id would slowly fill the temp directory. A failed run
+        // keeps its directory on purpose: the partial state is worth inspecting.
+        let _ = fs::remove_dir_all(&work_dir);
+    }
 
     Ok(out)
+}
+
+/// Scratch directory for this process.
+///
+/// The path carries the process id: with a fixed name two concurrent runs
+/// downloaded into the same file and each read the other's half-written bytes.
+fn work_dir_for_process() -> PathBuf {
+    std::env::temp_dir().join(format!("aruna-work.{}", std::process::id()))
 }
 
 fn format_now_local() -> String {
@@ -93,6 +107,20 @@ fn civil_from_unix(secs: u64) -> (i32, u32, u32, u32, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Two runs must never share a scratch directory — that is the whole point
+    /// of putting the process id in the name.
+    #[test]
+    fn work_dir_is_process_scoped() {
+        let dir = work_dir_for_process();
+        let name = dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .expect("work dir has a name");
+        assert_eq!(name, format!("aruna-work.{}", std::process::id()));
+        assert_eq!(dir.parent(), Some(std::env::temp_dir().as_path()));
+        assert_eq!(dir, work_dir_for_process(), "must be stable within a run");
+    }
 
     #[test]
     fn civil_epoch() {
