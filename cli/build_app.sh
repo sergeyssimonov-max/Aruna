@@ -9,6 +9,13 @@ cd "$ROOT"
 APP_NAME="Aruna"
 BUNDLE_ID="com.sergeyssimonov.aruna"
 MIN_SYSTEM="13.0"
+# Read from Cargo.toml rather than repeated here: a hardcoded copy meant every
+# release shipped an app reporting 1.0.0 no matter what the tag said.
+APP_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$(cd "$(dirname "$0")" && pwd)/Cargo.toml" | head -1)"
+if [[ -z "${APP_VERSION}" ]]; then
+  echo "error: could not read version from Cargo.toml" >&2
+  exit 1
+fi
 APP_DIR="${ROOT}/${APP_NAME}.app"
 ICON_SVG="${ROOT}/icon.svg"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/aruna-app.XXXXXX")"
@@ -196,7 +203,7 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0.0</string>
+  <string>${APP_VERSION}</string>
   <key>CFBundleVersion</key>
   <string>1</string>
   <key>LSMinimumSystemVersion</key>
