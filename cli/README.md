@@ -101,7 +101,7 @@ chmod +x build_app.sh
 
 - собирает `aarch64-apple-darwin` + `x86_64-apple-darwin`;
 - склеивает Universal Binary через `lipo`;
-- конвертирует `icon.svg` → `.icns` (`sips` + `iconutil`);
+- собирает `icon.png` → `.icns` со всеми десятью представлениями (`sips` + `iconutil`);
 - собирает `Aruna.app` (`Contents/MacOS`, `Contents/Resources`, `Info.plist`);
 - выставляет `CFBundleName = Aruna`, `CFBundleIdentifier = com.sergeyssimonov.aruna`,  
   `LSMinimumSystemVersion = 13.0`, `CFBundleIconFile = AppIcon`;
@@ -114,18 +114,20 @@ open Aruna.app
 # / «Aruna.app/Contents/MacOS/Aruna»
 ```
 
-Для растрирования SVG удобно иметь `librsvg`:
-
-```bash
-brew install librsvg
-```
-
 ---
 
 ## Иконка
 
-`icon.svg` — стилизованная хеттская глиняная табличка с абстрактной клинописью  
-(прямоугольная табличка + клинья). Используется `build_app.sh` для `.icns`.
+`icon.png` — глиняная табличка с клинописным знаком: 3D-рендер, вырезанный из
+фона по измеренному силуэту, 1024×1024, sRGB, с альфа-каналом.
+
+Разложен по сетке Apple: 824 px изображения по центру холста 1024 (поля по 100),
+собственная тень выходит за силуэт на 19 px вбок и 29 px вниз — те же пропорции,
+что у системных иконок macOS.
+
+`build_app.sh` собирает из него `.icns` и проверяет, что на выходе ровно десять
+представлений: 16, 32, 128, 256, 512 pt, каждое с `@2x`. Без `@2x`-половины
+Retina-экран показывает растянутую копию низкого разрешения.
 
 ---
 
@@ -154,7 +156,7 @@ Aruna/
 │   ├── paths.rs        # ~/Downloads via dirs
 │   └── error.rs        # thiserror
 ├── tests/integration.rs
-├── icon.svg
+├── icon.png
 ├── build_app.sh
 ├── .gitignore
 └── README.md

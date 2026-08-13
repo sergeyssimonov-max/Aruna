@@ -17,7 +17,7 @@ if [[ -z "${APP_VERSION}" ]]; then
   exit 1
 fi
 APP_DIR="${ROOT}/${APP_NAME}.app"
-ICON_SVG="${ROOT}/icon.svg"
+ICON_MASTER="${ROOT}/icon.png"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/aruna-app.XXXXXX")"
 trap 'rm -rf "${WORK}"' EXIT
 
@@ -36,8 +36,8 @@ for cmd in rustup cargo lipo sips iconutil plutil; do
   fi
 done
 
-if [[ ! -f "${ICON_SVG}" ]]; then
-  echo "error: missing ${ICON_SVG}" >&2
+if [[ ! -f "${ICON_MASTER}" ]]; then
+  echo "error: missing ${ICON_MASTER}" >&2
   exit 1
 fi
 
@@ -66,111 +66,65 @@ lipo -create -output "${UNI_BIN}" "${ARM_BIN}" "${X86_BIN}"
 chmod +x "${UNI_BIN}"
 lipo -info "${UNI_BIN}"
 
-echo "==> Converting SVG icon → .icns"
+echo "==> Building .icns from icon.png"
 ICONSET="${WORK}/Aruna.iconset"
 mkdir -p "${ICONSET}"
-MASTER_PNG="${WORK}/icon-1024.png"
 
-rasterise_svg() {
-  if command -v rsvg-convert >/dev/null 2>&1; then
-    rsvg-convert -w 1024 -h 1024 "${ICON_SVG}" -o "${MASTER_PNG}"
-    return 0
-  fi
-
-  # qlmanage is always present with Xcode CLT
-  if command -v qlmanage >/dev/null 2>&1; then
-    cp "${ICON_SVG}" "${WORK}/icon.svg"
-    # produces icon.svg.png in -o directory
-    qlmanage -t -s 1024 -o "${WORK}" "${WORK}/icon.svg" >/dev/null 2>&1 || true
-    if [[ -f "${WORK}/icon.svg.png" ]]; then
-      mv "${WORK}/icon.svg.png" "${MASTER_PNG}"
-      return 0
-    fi
-  fi
-
-  # Python + Quartz (system Python on macOS often has no PyObjC; try anyway)
-  if python3 - "${ICON_SVG}" "${MASTER_PNG}" <<'PY'
-import sys
-src, dst = sys.argv[1], sys.argv[2]
-try:
-    import Cocoa  # type: ignore
-    import Quartz  # type: ignore
-except Exception:
-    sys.exit(2)
-url = Cocoa.NSURL.fileURLWithPath_(src)
-img = Quartz.CIImage.imageWithContentsOfURL_(url)
-if img is None:
-    # fallback: NSImage
-    nsimg = Cocoa.NSImage.alloc().initWithContentsOfFile_(src)
-    if nsimg is None:
-        sys.exit(3)
-    rep = nsimg.representations_representations_representations if False else None
-    tiff = nsimg.TIFFRepresentation()
-    rep = Cocoa.NSBitmapImageRep.imageRepWithData_(tiff)
-    data = rep.representationUsingType_properties_(Cocoa.NSBitmapImageFileTypePNG, None)
-    data.writeToFile_atomically_(dst, True)
-    sys.exit(0)
-sys.exit(4)
-PY
-  then
-    return 0
-  fi
-
-  return 1
-}
-
-if ! rasterise_svg; then
-  # Last resort: solid-color PNG via sips from a tiny generated PNG with Python stdlib only
-  python3 - "${MASTER_PNG}" <<'PY'
-import struct, zlib, sys
-path = sys.argv[1]
-w = h = 1024
-# warm clay #F3EDE3
-r, g, b = 0xF3, 0xED, 0xE3
-raw = b"".join(b"\x00" + bytes([r, g, b]) * w for _ in range(h))
-
-def chunk(tag, data):
-    return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-
-png = b"\x89PNG\r\n\x1a\n"
-png += chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
-png += chunk(b"IDAT", zlib.compress(raw, 9))
-png += chunk(b"IEND", b"")
-open(path, "wb").write(png)
-print("wrote placeholder PNG", path)
-PY
-  echo "warning: used placeholder icon (install librsvg for full SVG: brew install librsvg)" >&2
-fi
-
-if [[ ! -f "${MASTER_PNG}" ]]; then
-  echo "error: master icon PNG missing" >&2
+# icon.png is a finished 1024x1024 artwork with an alpha channel, already laid
+# out on Apple's grid: 824 px of tablet centred in the canvas, plus its drop
+# shadow. It is committed as artwork rather than rasterised here on the fly.
+# The previous version rendered icon.svg through whichever of rsvg-convert,
+# qlmanage or PyObjC happened to be installed, and when none was, quietly wrote
+# a flat-coloured square instead — a build that succeeded and shipped a blank
+# icon.
+ICON_W="$(sips -g pixelWidth "${ICON_MASTER}" | sed -n 's/.*pixelWidth: //p')"
+ICON_H="$(sips -g pixelHeight "${ICON_MASTER}" | sed -n 's/.*pixelHeight: //p')"
+if [[ "${ICON_W}" != "1024" || "${ICON_H}" != "1024" ]]; then
+  echo "error: ${ICON_MASTER} must be 1024x1024 (found ${ICON_W}x${ICON_H})" >&2
   exit 1
 fi
-
-sips -z 1024 1024 "${MASTER_PNG}" --out "${MASTER_PNG}" >/dev/null
+if [[ "$(sips -g hasAlpha "${ICON_MASTER}" | sed -n 's/.*hasAlpha: //p')" != "yes" ]]; then
+  echo "error: ${ICON_MASTER} has no alpha channel; the Dock would draw it as a square" >&2
+  exit 1
+fi
 
 make_icon() {
   local size="$1"
   local name="$2"
-  # sips warns on @2x if suffix not .png intermediate — write via temp
+  # sips picks its output format from the file suffix and an @2x name throws it
+  # off, so write a plain name first and rename.
   local tmp="${WORK}/icon_${size}.png"
-  sips -z "${size}" "${size}" "${MASTER_PNG}" --out "${tmp}" >/dev/null
+  sips -z "${size}" "${size}" "${ICON_MASTER}" --out "${tmp}" >/dev/null
   mv -f "${tmp}" "${ICONSET}/${name}"
 }
 
+# All ten representations macOS looks for. Without the @2x half every Retina
+# display falls back to stretching a low-resolution copy.
 make_icon 16   icon_16x16.png
-make_icon 32   diana.k@example.org
+make_icon 32   icon_16x16@2x.png
 make_icon 32   icon_32x32.png
-make_icon 64   ivan.p@example.net
+make_icon 64   icon_32x32@2x.png
 make_icon 128  icon_128x128.png
-make_icon 256  wendy.h@example.net
+make_icon 256  icon_128x128@2x.png
 make_icon 256  icon_256x256.png
-make_icon 512  wendy.h@example.net
+make_icon 512  icon_256x256@2x.png
 make_icon 512  icon_512x512.png
-make_icon 1024 ethan.b@example.com
+make_icon 1024 icon_512x512@2x.png
 
 ICNS_OUT="${WORK}/AppIcon.icns"
 iconutil -c icns "${ICONSET}" -o "${ICNS_OUT}"
+
+# iconutil ignores filenames it does not recognise rather than failing, which is
+# how a set with five of the ten names built cleanly for months. Read the result
+# back and count.
+CHECK_SET="${WORK}/verify.iconset"
+iconutil -c iconset "${ICNS_OUT}" -o "${CHECK_SET}"
+REPS="$(find "${CHECK_SET}" -name '*.png' | wc -l | tr -d ' ')"
+if [[ "${REPS}" != "10" ]]; then
+  echo "error: AppIcon.icns carries ${REPS} representations, expected 10" >&2
+  exit 1
+fi
+echo "    ${REPS} representations: 16, 32, 128, 256, 512 pt, each with @2x"
 
 echo "==> Assembling ${APP_NAME}.app"
 rm -rf "${APP_DIR}"

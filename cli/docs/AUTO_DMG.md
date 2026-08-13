@@ -6,7 +6,7 @@
 
 | Файл | Описание |
 |------|----------|
-| `Aruna.app` | Universal Binary + `.icns` из `icon.svg` |
+| `Aruna.app` | Universal Binary + `.icns` из `icon.png` |
 | `releases/Aruna-macos-universal.dmg` | UDIF DMG (drag to Applications) |
 
 ## Требования

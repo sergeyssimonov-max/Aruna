@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Clay-coloured app icon">
-  <!--
-    Plain clay field, nothing on it.
-    Continuous-corner radius ~22.5% (Apple app-icon grid); fully opaque so the
-    Dock squircle never leaves sharp corners.
-  -->
-  <rect width="1024" height="1024" rx="230" ry="230" fill="#E6CFA8"/>
-</svg>
