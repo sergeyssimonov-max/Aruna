@@ -17,7 +17,6 @@ const ARUN_MAGIC = 0x4e555241;
 const ARUN_VERSION = 3;
 const NO_PREFIX = 255;
 const te = new TextEncoder();
-const HEADER = 60;
 
 const wire = JSON.parse(readFileSync(jsonPath, "utf8"));
 const pool = wire.p;
@@ -135,10 +134,9 @@ const nGroups = groups.length;
 const nItems = groups.reduce((a, g) => a + g.items.length, 0);
 const ITEM = 12;
 
-// header 60: magic ver m nG nI nAuth nYear nLang nInv nCorp nPref srcL sufL authL yearL
-// Wait - need more fields. Expand header to 72 (18 u32).
-const HEADER_V3 = 72;
-// magic, ver, m, nG, nI, nAuth, nYear, nLang, nInv, nCorp, nPref, srcL, sufL, authL, yearL, langL, invL, corpL, prefL, searchL = 20 u32 = 80
+// Header: magic, ver, m, nG, nI, nAuth, nYear, nLang, nInv, nCorp, nPref, srcL,
+// sufL, authL, yearL, langL, invL, corpL, prefL, searchL — 20 u32 = 80 bytes.
+// Must stay in step with `HEADER` in src/lib/arun.ts, which reads this format.
 const H = 80;
 
 const total =
