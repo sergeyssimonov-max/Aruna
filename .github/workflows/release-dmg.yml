@@ -78,6 +78,13 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # The runner ships the npm bundled with Node 22 (10.x), but the lockfile is
+      # written by npm 12 locally, and the two disagree about which transitive
+      # packages belong in it — `npm ci` then refuses to install at all. Pin the
+      # same major here so the check tests the lockfile, not the npm skew.
+      - name: Pin npm to the version the lockfile is written with
+        run: npm install -g npm@12
+
       - name: Install dependencies
         run: npm ci
 
