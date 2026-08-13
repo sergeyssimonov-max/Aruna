@@ -5,3 +5,9 @@
 *.icns
 /work/
 Aruna.app/
+
+# Build output: the DMG and its checksums are published as GitHub Release
+# assets, not committed. A copy in the tree went stale immediately — the one
+# that used to live here did not match the artifact of any release.
+releases/*.dmg
+releases/SHA256SUMS

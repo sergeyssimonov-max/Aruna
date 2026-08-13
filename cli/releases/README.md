@@ -1,11 +1,15 @@
 # Aruna — macOS releases only
 
-This folder holds **macOS** packages produced on a Mac or by GitHub Actions (`macos-14`):
+Build output lands here and is **not committed**: the packages are published as
+GitHub Release assets, and a copy kept in the tree goes stale the moment the next
+build runs.
+
+Download them from [Releases](https://github.com/sergeyssimonov-max/Aruna/releases):
 
 | File | Description |
 |------|-------------|
 | **Aruna-macos-universal.dmg** | UDIF disk image with `Aruna.app` (Universal: Apple Silicon + Intel) |
-| **SHA256SUMS** | Checksums |
+| **SHA256SUMS** | Checksums — verify with `shasum -a 256 -c SHA256SUMS` |
 
 > Linux binaries are **not** published.
 
@@ -22,7 +26,7 @@ Or CI:
 ```bash
 gh workflow run release-dmg.yml
 # tag release:
-git tag v1.0.0 && git push origin v1.0.0
+git tag v1.0.2 && git push origin v1.0.2   # bump cli/Cargo.toml first
 ```
 
 See [docs/AUTO_DMG.md](../docs/AUTO_DMG.md).
