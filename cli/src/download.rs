@@ -28,23 +28,31 @@ pub fn download_file(url: &str, dest: &Path) -> Result<()> {
     download_verified(url, dest, None)
 }
 
+/// Longest we will wait on a server's `Retry-After` before giving up on it.
+///
+/// Zenodo can answer a 429 with a delay measured in minutes. Sleeping that long
+/// inside a run the user is watching is worse than telling them to come back.
+const MAX_RETRY_AFTER: Duration = Duration::from_secs(30);
+
 /// Download `url` into `dest`, retrying transient failures and rejecting the
 /// result unless it hashes to `expected_md5`.
 ///
 /// Retries cover the failures a second attempt can actually fix: a dropped
-/// connection, a short body, a wrong digest, a local write error. An HTTP status
-/// is never retried — a 404 stays a 404, and re-requesting it only hammers the
-/// archive.
+/// connection, a short body, a local write error, and the HTTP statuses that
+/// mean "busy, not wrong". See [`is_retryable`] for what is deliberately left
+/// out.
 pub fn download_verified(url: &str, dest: &Path, expected_md5: Option<&str>) -> Result<()> {
     let mut attempt = 1;
     loop {
         match attempt_download(url, dest, expected_md5) {
             Ok(()) => return Ok(()),
             Err(err) if attempt < MAX_ATTEMPTS && is_retryable(&err) => {
-                eprintln!("Attempt {attempt} failed ({err}); retrying…");
-                // Linear backoff: these are transient hiccups, not an overloaded
-                // server that needs exponential backoff to recover.
-                std::thread::sleep(Duration::from_secs(2 * u64::from(attempt)));
+                let delay = retry_delay(attempt, &err);
+                eprintln!(
+                    "Attempt {attempt} failed ({err}); retrying in {}s…",
+                    delay.as_secs()
+                );
+                std::thread::sleep(delay);
                 attempt += 1;
             }
             Err(err) => return Err(err),
@@ -52,15 +60,43 @@ pub fn download_verified(url: &str, dest: &Path, expected_md5: Option<&str>) -> 
     }
 }
 
+/// HTTP statuses worth another attempt.
+///
+/// These say the server could not serve the request *right now*: overloaded,
+/// rate-limiting, a bad gateway in front of it. Every other status is a verdict
+/// on the request itself, and repeating it only hammers the archive.
+fn is_retryable_status(status: u16) -> bool {
+    matches!(status, 408 | 425 | 429 | 500 | 502 | 503 | 504)
+}
+
 /// Whether another attempt has any chance of succeeding.
 fn is_retryable(err: &ArunaError) -> bool {
-    matches!(
-        err,
-        ArunaError::Network { .. }
-            | ArunaError::Truncated { .. }
-            | ArunaError::ChecksumMismatch { .. }
-            | ArunaError::Io { .. }
-    )
+    match err {
+        ArunaError::Network { .. } | ArunaError::Truncated { .. } | ArunaError::Io { .. } => true,
+        ArunaError::Http { status, .. } => is_retryable_status(*status),
+        // A digest mismatch is not a hiccup. Either ZENODO_ZIP_MD5 is stale or
+        // the archive was republished, and both are settled before the first
+        // byte arrives — so the retries downloaded 71 MiB twice more only to
+        // reach the identical error. The message names both digests; that is
+        // the useful outcome, and it should arrive at once.
+        _ => false,
+    }
+}
+
+/// How long to wait before the next attempt.
+///
+/// A server that sent `Retry-After` has told us what it wants; anything else
+/// gets exponential backoff, which now matters because an overloaded server is
+/// among the things we retry.
+fn retry_delay(attempt: u32, err: &ArunaError) -> Duration {
+    if let ArunaError::Http {
+        retry_after: Some(secs),
+        ..
+    } = err
+    {
+        return Duration::from_secs(*secs).min(MAX_RETRY_AFTER);
+    }
+    Duration::from_secs(2u64.saturating_pow(attempt))
 }
 
 /// One transfer: stream to a scratch file, verify, rename into place.
@@ -78,18 +114,32 @@ fn attempt_download(url: &str, dest: &Path, expected_md5: Option<&str>) -> Resul
         .user_agent("Aruna/1.0 (+https://github.com/sergeyssimonov-max/Aruna)")
         .build();
 
-    let response = agent.get(url).call().map_err(|e| ArunaError::Network {
-        url: url.to_string(),
-        source: Box::new(e),
-    })?;
-
-    let status = response.status();
-    if !(200..300).contains(&status) {
-        return Err(ArunaError::Http {
-            url: url.to_string(),
-            status,
-        });
-    }
+    // ureq hands back every non-2xx as `Error::Status`, so the status has to be
+    // pulled out of the error rather than off a response. Mapping the whole
+    // error to `Network` — as this did — buried the status: a 404 was reported
+    // as a network failure and, because network failures are retried, fetched
+    // three times before the user heard about it.
+    let response = match agent.get(url).call() {
+        Ok(response) => response,
+        Err(ureq::Error::Status(status, response)) => {
+            return Err(ArunaError::Http {
+                url: url.to_string(),
+                status,
+                // Only the delta-seconds form is read. `Retry-After` may also
+                // carry an HTTP-date, but parsing dates to shave a few seconds
+                // off a backoff is not worth a date parser.
+                retry_after: response
+                    .header("Retry-After")
+                    .and_then(|v| v.trim().parse().ok()),
+            });
+        }
+        Err(source) => {
+            return Err(ArunaError::Network {
+                url: url.to_string(),
+                source: Box::new(source),
+            })
+        }
+    };
 
     // Announced size, when the server sends one — used below to catch a body
     // cut short by a dropped connection.
@@ -189,7 +239,17 @@ mod tests {
     use std::sync::Arc;
     use tempfile::tempdir;
 
-    /// A one-shot HTTP server that serves `bodies[i]` to request `i`, counting
+    /// What the fake server should do for one request.
+    enum Reply {
+        /// Serve these bytes with a matching `Content-Length`.
+        Body(Vec<u8>),
+        /// Announce a length, then hang up early — the truncated-body case.
+        Truncated,
+        /// Answer with this status, optionally carrying `Retry-After`.
+        Status(u16, Option<u64>),
+    }
+
+    /// A one-shot HTTP server that serves `replies[i]` to request `i`, counting
     /// the requests it saw. Local so the retry tests neither touch the network
     /// nor wait on real timeouts.
     struct FakeServer {
@@ -198,8 +258,21 @@ mod tests {
     }
 
     impl FakeServer {
-        /// `bodies` are served in order; the last one repeats once exhausted.
-        fn start(bodies: Vec<Option<Vec<u8>>>) -> Self {
+        /// Convenience for the common "serve these bodies" case.
+        fn with_bodies(bodies: Vec<Option<Vec<u8>>>) -> Self {
+            Self::start(
+                bodies
+                    .into_iter()
+                    .map(|b| match b {
+                        Some(bytes) => Reply::Body(bytes),
+                        None => Reply::Truncated,
+                    })
+                    .collect(),
+            )
+        }
+
+        /// `replies` are served in order; the last one repeats once exhausted.
+        fn start(replies: Vec<Reply>) -> Self {
             let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
             let port = listener.local_addr().expect("addr").port();
             let hits = Arc::new(AtomicU32::new(0));
@@ -208,11 +281,7 @@ mod tests {
             std::thread::spawn(move || {
                 for stream in listener.incoming().flatten() {
                     let i = counter.fetch_add(1, Ordering::SeqCst) as usize;
-                    let body = bodies
-                        .get(i)
-                        .or_else(|| bodies.last())
-                        .cloned()
-                        .flatten();
+                    let reply = replies.get(i).or_else(|| replies.last());
 
                     let mut stream = stream;
                     // Read the request line so the client is not writing into a
@@ -225,21 +294,29 @@ mod tests {
                         head.clear();
                     }
 
-                    match body {
-                        // `None` means: announce a length, then hang up early —
-                        // exactly the truncated-body case.
-                        None => {
+                    match reply {
+                        None | Some(Reply::Truncated) => {
                             let _ = stream.write_all(
                                 b"HTTP/1.1 200 OK\r\nContent-Length: 1024\r\n\r\nshort",
                             );
                         }
-                        Some(bytes) => {
+                        Some(Reply::Body(bytes)) => {
                             let head = format!(
                                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
                                 bytes.len()
                             );
                             let _ = stream.write_all(head.as_bytes());
-                            let _ = stream.write_all(&bytes);
+                            let _ = stream.write_all(bytes);
+                        }
+                        Some(Reply::Status(status, retry_after)) => {
+                            let mut head = format!(
+                                "HTTP/1.1 {status} Something\r\nContent-Length: 0\r\n"
+                            );
+                            if let Some(secs) = retry_after {
+                                head.push_str(&format!("Retry-After: {secs}\r\n"));
+                            }
+                            head.push_str("\r\n");
+                            let _ = stream.write_all(head.as_bytes());
                         }
                     }
                     let _ = stream.flush();
@@ -268,7 +345,7 @@ mod tests {
     fn truncated_body_is_rejected() {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
-        let server = FakeServer::start(vec![None]);
+        let server = FakeServer::with_bodies(vec![None]);
 
         let err = download_file(&server.url(), &dest).unwrap_err();
         assert!(
@@ -285,19 +362,22 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
         let good = b"complete archive bytes".to_vec();
-        let server = FakeServer::start(vec![None, Some(good.clone())]);
+        let server = FakeServer::with_bodies(vec![None, Some(good.clone())]);
 
         download_verified(&server.url(), &dest, Some(&md5_hex(&good))).expect("second attempt");
         assert_eq!(std::fs::read(&dest).expect("read back"), good);
         assert_eq!(server.hits(), 2, "should have taken exactly two attempts");
     }
 
-    /// A wrong digest is retried too — then reported rather than accepted.
+    /// A wrong digest is reported at once, on the first download.
+    ///
+    /// It used to be retried, which meant a stale `ZENODO_ZIP_MD5` pulled 71 MiB
+    /// three times to arrive at the identical error.
     #[test]
-    fn checksum_mismatch_is_reported_after_retries() {
+    fn checksum_mismatch_is_reported_without_downloading_again() {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
-        let server = FakeServer::start(vec![Some(b"corrupted".to_vec())]);
+        let server = FakeServer::with_bodies(vec![Some(b"corrupted".to_vec())]);
 
         let err = download_verified(&server.url(), &dest, Some(&md5_hex(b"expected")))
             .unwrap_err();
@@ -309,7 +389,68 @@ mod tests {
             other => panic!("unexpected: {other}"),
         }
         assert!(!dest.exists(), "corrupt body must not reach the destination");
-        assert_eq!(server.hits(), MAX_ATTEMPTS, "every attempt should be used");
+        assert_eq!(
+            server.hits(),
+            1,
+            "a digest mismatch is deterministic; re-downloading cannot fix it"
+        );
+    }
+
+    /// 503 is the server saying "busy", so the next attempt gets the archive.
+    #[test]
+    fn server_unavailable_is_retried() {
+        let dir = tempdir().expect("tempdir");
+        let dest = dir.path().join("out.zip");
+        let good = b"complete archive bytes".to_vec();
+        let server = FakeServer::start(vec![
+            Reply::Status(503, None),
+            Reply::Body(good.clone()),
+        ]);
+
+        download_verified(&server.url(), &dest, Some(&md5_hex(&good))).expect("second attempt");
+        assert_eq!(std::fs::read(&dest).expect("read back"), good);
+        assert_eq!(server.hits(), 2);
+    }
+
+    /// A 404 is a verdict. It must surface as an HTTP status — not as a network
+    /// error, which is what it looked like while every status was folded into
+    /// `Network` — and it must be requested exactly once.
+    #[test]
+    fn not_found_is_reported_once_and_as_a_status() {
+        let dir = tempdir().expect("tempdir");
+        let dest = dir.path().join("out.zip");
+        let server = FakeServer::start(vec![Reply::Status(404, None)]);
+
+        let err = download_file(&server.url(), &dest).unwrap_err();
+        match err {
+            ArunaError::Http { status, .. } => assert_eq!(status, 404),
+            other => panic!("expected an HTTP status, got: {other}"),
+        }
+        assert_eq!(server.hits(), 1, "a 404 must not be re-requested");
+    }
+
+    /// A server that says when to come back is obeyed, within reason.
+    #[test]
+    fn retry_after_is_read_and_capped() {
+        let err = |secs| ArunaError::Http {
+            url: "u".into(),
+            status: 429,
+            retry_after: secs,
+        };
+        assert_eq!(retry_delay(1, &err(Some(5))), Duration::from_secs(5));
+        assert_eq!(retry_delay(1, &err(Some(9_999))), MAX_RETRY_AFTER);
+        // Without a header, backoff grows instead of staying flat.
+        assert!(retry_delay(2, &err(None)) > retry_delay(1, &err(None)));
+    }
+
+    #[test]
+    fn retryable_statuses_are_the_transient_ones() {
+        for status in [408, 425, 429, 500, 502, 503, 504] {
+            assert!(is_retryable_status(status), "{status} should be retried");
+        }
+        for status in [400, 401, 403, 404, 410, 451, 501] {
+            assert!(!is_retryable_status(status), "{status} must not be retried");
+        }
     }
 
     /// A matching digest passes the file through untouched.
@@ -318,25 +459,33 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
         let body = b"the real archive".to_vec();
-        let server = FakeServer::start(vec![Some(body.clone())]);
+        let server = FakeServer::with_bodies(vec![Some(body.clone())]);
 
         download_verified(&server.url(), &dest, Some(&md5_hex(&body))).expect("accepted");
         assert_eq!(std::fs::read(&dest).expect("read back"), body);
         assert_eq!(server.hits(), 1, "no retry needed on success");
     }
 
-    /// An HTTP status is a verdict, not a hiccup: retrying a 404 only hammers
-    /// the archive.
+    /// The retry policy, stated as a whole: transient failures get another go,
+    /// settled ones are reported at once.
     #[test]
-    fn http_status_is_not_retried() {
-        assert!(!is_retryable(&ArunaError::Http {
+    fn retry_policy() {
+        let http = |status| ArunaError::Http {
             url: "u".into(),
-            status: 404,
-        }));
+            status,
+            retry_after: None,
+        };
+        assert!(!is_retryable(&http(404)));
+        assert!(is_retryable(&http(503)));
         assert!(is_retryable(&ArunaError::Truncated {
             url: "u".into(),
             expected: 2,
             got: 1,
+        }));
+        assert!(!is_retryable(&ArunaError::ChecksumMismatch {
+            url: "u".into(),
+            expected: "a".into(),
+            got: "b".into(),
         }));
     }
 
@@ -381,22 +530,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn http_error_on_404() {
-        let dir = tempdir().expect("tempdir");
-        let dest = dir.path().join("out.zip");
-        // httpbin may be flaky; use zenodo missing file for a real 404
-        let err = download_file(
-            "https://zenodo.org/records/20328284/files/this-file-does-not-exist-aruna.zip",
-            &dest,
-        )
-        .unwrap_err();
-        match err {
-            ArunaError::Http { status, .. } => assert!(status == 404 || status == 403),
-            ArunaError::Network { .. } => {
-                // offline CI environments are acceptable
-            }
-            other => panic!("unexpected: {other}"),
-        }
-    }
 }

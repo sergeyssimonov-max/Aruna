@@ -20,8 +20,25 @@ fn main() -> ExitCode {
             }
             // Extra context for common cases
             match &err {
-                ArunaError::Network { .. } | ArunaError::Http { .. } => {
+                ArunaError::Network { .. } => {
                     eprintln!("Проверьте сетевое соединение и доступность Zenodo.");
+                }
+                ArunaError::Http { status: 404 | 410, .. } => {
+                    eprintln!(
+                        "Zenodo больше не отдаёт этот файл — вероятно, архив перевыпущен.\n\
+                         Обновите ZENODO_ZIP_URL и ZENODO_ZIP_MD5 в cli/src/download.rs."
+                    );
+                }
+                ArunaError::Http { .. } => {
+                    eprintln!("Zenodo сейчас недоступен. Попробуйте позже.");
+                }
+                ArunaError::ChecksumMismatch { .. } => {
+                    eprintln!(
+                        "Архив скачался целиком, но его MD5 не совпал с ожидаемым.\n\
+                         Скорее всего, Zenodo перевыпустил архив: сверьте сумму на странице\n\
+                         записи и обновите ZENODO_ZIP_MD5 в cli/src/download.rs.\n\
+                         Повторный запуск не поможет — сумма не изменится."
+                    );
                 }
                 ArunaError::EmptyArchive | ArunaError::Zip(_) => {
                     eprintln!("Архив повреждён или не содержит XML-документов.");

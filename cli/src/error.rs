@@ -13,7 +13,14 @@ pub enum ArunaError {
     },
 
     #[error("HTTP {status} while downloading {url}")]
-    Http { url: String, status: u16 },
+    Http {
+        url: String,
+        status: u16,
+        /// `Retry-After`, in seconds, when the server sent one. A 429 or 503
+        /// usually carries it, and ignoring it is how a client gets throttled
+        /// harder than it needs to be.
+        retry_after: Option<u64>,
+    },
 
     /// The server announced `expected` bytes and delivered fewer. Caught here
     /// rather than downstream, where a short ZIP surfaces as a confusing
