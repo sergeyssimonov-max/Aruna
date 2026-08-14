@@ -29,6 +29,16 @@ fn main() -> ExitCode {
                 ArunaError::DownloadsDir => {
                     eprintln!("Не удалось определить каталог Downloads.");
                 }
+                ArunaError::Replace { scratch, .. } => {
+                    eprintln!(
+                        "Новая опись готова и никуда не делась — она лежит рядом:\n  {}",
+                        scratch.display()
+                    );
+                    eprintln!(
+                        "Закройте программу, которая держит старый файл открытым \
+                         (обычно это браузер), и запустите ещё раз."
+                    );
+                }
                 _ => {}
             }
             ExitCode::FAILURE

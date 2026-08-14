@@ -50,6 +50,20 @@ pub enum ArunaError {
         source: std::io::Error,
     },
 
+    /// The new inventory was written and flushed, but could not take the
+    /// destination's place — on Windows a replace fails while the old file is
+    /// open in another process (a browser showing the previous run), when it is
+    /// read-only, or under a transient lock from a scanner. The finished file is
+    /// kept and named here rather than discarded: it cost a download and a full
+    /// parse, and it is complete.
+    #[error("could not replace {path}; the new inventory is complete and kept at {scratch}")]
+    Replace {
+        path: PathBuf,
+        scratch: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("could not resolve Downloads directory")]
     DownloadsDir,
 }

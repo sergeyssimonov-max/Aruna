@@ -24,7 +24,7 @@
 | | |
 |---|---|
 | Rust | 1.74+ (`rustup`) |
-| ОС для CLI | macOS 13+, Linux, Windows |
+| ОС для CLI | macOS 13+ и Linux — собираются и тестируются в CI; на Windows не проверялось |
 | ОС для `.app` | **macOS 13 Ventura+** (Apple Silicon и Intel) |
 | Сеть | доступ к `zenodo.org` при обычном запуске |
 

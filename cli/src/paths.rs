@@ -61,12 +61,38 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     }
     drop(file);
 
-    std::fs::rename(&scratch, path).map_err(|source| {
-        let _ = std::fs::remove_file(&scratch);
-        ArunaError::Io {
-            path: path.to_path_buf(),
-            source,
+    replace_with_retries(&scratch, path)
+}
+
+/// Number of attempts at the final replace, and the pause between them.
+///
+/// A replace can fail for reasons that pass: on Windows an indexer or a virus
+/// scanner opens a freshly written file for a moment, and `rename` onto a file
+/// held open by another process fails outright. A short retry covers that
+/// without making a genuine failure slow to report.
+const REPLACE_ATTEMPTS: u32 = 3;
+const REPLACE_BACKOFF: std::time::Duration = std::time::Duration::from_millis(120);
+
+fn replace_with_retries(scratch: &Path, path: &Path) -> Result<()> {
+    let mut last = match std::fs::rename(scratch, path) {
+        Ok(()) => return Ok(()),
+        Err(e) => e,
+    };
+    for attempt in 1..REPLACE_ATTEMPTS {
+        std::thread::sleep(REPLACE_BACKOFF * attempt);
+        match std::fs::rename(scratch, path) {
+            Ok(()) => return Ok(()),
+            Err(e) => last = e,
         }
+    }
+
+    // The scratch file survives on purpose. It holds the finished, flushed
+    // inventory — deleting it would throw away a full download and parse to
+    // leave the user with nothing but the previous run's output.
+    Err(ArunaError::Replace {
+        path: path.to_path_buf(),
+        scratch: scratch.to_path_buf(),
+        source: last,
     })
 }
 
@@ -142,6 +168,50 @@ mod tests {
             .file_name()
             .and_then(|n| n.to_str())
             .is_some_and(|n| n.starts_with("out.html.") && n.ends_with(".part")));
+    }
+
+    /// A failed replace must not cost the user the run. The scratch file holds
+    /// a complete, flushed inventory; the old code deleted it and left only the
+    /// previous run's output behind.
+    #[test]
+    fn a_failed_replace_keeps_the_finished_inventory() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("inventory.html");
+        // A directory where the file should go makes `rename` fail on every
+        // platform, which is the only portable way to reach this branch.
+        std::fs::create_dir(&path).unwrap();
+
+        let err = write_atomic(&path, b"finished inventory").unwrap_err();
+        match err {
+            ArunaError::Replace {
+                scratch,
+                path: reported,
+                ..
+            } => {
+                assert_eq!(reported, path);
+                assert_eq!(
+                    std::fs::read(&scratch).unwrap(),
+                    b"finished inventory",
+                    "the completed inventory must survive a failed replace"
+                );
+                assert_eq!(scratch.parent(), path.parent());
+            }
+            other => panic!("expected a Replace error, got {other:?}"),
+        }
+    }
+
+    /// The message has to name the kept file — it is the only way the user can
+    /// find their inventory.
+    #[test]
+    fn failed_replace_message_names_both_paths() {
+        let err = ArunaError::Replace {
+            path: PathBuf::from("/tmp/out.html"),
+            scratch: PathBuf::from("/tmp/out.html.42.part"),
+            source: std::io::Error::other("busy"),
+        };
+        let text = err.to_string();
+        assert!(text.contains("/tmp/out.html"), "{text}");
+        assert!(text.contains("/tmp/out.html.42.part"), "{text}");
     }
 
     #[test]
