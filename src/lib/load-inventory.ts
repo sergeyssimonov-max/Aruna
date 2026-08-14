@@ -38,15 +38,45 @@ export type LoadedInventory = {
 };
 
 /**
- * Load ARUN (.gz preferred). One network hop.
+ * Load ARUN (.gz preferred, uncompressed as a fallback). One network hop.
  * Returns display model + binary for the search worker.
  */
 export async function loadInventory(signal?: AbortSignal): Promise<LoadedInventory> {
   let arun: ArrayBuffer;
   try {
     arun = await fetchBuf(GZIP_URL, signal);
-  } catch {
-    arun = await fetchBuf(BIN_URL, signal);
+  } catch (gzipError) {
+    // A cancelled load is not a missing file. The catch used to swallow
+    // everything, so navigating away — which aborts the request — read as "the
+    // gzip is unavailable, try the plain one". A browser short-circuits that
+    // second request because the signal is already aborted, so nothing extra
+    // went over the wire; what it did do was turn a deliberate cancellation
+    // into a fetch that can only fail, and report it as a load error.
+    if (isAbort(gzipError, signal)) throw gzipError;
+
+    try {
+      arun = await fetchBuf(BIN_URL, signal);
+    } catch (binError) {
+      if (isAbort(binError, signal)) throw binError;
+      // Both failed. The gzip is the file that is supposed to be there, so its
+      // failure is the one worth reporting — reporting only the fallback's
+      // hides a corrupt .gz behind a message about a file the deployment may
+      // not even publish.
+      throw new Error(
+        `Failed to load inventory: ${message(gzipError)} (fallback: ${message(binError)})`,
+        { cause: gzipError },
+      );
+    }
   }
   return { inventory: parseInventory(arun), arun };
+}
+
+/** Whether a rejection means "the caller cancelled", not "the load failed". */
+function isAbort(error: unknown, signal?: AbortSignal): boolean {
+  if (signal?.aborted) return true;
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
