@@ -91,14 +91,53 @@ pub fn find_exact(hay: &[u8], needle: &[u8]) -> Option<usize> {
     memmem::find(hay, needle)
 }
 
+/// Byte just past the comment, CDATA section, declaration or processing
+/// instruction opening at `i`, where `hay[i]` is `<` and the next byte is `!`
+/// or `?`.
+///
+/// Stepping a single byte past such a `<` is not enough: the scanners then look
+/// for the next `<`, and a comment may well contain one. A commented-out
+/// `<!-- <uebern editor="…"/> -->` would be read as a live element and outrank
+/// the real one, because the header heuristics take the first match they find.
+///
+/// An unterminated construct swallows the rest of the input — everything after
+/// an unclosed `<!--` is comment, so there is nothing left worth scanning.
+fn skip_non_element(hay: &[u8], i: usize) -> usize {
+    let rest = &hay[i..];
+    let past = |pat: &[u8]| match memmem::find(rest, pat) {
+        Some(p) => i + p + pat.len(),
+        None => hay.len(),
+    };
+    if rest.starts_with(b"<!--") {
+        return past(b"-->");
+    }
+    if rest.starts_with(b"<![CDATA[") {
+        return past(b"]]>");
+    }
+    if rest.starts_with(b"<?") {
+        return past(b"?>");
+    }
+    // `<!DOCTYPE …>` and other declarations
+    match memchr(b'>', rest) {
+        Some(p) => i + p + 1,
+        None => hay.len(),
+    }
+}
+
 /// Find the opening tag `<…local…>` (with optional namespace prefix).
 /// Returns `(start_of_tag, end_of_opening_tag)` so the caller can slice attributes or text.
 pub fn find_open_tag(hay: &[u8], local: &[u8]) -> Option<(usize, usize)> {
     let mut pos = 0;
     while let Some(rel) = memchr(b'<', &hay[pos..]) {
         let i = pos + rel;
-        // Skip closing tags and comments / declarations roughly.
-        if i + 1 < hay.len() && (hay[i + 1] == b'/' || hay[i + 1] == b'!' || hay[i + 1] == b'?') {
+        if i + 1 >= hay.len() {
+            break;
+        }
+        if hay[i + 1] == b'!' || hay[i + 1] == b'?' {
+            pos = skip_non_element(hay, i);
+            continue;
+        }
+        if hay[i + 1] == b'/' {
             pos = i + 1;
             continue;
         }
@@ -125,7 +164,15 @@ pub fn find_close_tag(hay: &[u8], from: usize, local: &[u8]) -> Option<usize> {
     let mut pos = from;
     while let Some(rel) = memchr(b'<', &hay[pos..]) {
         let i = pos + rel;
-        if i + 1 < hay.len() && hay[i + 1] == b'/' {
+        if i + 1 >= hay.len() {
+            break;
+        }
+        // A comment inside the element may hold a `</…>` that closes nothing.
+        if hay[i + 1] == b'!' || hay[i + 1] == b'?' {
+            pos = skip_non_element(hay, i);
+            continue;
+        }
+        if hay[i + 1] == b'/' {
             let name_start = i + 2;
             let mut j = name_start;
             while j < hay.len() && is_name_char(hay[j]) {
@@ -152,15 +199,37 @@ pub fn strip_tags_bytes(hay: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(hay.len());
     let mut i = 0;
     while i < hay.len() {
-        if hay[i] == b'<' {
-            if let Some(end) = memchr(b'>', &hay[i..]) {
-                i += end + 1;
-                continue;
-            }
-            break; // unclosed tag → stop
+        if hay[i] != b'<' {
+            out.push(hay[i]);
+            i += 1;
+            continue;
         }
-        out.push(hay[i]);
-        i += 1;
+        // A CDATA section is text that happens to be wrapped in markup; its
+        // contents belong in the output verbatim.
+        if hay[i..].starts_with(b"<![CDATA[") {
+            let start = i + b"<![CDATA[".len();
+            match memmem::find(&hay[start..], b"]]>") {
+                Some(p) => {
+                    out.extend_from_slice(&hay[start..start + p]);
+                    i = start + p + 3;
+                }
+                None => {
+                    out.extend_from_slice(&hay[start..]);
+                    i = hay.len();
+                }
+            }
+            continue;
+        }
+        // A comment ends at `-->`, not at the first `>` inside it. Stopping at
+        // the `>` would spill the rest of the comment into the text.
+        if matches!(hay.get(i + 1), Some(b'!') | Some(b'?')) {
+            i = skip_non_element(hay, i);
+            continue;
+        }
+        match memchr(b'>', &hay[i..]) {
+            Some(end) => i += end + 1,
+            None => break, // unclosed tag → stop
+        }
     }
     out
 }
@@ -175,7 +244,11 @@ pub fn for_each_start_tag(hay: &[u8], mut f: impl FnMut(&[u8], &[u8]) -> bool) {
             break;
         }
         let next = hay[i + 1];
-        if next == b'/' || next == b'!' || next == b'?' {
+        if next == b'!' || next == b'?' {
+            pos = skip_non_element(hay, i);
+            continue;
+        }
+        if next == b'/' {
             pos = i + 1;
             continue;
         }
@@ -379,6 +452,101 @@ mod tests {
             true
         });
         assert_eq!(count, 1);
+    }
+
+    /// The existing comment test used `<!-- c -->`, which has nothing inside it
+    /// that looks like markup — so it passed while the scanner was stepping one
+    /// byte past `<!` and finding the next `<` wherever it fell.
+    #[test]
+    fn a_tag_inside_a_comment_is_not_a_tag() {
+        let h = br#"<!-- <docID id="ghost">nope</docID> --><docID id="real">yes</docID>"#;
+        let (open, content) = find_open_tag(h, b"docID").unwrap();
+        assert_eq!(&h[open..open + 14], br#"<docID id="rea"#);
+        assert_eq!(tag_text(h, b"docID").unwrap(), b"yes");
+
+        let mut seen = Vec::new();
+        for_each_start_tag(h, |local, attrs| {
+            seen.push(String::from_utf8_lossy(attrs).into_owned());
+            assert_eq!(local, b"docID");
+            false
+        });
+        assert_eq!(seen, vec![r#"id="real""#.to_string()]);
+        let _ = content;
+    }
+
+    /// The real shape of the bug: header heuristics take the first match, so a
+    /// commented-out editor would win over the live one.
+    #[test]
+    fn commented_out_element_does_not_outrank_the_live_one() {
+        let h = br#"<AOHeader><!-- <uebern editor="OLD" date="1999-01-01"/> --><uebern editor="NEW" date="2017-03-28"/></AOHeader>"#;
+        let mut editors = Vec::new();
+        for_each_start_tag(h, |local, attrs| {
+            if eq_ci(local, b"uebern") {
+                editors.push(
+                    String::from_utf8_lossy(attr_value(attrs, b"editor").unwrap()).into_owned(),
+                );
+            }
+            false
+        });
+        assert_eq!(editors, vec!["NEW".to_string()]);
+    }
+
+    #[test]
+    fn a_closing_tag_inside_a_comment_closes_nothing() {
+        let h = br#"<note>keep<!-- </note> -->all</note>"#;
+        assert_eq!(tag_text(h, b"note").unwrap(), b"keep<!-- </note> -->all");
+    }
+
+    #[test]
+    fn cdata_is_text_not_markup() {
+        let h = br#"<v><![CDATA[<uebern editor="ghost"/>]]></v>"#;
+        let mut seen = Vec::new();
+        for_each_start_tag(h, |local, _| {
+            seen.push(String::from_utf8_lossy(local).into_owned());
+            false
+        });
+        assert_eq!(seen, vec!["v".to_string()]);
+        assert_eq!(
+            strip_tags_bytes(h),
+            br#"<uebern editor="ghost"/>"#.to_vec(),
+            "CDATA contents are text and must survive stripping"
+        );
+    }
+
+    #[test]
+    fn declarations_and_instructions_are_stepped_over() {
+        let h = br#"<?xml version="1.0"?><!DOCTYPE AO SYSTEM "ao.dtd"><AO:docID>7</AO:docID>"#;
+        assert_eq!(tag_text(h, b"docID").unwrap(), b"7");
+
+        let mut seen = Vec::new();
+        for_each_start_tag(h, |local, _| {
+            seen.push(String::from_utf8_lossy(local).into_owned());
+            false
+        });
+        assert_eq!(seen, vec!["docID".to_string()]);
+    }
+
+    /// Everything after an unclosed `<!--` is comment; the scanners must stop
+    /// rather than resume on the next `<` they see.
+    #[test]
+    fn an_unterminated_comment_swallows_the_rest() {
+        let h = br#"<a/><!-- <b/>"#;
+        let mut seen = Vec::new();
+        for_each_start_tag(h, |local, _| {
+            seen.push(String::from_utf8_lossy(local).into_owned());
+            false
+        });
+        assert_eq!(seen, vec!["a".to_string()]);
+        assert_eq!(find_open_tag(h, b"b"), None);
+    }
+
+    #[test]
+    fn strip_tags_drops_a_whole_comment() {
+        // The `>` in the middle used to end the "tag", spilling the rest of the
+        // comment into the text.
+        assert_eq!(strip_tags_bytes(b"a<!-- x > y -->b"), b"ab");
+        assert_eq!(strip_tags_bytes(b"a<?pi x > y ?>b"), b"ab");
+        assert_eq!(strip_tags_bytes(b"a<!-- unterminated"), b"a");
     }
 
     #[test]
