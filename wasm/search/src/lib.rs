@@ -87,6 +87,8 @@ enum IndexError {
     RangeOutOfPool,
     /// A group claims items that do not exist.
     GroupOutOfRange,
+    /// An item points at an author or year that is not in the pool.
+    MetaIdOutOfRange,
 }
 
 impl IndexView {
@@ -126,10 +128,22 @@ impl IndexView {
                 let at = items_off + i * ITEM_STRIDE;
                 let off = u32_le(&bytes, at) as usize;
                 let len = bytes[at + 4] as usize;
+                let auth = bytes[at + 5];
+                let year = bytes[at + 6];
+                // Ids index the `u64` bitsets built in `matching`, so an id past
+                // its pool is not merely meaningless — it would shift a `u64` by
+                // up to 255. That is an overflow: a build with overflow checks
+                // panics, and a panic crossing `extern "C"` takes the whole
+                // module down; without them the shift is masked and the item
+                // silently matches the wrong pool entry. Reject the blob here
+                // and the caller falls back to the JavaScript engine.
+                if u32::from(auth) >= n_auth || u32::from(year) >= n_year {
+                    return Err(IndexError::MetaIdOutOfRange);
+                }
                 Ok(Item {
                     sig: pool_range(sig_pool_off, sig_pool_len, off, len)?,
-                    auth: bytes[at + 5],
-                    year: bytes[at + 6],
+                    auth,
+                    year,
                 })
             })
             .collect::<Result<Vec<_>, IndexError>>()?;
@@ -219,6 +233,16 @@ fn u32_le(bytes: &[u8], at: usize) -> u32 {
 
 fn u16_le(bytes: &[u8], at: usize) -> u16 {
     u16::from_le_bytes([bytes[at], bytes[at + 1]])
+}
+
+/// Test bit `idx` of a pool bitset.
+///
+/// `parse` already refuses ids past their pool, so `idx` is in range by the time
+/// a search runs. The guard stays because the cost of being wrong is not a bad
+/// answer but a trap: this module is compiled with `panic = "abort"`, so one
+/// overflowing shift would take search off the page entirely.
+fn bit(bits: u64, idx: u8) -> bool {
+    idx < 64 && bits >> idx & 1 != 0
 }
 
 /// Substring test — the only matcher in this module.
@@ -398,7 +422,7 @@ fn run_search(index: &IndexView, query: &[u8], out: &mut [u8]) -> u32 {
             if count >= max_entries {
                 break 'groups;
             }
-            let meta_hit = auth_bits >> item.auth & 1 != 0 || year_bits >> item.year & 1 != 0;
+            let meta_hit = bit(auth_bits, item.auth) || bit(year_bits, item.year);
             if meta_hit || contains(index.sig(item), query) {
                 write_entry(out, count, gi as u32, 1, offset as u32);
                 count += 1;
@@ -478,6 +502,56 @@ mod tests {
         let blob = build_tiny();
         reset();
         assert_eq!(unsafe { init(blob.as_ptr(), blob.len()) }, 1);
+    }
+
+    /// An id past its pool must be refused at load, not shifted at search time.
+    ///
+    /// Before this was checked, `init` accepted the blob and the first query
+    /// shifted a `u64` by 200: with overflow checks that is a panic, and with
+    /// `panic = "abort"` a panic here ends the module. Without them the shift is
+    /// masked to `200 & 63`, so the item quietly matches pool entry 8.
+    #[test]
+    fn an_id_past_its_pool_is_rejected() {
+        let items_off = HEADER + GROUP_STRIDE;
+        for offset in [5 /* auth */, 6 /* year */] {
+            for bad in [1u8, 64, 200, 255] {
+                let mut blob = build_tiny(); // one auth entry, one year entry
+                blob[items_off + offset] = bad;
+                assert_rejected(blob.clone(), IndexError::MetaIdOutOfRange);
+                reset();
+                assert_eq!(
+                    unsafe { init(blob.as_ptr(), blob.len()) },
+                    0,
+                    "init must refuse the blob so the caller can fall back"
+                );
+            }
+        }
+    }
+
+    /// Searching after a refused load must answer "nothing", not trap: the
+    /// module has to stay usable so a later, valid index can be loaded.
+    #[test]
+    fn a_refused_index_leaves_the_module_alive() {
+        let mut blob = build_tiny();
+        blob[HEADER + GROUP_STRIDE + 5] = 200;
+        reset();
+        assert_eq!(unsafe { init(blob.as_ptr(), blob.len()) }, 0);
+        assert_eq!(search_hits(b"ls"), 0, "no index loaded → no results");
+
+        // The module still works afterwards.
+        load_tiny();
+        assert!(search_hits(b"ls") > 0, "a valid index still loads and matches");
+    }
+
+    /// The bit test is total, so even an id that somehow reached a search
+    /// cannot overflow the shift.
+    #[test]
+    fn bit_test_is_total() {
+        assert!(bit(0b101, 0));
+        assert!(!bit(0b101, 1));
+        assert!(bit(0b101, 2));
+        assert!(!bit(u64::MAX, 64), "past the bitset, not wrapped to bit 0");
+        assert!(!bit(u64::MAX, 255));
     }
 
     /// `contains` must agree with an independent oracle over an ASCII corpus.

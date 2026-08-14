@@ -2,10 +2,31 @@ import type { Wire } from "./inventory";
 
 /** TLH2 magic — must match wasm/search. */
 const MAGIC = 0x32484c54;
+/**
+ * Author and year pools are matched through `u64` bitsets in the WASM module,
+ * which caps each at 64 entries (`MAX_POOL` in wasm/search/src/lib.rs).
+ *
+ * This used to be guarded as `> 255`, the width of the id field rather than the
+ * width of the bitset. Between 65 and 255 authors the builder was happy and the
+ * module rejected the result, so search fell back to the JavaScript scan with
+ * nothing said. The corpus currently holds 44 distinct authors.
+ */
+const MAX_POOL = 64;
 const te = new TextEncoder();
 
-/** Build compact TLH2 binary index for `public/wasm/search.wasm`. */
-export function buildSearchIndex(wire: Wire): ArrayBuffer {
+/**
+ * Build the compact TLH2 binary index for `public/wasm/search.wasm`.
+ *
+ * Returns null when the inventory does not fit the format — too many distinct
+ * authors or years, a siglum past 255 bytes, a CTH past `u16`. The caller then
+ * uses the JavaScript engine, which has no such limits.
+ *
+ * Null rather than an exception on purpose: this runs inside the worker on
+ * every load, and a throw here would surface as a fatal error and replace the
+ * inventory with an error screen, when a slower but working search was
+ * available all along.
+ */
+export function buildSearchIndex(wire: Wire): ArrayBuffer | null {
   const pool = wire.p;
 
   // ── collect unique lowercase strings ──────────────────────────
@@ -76,12 +97,10 @@ export function buildSearchIndex(wire: Wire): ArrayBuffer {
       const sig = internSig(hay);
       const auth = internAuth(pool[ai] ?? "—");
       const year = internYear(pool[yi] ?? "—");
-      if (auth > 255 || year > 255) {
-        throw new Error("auth/year pool exceeds u8");
-      }
+      if (auth >= MAX_POOL || year >= MAX_POOL) return null;
       items[ri] = { sig, auth, year };
     }
-    if (cth > 0xffff) throw new Error("CTH exceeds u16");
+    if (cth > 0xffff) return null;
     groups.push({ cth, items });
   }
 
@@ -92,7 +111,7 @@ export function buildSearchIndex(wire: Wire): ArrayBuffer {
   const sigOffByStr = new Map<string, { off: number; len: number }>();
   for (const s of sigList) {
     const b = te.encode(s);
-    if (b.length > 255) throw new Error("siglum longer than u8");
+    if (b.length > 255) return null;
     const meta = { off: sigPoolLen, len: b.length };
     sigOffByStr.set(s, meta);
     sigMeta.push(meta);
@@ -106,7 +125,7 @@ export function buildSearchIndex(wire: Wire): ArrayBuffer {
     let len = 0;
     for (const s of list) {
       const b = te.encode(s);
-      if (b.length > 0xffff || len > 0xffff) throw new Error("small pool overflow");
+      if (b.length > 0xffff || len > 0xffff) return null;
       dir.push({ off: len, len: b.length });
       parts.push(b);
       len += b.length;
@@ -116,6 +135,7 @@ export function buildSearchIndex(wire: Wire): ArrayBuffer {
 
   const authP = packSmallPool(auths);
   const yearP = packSmallPool(years);
+  if (!authP || !yearP) return null;
 
   // ── layout ────────────────────────────────────────────────────
   const nGroups = groups.length;

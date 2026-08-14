@@ -57,7 +57,19 @@ function runSearch(q: string): SearchMatch[] {
     for (let i = 0; i < nGroups; i++) all[i] = { gi: i, ii: null };
     return all;
   }
-  if (engine === "wasm" && wasm) return wasm.search(q);
+  if (engine === "wasm" && wasm) {
+    try {
+      return wasm.search(q);
+    } catch {
+      // A trap poisons the instance: every later call would throw too. Letting
+      // that reach the caller turns one bad query into a fatal error and takes
+      // the whole inventory off the screen, even though the JavaScript index is
+      // built and sitting right here. Switch to it for good and answer the
+      // query that just failed.
+      engine = "js";
+      wasm = null;
+    }
+  }
   return searchJs(q);
 }
 
@@ -73,8 +85,10 @@ ctx.onmessage = async (ev: MessageEvent<WorkerIn>) => {
       nManuscripts = wire.m;
       nGroups = wire.g.length;
       jsIndex = buildJsIndex(wire);
+      // Null when the inventory outgrew the binary format; the JavaScript index
+      // covers that case, so it is a downgrade rather than a failure.
       const blob = buildSearchIndex(wire);
-      wasm = await WasmSearch.create(blob);
+      wasm = blob ? await WasmSearch.create(blob) : null;
       engine = wasm ? "wasm" : "js";
       ctx.postMessage({
         type: "ready",
