@@ -107,8 +107,14 @@ function InventoryPage() {
   const [range, setRange] = useState({ y0: 0, y1: 720 });
   const rafRef = useRef(0);
 
-  const { status: workerStatus, error: workerError, matches, search } =
+  const { status: workerStatus, error: workerError, matches, matchesQuery, search } =
     useSearchWorker(arun);
+
+  // The worker normalises the query before searching; normalise the same way
+  // here so a result can be matched to the query on screen.
+  const normalizedQuery = deferredQuery.trim().toLowerCase();
+  // Results for an earlier query are not results for this one.
+  const currentMatches = matchesQuery === normalizedQuery ? matches : null;
 
   useEffect(() => {
     const ac = new AbortController();
@@ -132,10 +138,10 @@ function InventoryPage() {
 
   const filtered: Group[] = useMemo(() => {
     if (!data) return [];
-    if (!deferredQuery.trim()) return data.groups;
-    if (!matches) return [];
-    return applyMatches(data, matches);
-  }, [data, deferredQuery, matches]);
+    if (!normalizedQuery) return data.groups;
+    if (!currentMatches) return [];
+    return applyMatches(data, currentMatches);
+  }, [data, normalizedQuery, currentMatches]);
 
   const layout = useMemo(
     () => buildLayout(filtered, openAll),
@@ -211,11 +217,12 @@ function InventoryPage() {
 
   const onQuery = useCallback((v: string) => setQuery(v), []);
 
-  const searching = deferredQuery.trim() !== "";
+  const searching = normalizedQuery !== "";
+  // Pending until a result for *this* query is in hand — the previous query's
+  // matches are never null, so keying off that alone kept the indicator dark
+  // through every re-search.
   const searchPending =
-    searching &&
-    (workerStatus !== "ready" ||
-      (matches === null && deferredQuery.trim() !== ""));
+    searching && (workerStatus !== "ready" || currentMatches === null);
 
   const error = loadError || workerError;
   if (error) {

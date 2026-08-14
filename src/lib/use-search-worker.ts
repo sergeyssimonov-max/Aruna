@@ -8,9 +8,17 @@ type Status = "boot" | "ready" | "error";
 export function useSearchWorker(arun: ArrayBuffer | null) {
   const workerRef = useRef<Worker | null>(null);
   const reqId = useRef(0);
+  /** Query of the request currently in flight — the one `reqId` refers to. */
+  const sentQuery = useRef("");
   const [status, setStatus] = useState<Status>("boot");
   const [error, setError] = useState<string | null>(null);
-  const [matches, setMatches] = useState<SearchMatch[] | null>(null);
+  // A result carries the query it answers. Matches alone cannot say whether
+  // they are still current, so a caller holding them would go on drawing the
+  // previous query's hits for as long as the next search is in flight.
+  const [result, setResult] = useState<{
+    query: string;
+    matches: SearchMatch[];
+  } | null>(null);
 
   useEffect(() => {
     if (!arun) return;
@@ -30,7 +38,7 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
       }
       if (msg.type === "result") {
         if (msg.id !== reqId.current) return;
-        setMatches(msg.matches);
+        setResult({ query: sentQuery.current, matches: msg.matches });
         return;
       }
       if (msg.type === "error") {
@@ -58,25 +66,33 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
       worker.terminate();
       workerRef.current = null;
       setStatus("boot");
-      setMatches(null);
+      setResult(null);
     };
   }, [arun]);
 
   const search = useCallback(
     (q: string) => {
       const trimmed = q.trim().toLowerCase();
+      const id = ++reqId.current;
+      sentQuery.current = trimmed;
       if (!trimmed) {
-        reqId.current += 1;
-        setMatches(null);
+        // An empty query is answered here: the caller shows everything.
+        setResult({ query: "", matches: [] });
         return;
       }
       const w = workerRef.current;
       if (!w || status !== "ready") return;
-      const id = ++reqId.current;
       w.postMessage({ type: "search", id, q: trimmed } satisfies WorkerIn);
     },
     [status],
   );
 
-  return { status, error, matches, search };
+  return {
+    status,
+    error,
+    matches: result?.matches ?? null,
+    /** Query `matches` answers; compare with the live one before trusting it. */
+    matchesQuery: result?.query ?? null,
+    search,
+  };
 }
