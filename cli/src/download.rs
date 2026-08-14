@@ -69,10 +69,37 @@ fn is_retryable_status(status: u16) -> bool {
     matches!(status, 408 | 425 | 429 | 500 | 502 | 503 | 504)
 }
 
+/// I/O failures worth another attempt.
+///
+/// An allowlist rather than a denylist, because the cost of guessing wrong is
+/// asymmetric: retrying re-downloads 71 MiB. `UnexpectedEof` is the one that
+/// matters — it is how ureq reports a body that stopped short of its
+/// `Content-Length` — and the rest are ordinary interruptions.
+///
+/// Everything else is treated as settled, which is what a full disk, a
+/// read-only volume, an exceeded quota or a permission error are. Those used to
+/// be retried, so a run that could not write its scratch file downloaded the
+/// archive three times before saying so.
+///
+/// Listing what may be retried rather than what may not also means a kind
+/// nobody anticipated costs one download instead of three.
+fn is_retryable_io(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::UnexpectedEof
+            | std::io::ErrorKind::Interrupted
+            | std::io::ErrorKind::TimedOut
+            | std::io::ErrorKind::ConnectionReset
+            | std::io::ErrorKind::ConnectionAborted
+            | std::io::ErrorKind::BrokenPipe
+    )
+}
+
 /// Whether another attempt has any chance of succeeding.
 fn is_retryable(err: &ArunaError) -> bool {
     match err {
-        ArunaError::Network { .. } | ArunaError::Truncated { .. } | ArunaError::Io { .. } => true,
+        ArunaError::Network { .. } | ArunaError::Truncated { .. } => true,
+        ArunaError::Io { source, .. } => is_retryable_io(source),
         ArunaError::Http { status, .. } => is_retryable_status(*status),
         // A digest mismatch is not a hiccup. Either ZENODO_ZIP_MD5 is stale or
         // the archive was republished, and both are settled before the first
@@ -487,6 +514,49 @@ mod tests {
             expected: "a".into(),
             got: "b".into(),
         }));
+    }
+
+    /// A local write that cannot succeed must not drag the archive down the
+    /// wire again. Raw codes rather than `ErrorKind` names, so the test states
+    /// the exact condition it means.
+    #[test]
+    fn a_failed_local_write_is_not_retried() {
+        let io = |code| ArunaError::Io {
+            path: "/tmp/x".into(),
+            source: std::io::Error::from_raw_os_error(code),
+        };
+        for (code, what) in [
+            (28, "ENOSPC — disk full"),
+            (13, "EACCES — permission denied"),
+            (30, "EROFS — read-only filesystem"),
+            (69, "EDQUOT — quota exceeded"),
+        ] {
+            assert!(
+                !is_retryable(&io(code)),
+                "{what} cannot be fixed by downloading 71 MiB again"
+            );
+        }
+    }
+
+    /// The interruptions that a second attempt does fix stay retryable — above
+    /// all the short body, which is how ureq reports a connection that dropped
+    /// mid-transfer.
+    #[test]
+    fn an_interrupted_transfer_is_retried() {
+        for kind in [
+            std::io::ErrorKind::UnexpectedEof,
+            std::io::ErrorKind::Interrupted,
+            std::io::ErrorKind::TimedOut,
+            std::io::ErrorKind::ConnectionReset,
+        ] {
+            assert!(
+                is_retryable(&ArunaError::Io {
+                    path: "/tmp/x".into(),
+                    source: std::io::Error::new(kind, "interrupted"),
+                }),
+                "{kind:?} deserves another attempt"
+            );
+        }
     }
 
     #[test]
