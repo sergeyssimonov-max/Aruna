@@ -14,51 +14,113 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("Ошибка: {err}");
-            if let Some(src) = std::error::Error::source(&err) {
-                eprintln!("  причина: {src}");
-            }
-            // Extra context for common cases
-            match &err {
-                ArunaError::Network { .. } => {
-                    eprintln!("Проверьте сетевое соединение и доступность Zenodo.");
-                }
-                ArunaError::Http { status: 404 | 410, .. } => {
-                    eprintln!(
-                        "Zenodo больше не отдаёт этот файл — вероятно, архив перевыпущен.\n\
-                         Обновите ZENODO_ZIP_URL и ZENODO_ZIP_MD5 в cli/src/download.rs."
-                    );
-                }
-                ArunaError::Http { .. } => {
-                    eprintln!("Zenodo сейчас недоступен. Попробуйте позже.");
-                }
-                ArunaError::ChecksumMismatch { .. } => {
-                    eprintln!(
-                        "Архив скачался целиком, но его MD5 не совпал с ожидаемым.\n\
-                         Скорее всего, Zenodo перевыпустил архив: сверьте сумму на странице\n\
-                         записи и обновите ZENODO_ZIP_MD5 в cli/src/download.rs.\n\
-                         Повторный запуск не поможет — сумма не изменится."
-                    );
-                }
-                ArunaError::EmptyArchive | ArunaError::Zip(_) => {
-                    eprintln!("Архив повреждён или не содержит XML-документов.");
-                }
-                ArunaError::DownloadsDir => {
-                    eprintln!("Не удалось определить каталог Downloads.");
-                }
-                ArunaError::Replace { scratch, .. } => {
-                    eprintln!(
-                        "Новая опись готова и никуда не делась — она лежит рядом:\n  {}",
-                        scratch.display()
-                    );
-                    eprintln!(
-                        "Закройте программу, которая держит старый файл открытым \
-                         (обычно это браузер), и запустите ещё раз."
-                    );
-                }
-                _ => {}
-            }
+            report(&err);
             ExitCode::FAILURE
         }
+    }
+}
+
+/// Print the failure, its cause, and what the person in front of it can do.
+fn report(err: &ArunaError) {
+    eprintln!("Ошибка: {err}");
+    if let Some(src) = std::error::Error::source(err) {
+        eprintln!("  причина: {src}");
+    }
+    if let Some(advice) = advice(err) {
+        eprintln!("{advice}");
+    }
+}
+
+/// What to try next, for the failures where there is something to try.
+///
+/// Separated from [`report`] so the wording of each case can be read — and
+/// changed — without the printing around it, and so a new error variant that
+/// deserves advice is a missing arm here rather than a line lost in a `match`
+/// that also handles exit codes.
+///
+/// `None` means the error message says everything useful on its own.
+fn advice(err: &ArunaError) -> Option<String> {
+    Some(match err {
+        ArunaError::Network { .. } => {
+            "Проверьте сетевое соединение и доступность Zenodo.".to_string()
+        }
+        ArunaError::Http {
+            status: 404 | 410, ..
+        } => "Zenodo больше не отдаёт этот файл — вероятно, архив перевыпущен.\n\
+              Обновите ZENODO_ZIP_URL и ZENODO_ZIP_MD5 в cli/src/download.rs."
+            .to_string(),
+        ArunaError::Http { .. } => "Zenodo сейчас недоступен. Попробуйте позже.".to_string(),
+        ArunaError::ChecksumMismatch { .. } => {
+            "Архив скачался целиком, но его MD5 не совпал с ожидаемым.\n\
+             Скорее всего, Zenodo перевыпустил архив: сверьте сумму на странице\n\
+             записи и обновите ZENODO_ZIP_MD5 в cli/src/download.rs.\n\
+             Повторный запуск не поможет — сумма не изменится."
+                .to_string()
+        }
+        ArunaError::EmptyArchive | ArunaError::Zip(_) => {
+            "Архив повреждён или не содержит XML-документов.".to_string()
+        }
+        ArunaError::DownloadsDir => "Не удалось определить каталог Downloads.".to_string(),
+        // The finished inventory is not lost — say where it is, and what is
+        // holding the old file open.
+        ArunaError::Replace { scratch, .. } => format!(
+            "Новая опись готова и никуда не делась — она лежит рядом:\n  {}\n\
+             Закройте программу, которая держит старый файл открытым \
+             (обычно это браузер), и запустите ещё раз.",
+            scratch.display()
+        ),
+        ArunaError::Truncated { .. } | ArunaError::Io { .. } => return None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The two cases that are advised differently by status must stay
+    /// distinguishable: a gone file needs the URL updated, a busy server needs
+    /// waiting. They used to sit in one `match` with the exit code, where the
+    /// arm order is what keeps them apart.
+    #[test]
+    fn a_gone_archive_and_a_busy_server_are_advised_differently() {
+        let gone = advice(&ArunaError::Http {
+            url: "u".into(),
+            status: 404,
+            retry_after: None,
+        })
+        .expect("404 has advice");
+        assert!(gone.contains("ZENODO_ZIP_URL"));
+
+        let busy = advice(&ArunaError::Http {
+            url: "u".into(),
+            status: 503,
+            retry_after: Some(30),
+        })
+        .expect("503 has advice");
+        assert!(busy.contains("Попробуйте позже"));
+    }
+
+    /// A failed replace must name the file it kept — that path is the whole
+    /// point of the variant.
+    #[test]
+    fn a_failed_replace_names_the_file_it_kept() {
+        let advice = advice(&ArunaError::Replace {
+            path: PathBuf::from("/out/inventory.html"),
+            scratch: PathBuf::from("/out/inventory.html.123.part"),
+            source: std::io::Error::other("busy"),
+        })
+        .expect("a kept inventory has advice");
+        assert!(advice.contains("/out/inventory.html.123.part"));
+    }
+
+    /// Errors whose own message is the whole story get no second paragraph.
+    #[test]
+    fn a_self_explanatory_error_is_left_alone() {
+        assert!(advice(&ArunaError::Truncated {
+            url: "u".into(),
+            expected: 10,
+            got: 4,
+        })
+        .is_none());
     }
 }
