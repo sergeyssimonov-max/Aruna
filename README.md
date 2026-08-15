@@ -11,6 +11,7 @@ Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (H
 | [`wasm/search/`](wasm/search/) | Rust → WASM search engine (BMH + bitmasks) |
 | [`public/data/`](public/data/) | ARUN v3 binary catalog (`inventory.bin` / `.gz`) |
 | [`scripts/build-inventory-bin.mjs`](scripts/build-inventory-bin.mjs) | Rebuild ARUN from `inventory.json` |
+| [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Rebuild `inventory.json` from the archive — the parser is the source of truth for both the site and the CLI |
 
 ## CLI (Aruna) — macOS only
 

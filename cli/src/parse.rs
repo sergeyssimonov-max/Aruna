@@ -81,7 +81,7 @@ pub fn parse_manuscript(path: &str, xml: &str) -> ManuscriptRecord {
         authorship: authorship.unwrap_or_else(|| MISSING.to_string()),
         year,
         lang: extract_lang(window),
-        inv: extract_inv(header),
+        inv: extract_inv(header, window),
         corpus: extract_corpus(path),
     }
 }
@@ -362,12 +362,21 @@ fn normalize_ws(s: &str) -> String {
 
 
 /// Museum / excavation number from the header.
-fn extract_inv(header: &str) -> String {
-    for tag in [b"InvNr".as_slice(), b"invNr", b"inv"] {
-        if let Some(v) = first_tag_text(header, tag) {
-            let t = normalize_ws(&v);
-            if !t.is_empty() {
-                return t;
+/// Museum / excavation inventory number.
+///
+/// Searched in the header first, then in the wider window, because TLHdig keeps
+/// it outside the header: `<AO:InvNr>` sits in `<AO:Manuscripts>` in the body.
+/// Looking only at the header therefore found it in no document at all, and
+/// every one of the 24 000 records carried the missing-value dash — while the
+/// numbers are what makes a manuscript findable by its museum id in search.
+fn extract_inv(header: &str, window: &str) -> String {
+    for hay in [header, window] {
+        for tag in [b"InvNr".as_slice(), b"invNr", b"inv"] {
+            if let Some(v) = first_tag_text(hay, tag) {
+                let t = normalize_ws(&v);
+                if !t.is_empty() {
+                    return t;
+                }
             }
         }
     }
@@ -476,6 +485,32 @@ pub fn is_manuscript_xml(path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// TLHdig keeps the inventory number outside the header — `<AO:InvNr>` sits
+    /// in `<AO:Manuscripts>` in the body. Searching the header alone found it in
+    /// no document at all, so every record in the corpus carried the dash and
+    /// museum numbers vanished from search.
+    #[test]
+    fn inventory_number_is_found_outside_the_header() {
+        let xml = r#"<AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0">
+<AOHeader><docID>KBo 3.22</docID></AOHeader>
+<AO:Manuscripts> <AO:TxtPubl>KBo 3.22</AO:TxtPubl> <AO:InvNr>VAT 7479</AO:InvNr> </AO:Manuscripts>
+<body>…</body></AOxml>"#;
+        let rec = parse_manuscript("CTH 1_XML_HAnn/KBo 3.22.xml", xml);
+        assert_eq!(rec.inv, "VAT 7479");
+    }
+
+    /// The header still wins when it carries one, and a document without the
+    /// tag anywhere reports the missing-value dash rather than empty text.
+    #[test]
+    fn inventory_number_prefers_the_header_and_tolerates_absence() {
+        let in_header = r#"<AOxml><AOHeader><docID>X</docID><InvNr>Bo 1234</InvNr></AOHeader>
+<AO:Manuscripts><AO:InvNr>VAT 9999</AO:InvNr></AO:Manuscripts></AOxml>"#;
+        assert_eq!(parse_manuscript("CTH 1_XML/X.xml", in_header).inv, "Bo 1234");
+
+        let absent = r#"<AOxml><AOHeader><docID>X</docID></AOHeader><body>t</body></AOxml>"#;
+        assert_eq!(parse_manuscript("CTH 1_XML/X.xml", absent).inv, MISSING);
+    }
 
     const SAMPLE_FULL: &str = r#"<?xml-stylesheet href="HPMxml.css" type="text/css"?>
 <AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0">
