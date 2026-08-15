@@ -207,14 +207,14 @@ export function parseInventory(buf: ArrayBuffer): Inventory {
     for (let li = 0; li < count; li++) {
       const it = itemAt(L, start + li);
       items[li] = {
-        s: it.sig,
-        a: L.auths[it.auth] ?? "—",
-        y: L.years[it.year] ?? "—",
-        l: L.langs[it.lang] ?? "—",
-        c: L.corps[it.corpus] ?? "—",
+        siglum: it.sig,
+        editor: L.auths[it.auth] ?? "—",
+        year: L.years[it.year] ?? "—",
+        lang: L.langs[it.lang] ?? "—",
+        corpus: L.corps[it.corpus] ?? "—",
       };
     }
-    groups[gi] = { c: `CTH ${cth}`, i: items };
+    groups[gi] = { cth: `CTH ${cth}`, items };
   }
   return { source: L.source, manuscripts: L.manuscripts, groups };
 }

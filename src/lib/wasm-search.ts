@@ -85,26 +85,26 @@ export class WasmSearch {
     let i = 0;
     while (i < n) {
       const base = 4 + i * 12;
-      const gi = view.getUint32(base, true);
+      const group = view.getUint32(base, true);
       const kind = view.getUint32(base + 4, true);
       const extra = view.getUint32(base + 8, true);
       if (kind === 0) {
-        out.push({ gi, ii: null });
+        out.push({ group, items: null });
         i++;
         continue;
       }
       // Gather run of items for this group.
-      const ii: number[] = [extra];
+      const items: number[] = [extra];
       i++;
       while (i < n) {
         const b2 = 4 + i * 12;
-        const gi2 = view.getUint32(b2, true);
+        const group2 = view.getUint32(b2, true);
         const kind2 = view.getUint32(b2 + 4, true);
-        if (gi2 !== gi || kind2 !== 1) break;
-        ii.push(view.getUint32(b2 + 8, true));
+        if (group2 !== group || kind2 !== 1) break;
+        items.push(view.getUint32(b2 + 8, true));
         i++;
       }
-      out.push({ gi, ii });
+      out.push({ group, items });
     }
     return out;
   }

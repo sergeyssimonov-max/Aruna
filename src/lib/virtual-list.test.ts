@@ -5,13 +5,13 @@ import { GROUP_H, ROW_H, buildLayout, countItems, visibleRows } from "./virtual-
 
 function groups(...sizes: number[]): Group[] {
   return sizes.map((n, gi) => ({
-    c: `CTH ${gi + 1}`,
-    i: Array.from({ length: n }, (_, li) => ({
-      s: `sig ${gi}.${li}`,
-      a: "ed",
-      y: "2021",
-      l: "Hit",
-      c: "TLH",
+    cth: `CTH ${gi + 1}`,
+    items: Array.from({ length: n }, (_, li) => ({
+      siglum: `sig ${gi}.${li}`,
+      editor: "ed",
+      year: "2021",
+      lang: "Hit",
+      corpus: "TLH",
     })),
   }));
 }
@@ -43,8 +43,8 @@ test("only rows inside the window are produced", () => {
   assert.ok(rows.length > 0, "the window is not empty");
   assert.ok(rows.length < 100, "and it is not the whole group either");
   for (const row of rows) {
-    assert.ok(row.y < 200, `row at ${row.y} starts before the window ends`);
-    assert.ok(row.y + ROW_H > 0, "and ends after it begins");
+    assert.ok(row.top < 200, `row at ${row.top} starts before the window ends`);
+    assert.ok(row.top + ROW_H > 0, "and ends after it begins");
   }
 });
 
@@ -54,18 +54,18 @@ test("scrolling far down still finds the right rows", () => {
   const y0 = GROUP_H + 500 * ROW_H;
   const rows = visibleRows(g, layout, true, y0, y0 + 3 * ROW_H);
 
-  const items = rows.filter((r) => r.t === 1);
+  const items = rows.filter((r) => r.kind === "item");
   assert.ok(items.length > 0, "found items");
   // Row numbering is one-based and continuous across the whole inventory.
-  assert.equal(items[0]!.n, 501, "first visible row is #501");
-  assert.equal(items[0]!.s, "sig 0.500");
+  assert.equal(items[0]!.number, 501, "first visible row is #501");
+  assert.equal(items[0]!.siglum, "sig 0.500");
 });
 
 test("numbering runs unbroken across groups", () => {
   const g = groups(2, 3);
   const layout = buildLayout(g, true);
   const rows = visibleRows(g, layout, true, 0, layout.totalH);
-  const numbers = rows.filter((r) => r.t === 1).map((r) => r.n);
+  const numbers = rows.filter((r) => r.kind === "item").map((r) => r.number);
   assert.deepEqual(numbers, [1, 2, 3, 4, 5]);
 });
 
@@ -83,7 +83,7 @@ test("collapsed groups show headers and no items", () => {
   const rows = visibleRows(g, layout, false, 0, layout.totalH);
   assert.equal(rows.length, 2);
   assert.ok(
-    rows.every((r) => r.t === 0),
+    rows.every((r) => r.kind === "group"),
     "headers only",
   );
 });

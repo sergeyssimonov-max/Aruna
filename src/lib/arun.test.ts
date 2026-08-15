@@ -24,16 +24,16 @@ test("the shipped catalog parses into a coherent inventory", () => {
   assert.ok(inv.manuscripts > 0, "has a manuscript count");
   assert.match(inv.source, /Zenodo/, "carries its provenance");
 
-  const counted = inv.groups.reduce((n, g) => n + g.i.length, 0);
+  const counted = inv.groups.reduce((n, g) => n + g.items.length, 0);
   assert.equal(counted, inv.manuscripts, "the header count matches the rows present");
 
   for (const g of inv.groups) {
-    assert.match(g.c, /^CTH \d+$/, `group label ${JSON.stringify(g.c)}`);
+    assert.match(g.cth, /^CTH \d+$/, `group label ${JSON.stringify(g.cth)}`);
   }
 
   // Every field is either real text or the missing-value dash — never empty,
   // never undefined, which is what the table renders directly.
-  for (const item of inv.groups.flatMap((g) => g.i)) {
+  for (const item of inv.groups.flatMap((g) => g.items)) {
     for (const [field, value] of Object.entries(item)) {
       assert.equal(typeof value, "string", `${field} is a string`);
       assert.notEqual(value, "", `${field} is not blank`);
@@ -54,14 +54,14 @@ test("parseWire agrees with parseInventory about the same catalog", () => {
   for (let gi = 0; gi < wire.g.length; gi++) {
     const [label, rows] = wire.g[gi]!;
     const group = inv.groups[gi]!;
-    assert.equal(label, group.c);
-    assert.equal(rows.length, group.i.length);
+    assert.equal(label, group.cth);
+    assert.equal(rows.length, group.items.length);
     for (let ri = 0; ri < rows.length; ri++) {
       const row = rows[ri]!;
-      const item = group.i[ri]!;
-      assert.equal(row[0], item.s, "siglum");
-      assert.equal(wire.p[row[1] as number], item.a, "author");
-      assert.equal(wire.p[row[2] as number], item.y, "year");
+      const item = group.items[ri]!;
+      assert.equal(row[0], item.siglum, "siglum");
+      assert.equal(wire.p[row[1] as number], item.editor, "author");
+      assert.equal(wire.p[row[2] as number], item.year, "year");
     }
   }
 });

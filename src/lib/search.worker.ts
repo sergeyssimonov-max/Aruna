@@ -5,7 +5,13 @@ import type { WorkerIn, WorkerOut } from "./search-protocol";
 import { buildSearchIndex } from "./search-index";
 import { WasmSearch } from "./wasm-search";
 
-type JsGroup = { cl: string; h: string[] };
+/** One group, folded to lowercase once so a query can be a plain `includes`. */
+type JsGroup = {
+  /** The group's own label, e.g. `cth 786`. */
+  label: string;
+  /** Per item: siglum and metadata joined, the text a query is tested against. */
+  haystacks: string[];
+};
 
 let wasm: WasmSearch | null = null;
 let jsIndex: JsGroup[] | null = null;
@@ -17,18 +23,18 @@ function buildJsIndex(w: Wire): JsGroup[] {
   const pool = w.p;
   const groups: JsGroup[] = new Array(w.g.length);
   for (let gi = 0; gi < w.g.length; gi++) {
-    const [c, rows] = w.g[gi]!;
-    const h: string[] = new Array(rows.length);
+    const [label, rows] = w.g[gi]!;
+    const haystacks: string[] = new Array(rows.length);
     for (let ri = 0; ri < rows.length; ri++) {
       const row = rows[ri]!;
-      let s = row[0]!;
+      let hay = row[0]!;
       for (let k = 1; k < row.length; k++) {
         const part = pool[row[k] as number] ?? "—";
-        if (part && part !== "—") s += `\n${part}`;
+        if (part && part !== "—") hay += `\n${part}`;
       }
-      h[ri] = s.toLowerCase();
+      haystacks[ri] = hay.toLowerCase();
     }
-    groups[gi] = { cl: c.toLowerCase(), h };
+    groups[gi] = { label: label.toLowerCase(), haystacks };
   }
   return groups;
 }
@@ -36,17 +42,18 @@ function buildJsIndex(w: Wire): JsGroup[] {
 function searchJs(q: string): SearchMatch[] {
   if (!jsIndex) return [];
   const matches: SearchMatch[] = [];
-  for (let gi = 0; gi < jsIndex.length; gi++) {
-    const g = jsIndex[gi]!;
-    if (g.cl.includes(q)) {
-      matches.push({ gi, ii: null });
+  for (let group = 0; group < jsIndex.length; group++) {
+    const g = jsIndex[group]!;
+    // A group whose label matches stands for all of its manuscripts.
+    if (g.label.includes(q)) {
+      matches.push({ group, items: null });
       continue;
     }
-    const ii: number[] = [];
-    for (let i = 0; i < g.h.length; i++) {
-      if (g.h[i]!.includes(q)) ii.push(i);
+    const items: number[] = [];
+    for (let i = 0; i < g.haystacks.length; i++) {
+      if (g.haystacks[i]!.includes(q)) items.push(i);
     }
-    if (ii.length) matches.push({ gi, ii });
+    if (items.length) matches.push({ group, items });
   }
   return matches;
 }
@@ -54,7 +61,7 @@ function searchJs(q: string): SearchMatch[] {
 function runSearch(q: string): SearchMatch[] {
   if (!q) {
     const all: SearchMatch[] = new Array(nGroups);
-    for (let i = 0; i < nGroups; i++) all[i] = { gi: i, ii: null };
+    for (let i = 0; i < nGroups; i++) all[i] = { group: i, items: null };
     return all;
   }
   if (engine === "wasm" && wasm) {
