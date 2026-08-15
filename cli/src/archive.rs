@@ -32,70 +32,104 @@ pub fn parse_zip(zip_path: &Path) -> Result<Vec<ManuscriptRecord>> {
 /// fits within it, while bodies run to hundreds of KiB of cuneiform that nothing
 /// downstream looks at.
 pub fn read_sources(zip_path: &Path) -> Result<Vec<ManuscriptSource>> {
-    let file = File::open(zip_path).map_err(|source| ArunaError::Io {
-        path: zip_path.to_path_buf(),
-        source,
-    })?;
-    let reader = BufReader::with_capacity(256 * 1024, file);
-    let mut archive = ZipArchive::new(reader)?;
-
-    if archive.is_empty() {
-        return Err(ArunaError::EmptyArchive);
-    }
+    let mut archive = open_archive(zip_path)?;
 
     let mut sources = Vec::new();
-    let mut skipped_by_path = 0usize;
-    let mut skipped_by_content = 0usize;
+    let mut skipped = Skipped::default();
     for i in 0..archive.len() {
         let entry = archive.by_index(i)?;
         let path = entry.name().to_string();
+
+        // The path gate, which costs nothing: an entry rejected here is never
+        // inflated.
         if !is_manuscript_xml(&path) {
-            if path.to_ascii_lowercase().ends_with(".xml") {
-                skipped_by_path += 1;
-            }
+            skipped.by_path(&path);
             continue;
         }
 
-        let mut bytes = Vec::new();
-        entry
-            .take(HEADER_READ_LIMIT as u64)
-            .read_to_end(&mut bytes)
-            .map_err(|source| ArunaError::Io {
-                path: PathBuf::from(&path),
-                source,
-            })?;
-
-        // Lossy conversion is correct here rather than lenient: cutting the
-        // entry at HEADER_READ_LIMIT routinely splits a multi-byte character,
-        // so invalid UTF-8 at the tail is expected, not a corrupt archive.
-        let xml = String::from_utf8_lossy(&bytes).into_owned();
+        let xml = read_header_window(entry, &path)?;
 
         // The content gate. A path can only be checked against junk that is
         // already known; this asks whether the bytes are a manuscript, which is
         // what a new release of the archive will be judged by.
         if !looks_like_manuscript(&xml) {
-            skipped_by_content += 1;
+            skipped.by_content += 1;
             continue;
         }
         sources.push(ManuscriptSource { path, xml });
     }
-
-    // Reported rather than silent: the archive is republished from time to time,
-    // and its debris changes with it. A run that suddenly discards thousands of
-    // entries should say so while there is still someone reading the output.
-    if skipped_by_path + skipped_by_content > 0 {
-        eprintln!(
-            "Skipped {} non-manuscript entries ({} by path, {} by content).",
-            skipped_by_path + skipped_by_content,
-            skipped_by_path,
-            skipped_by_content
-        );
-    }
+    skipped.report();
 
     if sources.is_empty() {
         return Err(ArunaError::EmptyArchive);
     }
     Ok(sources)
+}
+
+/// Open the ZIP, refusing one with nothing in it.
+fn open_archive(zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
+    let file = File::open(zip_path).map_err(|source| ArunaError::Io {
+        path: zip_path.to_path_buf(),
+        source,
+    })?;
+    let archive = ZipArchive::new(BufReader::with_capacity(256 * 1024, file))?;
+    if archive.is_empty() {
+        return Err(ArunaError::EmptyArchive);
+    }
+    Ok(archive)
+}
+
+/// Inflate at most [`HEADER_READ_LIMIT`] bytes of one entry.
+fn read_header_window(entry: impl Read, path: &str) -> Result<String> {
+    let mut bytes = Vec::new();
+    entry
+        .take(HEADER_READ_LIMIT as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|source| ArunaError::Io {
+            path: PathBuf::from(path),
+            source,
+        })?;
+
+    // Lossy conversion is correct here rather than lenient: cutting the entry at
+    // HEADER_READ_LIMIT routinely splits a multi-byte character, so invalid
+    // UTF-8 at the tail is expected, not a corrupt archive.
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Entries the two gates turned away, counted apart because they mean
+/// different things: junk the archive has always carried, and a document that
+/// is named like a manuscript but is not one.
+#[derive(Default)]
+struct Skipped {
+    by_path: usize,
+    by_content: usize,
+}
+
+impl Skipped {
+    /// Count a path the name gate rejected — but only if it claimed to be XML.
+    ///
+    /// The archive is mostly directories, images and stylesheets, and reporting
+    /// those as "skipped" would bury the number that matters in five figures of
+    /// entries nobody expected to be manuscripts in the first place.
+    fn by_path(&mut self, path: &str) {
+        if path.to_ascii_lowercase().ends_with(".xml") {
+            self.by_path += 1;
+        }
+    }
+
+    /// Reported rather than silent: the archive is republished from time to
+    /// time, and its debris changes with it. A run that suddenly discards
+    /// thousands of entries should say so while there is still someone reading
+    /// the output.
+    fn report(&self) {
+        let total = self.by_path + self.by_content;
+        if total > 0 {
+            eprintln!(
+                "Skipped {total} non-manuscript entries ({} by path, {} by content).",
+                self.by_path, self.by_content
+            );
+        }
+    }
 }
 
 /// Parse every source into a record. Pure CPU work, one source at a time.
