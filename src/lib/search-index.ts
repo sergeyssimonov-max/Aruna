@@ -1,7 +1,27 @@
+/**
+ * Build the compact TLH2 binary index the WASM module searches.
+ *
+ * Three stages, in the order the format forces: read the inventory into ids
+ * ([`collect`]), lay the deduplicated strings out into pools ([`packPool`]),
+ * then write the container ([`write`]). Nothing is written before every length
+ * is known, because the header declares them all.
+ *
+ * The layout itself lives in `wasm/search/src/format.rs` — the reader is Rust
+ * and cannot share a module with this one, so `tlh2-agreement.test.ts` parses
+ * the constants there and fails if the two disagree.
+ */
 import type { Wire } from "./inventory";
 
 /** TLH2 magic — must match wasm/search. */
 const MAGIC = 0x32484c54;
+/** Header: eight little-endian `u32`s. */
+const HEADER = 32;
+/** cth u16, item count u16, first item u32. */
+const GROUP_STRIDE = 8;
+/** siglum offset u32, length u8, auth u8, year u8, pad. */
+const ITEM_STRIDE = 8;
+/** pool offset u16, length u16. */
+const DIR_STRIDE = 4;
 /**
  * Author and year pools are matched through `u64` bitsets in the WASM module,
  * which caps each at 64 entries (`MAX_POOL` in wasm/search/src/format.rs).
@@ -12,6 +32,11 @@ const MAGIC = 0x32484c54;
  * nothing said. The corpus currently holds 44 distinct authors.
  */
 const MAX_POOL = 64;
+/** A siglum's length is a `u8` in the item record. */
+const MAX_SIGLUM_BYTES = 255;
+/** Directory entries address their pool with `u16`s. */
+const MAX_SMALL_POOL_BYTES = 0xffff;
+
 const te = new TextEncoder();
 
 /**
@@ -27,133 +52,158 @@ const te = new TextEncoder();
  * available all along.
  */
 export function buildSearchIndex(wire: Wire): ArrayBuffer | null {
+  const collected = collect(wire);
+  if (!collected) return null;
+
+  const sigs = packPool(collected.sigs.list, MAX_SIGLUM_BYTES, Infinity);
+  const auths = packPool(collected.auths.list, MAX_SMALL_POOL_BYTES, MAX_SMALL_POOL_BYTES);
+  const years = packPool(collected.years.list, MAX_SMALL_POOL_BYTES, MAX_SMALL_POOL_BYTES);
+  if (!sigs || !auths || !years) return null;
+
+  return write(collected.groups, sigs, auths, years);
+}
+
+/** A pooled string table: first-seen order, deduplicated, lowercase. */
+type Interner = {
+  /** Id of `s` in the pool, adding it if this is its first occurrence. */
+  intern(s: string): number;
+  readonly list: string[];
+};
+
+function interner(): Interner {
+  const ids = new Map<string, number>();
+  const list: string[] = [];
+  return {
+    intern(s: string) {
+      const key = s.toLowerCase();
+      let id = ids.get(key);
+      if (id === undefined) {
+        id = list.length;
+        ids.set(key, id);
+        list.push(key);
+      }
+      return id;
+    },
+    list,
+  };
+}
+
+/** One manuscript, as ids into the three pools. */
+type IndexItem = { sig: number; auth: number; year: number };
+type IndexGroup = { cth: number; items: IndexItem[] };
+
+type Collected = {
+  groups: IndexGroup[];
+  sigs: Interner;
+  auths: Interner;
+  years: Interner;
+};
+
+/**
+ * Read the inventory into ids, deduplicating as it goes.
+ *
+ * Returns null as soon as something will not fit the container: an id past the
+ * bitset the module matches with, or a CTH past the `u16` the group record
+ * holds.
+ */
+function collect(wire: Wire): Collected | null {
   const pool = wire.p;
+  const sigs = interner();
+  const auths = interner();
+  const years = interner();
+  const groups: IndexGroup[] = [];
 
-  // ── collect unique lowercase strings ──────────────────────────
-  const authMap = new Map<string, number>();
-  const yearMap = new Map<string, number>();
-  const auths: string[] = [];
-  const years: string[] = [];
-
-  const internAuth = (s: string) => {
-    const k = s.toLowerCase();
-    let i = authMap.get(k);
-    if (i === undefined) {
-      i = auths.length;
-      authMap.set(k, i);
-      auths.push(k);
-    }
-    return i;
-  };
-  const internYear = (s: string) => {
-    const k = s.toLowerCase();
-    let i = yearMap.get(k);
-    if (i === undefined) {
-      i = years.length;
-      yearMap.set(k, i);
-      years.push(k);
-    }
-    return i;
-  };
-
-  type ItemRec = { sig: string; auth: number; year: number };
-  type GroupRec = { cth: number; items: ItemRec[] };
-
-  const groups: GroupRec[] = [];
-  const sigSet = new Map<string, number>(); // sig -> first occurrence order for pool
-  const sigList: string[] = [];
-
-  const internSig = (s: string) => {
-    const k = s.toLowerCase();
-    let i = sigSet.get(k);
-    if (i === undefined) {
-      i = sigList.length;
-      sigSet.set(k, i);
-      sigList.push(k);
-    }
-    return k; // store string; offsets assigned later
-  };
-
-  for (const [c, rows] of wire.g) {
-    const m = /^CTH\s*(\d+)/i.exec(c);
+  for (const [label, rows] of wire.g) {
+    const m = /^CTH\s*(\d+)/i.exec(label);
     const cth = m ? parseInt(m[1]!, 10) : 0;
-    const items: ItemRec[] = new Array(rows.length);
+    if (cth > 0xffff) return null;
+
+    const items: IndexItem[] = new Array(rows.length);
     for (let ri = 0; ri < rows.length; ri++) {
       const row = rows[ri]!;
-      const s = row[0]!;
-      const ai = row[1]!;
-      const yi = row[2]!;
-      const li = row[3];
-      const ii = row[4];
-      const ci = row[5];
-      // Searchable blob: siglum + lang/inv/corpus (fits u8 length).
-      let hay = s.toLowerCase();
-      for (const idx of [li, ii, ci]) {
-        if (idx === undefined) continue;
-        const extra = (pool[idx] ?? "—").toLowerCase();
-        if (!extra || extra === "—") continue;
-        if (hay.length + 1 + extra.length <= 255) hay += `\n${extra}`;
-      }
-      const sig = internSig(hay);
-      const auth = internAuth(pool[ai] ?? "—");
-      const year = internYear(pool[yi] ?? "—");
+      const auth = auths.intern(pool[row[1]!] ?? "—");
+      const year = years.intern(pool[row[2]!] ?? "—");
       if (auth >= MAX_POOL || year >= MAX_POOL) return null;
-      items[ri] = { sig, auth, year };
+      items[ri] = { sig: sigs.intern(searchableText(row, pool)), auth, year };
     }
-    if (cth > 0xffff) return null;
     groups.push({ cth, items });
   }
 
-  // ── build pools ───────────────────────────────────────────────
-  const sigMeta: { off: number; len: number }[] = [];
-  let sigPoolLen = 0;
-  const sigParts: Uint8Array[] = [];
-  const sigOffByStr = new Map<string, { off: number; len: number }>();
-  for (const s of sigList) {
-    const b = te.encode(s);
-    if (b.length > 255) return null;
-    const meta = { off: sigPoolLen, len: b.length };
-    sigOffByStr.set(s, meta);
-    sigMeta.push(meta);
-    sigParts.push(b);
-    sigPoolLen += b.length;
+  return { groups, sigs, auths, years };
+}
+
+/**
+ * The text a query is matched against: the siglum, plus lang, inventory number
+ * and corpus when there is room for them.
+ *
+ * They share one string because the item record has one offset and one length.
+ * The budget is that length field — a `u8` — so metadata is appended only while
+ * it fits, and a document keeps its siglum searchable either way.
+ */
+function searchableText(row: Wire["g"][0][1][0], pool: string[]): string {
+  let hay = row[0]!.toLowerCase();
+  for (const id of [row[3], row[4], row[5]]) {
+    if (id === undefined) continue;
+    const extra = (pool[id] ?? "—").toLowerCase();
+    if (!extra || extra === "—") continue;
+    if (hay.length + 1 + extra.length <= MAX_SIGLUM_BYTES) hay += `\n${extra}`;
+  }
+  return hay;
+}
+
+/** Pooled strings laid out end to end, with where each one starts. */
+type PackedPool = {
+  bytes: Uint8Array;
+  entries: { off: number; len: number }[];
+};
+
+/**
+ * Encode `list` into one buffer, refusing a pool the format cannot address.
+ *
+ * `maxEntry` is the width of the length field that will describe an entry;
+ * `maxTotal` the width of the offsets pointing into the pool.
+ */
+function packPool(list: string[], maxEntry: number, maxTotal: number): PackedPool | null {
+  const parts: Uint8Array[] = [];
+  const entries: { off: number; len: number }[] = [];
+  let len = 0;
+  for (const s of list) {
+    const encoded = te.encode(s);
+    if (encoded.length > maxEntry || len > maxTotal) return null;
+    entries.push({ off: len, len: encoded.length });
+    parts.push(encoded);
+    len += encoded.length;
   }
 
-  const packSmallPool = (list: string[]) => {
-    const parts: Uint8Array[] = [];
-    const dir: { off: number; len: number }[] = [];
-    let len = 0;
-    for (const s of list) {
-      const b = te.encode(s);
-      if (b.length > 0xffff || len > 0xffff) return null;
-      dir.push({ off: len, len: b.length });
-      parts.push(b);
-      len += b.length;
-    }
-    return { parts, dir, len };
-  };
+  const bytes = new Uint8Array(len);
+  let at = 0;
+  for (const part of parts) {
+    bytes.set(part, at);
+    at += part.length;
+  }
+  return { bytes, entries };
+}
 
-  const authP = packSmallPool(auths);
-  const yearP = packSmallPool(years);
-  if (!authP || !yearP) return null;
-
-  // ── layout ────────────────────────────────────────────────────
+/** Write the container: header, groups, items, directories, pools. */
+function write(
+  groups: IndexGroup[],
+  sigs: PackedPool,
+  auths: PackedPool,
+  years: PackedPool,
+): ArrayBuffer {
   const nGroups = groups.length;
-  const nItems = groups.reduce((a, g) => a + g.items.length, 0);
-  const header = 32;
-  const groupsBytes = nGroups * 8;
-  const itemsBytes = nItems * 8;
-  const authDirBytes = auths.length * 4;
-  const yearDirBytes = years.length * 4;
+  const nItems = groups.reduce((n, g) => n + g.items.length, 0);
+  const nAuth = auths.entries.length;
+  const nYear = years.entries.length;
+
   const total =
-    header +
-    groupsBytes +
-    itemsBytes +
-    authDirBytes +
-    yearDirBytes +
-    sigPoolLen +
-    authP.len +
-    yearP.len;
+    HEADER +
+    nGroups * GROUP_STRIDE +
+    nItems * ITEM_STRIDE +
+    (nAuth + nYear) * DIR_STRIDE +
+    sigs.bytes.length +
+    auths.bytes.length +
+    years.bytes.length;
 
   const buf = new ArrayBuffer(total);
   const view = new DataView(buf);
@@ -162,58 +212,49 @@ export function buildSearchIndex(wire: Wire): ArrayBuffer | null {
   view.setUint32(0, MAGIC, true);
   view.setUint32(4, nGroups, true);
   view.setUint32(8, nItems, true);
-  view.setUint32(12, auths.length, true);
-  view.setUint32(16, years.length, true);
-  view.setUint32(20, sigPoolLen, true);
-  view.setUint32(24, authP.len, true);
-  view.setUint32(28, yearP.len, true);
+  view.setUint32(12, nAuth, true);
+  view.setUint32(16, nYear, true);
+  view.setUint32(20, sigs.bytes.length, true);
+  view.setUint32(24, auths.bytes.length, true);
+  view.setUint32(28, years.bytes.length, true);
 
-  let o = header;
-  let itemCursor = 0;
+  let o = HEADER;
+
+  // Groups, each naming the run of items that follows the previous group's.
+  let firstItem = 0;
   for (const g of groups) {
     view.setUint16(o, g.cth, true);
     view.setUint16(o + 2, g.items.length, true);
-    view.setUint32(o + 4, itemCursor, true);
-    o += 8;
-    itemCursor += g.items.length;
+    view.setUint32(o + 4, firstItem, true);
+    o += GROUP_STRIDE;
+    firstItem += g.items.length;
   }
 
+  // Items, in the same order the groups just claimed them.
   for (const g of groups) {
-    for (const it of g.items) {
-      const meta = sigOffByStr.get(it.sig)!;
-      view.setUint32(o, meta.off, true);
-      u8[o + 4] = meta.len;
-      u8[o + 5] = it.auth;
-      u8[o + 6] = it.year;
-      u8[o + 7] = 0;
-      o += 8;
+    for (const item of g.items) {
+      const sig = sigs.entries[item.sig]!;
+      view.setUint32(o, sig.off, true);
+      u8[o + 4] = sig.len;
+      u8[o + 5] = item.auth;
+      u8[o + 6] = item.year;
+      u8[o + 7] = 0; // pad
+      o += ITEM_STRIDE;
     }
   }
 
-  for (const d of authP.dir) {
-    view.setUint16(o, d.off, true);
-    view.setUint16(o + 2, d.len, true);
-    o += 4;
-  }
-  for (const d of yearP.dir) {
-    view.setUint16(o, d.off, true);
-    view.setUint16(o + 2, d.len, true);
-    o += 4;
+  for (const pool of [auths, years]) {
+    for (const entry of pool.entries) {
+      view.setUint16(o, entry.off, true);
+      view.setUint16(o + 2, entry.len, true);
+      o += DIR_STRIDE;
+    }
   }
 
-  for (const part of sigParts) {
-    u8.set(part, o);
-    o += part.length;
-  }
-  for (const part of authP.parts) {
-    u8.set(part, o);
-    o += part.length;
-  }
-  for (const part of yearP.parts) {
-    u8.set(part, o);
-    o += part.length;
+  for (const pool of [sigs, auths, years]) {
+    u8.set(pool.bytes, o);
+    o += pool.bytes.length;
   }
 
   return buf;
 }
-
