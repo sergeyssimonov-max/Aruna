@@ -73,9 +73,11 @@ jobs:
   # anything, while being the test that caught the character-boundary panic on
   # real cuneiform.
   #
-  # Deliberately not a dependency of the release job: the archive comes from an
-  # outside service, and a Zenodo outage should show up as a red corpus job, not
-  # as an inability to cut a release. The parse itself takes about two seconds.
+  # It gates the release. The cost is a real coupling: the archive comes from an
+  # outside service, so a Zenodo outage on a cold cache blocks cutting a
+  # release. That is accepted deliberately — shipping a build whose parser was
+  # never run against the actual corpus is the worse outcome, and the cache key
+  # is the archive digest, so a warm cache needs no network at all.
   corpus:
     name: Full corpus parse
     runs-on: ubuntu-latest
@@ -161,7 +163,7 @@ jobs:
 
   macos:
     name: Universal .app + DMG
-    needs: [check]
+    needs: [check, corpus]
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v7
