@@ -26,7 +26,7 @@ Or CI:
 ```bash
 gh workflow run release-dmg.yml
 # tag release:
-git tag v1.0.2 && git push origin v1.0.2   # the tag must match version in cli/Cargo.toml
+git tag v1.0.3 && git push origin v1.0.3   # the tag must match version in cli/Cargo.toml
 ```
 
 See [docs/AUTO_DMG.md](../docs/AUTO_DMG.md).

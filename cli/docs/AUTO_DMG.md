@@ -23,15 +23,15 @@
 |---------|----------|
 | push / PR в `main` | Сборка на `macos-14` → artifact DMG |
 | `workflow_dispatch` | То же вручную |
-| tag `v1.0.2` | DMG + **GitHub Release** |
+| tag `v1.0.3` | DMG + **GitHub Release** |
 
 ```bash
 # ручной запуск
 gh workflow run release-dmg.yml
 
 # релиз
-git tag v1.0.2
-git push origin v1.0.2
+git tag v1.0.3
+git push origin v1.0.3
 ```
 
 ## Локально
