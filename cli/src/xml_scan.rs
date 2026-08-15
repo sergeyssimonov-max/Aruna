@@ -41,6 +41,20 @@ fn local_part(name: &[u8]) -> &[u8] {
     }
 }
 
+/// Read the element name beginning at `from`: its local part, and the byte
+/// after the name.
+///
+/// Every scanner below starts a tag the same way — take name characters, drop
+/// the namespace prefix — and the three copies of that loop were three chances
+/// to disagree about which bytes belong to a name.
+fn element_name(hay: &[u8], from: usize) -> (&[u8], usize) {
+    let mut end = from;
+    while end < hay.len() && is_name_char(hay[end]) {
+        end += 1;
+    }
+    (local_part(&hay[from..end]), end)
+}
+
 /// Case-insensitive equality of two equal-length byte slices (ASCII).
 pub fn eq_ci(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
@@ -143,11 +157,8 @@ pub fn find_open_tag(hay: &[u8], local: &[u8]) -> Option<(usize, usize)> {
         }
 
         // Read the name, then compare only its local part.
-        let mut j = i + 1;
-        while j < hay.len() && is_name_char(hay[j]) {
-            j += 1;
-        }
-        if eq_ci(local_part(&hay[i + 1..j]), local) {
+        let (name, j) = element_name(hay, i + 1);
+        if eq_ci(name, local) {
             // Find the end of the opening tag.
             if let Some(end) = memchr(b'>', &hay[j..]) {
                 return Some((i, j + end + 1));
@@ -173,12 +184,8 @@ pub fn find_close_tag(hay: &[u8], from: usize, local: &[u8]) -> Option<usize> {
             continue;
         }
         if hay[i + 1] == b'/' {
-            let name_start = i + 2;
-            let mut j = name_start;
-            while j < hay.len() && is_name_char(hay[j]) {
-                j += 1;
-            }
-            if eq_ci(local_part(&hay[name_start..j]), local) {
+            let (name, _) = element_name(hay, i + 2);
+            if eq_ci(name, local) {
                 return Some(i);
             }
         }
@@ -253,11 +260,7 @@ pub fn for_each_start_tag(hay: &[u8], mut f: impl FnMut(&[u8], &[u8]) -> bool) {
             continue;
         }
 
-        let mut j = i + 1;
-        while j < hay.len() && is_name_char(hay[j]) {
-            j += 1;
-        }
-        let local = local_part(&hay[i + 1..j]);
+        let (local, j) = element_name(hay, i + 1);
 
         // attributes run until '>' or '/>'
         let end = match memchr(b'>', &hay[j..]) {

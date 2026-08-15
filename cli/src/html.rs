@@ -8,7 +8,7 @@
 //! [`COLUMNS`], the one description of the table's columns; and the rows, which
 //! are the only part that depends on the records.
 
-use crate::parse::{group_label, ManuscriptRecord, MISSING};
+use crate::parse::{group_label, group_runs, ManuscriptRecord, MISSING};
 use std::fmt::Write as _;
 
 /// Escape text for safe HTML text/attribute embedding.
@@ -106,22 +106,15 @@ fn render_rows(records: &[ManuscriptRecord]) -> (String, usize) {
     let mut rows = String::new();
     let mut row_n = 0usize;
     let mut groups = 0usize;
-    let mut i = 0usize;
 
-    while i < records.len() {
-        let label = group_label(&records[i]).to_string();
-        let mut j = i + 1;
-        while j < records.len() && group_label(&records[j]) == label {
-            j += 1;
-        }
+    for run in group_runs(records) {
         groups += 1;
-        write_group_row(&mut rows, &label, j - i);
+        write_group_row(&mut rows, group_label(&run[0]), run.len());
 
-        for rec in &records[i..j] {
+        for rec in run {
             row_n += 1;
             write_item_row(&mut rows, row_n, rec);
         }
-        i = j;
     }
 
     (rows, groups)
