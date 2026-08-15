@@ -4,7 +4,7 @@ import type { Wire } from "./inventory";
 const MAGIC = 0x32484c54;
 /**
  * Author and year pools are matched through `u64` bitsets in the WASM module,
- * which caps each at 64 entries (`MAX_POOL` in wasm/search/src/lib.rs).
+ * which caps each at 64 entries (`MAX_POOL` in wasm/search/src/format.rs).
  *
  * This used to be guarded as `> 255`, the width of the id field rather than the
  * width of the bitset. Between 65 and 255 authors the builder was happy and the
