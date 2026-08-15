@@ -126,70 +126,132 @@ fn retry_delay(attempt: u32, err: &ArunaError) -> Duration {
     Duration::from_secs(2u64.saturating_pow(attempt))
 }
 
-/// One transfer: stream to a scratch file, verify, rename into place.
+/// One transfer, in the four steps it actually has.
+///
+/// Written as four calls rather than one block because each step fails in its
+/// own way and the reader has to be able to find the one they are looking at:
+/// the request turns a status into [`ArunaError::Http`], the transfer streams
+/// and hashes at once, the checks are what stands between a damaged body and
+/// `dest`, and the rename is the only moment anything at `dest` changes.
+///
+/// The scratch file is not deleted anywhere in here. [`Scratch`] removes it
+/// when it goes out of scope uncommitted, which covers every `?` above — the
+/// previous version repeated the removal at four returns and had to be read in
+/// full to be sure it covered all of them.
 fn attempt_download(url: &str, dest: &Path, expected_md5: Option<&str>) -> Result<()> {
-    if let Some(parent) = dest.parent() {
-        std::fs::create_dir_all(parent).map_err(|source| ArunaError::Io {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
+    create_parent(dest)?;
+    let response = request(url)?;
 
+    // Announced size, when the server sends one — used below to catch a body
+    // cut short by a dropped connection.
+    let announced: Option<u64> = response
+        .header("Content-Length")
+        .and_then(|v| v.trim().parse().ok());
+
+    // Stream into a scratch file and rename only on success: an interrupted
+    // download must never leave a truncated archive sitting at `dest` looking
+    // like a complete one.
+    let scratch = Scratch::beside(dest);
+    let transfer = stream_to_file(&mut response.into_reader(), scratch.path())?;
+    transfer.verify(url, announced, expected_md5)?;
+    scratch.commit(dest)
+}
+
+/// Create the directory `dest` will be written into.
+fn create_parent(dest: &Path) -> Result<()> {
+    let Some(parent) = dest.parent() else {
+        return Ok(());
+    };
+    std::fs::create_dir_all(parent).map_err(|source| ArunaError::Io {
+        path: parent.to_path_buf(),
+        source,
+    })
+}
+
+/// GET `url`, turning a refusal into the error that describes it.
+///
+/// ureq hands back every non-2xx as `Error::Status`, so the status has to be
+/// pulled out of the error rather than off a response. Mapping the whole error
+/// to `Network` — as this did — buried the status: a 404 was reported as a
+/// network failure and, because network failures are retried, fetched three
+/// times before the user heard about it.
+fn request(url: &str) -> Result<ureq::Response> {
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(Duration::from_secs(300))
         .user_agent("Aruna/1.0 (+https://github.com/sergeyssimonov-max/Aruna)")
         .build();
 
-    // ureq hands back every non-2xx as `Error::Status`, so the status has to be
-    // pulled out of the error rather than off a response. Mapping the whole
-    // error to `Network` — as this did — buried the status: a 404 was reported
-    // as a network failure and, because network failures are retried, fetched
-    // three times before the user heard about it.
-    let response = match agent.get(url).call() {
-        Ok(response) => response,
-        Err(ureq::Error::Status(status, response)) => {
-            return Err(ArunaError::Http {
-                url: url.to_string(),
-                status,
-                // Only the delta-seconds form is read. `Retry-After` may also
-                // carry an HTTP-date, but parsing dates to shave a few seconds
-                // off a backoff is not worth a date parser.
-                retry_after: response
-                    .header("Retry-After")
-                    .and_then(|v| v.trim().parse().ok()),
-            });
+    match agent.get(url).call() {
+        Ok(response) => Ok(response),
+        Err(ureq::Error::Status(status, response)) => Err(ArunaError::Http {
+            url: url.to_string(),
+            status,
+            // Only the delta-seconds form is read. `Retry-After` may also carry
+            // an HTTP-date, but parsing dates to shave a few seconds off a
+            // backoff is not worth a date parser.
+            retry_after: response
+                .header("Retry-After")
+                .and_then(|v| v.trim().parse().ok()),
+        }),
+        Err(source) => Err(ArunaError::Network {
+            url: url.to_string(),
+            source: Box::new(source),
+        }),
+    }
+}
+
+/// What arrived: how many bytes, and what they hash to.
+struct Transfer {
+    bytes: u64,
+    digest: Md5,
+}
+
+impl Transfer {
+    /// Reject a body that is short or does not hash as promised.
+    ///
+    /// Both checks run before the rename in [`attempt_download`], so a damaged
+    /// body never reaches `dest` under a name that says it is the archive.
+    fn verify(self, url: &str, announced: Option<u64>, expected_md5: Option<&str>) -> Result<()> {
+        if let Some(announced) = announced {
+            if self.bytes != announced {
+                return Err(ArunaError::Truncated {
+                    url: url.to_string(),
+                    expected: announced,
+                    got: self.bytes,
+                });
+            }
         }
-        Err(source) => {
-            return Err(ArunaError::Network {
-                url: url.to_string(),
-                source: Box::new(source),
-            })
+
+        if let Some(expected) = expected_md5 {
+            let got = self.digest.finish_hex();
+            if !got.eq_ignore_ascii_case(expected) {
+                return Err(ArunaError::ChecksumMismatch {
+                    url: url.to_string(),
+                    expected: expected.to_string(),
+                    got,
+                });
+            }
         }
+        Ok(())
+    }
+}
+
+/// Copy `reader` into `path`, hashing as it goes.
+///
+/// Hashed in the same pass: a second read over 71 MiB just to digest the file
+/// would cost more than the check it feeds.
+fn stream_to_file(reader: &mut impl Read, path: &Path) -> Result<Transfer> {
+    let io = |source| ArunaError::Io {
+        path: path.to_path_buf(),
+        source,
     };
 
-    // Announced size, when the server sends one — used below to catch a body
-    // cut short by a dropped connection.
-    let expected: Option<u64> = response
-        .header("Content-Length")
-        .and_then(|v| v.trim().parse().ok());
-
-    let mut reader = response.into_reader();
-
-    // Stream into a scratch file and rename only on success: an interrupted
-    // download must never leave a truncated archive sitting at `dest` looking
-    // like a complete one.
-    let scratch = scratch_path(dest);
-    let mut file = File::create(&scratch).map_err(|source| ArunaError::Io {
-        path: scratch.clone(),
-        source,
-    })?;
-
-    let mut got: u64 = 0;
-    // Hashed as it streams: a second pass over 71 MiB just to digest the file
-    // would cost more than the download check saves.
+    let mut file = File::create(path).map_err(io)?;
+    let mut bytes: u64 = 0;
     let mut digest = Md5::new();
     let mut buf = [0u8; 64 * 1024];
+
     let outcome = loop {
         let n = match reader.read(&mut buf) {
             Ok(0) => break Ok(()),
@@ -200,60 +262,60 @@ fn attempt_download(url: &str, dest: &Path, expected_md5: Option<&str>) -> Resul
             break Err(source);
         }
         digest.update(&buf[..n]);
-        got += n as u64;
+        bytes += n as u64;
     };
+    // The data is only on disk once `sync_all` returns, and the file has to be
+    // closed before the rename that follows.
     let outcome = outcome.and_then(|()| file.sync_all());
     drop(file);
+    outcome.map_err(io)?;
 
-    if let Err(source) = outcome {
-        let _ = std::fs::remove_file(&scratch);
-        return Err(ArunaError::Io {
-            path: scratch,
-            source,
-        });
-    }
-
-    if let Some(expected) = expected {
-        if got != expected {
-            let _ = std::fs::remove_file(&scratch);
-            return Err(ArunaError::Truncated {
-                url: url.to_string(),
-                expected,
-                got,
-            });
-        }
-    }
-
-    // Checked before the rename, so a corrupted body never reaches `dest`.
-    if let Some(expected) = expected_md5 {
-        let got_md5 = digest.finish_hex();
-        if !got_md5.eq_ignore_ascii_case(expected) {
-            let _ = std::fs::remove_file(&scratch);
-            return Err(ArunaError::ChecksumMismatch {
-                url: url.to_string(),
-                expected: expected.to_string(),
-                got: got_md5,
-            });
-        }
-    }
-
-    std::fs::rename(&scratch, dest).map_err(|source| {
-        let _ = std::fs::remove_file(&scratch);
-        ArunaError::Io {
-            path: dest.to_path_buf(),
-            source,
-        }
-    })
+    Ok(Transfer { bytes, digest })
 }
 
-/// Sibling scratch path for the in-flight download.
+/// The in-flight download: a scratch file that deletes itself unless committed.
 ///
 /// Same filesystem as `dest`, so the closing rename is atomic; the process id
 /// keeps concurrent runs from sharing one scratch file.
-fn scratch_path(dest: &Path) -> PathBuf {
-    let mut name = dest.file_name().unwrap_or_default().to_os_string();
-    name.push(format!(".{}.part", std::process::id()));
-    dest.with_file_name(name)
+struct Scratch {
+    path: PathBuf,
+    committed: bool,
+}
+
+impl Scratch {
+    fn beside(dest: &Path) -> Self {
+        let mut name = dest.file_name().unwrap_or_default().to_os_string();
+        name.push(format!(".{}.part", std::process::id()));
+        Self {
+            path: dest.with_file_name(name),
+            committed: false,
+        }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Move the finished file to `dest`.
+    ///
+    /// On failure the scratch file is dropped like any other uncommitted one —
+    /// which is what a rename that could not happen means.
+    fn commit(mut self, dest: &Path) -> Result<()> {
+        std::fs::rename(&self.path, dest).map_err(|source| ArunaError::Io {
+            path: dest.to_path_buf(),
+            source,
+        })?;
+        self.committed = true;
+        Ok(())
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        if !self.committed {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
 }
 
 #[cfg(test)]
