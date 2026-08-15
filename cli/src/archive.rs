@@ -1,7 +1,9 @@
 //! ZIP archive traversal and batch parsing.
 
 use crate::error::{ArunaError, Result};
-use crate::parse::{is_manuscript_xml, parse_manuscript, ManuscriptRecord, HEADER_READ_LIMIT};
+use crate::parse::{
+    is_manuscript_xml, looks_like_manuscript, parse_manuscript, ManuscriptRecord, HEADER_READ_LIMIT,
+};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -42,10 +44,15 @@ pub fn read_sources(zip_path: &Path) -> Result<Vec<ManuscriptSource>> {
     }
 
     let mut sources = Vec::new();
+    let mut skipped_by_path = 0usize;
+    let mut skipped_by_content = 0usize;
     for i in 0..archive.len() {
         let entry = archive.by_index(i)?;
         let path = entry.name().to_string();
         if !is_manuscript_xml(&path) {
+            if path.to_ascii_lowercase().ends_with(".xml") {
+                skipped_by_path += 1;
+            }
             continue;
         }
 
@@ -62,7 +69,27 @@ pub fn read_sources(zip_path: &Path) -> Result<Vec<ManuscriptSource>> {
         // entry at HEADER_READ_LIMIT routinely splits a multi-byte character,
         // so invalid UTF-8 at the tail is expected, not a corrupt archive.
         let xml = String::from_utf8_lossy(&bytes).into_owned();
+
+        // The content gate. A path can only be checked against junk that is
+        // already known; this asks whether the bytes are a manuscript, which is
+        // what a new release of the archive will be judged by.
+        if !looks_like_manuscript(&xml) {
+            skipped_by_content += 1;
+            continue;
+        }
         sources.push(ManuscriptSource { path, xml });
+    }
+
+    // Reported rather than silent: the archive is republished from time to time,
+    // and its debris changes with it. A run that suddenly discards thousands of
+    // entries should say so while there is still someone reading the output.
+    if skipped_by_path + skipped_by_content > 0 {
+        eprintln!(
+            "Skipped {} non-manuscript entries ({} by path, {} by content).",
+            skipped_by_path + skipped_by_content,
+            skipped_by_path,
+            skipped_by_content
+        );
     }
 
     if sources.is_empty() {
