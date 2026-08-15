@@ -1,9 +1,13 @@
 /// <reference lib="webworker" />
 import { parseWire } from "./arun";
+import { searchableEditor } from "./editor-aliases.ts";
 import type { SearchMatch, Wire } from "./inventory";
 import type { WorkerIn, WorkerOut } from "./search-protocol";
 import { buildSearchIndex } from "./search-index";
 import { WasmSearch } from "./wasm-search";
+
+/** Position of the editor in a wire row: siglum, editor, year, lang, inv, corpus. */
+const EDITOR_COLUMN = 1;
 
 /** One group, folded to lowercase once so a query can be a plain `includes`. */
 type JsGroup = {
@@ -29,7 +33,11 @@ function buildJsIndex(w: Wire): JsGroup[] {
       const row = rows[ri]!;
       let hay = row[0]!;
       for (let k = 1; k < row.length; k++) {
-        const part = pool[row[k] as number] ?? "—";
+        let part = pool[row[k] as number] ?? "—";
+        // Column 1 is the editor: search it under every spelling of the same
+        // person, as the WASM index does — the two engines must answer the
+        // same query the same way.
+        if (k === EDITOR_COLUMN) part = searchableEditor(part);
         if (part && part !== "—") hay += `\n${part}`;
       }
       haystacks[ri] = hay.toLowerCase();

@@ -10,6 +10,7 @@
  * and cannot share a module with this one, so `tlh2-agreement.test.ts` parses
  * the constants there and fails if the two disagree.
  */
+import { searchableEditor } from "./editor-aliases.ts";
 import type { Wire } from "./inventory";
 
 /** TLH2 magic — must match wasm/search. */
@@ -29,7 +30,8 @@ const DIR_STRIDE = 4;
  * This used to be guarded as `> 255`, the width of the id field rather than the
  * width of the bitset. Between 65 and 255 authors the builder was happy and the
  * module rejected the result, so search fell back to the JavaScript scan with
- * nothing said. The corpus currently holds 44 distinct authors.
+ * nothing said. The corpus currently fills 45 of the 64 entries — 46 spellings,
+ * two of which are one person under `editor-aliases` and share an entry.
  */
 const MAX_POOL = 64;
 /** A siglum's length is a `u8` in the item record. */
@@ -121,7 +123,9 @@ function collect(wire: Wire): Collected | null {
     const items: IndexItem[] = new Array(rows.length);
     for (let ri = 0; ri < rows.length; ri++) {
       const row = rows[ri]!;
-      const auth = auths.intern(pool[row[1]!] ?? "—");
+      // The editor is pooled with the person's other spellings appended, so a
+      // surname reaches the rows that carry only initials — see editor-aliases.
+      const auth = auths.intern(searchableEditor(pool[row[1]!] ?? "—"));
       const year = years.intern(pool[row[2]!] ?? "—");
       if (auth >= MAX_POOL || year >= MAX_POOL) return null;
       items[ri] = { sig: sigs.intern(searchableText(row, pool)), auth, year };
