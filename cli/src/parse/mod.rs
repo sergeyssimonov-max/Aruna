@@ -324,6 +324,45 @@ mod tests {
         assert_eq!(r.year, "2023");
     }
 
+    /// The newer TLH files name the person in `author=`, on an `<author>`
+    /// element that has no text of its own. Reading only `editor=` left 549
+    /// manuscripts of this shape with a dash where the document said
+    /// "Daniel Schwemer".
+    #[test]
+    fn the_editor_may_be_named_in_an_author_attribute() {
+        let xml = r#"<AOxml><AOHeader><docID>KBo 71.260</docID><meta>
+        <creation-date date="2026-05-11"/>
+        <author date="2026-05-11" author="Daniel Schwemer"/>
+        </meta></AOHeader></AOxml>"#;
+        let r = parse_manuscript("CTH 694_XML_TLH/KBo 71.260.xml", xml);
+        assert_eq!(r.authorship, "Daniel Schwemer");
+        assert_eq!(r.year, "2026", "the date beside the name, not another one");
+    }
+
+    /// An explicit transliteration role still outranks it: `<uebern>` is who
+    /// made this edition, `<author>` the fallback for documents with no roles.
+    #[test]
+    fn a_transliteration_role_outranks_an_author_attribute() {
+        let xml = r#"<AOHeader><docID>X</docID>
+        <author date="2026-05-11" author="Daniel Schwemer"/>
+        <uebern editor="FB" date="2017-03-28" src="MZ"/>
+        </AOHeader>"#;
+        let r = parse_manuscript("CTH 1_XML/X.xml", xml);
+        assert_eq!(r.authorship, "FB");
+        assert_eq!(r.year, "2017");
+    }
+
+    /// `src=` sits beside `editor=` on `<uebern>` and says where the
+    /// transliteration was taken over from — not who did it. Taking it would
+    /// credit 27% of the corpus to publication sigla like `MZ`.
+    #[test]
+    fn the_source_of_a_takeover_is_not_its_editor() {
+        let xml = r#"<AOHeader><docID>X</docID>
+        <uebern editor="" date="2017-03-28" src="MZ"/>
+        </AOHeader>"#;
+        assert_eq!(parse_manuscript("CTH 1_XML/X.xml", xml).authorship, MISSING);
+    }
+
     #[test]
     fn trlst_role_preferred_over_annot() {
         let xml = r#"<AOHeader><docID>KBo 29.170</docID>
