@@ -2,6 +2,11 @@
  * ARUN v3 reader — display inventory and search wire from the binary container.
  *
  * The layout itself lives in `./arun-format.js`, shared with the writer.
+ *
+ * Reading happens twice over the same bytes and the two readers want different
+ * things: the page wants strings to render ([`parseInventory`]), the worker
+ * wants pool ids to index with ([`parseWire`]). Both start from [`openArun`],
+ * which validates the container once and hands back where everything is.
  */
 import type { Inventory, Item, Wire } from "./inventory";
 import {
@@ -58,7 +63,30 @@ function readDir(
   return out;
 }
 
-type Layout = {
+/**
+ * A walk through the container's sections, in file order.
+ *
+ * Every section begins where the previous one ended, so the offsets are not
+ * independent facts to be maintained — they are this sequence of calls, and
+ * `end` is where the file must reach.
+ */
+function sections(start: number) {
+  let at = start;
+  return {
+    /** Offset of the next section, `size` bytes long. */
+    take(size: number): number {
+      const off = at;
+      at += size;
+      return off;
+    },
+    get end() {
+      return at;
+    },
+  };
+}
+
+/** An opened container: validated header, and where each section begins. */
+type Container = {
   v: DataView;
   bytes: Uint8Array;
   manuscripts: number;
@@ -77,7 +105,13 @@ type Layout = {
   sufPoolLen: number;
 };
 
-function openArun(buf: ArrayBuffer): Layout {
+/**
+ * Validate the header and resolve every section, or throw.
+ *
+ * Nothing downstream re-checks anything: an item read through the result is
+ * inside the buffer because the walk below said the buffer was long enough.
+ */
+function openArun(buf: ArrayBuffer): Container {
   if (buf.byteLength < HEADER) throw new Error("ARUN: truncated header");
   const v = new DataView(buf);
   const bytes = new Uint8Array(buf);
@@ -88,7 +122,6 @@ function openArun(buf: ArrayBuffer): Layout {
     throw new Error(`ARUN: unsupported version ${field("version")}`);
   }
 
-  const manuscripts = field("manuscripts");
   const nGroups = field("nGroups");
   const nItems = field("nItems");
   const nAuth = field("nAuth");
@@ -97,7 +130,6 @@ function openArun(buf: ArrayBuffer): Layout {
   const nInv = field("nInv");
   const nCorp = field("nCorp");
   const nPrefix = field("nPrefix");
-  const sourceLen = field("sourceLen");
   const sufPoolLen = field("sufPoolLen");
   const authPoolLen = field("authPoolLen");
   const yearPoolLen = field("yearPoolLen");
@@ -106,48 +138,34 @@ function openArun(buf: ArrayBuffer): Layout {
   const corpPoolLen = field("corpPoolLen");
   const prefixPoolLen = field("prefixPoolLen");
 
-  let o = HEADER;
-  const source = strAt(bytes, o, sourceLen);
-  o += sourceLen;
-  const groupsOff = o;
-  o += nGroups * GROUP;
-  const itemsOff = o;
-  o += nItems * ITEM;
-  const authDirOff = o;
-  o += nAuth * DIR_ENTRY;
-  const yearDirOff = o;
-  o += nYear * DIR_ENTRY;
-  const langDirOff = o;
-  o += nLang * DIR_ENTRY;
-  const invDirOff = o;
-  o += nInv * DIR_ENTRY;
-  const corpDirOff = o;
-  o += nCorp * DIR_ENTRY;
-  const prefixDirOff = o;
-  o += nPrefix * DIR_ENTRY;
-  const sufPoolOff = o;
-  o += sufPoolLen;
-  const authPoolOff = o;
-  o += authPoolLen;
-  const yearPoolOff = o;
-  o += yearPoolLen;
-  const langPoolOff = o;
-  o += langPoolLen;
-  const invPoolOff = o;
-  o += invPoolLen;
-  const corpPoolOff = o;
-  o += corpPoolLen;
-  const prefixPoolOff = o;
-  o += prefixPoolLen;
-  if (o > buf.byteLength) throw new Error("ARUN: truncated body");
+  // In file order: the source line, the records, the six directories, then the
+  // pools they point into.
+  const at = sections(HEADER);
+  const sourceOff = at.take(field("sourceLen"));
+  const groupsOff = at.take(nGroups * GROUP);
+  const itemsOff = at.take(nItems * ITEM);
+  const authDirOff = at.take(nAuth * DIR_ENTRY);
+  const yearDirOff = at.take(nYear * DIR_ENTRY);
+  const langDirOff = at.take(nLang * DIR_ENTRY);
+  const invDirOff = at.take(nInv * DIR_ENTRY);
+  const corpDirOff = at.take(nCorp * DIR_ENTRY);
+  const prefixDirOff = at.take(nPrefix * DIR_ENTRY);
+  const sufPoolOff = at.take(sufPoolLen);
+  const authPoolOff = at.take(authPoolLen);
+  const yearPoolOff = at.take(yearPoolLen);
+  const langPoolOff = at.take(langPoolLen);
+  const invPoolOff = at.take(invPoolLen);
+  const corpPoolOff = at.take(corpPoolLen);
+  const prefixPoolOff = at.take(prefixPoolLen);
+  if (at.end > buf.byteLength) throw new Error("ARUN: truncated body");
 
   return {
     v,
     bytes,
-    manuscripts,
+    manuscripts: field("manuscripts"),
     nGroups,
     nItems,
-    source,
+    source: strAt(bytes, sourceOff, field("sourceLen")),
     groupsOff,
     itemsOff,
     auths: readDir(v, bytes, authDirOff, nAuth, authPoolOff, authPoolLen, "author"),
@@ -155,13 +173,35 @@ function openArun(buf: ArrayBuffer): Layout {
     langs: readDir(v, bytes, langDirOff, nLang, langPoolOff, langPoolLen, "lang"),
     invs: readDir(v, bytes, invDirOff, nInv, invPoolOff, invPoolLen, "inv"),
     corps: readDir(v, bytes, corpDirOff, nCorp, corpPoolOff, corpPoolLen, "corpus"),
-    prefixes: readDir(v, bytes, prefixDirOff, nPrefix, prefixPoolOff, prefixPoolLen, "prefix"),
+    prefixes: readDir(
+      v,
+      bytes,
+      prefixDirOff,
+      nPrefix,
+      prefixPoolOff,
+      prefixPoolLen,
+      "prefix",
+    ),
     sufPoolOff,
     sufPoolLen,
   };
 }
 
-function itemAt(L: Layout, index: number): {
+/** One group record: its CTH number and the run of items belonging to it. */
+function groupAt(c: Container, index: number): { cth: number; start: number; count: number } {
+  const at = c.groupsOff + index * GROUP;
+  return {
+    cth: c.v.getUint16(at, true),
+    count: c.v.getUint16(at + 2, true),
+    start: c.v.getUint32(at + 4, true),
+  };
+}
+
+/** One item record: its siglum, rebuilt from the prefix table, and its ids. */
+function itemAt(
+  c: Container,
+  index: number,
+): {
   sig: string;
   auth: number;
   year: number;
@@ -169,86 +209,85 @@ function itemAt(L: Layout, index: number): {
   inv: number;
   corpus: number;
 } {
-  const ib = L.itemsOff + index * ITEM;
-  const b = L.bytes;
+  const ib = c.itemsOff + index * ITEM;
+  const b = c.bytes;
   const sufOff = b[ib]! | (b[ib + 1]! << 8) | (b[ib + 2]! << 16);
   const sufLen = b[ib + 3]!;
   const pref = b[ib + 4]!;
-  if (sufOff + sufLen > L.sufPoolLen) {
+  if (sufOff + sufLen > c.sufPoolLen) {
     throw new Error(`ARUN: item ${index} siglum runs past the suffix pool`);
   }
-  const suf = strAt(b, L.sufPoolOff + sufOff, sufLen);
+  const suf = strAt(b, c.sufPoolOff + sufOff, sufLen);
   // A prefix id other than NO_PREFIX must name a real prefix; silently dropping
   // it would hand back a truncated siglum that reads as a genuine one.
-  if (pref !== NO_PREFIX && pref >= L.prefixes.length) {
-    throw new Error(`ARUN: item ${index} names prefix ${pref}, pool holds ${L.prefixes.length}`);
+  if (pref !== NO_PREFIX && pref >= c.prefixes.length) {
+    throw new Error(`ARUN: item ${index} names prefix ${pref}, pool holds ${c.prefixes.length}`);
   }
-  const sig = pref === NO_PREFIX ? suf : L.prefixes[pref]! + suf;
   return {
-    sig,
+    sig: pref === NO_PREFIX ? suf : c.prefixes[pref]! + suf,
     auth: b[ib + 5]!,
     year: b[ib + 6]!,
     lang: b[ib + 7]!,
-    inv: L.v.getUint16(ib + 8, true),
+    inv: c.v.getUint16(ib + 8, true),
     corpus: b[ib + 10]!,
   };
 }
 
 /** Parse ARUN → display inventory (no inv column; kept only for search in worker). */
 export function parseInventory(buf: ArrayBuffer): Inventory {
-  const L = openArun(buf);
-  const groups = new Array(L.nGroups);
-  for (let gi = 0; gi < L.nGroups; gi++) {
-    const gb = L.groupsOff + gi * GROUP;
-    const cth = L.v.getUint16(gb, true);
-    const count = L.v.getUint16(gb + 2, true);
-    const start = L.v.getUint32(gb + 4, true);
+  const c = openArun(buf);
+  const groups = new Array(c.nGroups);
+  for (let gi = 0; gi < c.nGroups; gi++) {
+    const { cth, start, count } = groupAt(c, gi);
     const items: Item[] = new Array(count);
     for (let li = 0; li < count; li++) {
-      const it = itemAt(L, start + li);
+      const it = itemAt(c, start + li);
       items[li] = {
         siglum: it.sig,
-        editor: L.auths[it.auth] ?? "—",
-        year: L.years[it.year] ?? "—",
-        lang: L.langs[it.lang] ?? "—",
-        corpus: L.corps[it.corpus] ?? "—",
+        editor: c.auths[it.auth] ?? "—",
+        year: c.years[it.year] ?? "—",
+        lang: c.langs[it.lang] ?? "—",
+        corpus: c.corps[it.corpus] ?? "—",
       };
     }
     groups[gi] = { cth: `CTH ${cth}`, items };
   }
-  return { source: L.source, manuscripts: L.manuscripts, groups };
+  return { source: c.source, manuscripts: c.manuscripts, groups };
 }
 
-/** Full wire for search-index builder (worker only). */
+/**
+ * Full wire for search-index builder (worker only).
+ *
+ * The five metadata pools are concatenated into one, so a row can name any of
+ * them with a single index — which is what the wire's tuples carry. The bases
+ * below are where each pool starts inside that concatenation.
+ */
 export function parseWire(buf: ArrayBuffer): Wire {
-  const L = openArun(buf);
-  const pool: string[] = L.auths.concat(L.years, L.langs, L.invs, L.corps);
-  const yBase = L.auths.length;
-  const lBase = yBase + L.years.length;
-  const iBase = lBase + L.langs.length;
-  const cBase = iBase + L.invs.length;
+  const c = openArun(buf);
+  const pool: string[] = c.auths.concat(c.years, c.langs, c.invs, c.corps);
+  const yearBase = c.auths.length;
+  const langBase = yearBase + c.years.length;
+  const invBase = langBase + c.langs.length;
+  const corpBase = invBase + c.invs.length;
 
-  const g: Wire["g"] = new Array(L.nGroups);
-  for (let gi = 0; gi < L.nGroups; gi++) {
-    const gb = L.groupsOff + gi * GROUP;
-    const cth = L.v.getUint16(gb, true);
-    const count = L.v.getUint16(gb + 2, true);
-    const start = L.v.getUint32(gb + 4, true);
+  const g: Wire["g"] = new Array(c.nGroups);
+  for (let gi = 0; gi < c.nGroups; gi++) {
+    const { cth, start, count } = groupAt(c, gi);
     const rows: Wire["g"][0][1] = new Array(count);
     for (let li = 0; li < count; li++) {
-      const it = itemAt(L, start + li);
+      const it = itemAt(c, start + li);
       rows[li] = [
         it.sig,
         it.auth,
-        yBase + it.year,
-        lBase + it.lang,
-        iBase + it.inv,
-        cBase + it.corpus,
+        yearBase + it.year,
+        langBase + it.lang,
+        invBase + it.inv,
+        corpBase + it.corpus,
       ];
     }
     g[gi] = [`CTH ${cth}`, rows];
   }
-  return { s: L.source, m: L.manuscripts, p: pool, g, v: 2 };
+  return { s: c.source, m: c.manuscripts, p: pool, g, v: 2 };
 }
 
 export function isArun(buf: ArrayBuffer): boolean {
