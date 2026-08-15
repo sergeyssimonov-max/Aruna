@@ -2,6 +2,11 @@
 //!
 //! Rows are grouped by CTH catalogue number (tablet family); fragments of the
 //! same text (e.g. all CTH 547) render under one section heading.
+//!
+//! The document is assembled from three kinds of thing, kept apart on purpose:
+//! the fixed chunks below, which are the page as it would be written by hand;
+//! [`COLUMNS`], the one description of the table's columns; and the rows, which
+//! are the only part that depends on the records.
 
 use crate::parse::{group_label, ManuscriptRecord, MISSING};
 use std::fmt::Write as _;
@@ -22,16 +27,83 @@ pub fn escape_html(s: &str) -> String {
     out
 }
 
+/// One table column: its heading, its `<colgroup>` class, and its explanation.
+///
+/// The legend, the `<colgroup>` and the `<thead>` are three parallel lists of
+/// the same six columns; written out three times, they were three places to
+/// forget. Adding or renaming a column is one line here.
+struct Column {
+    /// Text in the `<th>`.
+    head: &'static str,
+    /// Class on the `<col>`, which the stylesheet gives its width.
+    class: &'static str,
+    /// What the legend above the table says the column holds.
+    legend: &'static str,
+}
+
+const COLUMNS: [Column; 6] = [
+    Column {
+        head: "№",
+        class: "c-num",
+        legend: "row number",
+    },
+    Column {
+        head: "Siglum",
+        class: "c-sig",
+        legend: "publication id (e.g. KBo 3.22)",
+    },
+    Column {
+        head: "Lang",
+        class: "c-lang",
+        legend: "dominant language (Hit, Hur, Akk…)",
+    },
+    Column {
+        head: "Corpus",
+        class: "c-corp",
+        legend: "edition series (HFR, TLH, HAnn…)",
+    },
+    Column {
+        head: "Editor",
+        class: "c-ed",
+        legend: "transliteration / edition author",
+    },
+    Column {
+        head: "Year",
+        class: "c-year",
+        legend: "edition year",
+    },
+];
+
 /// Build the full HTML document.
 ///
 /// `source` — human-readable source line (Zenodo record).
 /// `generated_at` — already-formatted local date/time string.
-pub fn render_html(
-    records: &[ManuscriptRecord],
-    source: &str,
-    generated_at: &str,
-) -> String {
-    let mut body_rows = String::new();
+pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &str) -> String {
+    let (body_rows, groups) = render_rows(records);
+
+    let mut html = String::with_capacity(4096 + body_rows.len());
+    html.push_str(DOCUMENT_HEAD);
+    html.push_str(include_str!("html_style.css"));
+    html.push_str(HEAD_TO_BODY);
+    write_summary(&mut html, source, generated_at, records.len(), groups);
+    write_legend(&mut html);
+    html.push_str(TOOLBAR);
+    write_table(&mut html, &body_rows);
+    html.push_str(BODY_TO_SCRIPT);
+    html.push_str(include_str!("html_filter.js"));
+    html.push_str(DOCUMENT_TAIL);
+    html
+}
+
+/// The table body: one section row per CTH group, then its manuscripts.
+///
+/// Returns the rows and how many groups they fell into — the count is part of
+/// the summary line, and counting it here means walking the records once.
+///
+/// The records arrive sorted (`archive::sort_records`), so a group is a run of
+/// equal labels rather than something to collect into a map.
+fn render_rows(records: &[ManuscriptRecord]) -> (String, usize) {
+    let mut rows = String::new();
     let mut row_n = 0usize;
     let mut groups = 0usize;
     let mut i = 0usize;
@@ -42,117 +114,154 @@ pub fn render_html(
         while j < records.len() && group_label(&records[j]) == label {
             j += 1;
         }
-        let group_count = j - i;
         groups += 1;
-
-        let label_esc = escape_html(&label);
-        let _ = writeln!(
-            body_rows,
-            "        <tr class=\"group\">\n          <td colspan=\"6\"><span class=\"group-label\">{label_esc}</span><span class=\"group-count\">{group_count}</span></td>\n        </tr>"
-        );
+        write_group_row(&mut rows, &label, j - i);
 
         for rec in &records[i..j] {
             row_n += 1;
-            // Within a CTH group show the siglum as the primary name.
-            let name = if rec.cth.is_some() && rec.sigla != MISSING {
-                rec.sigla.as_str()
-            } else {
-                rec.title.as_str()
-            };
-            let title = escape_html(name);
-            let lang = escape_html(&rec.lang);
-            let auth = escape_html(&rec.authorship);
-            let year = escape_html(&rec.year);
-            let corpus = escape_html(&rec.corpus);
-            let _ = writeln!(
-                body_rows,
-                "        <tr>\n          <td class=\"num\">{row_n}</td>\n          <td>{title}</td>\n          <td>{lang}</td>\n          <td>{corpus}</td>\n          <td>{auth}</td>\n          <td class=\"year\">{year}</td>\n        </tr>"
-            );
+            write_item_row(&mut rows, row_n, rec);
         }
         i = j;
     }
 
-    let count = records.len();
+    (rows, groups)
+}
+
+fn write_group_row(out: &mut String, label: &str, count: usize) {
+    let label = escape_html(label);
+    let _ = writeln!(
+        out,
+        "        <tr class=\"group\">\n          <td colspan=\"6\"><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></td>\n        </tr>"
+    );
+}
+
+fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord) {
+    // Within a CTH group show the siglum as the primary name: the group heading
+    // already names the CTH, so the full title would repeat it on every row.
+    let name = if rec.cth.is_some() && rec.sigla != MISSING {
+        rec.sigla.as_str()
+    } else {
+        rec.title.as_str()
+    };
+    let title = escape_html(name);
+    let lang = escape_html(&rec.lang);
+    let auth = escape_html(&rec.authorship);
+    let year = escape_html(&rec.year);
+    let corpus = escape_html(&rec.corpus);
+    let _ = writeln!(
+        out,
+        "        <tr>\n          <td class=\"num\">{row_n}</td>\n          <td>{title}</td>\n          <td>{lang}</td>\n          <td>{corpus}</td>\n          <td>{auth}</td>\n          <td class=\"year\">{year}</td>\n        </tr>"
+    );
+}
+
+/// The line under the title: where the data came from and how much of it there is.
+fn write_summary(
+    out: &mut String,
+    source: &str,
+    generated_at: &str,
+    count: usize,
+    groups: usize,
+) {
     let source = escape_html(source);
     let generated = escape_html(generated_at);
-
-    let mut html = String::with_capacity(4096 + body_rows.len());
-    html.push_str("<!DOCTYPE html>\n");
-    html.push_str("<html lang=\"en\">\n");
-    html.push_str("<head>\n");
-    html.push_str("  <meta charset=\"utf-8\" />\n");
-    html.push_str(
-        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n",
-    );
-    html.push_str("  <title>Thesaurus Linguarum Hethaeorum Digitalis</title>\n");
-    html.push_str("  <style>\n");
-    html.push_str(include_str!("html_style.css"));
-    html.push_str("  </style>\n");
-    html.push_str("</head>\n");
-    html.push_str("<body>\n");
-    html.push_str("  <main>\n");
-    html.push_str("    <h1>Thesaurus Linguarum Hethaeorum Digitalis</h1>\n");
-    html.push_str("    <p class=\"meta\">\n");
-    let _ = writeln!(html, "      <span>Source: {source}</span>");
-    let _ = writeln!(html, "      <span>Generated: {generated}</span>");
-    let _ = writeln!(html, "      <span>Manuscripts: {count}</span>");
-    let _ = writeln!(html, "      <span>Groups (CTH): {groups}</span>");
-    html.push_str("    </p>\n");
-
-    // Legend
-    html.push_str("    <section class=\"legend\" aria-label=\"Column legend\">\n");
-    html.push_str("      <p class=\"legend-title\">Columns</p>\n");
-    html.push_str("      <ul class=\"legend-list\">\n");
-    html.push_str("        <li><span class=\"k\">№</span><span class=\"d\">row number</span></li>\n");
-    html.push_str("        <li><span class=\"k\">Siglum</span><span class=\"d\">publication id (e.g. KBo 3.22)</span></li>\n");
-    html.push_str("        <li><span class=\"k\">Lang</span><span class=\"d\">dominant language (Hit, Hur, Akk…)</span></li>\n");
-    html.push_str("        <li><span class=\"k\">Corpus</span><span class=\"d\">edition series (HFR, TLH, HAnn…)</span></li>\n");
-    html.push_str("        <li><span class=\"k\">Editor</span><span class=\"d\">transliteration / edition author</span></li>\n");
-    html.push_str("        <li><span class=\"k\">Year</span><span class=\"d\">edition year</span></li>\n");
-    html.push_str("      </ul>\n");
-    html.push_str("    </section>\n");
-
-    // Search filter
-    html.push_str("    <div class=\"toolbar\">\n");
-    html.push_str("      <input type=\"search\" id=\"q\" placeholder=\"Search CTH, siglum, lang, corpus, editor, year…\" autocomplete=\"off\" spellcheck=\"false\" />\n");
-    html.push_str("      <span class=\"hint\" id=\"hint\"></span>\n");
-    html.push_str("    </div>\n");
-
-    html.push_str("    <table id=\"inv\">\n");
-    html.push_str("      <colgroup>\n");
-    html.push_str("        <col class=\"c-num\" /><col class=\"c-sig\" /><col class=\"c-lang\" />\n");
-    html.push_str("        <col class=\"c-corp\" /><col class=\"c-ed\" /><col class=\"c-year\" />\n");
-    html.push_str("      </colgroup>\n");
-    html.push_str("      <thead>\n");
-    html.push_str("        <tr>\n");
-    html.push_str("          <th scope=\"col\">№</th>\n");
-    html.push_str("          <th scope=\"col\">Siglum</th>\n");
-    html.push_str("          <th scope=\"col\">Lang</th>\n");
-    html.push_str("          <th scope=\"col\">Corpus</th>\n");
-    html.push_str("          <th scope=\"col\">Editor</th>\n");
-    html.push_str("          <th scope=\"col\">Year</th>\n");
-    html.push_str("        </tr>\n");
-    html.push_str("      </thead>\n");
-    html.push_str("      <tbody>\n");
-    html.push_str(&body_rows);
-    html.push_str("      </tbody>\n");
-    html.push_str("    </table>\n");
-    html.push_str("  </main>\n");
-    html.push_str("  <script>\n");
-    html.push_str(include_str!("html_filter.js"));
-    html.push_str("  </script>\n");
-    html.push_str("</body>\n");
-    html.push_str("</html>\n");
-    html
-
+    out.push_str("    <p class=\"meta\">\n");
+    let _ = writeln!(out, "      <span>Source: {source}</span>");
+    let _ = writeln!(out, "      <span>Generated: {generated}</span>");
+    let _ = writeln!(out, "      <span>Manuscripts: {count}</span>");
+    let _ = writeln!(out, "      <span>Groups (CTH): {groups}</span>");
+    out.push_str("    </p>\n");
 }
+
+/// What each column holds, spelled out above the table.
+fn write_legend(out: &mut String) {
+    out.push_str("    <section class=\"legend\" aria-label=\"Column legend\">\n");
+    out.push_str("      <p class=\"legend-title\">Columns</p>\n");
+    out.push_str("      <ul class=\"legend-list\">\n");
+    for column in &COLUMNS {
+        let _ = writeln!(
+            out,
+            "        <li><span class=\"k\">{}</span><span class=\"d\">{}</span></li>",
+            column.head, column.legend
+        );
+    }
+    out.push_str("      </ul>\n");
+    out.push_str("    </section>\n");
+}
+
+/// The table around the rows: column widths, headings, body.
+fn write_table(out: &mut String, body_rows: &str) {
+    out.push_str("    <table id=\"inv\">\n");
+    out.push_str("      <colgroup>\n");
+    // Three to a line, as they would be written by hand.
+    for line in COLUMNS.chunks(3) {
+        out.push_str("        ");
+        for column in line {
+            let _ = write!(out, "<col class=\"{}\" />", column.class);
+        }
+        out.push('\n');
+    }
+    out.push_str("      </colgroup>\n");
+    out.push_str("      <thead>\n");
+    out.push_str("        <tr>\n");
+    for column in &COLUMNS {
+        let _ = writeln!(out, "          <th scope=\"col\">{}</th>", column.head);
+    }
+    out.push_str("        </tr>\n");
+    out.push_str("      </thead>\n");
+    out.push_str("      <tbody>\n");
+    out.push_str(body_rows);
+    out.push_str("      </tbody>\n");
+    out.push_str("    </table>\n");
+}
+
+/// Everything before the stylesheet.
+const DOCUMENT_HEAD: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thesaurus Linguarum Hethaeorum Digitalis</title>
+  <style>
+"#;
+
+/// From the end of the stylesheet to the page title.
+const HEAD_TO_BODY: &str = r#"  </style>
+</head>
+<body>
+  <main>
+    <h1>Thesaurus Linguarum Hethaeorum Digitalis</h1>
+"#;
+
+/// The search box. Filtering itself is `html_filter.js`.
+const TOOLBAR: &str = r#"    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search CTH, siglum, lang, corpus, editor, year…" autocomplete="off" spellcheck="false" />
+      <span class="hint" id="hint"></span>
+    </div>
+"#;
+
+/// From the end of the table to the start of the script.
+const BODY_TO_SCRIPT: &str = r#"  </main>
+  <script>
+"#;
+
+/// Everything after the script.
+const DOCUMENT_TAIL: &str = r#"  </script>
+</body>
+</html>
+"#;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::parse::MISSING;
 
-    fn rec(sigla: &str, cth: Option<&str>, cth_num: u32, auth: &str, year: &str) -> ManuscriptRecord {
+    fn rec(
+        sigla: &str,
+        cth: Option<&str>,
+        cth_num: u32,
+        auth: &str,
+        year: &str,
+    ) -> ManuscriptRecord {
         let title = match cth {
             Some(c) => format!("{sigla} · {c}"),
             None => sigla.to_string(),
@@ -246,5 +355,30 @@ mod tests {
         assert!(html.contains("Manuscripts: 0"));
         assert!(html.contains("<tbody>"));
         assert!(html.contains("Groups (CTH): 0"));
+    }
+
+    /// The legend, the column widths and the headings are generated from one
+    /// list, so a column cannot appear in two of the three and be missing from
+    /// the last — which is what writing them out separately allowed.
+    #[test]
+    fn every_column_appears_in_all_three_places() {
+        let html = render_html(&[], "src", "now");
+        for column in &COLUMNS {
+            assert!(
+                html.contains(&format!("<th scope=\"col\">{}</th>", column.head)),
+                "no heading for {}",
+                column.head
+            );
+            assert!(
+                html.contains(&format!("<col class=\"{}\" />", column.class)),
+                "no colgroup entry for {}",
+                column.class
+            );
+            assert!(
+                html.contains(&format!("<span class=\"d\">{}</span>", column.legend)),
+                "no legend entry for {}",
+                column.head
+            );
+        }
     }
 }
