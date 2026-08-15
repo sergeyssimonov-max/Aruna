@@ -1,26 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  memo,
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  applyMatches,
-  type Group,
-  type Inventory,
-} from "@/lib/inventory";
-import { loadInventory } from "@/lib/load-inventory";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { ColumnLegend, InventoryHeader } from "@/components/inventory-header";
+import { InventoryTable } from "@/components/inventory-table";
+import { SearchBar } from "@/components/search-bar";
+import { applyMatches, type Group } from "@/lib/inventory";
+import { useInventory } from "@/lib/use-inventory";
+import { useScrollWindow } from "@/lib/use-scroll-window";
 import { useSearchWorker } from "@/lib/use-search-worker";
-import {
-  OVERSCAN_PX,
-  buildLayout,
-  countItems,
-  visibleRows,
-} from "@/lib/virtual-list";
+import { buildLayout, countItems, visibleRows } from "@/lib/virtual-list";
 
 export const Route = createFileRoute("/")({
   component: InventoryPage,
@@ -29,108 +16,38 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const IconSearch = memo(function IconSearch({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <circle cx="11" cy="11" r="7" />
-      <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
-    </svg>
-  );
-});
-
-const IconChevron = memo(function IconChevron({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-});
-
-const GroupRow = memo(function GroupRow({
-  cth,
-  count,
-  top,
-}: {
-  cth: string;
-  count: number;
-  top: number;
-}) {
-  return (
-    <div className="vl-row vl-group" style={{ transform: `translate3d(0,${top}px,0)` }}>
-      <IconChevron className="h-3.5 w-3.5 shrink-0 text-[#bbb]" />
-      <span className="text-[0.95rem] font-semibold tracking-tight">{cth}</span>
-      <span className="text-[0.75rem] tabular-nums text-[#999]">· {count}</span>
-    </div>
-  );
-});
-
-const ItemRow = memo(function ItemRow({
-  number,
-  siglum,
-  lang,
-  corpus,
-  editor,
-  year,
-  top,
-}: {
-  number: number;
-  siglum: string;
-  lang: string;
-  corpus: string;
-  editor: string;
-  year: string;
-  top: number;
-}) {
-  return (
-    <div className="vl-row vl-item" style={{ transform: `translate3d(0,${top}px,0)` }}>
-      <div className="vl-c-num tabular-nums text-[#999]">{number}</div>
-      <div className="vl-c-sig min-w-0 truncate font-medium" title={siglum}>{siglum}</div>
-      <div className="vl-c-lang tabular-nums text-[#444]">{lang}</div>
-      <div className="vl-c-corp truncate text-[#444]" title={corpus}>{corpus}</div>
-      <div className="vl-c-ed min-w-0 truncate text-[#444]" title={editor}>{editor}</div>
-      <div className="vl-c-year tabular-nums text-[#444]">{year}</div>
-    </div>
-  );
-});
-
+/**
+ * The page: load the inventory, search it in a worker, and render the slice of
+ * it that is on screen.
+ *
+ * Everything below is wiring — the loading lives in `useInventory`, the search
+ * in `useSearchWorker`, the scroll arithmetic in `useScrollWindow` and
+ * `virtual-list`, and the markup in `@/components`. What is left here is the
+ * order those depend on each other in, which is the part that is specific to
+ * this page.
+ */
 function InventoryPage() {
-  const [data, setData] = useState<Inventory | null>(null);
-  const [arun, setArun] = useState<ArrayBuffer | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { data, arun, error: loadError } = useInventory();
   const [query, setQuery] = useState("");
-  const deferredQuery = useDeferredValue(query);
   const [openAll, setOpenAll] = useState(true);
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const frameRef = useRef<HTMLDivElement>(null);
-  const scrollTopRef = useRef(0);
-  const rangeRef = useRef({ y0: 0, y1: 720 });
-  const [range, setRange] = useState({ y0: 0, y1: 720 });
-  const rafRef = useRef(0);
+  const deferredQuery = useDeferredValue(query);
 
-  const { status: workerStatus, error: workerError, matches, matchesQuery, search } =
-    useSearchWorker(arun);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  const {
+    status: workerStatus,
+    error: workerError,
+    matches,
+    matchesQuery,
+    search,
+  } = useSearchWorker(arun);
 
   // The worker normalises the query before searching; normalise the same way
   // here so a result can be matched to the query on screen.
   const normalizedQuery = deferredQuery.trim().toLowerCase();
   // Results for an earlier query are not results for this one.
   const currentMatches = matchesQuery === normalizedQuery ? matches : null;
-
-  useEffect(() => {
-    const ac = new AbortController();
-    (async () => {
-      try {
-        const loaded = await loadInventory(ac.signal);
-        if (ac.signal.aborted) return;
-        setData(loaded.inventory);
-        setArun(loaded.arun);
-      } catch (e) {
-        if (ac.signal.aborted) return;
-        setLoadError(e instanceof Error ? e.message : "Load failed");
-      }
-    })();
-    return () => ac.abort();
-  }, []);
 
   useEffect(() => {
     search(deferredQuery);
@@ -143,67 +60,12 @@ function InventoryPage() {
     return applyMatches(data, currentMatches);
   }, [data, normalizedQuery, currentMatches]);
 
-  const layout = useMemo(
-    () => buildLayout(filtered, openAll),
-    [filtered, openAll],
-  );
+  const layout = useMemo(() => buildLayout(filtered, openAll), [filtered, openAll]);
 
-  // Scroll window — rAF coalesced, hysteresis avoids thrash near edges.
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
+  const { range, resetWindow } = useScrollWindow(scrollerRef, frameRef, data !== null);
 
-    const publish = (st: number, vh: number) => {
-      scrollTopRef.current = st;
-      const prev = rangeRef.current;
-      const margin = OVERSCAN_PX * 0.45;
-      if (st >= prev.y0 + margin && st + vh <= prev.y1 - margin) return;
-      const y0 = st > OVERSCAN_PX ? st - OVERSCAN_PX : 0;
-      const y1 = st + vh + OVERSCAN_PX;
-      const next = { y0, y1 };
-      rangeRef.current = next;
-      setRange(next);
-    };
-
-    const onScroll = () => {
-      if (rafRef.current) return;
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = 0;
-        publish(el.scrollTop, el.clientHeight);
-      });
-    };
-
-    const syncSb = () => {
-      const sb = el.offsetWidth - el.clientWidth;
-      if (frameRef.current) {
-        frameRef.current.style.setProperty("--vl-sb", `${Math.max(0, sb)}px`);
-      }
-    };
-    const ro = new ResizeObserver(() => {
-      syncSb();
-      publish(el.scrollTop, el.clientHeight);
-    });
-    ro.observe(el);
-    syncSb();
-    publish(el.scrollTop, el.clientHeight || 600);
-
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      ro.disconnect();
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [data]);
-
-  // Reset window on filter / expand change.
-  useEffect(() => {
-    scrollTopRef.current = 0;
-    const vh = scrollerRef.current?.clientHeight ?? 600;
-    const next = { y0: 0, y1: vh + OVERSCAN_PX };
-    rangeRef.current = next;
-    setRange(next);
-    scrollerRef.current?.scrollTo({ top: 0 });
-  }, [filtered, openAll]);
+  // A different set of groups is a different list: start it at the top.
+  useEffect(() => resetWindow(), [filtered, openAll, resetWindow]);
 
   const rows = useMemo(
     () => visibleRows(filtered, layout, openAll, range.y0, range.y1),
@@ -216,168 +78,63 @@ function InventoryPage() {
   }, [filtered, layout, openAll]);
 
   const onQuery = useCallback((v: string) => setQuery(v), []);
+  const onToggleOpenAll = useCallback(() => setOpenAll((v) => !v), []);
 
   const searching = normalizedQuery !== "";
   // Pending until a result for *this* query is in hand — the previous query's
   // matches are never null, so keying off that alone kept the indicator dark
   // through every re-search.
-  const searchPending =
-    searching && (workerStatus !== "ready" || currentMatches === null);
+  const searchPending = searching && (workerStatus !== "ready" || currentMatches === null);
 
   const error = loadError || workerError;
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-8 text-[#1a1a1a]">
-        <p className="text-sm text-red-700">{error}</p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-8 text-[#666]">
-        <p className="text-sm">Loading inventory…</p>
-      </div>
-    );
-  }
+  if (error) return <Notice tone="error">{error}</Notice>;
+  if (!data) return <Notice tone="muted">Loading inventory…</Notice>;
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-[#1a1a1a]">
       <div className="mx-auto max-w-4xl px-4 pt-6 pb-10 sm:px-6">
-        <header className="mb-6 sm:mb-8">
-          <div className="mb-3 min-w-0">
-            <h1 className="text-[1.25rem] font-semibold leading-snug tracking-tight sm:text-[1.35rem]">
-              Thesaurus Linguarum Hethaeorum Digitalis
-            </h1>
-            <p className="mt-1 text-[0.8125rem] leading-relaxed text-[#666]">
-              {data.source}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8125rem] text-[#666]">
-            <span>
-              Manuscripts:{" "}
-              <strong className="font-medium tabular-nums text-[#1a1a1a]">
-                {data.manuscripts.toLocaleString()}
-              </strong>
-            </span>
-            <span>
-              CTH groups:{" "}
-              <strong className="font-medium tabular-nums text-[#1a1a1a]">
-                {data.groups.length.toLocaleString()}
-              </strong>
-            </span>
-            {searching && (
-              <span>
-                Match:{" "}
-                <strong className="font-medium tabular-nums text-[#1a1a1a]">
-                  {visibleCount.toLocaleString()}
-                </strong>
-                {searchPending ? <span className="ml-1 text-[#aaa]">…</span> : null}
-              </span>
-            )}
-          </div>
-        </header>
+        <InventoryHeader
+          source={data.source}
+          manuscripts={data.manuscripts}
+          groups={data.groups.length}
+          matches={searching ? { count: visibleCount, pending: searchPending } : null}
+        />
 
-        <section className="col-legend mb-4" aria-label="Column legend">
-          <p className="col-legend-title">Columns</p>
-          <ul className="col-legend-list">
-            <li>
-              <span className="col-legend-key">№</span>
-              <span className="col-legend-def">row number</span>
-            </li>
-            <li>
-              <span className="col-legend-key">Siglum</span>
-              <span className="col-legend-def">publication id (e.g. KBo 3.22)</span>
-            </li>
-            <li>
-              <span className="col-legend-key">Lang</span>
-              <span className="col-legend-def">dominant language (Hit, Hur, Akk…)</span>
-            </li>
-            <li>
-              <span className="col-legend-key">Corpus</span>
-              <span className="col-legend-def">edition series (HFR, TLH, HAnn…)</span>
-            </li>
-            <li>
-              <span className="col-legend-key">Editor</span>
-              <span className="col-legend-def">transliteration / edition author</span>
-            </li>
-            <li>
-              <span className="col-legend-key">Year</span>
-              <span className="col-legend-def">edition year</span>
-            </li>
-          </ul>
-        </section>
+        <ColumnLegend />
 
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="relative flex-1">
-            <IconSearch className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#999]" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-              placeholder="Search CTH, siglum, lang, corpus, editor, year…"
-              autoComplete="off"
-              spellCheck={false}
-              className="w-full rounded-md border border-[#e8e8e8] bg-white py-2.5 pr-3 pl-10 text-sm outline-none placeholder:text-[#aaa] focus:border-[#ccc] focus:ring-2 focus:ring-[#eee]"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => setOpenAll((v) => !v)}
-            className="shrink-0 rounded-md border border-[#e8e8e8] bg-white px-3 py-2.5 text-sm text-[#444] hover:bg-[#fafafa]"
-          >
-            {openAll ? "Collapse fragments" : "Expand fragments"}
-          </button>
-        </div>
+        <SearchBar
+          query={query}
+          onQuery={onQuery}
+          openAll={openAll}
+          onToggleOpenAll={onToggleOpenAll}
+        />
 
-        <div
-          ref={frameRef}
-          className="vl-frame overflow-hidden rounded-md border border-[#e8e8e8] bg-white"
-          style={{ height: "min(70vh, 720px)" }}
-        >
-          <div className="vl-head-bar">
-            <div className="vl-head" role="row">
-              <div className="vl-c-num">№</div>
-              <div className="vl-c-sig">Siglum</div>
-              <div className="vl-c-lang">Lang</div>
-              <div className="vl-c-corp">Corpus</div>
-              <div className="vl-c-ed">Editor</div>
-              <div className="vl-c-year">Year</div>
-            </div>
-          </div>
-          <div ref={scrollerRef} className="vl-scroll">
-            <div
-              className="vl-spacer"
-              style={{ height: layout.totalH }}
-              aria-rowcount={
-                openAll ? layout.itemBase[layout.groupCount]! : layout.groupCount
-              }
-            >
-              {rows.map((row) =>
-                row.kind === "group" ? (
-                  <GroupRow key={row.key} cth={row.cth} count={row.count} top={row.top} />
-                ) : (
-                  <ItemRow
-                    key={row.key}
-                    number={row.number}
-                    siglum={row.siglum}
-                    lang={row.lang}
-                    corpus={row.corpus}
-                    editor={row.editor}
-                    year={row.year}
-                    top={row.top}
-                  />
-                ),
-              )}
-            </div>
-          </div>
-        </div>
+        <InventoryTable
+          rows={rows}
+          layout={layout}
+          openAll={openAll}
+          frameRef={frameRef}
+          scrollerRef={scrollerRef}
+        />
 
         <p className="mt-4 text-[0.75rem] leading-relaxed text-[#999]">
-          Grouped by CTH catalogue number. Fragments of the same tablet family stay
-          together. Data: TLHdig Beta 0.3 via Zenodo.
+          Grouped by CTH catalogue number. Fragments of the same tablet family stay together. Data:
+          TLHdig Beta 0.3 via Zenodo.
         </p>
       </div>
+    </div>
+  );
+}
+
+/** The two states that replace the page rather than appear inside it. */
+function Notice({ tone, children }: { tone: "error" | "muted"; children: React.ReactNode }) {
+  const wrapper =
+    tone === "error"
+      ? "flex min-h-screen items-center justify-center p-8 text-[#1a1a1a]"
+      : "flex min-h-screen items-center justify-center p-8 text-[#666]";
+  return (
+    <div className={wrapper}>
+      <p className={tone === "error" ? "text-sm text-red-700" : "text-sm"}>{children}</p>
     </div>
   );
 }
