@@ -95,13 +95,14 @@ impl IndexView {
                 let len = bytes[at + 4] as usize;
                 let auth = bytes[at + 5];
                 let year = bytes[at + 6];
-                // Ids index the `u64` bitsets built in `matching`, so an id past
-                // its pool is not merely meaningless — it would shift a `u64` by
-                // up to 255. That is an overflow: a build with overflow checks
-                // panics, and a panic crossing `extern "C"` takes the whole
-                // module down; without them the shift is masked and the item
-                // silently matches the wrong pool entry. Reject the blob here
-                // and the caller falls back to the JavaScript engine.
+                // Ids index the bitsets `PoolHits` builds, so an id past its
+                // pool is not merely meaningless — it would read a word that
+                // was never allocated for it and match some other entry, or,
+                // when the bitset was a bare `u64`, shift out of range and
+                // abort the module. `PoolHits::has` is total either way; this
+                // is the check that keeps a wrong answer from being possible in
+                // the first place. Reject the blob and the caller falls back to
+                // the JavaScript engine.
                 if u32::from(auth) >= n_auth || u32::from(year) >= n_year {
                     return Err(IndexError::MetaIdOutOfRange);
                 }

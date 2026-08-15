@@ -24,16 +24,19 @@ const ITEM_STRIDE = 8;
 /** pool offset u16, length u16. */
 const DIR_STRIDE = 4;
 /**
- * Author and year pools are matched through `u64` bitsets in the WASM module,
- * which caps each at 64 entries (`MAX_POOL` in wasm/search/src/format.rs).
+ * Entries an author or year pool may hold — as many as the `u8` id in an item
+ * record can address (`MAX_POOL` in wasm/search/src/format.rs, checked against
+ * this constant by tlh2-agreement.test.ts).
  *
- * This used to be guarded as `> 255`, the width of the id field rather than the
- * width of the bitset. Between 65 and 255 authors the builder was happy and the
- * module rejected the result, so search fell back to the JavaScript scan with
- * nothing said. The corpus currently fills 45 of the 64 entries — 46 spellings,
- * two of which are one person under `editor-aliases` and share an entry.
+ * It was 64 on both sides for a while: the width of the `u64` the module used
+ * as a bitset. Before that the two disagreed — this file guarded at 255 and the
+ * module refused anything past 64, which showed up only as search quietly
+ * falling back to the JavaScript scan. The module now sizes its bitset to the
+ * pool, so the limit is the format's own. The corpus currently fills 45
+ * entries: 46 spellings, two of which are one person under `editor-aliases`
+ * and share an entry.
  */
-const MAX_POOL = 64;
+const MAX_POOL = 255;
 /** A siglum's length is a `u8` in the item record. */
 const MAX_SIGLUM_BYTES = 255;
 /** Directory entries address their pool with `u16`s. */

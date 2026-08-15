@@ -32,8 +32,8 @@ pub fn run_search(index: &IndexView, query: &[u8], out: &mut [u8]) -> u32 {
 
     // Metadata is pooled and deduplicated, so a query is compared against each
     // distinct author/year once rather than once per manuscript.
-    let auth_bits = matching(index, &index.auth, query);
-    let year_bits = matching(index, &index.year, query);
+    let auth_hits = PoolHits::of(index, &index.auth, query);
+    let year_hits = PoolHits::of(index, &index.year, query);
 
     'groups: for (gi, group) in index.groups.iter().enumerate() {
         if count >= max_entries {
@@ -50,7 +50,7 @@ pub fn run_search(index: &IndexView, query: &[u8], out: &mut [u8]) -> u32 {
             if count >= max_entries {
                 break 'groups;
             }
-            if item_matches(index, item, query, auth_bits, year_bits) {
+            if item_matches(index, item, query, &auth_hits, &year_hits) {
                 write_entry(out, count, gi as u32, 1, offset as u32);
                 count += 1;
             }
@@ -66,32 +66,49 @@ fn item_matches(
     index: &IndexView,
     item: &Item,
     query: &[u8],
-    auth_bits: u64,
-    year_bits: u64,
+    auth_hits: &PoolHits,
+    year_hits: &PoolHits,
 ) -> bool {
-    bit(auth_bits, item.auth) || bit(year_bits, item.year) || contains(index.sig(item), query)
+    auth_hits.has(item.auth) || year_hits.has(item.year) || contains(index.sig(item), query)
 }
 
-/// Bitset of pool entries containing `query`. Pools hold at most 64 entries,
-/// so this is one pass over the pool instead of one per item.
-fn matching(index: &IndexView, pool: &[Range<usize>], query: &[u8]) -> u64 {
-    let mut bits = 0u64;
-    for (i, range) in pool.iter().enumerate() {
-        if contains(index.pooled(range), query) {
-            bits |= 1u64 << i;
-        }
-    }
-    bits
-}
-
-/// Test bit `idx` of a pool bitset.
+/// Which entries of one pool contain the query — one bit each.
 ///
-/// `IndexView::parse` already refuses ids past their pool, so `idx` is in range
-/// by the time a search runs. The guard stays because the cost of being wrong is
-/// not a bad answer but a trap: this module is compiled with `panic = "abort"`,
-/// so one overflowing shift would take search off the page entirely.
-fn bit(bits: u64, idx: u8) -> bool {
-    idx < 64 && bits >> idx & 1 != 0
+/// Metadata is deduplicated, so the query is compared against each distinct
+/// author or year once and every item then costs a bit test instead of a
+/// substring search.
+///
+/// Sized to the pool rather than to a machine word. It was a single `u64`,
+/// which capped both pools at 64 entries — a limit belonging to the matcher and
+/// not to the format, whose ids are `u8`. Two words cover the 255 the container
+/// can express, and the allocation is two `Vec`s per query against ~25 000
+/// substring tests.
+struct PoolHits(Vec<u64>);
+
+impl PoolHits {
+    fn of(index: &IndexView, pool: &[Range<usize>], query: &[u8]) -> Self {
+        let mut words = vec![0u64; pool.len().div_ceil(64)];
+        for (i, range) in pool.iter().enumerate() {
+            if contains(index.pooled(range), query) {
+                words[i / 64] |= 1u64 << (i % 64);
+            }
+        }
+        Self(words)
+    }
+
+    /// Whether pool entry `idx` matched.
+    ///
+    /// `IndexView::parse` already refuses ids past their pool, so `idx` is in
+    /// range by the time a search runs. The bounds check stays because the cost
+    /// of being wrong is not a bad answer but a trap: this module is compiled
+    /// with `panic = "abort"`, so one out-of-range index would take search off
+    /// the page entirely.
+    fn has(&self, idx: u8) -> bool {
+        let idx = idx as usize;
+        self.0
+            .get(idx / 64)
+            .is_some_and(|word| word >> (idx % 64) & 1 != 0)
+    }
 }
 
 /// Substring test — the only matcher in this module.
@@ -200,15 +217,35 @@ mod tests {
         }
     }
 
-    /// The bit test is total, so even an id that somehow reached a search
-    /// cannot overflow the shift.
+    /// The bit test is total: an id past the pool answers "no match" rather
+    /// than shifting out of range, whatever reached it.
     #[test]
-    fn bit_test_is_total() {
-        assert!(bit(0b101, 0));
-        assert!(!bit(0b101, 1));
-        assert!(bit(0b101, 2));
-        assert!(!bit(u64::MAX, 64), "past the bitset, not wrapped to bit 0");
-        assert!(!bit(u64::MAX, 255));
+    fn the_bit_test_is_total() {
+        let one_word = PoolHits(vec![0b101]);
+        assert!(one_word.has(0));
+        assert!(!one_word.has(1));
+        assert!(one_word.has(2));
+        assert!(!one_word.has(64), "past the words held, not wrapped to bit 0");
+        assert!(!one_word.has(255));
+
+        assert!(!PoolHits(vec![]).has(0), "an empty pool matches nothing");
+    }
+
+    /// Entries beyond the first word must be reachable — this is what the
+    /// single `u64` could not do, and why the pools were capped at 64.
+    #[test]
+    fn a_pool_wider_than_one_word_is_addressable() {
+        let mut words = vec![0u64; 4];
+        for idx in [0usize, 63, 64, 65, 127, 128, 254] {
+            words[idx / 64] |= 1u64 << (idx % 64);
+        }
+        let hits = PoolHits(words);
+        for idx in [0u8, 63, 64, 65, 127, 128, 254] {
+            assert!(hits.has(idx), "entry {idx} should match");
+        }
+        for idx in [1u8, 62, 66, 129, 253, 255] {
+            assert!(!hits.has(idx), "entry {idx} should not match");
+        }
     }
 
     /// `contains` must agree with an independent oracle over an ASCII corpus.

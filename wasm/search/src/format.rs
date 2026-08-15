@@ -43,13 +43,19 @@ pub const DIR_STRIDE: usize = 4;
 /// Bytes per entry in the result buffer.
 pub const RESULT_STRIDE: usize = 12;
 
-/// Auth and year ids are matched through `u64` bitsets, which caps both pools.
+/// Entries a metadata pool may hold: as many as the id field can address.
 ///
-/// The builder enforces the same cap. When it did not — it guarded at 255, the
-/// width of the id field rather than the width of the bitset — every index with
-/// more than 64 authors was built happily and refused here, and search fell
-/// back to the JavaScript scan with nothing said.
-pub const MAX_POOL: u32 = 64;
+/// An item names its author and year with a `u8` each, so 255 is what the
+/// container can express; ids run `0..=254`.
+///
+/// This used to be 64, the width of the `u64` the matcher used as a bitset —
+/// a limit belonging to one implementation detail rather than to the format.
+/// It cost twice: the builder once guarded at 255 and produced indexes the
+/// module refused, which showed up as search silently falling back to the
+/// JavaScript scan; and the ceiling sat 19 authors above a corpus that gains a
+/// few every release. The matcher now sizes its bitset to the pool, so the
+/// only limit left is the one the bytes impose.
+pub const MAX_POOL: u32 = 255;
 
 /// Read a little-endian `u32`.
 pub fn u32_le(bytes: &[u8], at: usize) -> u32 {
