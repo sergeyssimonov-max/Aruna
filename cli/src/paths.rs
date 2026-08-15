@@ -17,12 +17,17 @@ pub fn output_html_path() -> Result<PathBuf> {
     Ok(dir.join(OUTPUT_FILE_NAME))
 }
 
-/// Sibling scratch path used by [`write_atomic`].
+/// Sibling scratch path: `<name>.<pid>.part`, beside `path`.
 ///
 /// The process id keeps two concurrent runs from writing the same scratch file,
 /// and keeping it next to the destination keeps the later rename on a single
 /// filesystem — across devices `rename` fails instead of being atomic.
-fn scratch_sibling(path: &Path) -> PathBuf {
+///
+/// Both things this program writes are written this way — the inventory here
+/// and the archive in [`crate::download`] — so the convention is stated once
+/// and they cannot end up with different ideas of what a half-written file
+/// looks like.
+pub fn scratch_sibling(path: &Path) -> PathBuf {
     let mut name = path.file_name().unwrap_or_default().to_os_string();
     name.push(format!(".{}.part", std::process::id()));
     path.with_file_name(name)

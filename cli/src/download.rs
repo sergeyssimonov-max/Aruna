@@ -275,8 +275,9 @@ fn stream_to_file(reader: &mut impl Read, path: &Path) -> Result<Transfer> {
 
 /// The in-flight download: a scratch file that deletes itself unless committed.
 ///
-/// Same filesystem as `dest`, so the closing rename is atomic; the process id
-/// keeps concurrent runs from sharing one scratch file.
+/// The path is [`crate::paths::scratch_sibling`], the same convention the
+/// inventory is written with: beside the destination, so the closing rename is
+/// atomic, and carrying the process id, so concurrent runs do not share it.
 struct Scratch {
     path: PathBuf,
     committed: bool,
@@ -284,10 +285,8 @@ struct Scratch {
 
 impl Scratch {
     fn beside(dest: &Path) -> Self {
-        let mut name = dest.file_name().unwrap_or_default().to_os_string();
-        name.push(format!(".{}.part", std::process::id()));
         Self {
-            path: dest.with_file_name(name),
+            path: crate::paths::scratch_sibling(dest),
             committed: false,
         }
     }
