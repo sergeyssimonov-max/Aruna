@@ -587,6 +587,42 @@ mod tests {
         assert!(leftovers.is_empty(), "scratch left behind: {leftovers:?}");
     }
 
+    /// Both READMEs point the reader at the Zenodo record, by hand.
+    ///
+    /// They are the fifth and sixth copies of a number that lives in
+    /// `ZENODO_ZIP_URL`, and the only ones a person reads before running
+    /// anything. `SOURCE_LABEL` is already checked against the URL; this covers
+    /// the documentation, so republishing the archive cannot leave the prose
+    /// sending people to the record the tool no longer downloads.
+    ///
+    /// Included at compile time, so a moved or renamed README is a build error
+    /// rather than a test that quietly stops checking anything.
+    #[test]
+    fn the_readmes_point_at_the_record_that_is_downloaded() {
+        let record = ZENODO_ZIP_URL
+            .split("/records/")
+            .nth(1)
+            .and_then(|rest| rest.split('/').next())
+            .expect("the Zenodo URL names a record");
+        let landing = format!("https://zenodo.org/records/{record}");
+        // The prose drops `?download=1`; the path before it is what must agree.
+        let file_url = ZENODO_ZIP_URL.split('?').next().expect("split yields one");
+
+        for (name, text) in [
+            ("cli/README.md", include_str!("../README.md")),
+            ("README.md", include_str!("../../README.md")),
+        ] {
+            assert!(
+                text.contains(&landing),
+                "{name} does not link {landing} — the record the CLI downloads"
+            );
+        }
+        assert!(
+            include_str!("../README.md").contains(file_url),
+            "cli/README.md names a different archive than {file_url}"
+        );
+    }
+
     /// An existing archive stays intact when a later download fails.
     #[test]
     fn failed_download_preserves_previous_file() {
