@@ -47,48 +47,48 @@ const IconChevron = memo(function IconChevron({ className = "" }: { className?: 
 });
 
 const GroupRow = memo(function GroupRow({
-  c,
-  n,
-  y,
+  cth,
+  count,
+  top,
 }: {
-  c: string;
-  n: number;
-  y: number;
+  cth: string;
+  count: number;
+  top: number;
 }) {
   return (
-    <div className="vl-row vl-group" style={{ transform: `translate3d(0,${y}px,0)` }}>
+    <div className="vl-row vl-group" style={{ transform: `translate3d(0,${top}px,0)` }}>
       <IconChevron className="h-3.5 w-3.5 shrink-0 text-[#bbb]" />
-      <span className="text-[0.95rem] font-semibold tracking-tight">{c}</span>
-      <span className="text-[0.75rem] tabular-nums text-[#999]">· {n}</span>
+      <span className="text-[0.95rem] font-semibold tracking-tight">{cth}</span>
+      <span className="text-[0.75rem] tabular-nums text-[#999]">· {count}</span>
     </div>
   );
 });
 
 const ItemRow = memo(function ItemRow({
-  n,
-  s,
-  l,
+  number,
+  siglum,
+  lang,
   corpus,
-  a,
-  yv,
-  y,
+  editor,
+  year,
+  top,
 }: {
-  n: number;
-  s: string;
-  l: string;
+  number: number;
+  siglum: string;
+  lang: string;
   corpus: string;
-  a: string;
-  yv: string;
-  y: number;
+  editor: string;
+  year: string;
+  top: number;
 }) {
   return (
-    <div className="vl-row vl-item" style={{ transform: `translate3d(0,${y}px,0)` }}>
-      <div className="vl-c-num tabular-nums text-[#999]">{n}</div>
-      <div className="vl-c-sig min-w-0 truncate font-medium" title={s}>{s}</div>
-      <div className="vl-c-lang tabular-nums text-[#444]">{l}</div>
+    <div className="vl-row vl-item" style={{ transform: `translate3d(0,${top}px,0)` }}>
+      <div className="vl-c-num tabular-nums text-[#999]">{number}</div>
+      <div className="vl-c-sig min-w-0 truncate font-medium" title={siglum}>{siglum}</div>
+      <div className="vl-c-lang tabular-nums text-[#444]">{lang}</div>
       <div className="vl-c-corp truncate text-[#444]" title={corpus}>{corpus}</div>
-      <div className="vl-c-ed min-w-0 truncate text-[#444]" title={a}>{a}</div>
-      <div className="vl-c-year tabular-nums text-[#444]">{yv}</div>
+      <div className="vl-c-ed min-w-0 truncate text-[#444]" title={editor}>{editor}</div>
+      <div className="vl-c-year tabular-nums text-[#444]">{year}</div>
     </div>
   );
 });
@@ -354,18 +354,18 @@ function InventoryPage() {
               }
             >
               {rows.map((row) =>
-                row.t === 0 ? (
-                  <GroupRow key={row.key} c={row.c} n={row.n} y={row.y} />
+                row.kind === "group" ? (
+                  <GroupRow key={row.key} cth={row.cth} count={row.count} top={row.top} />
                 ) : (
                   <ItemRow
                     key={row.key}
-                    n={row.n}
-                    s={row.s}
-                    l={row.l}
+                    number={row.number}
+                    siglum={row.siglum}
+                    lang={row.lang}
                     corpus={row.corpus}
-                    a={row.a}
-                    yv={row.yv}
-                    y={row.y}
+                    editor={row.editor}
+                    year={row.year}
+                    top={row.top}
                   />
                 ),
               )}
