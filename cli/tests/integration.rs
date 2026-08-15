@@ -168,23 +168,73 @@ fn run_with_local_zip_writes_downloads() {
     assert!(body.contains("2015"));
 }
 
+/// Where the full TLHdig archive lives, when it lives anywhere.
+///
+/// `ARUNA_FIXTURE_ZIP` wins, so CI can keep the 71 MiB download in a cache
+/// directory outside the checkout. Otherwise it is `cli/fixtures/`, anchored to
+/// `CARGO_MANIFEST_DIR` rather than written relative: cargo happens to run tests
+/// from the package root, so a bare `fixtures/...` works today, but it is a
+/// property of the runner rather than of this test, and it silently produced a
+/// skip rather than an error when it did not hold.
+fn fixture_path() -> std::path::PathBuf {
+    match std::env::var_os("ARUNA_FIXTURE_ZIP") {
+        Some(p) => std::path::PathBuf::from(p),
+        None => Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("TLHbasisONLINE25_1_ZENODO_Beta_03.zip"),
+    }
+}
+
+/// The whole corpus, parsed: 24 000 manuscripts of real cuneiform.
+///
+/// This is the test that catches what handmade fixtures cannot — the character
+/// boundary panic on multi-byte transliterations came from here. It needs the
+/// archive, which is 71 MiB and not in the repository, so it skips when the file
+/// is absent.
+///
+/// That skip used to be invisible: `eprintln!` is swallowed without
+/// `--nocapture`, so the test reported "ok" having asserted nothing, and in CI
+/// — where the archive never exists — it had never once run. Setting
+/// `ARUNA_REQUIRE_FIXTURE=1` turns a missing archive into a failure, so a job
+/// that means to exercise the corpus cannot quietly stop doing so.
 #[test]
 fn real_fixture_zip_if_present() {
-    let fixture = Path::new("fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip");
+    let fixture = fixture_path();
     if !fixture.is_file() {
-        eprintln!("skipping real fixture — file not present");
+        assert!(
+            std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
+            "ARUNA_REQUIRE_FIXTURE is set but {} is missing",
+            fixture.display()
+        );
+        eprintln!("skipping corpus test — {} not present", fixture.display());
         return;
     }
-    // Parse only a smoke subset would be ideal; full 24k is acceptable but slow.
-    // We still run it as an optional stress test when the fixture is available.
-    let records = parse_zip(fixture).expect("fixture parse");
-    assert!(records.len() > 1000, "expected large corpus, got {}", records.len());
-    // Spot-check: every record has non-empty fields
-    for r in records.iter().take(100) {
-        assert!(!r.title.is_empty());
-        assert!(!r.authorship.is_empty());
-        assert!(!r.year.is_empty());
+
+    let records = parse_zip(&fixture).expect("fixture parse");
+    assert!(
+        records.len() > 20_000,
+        "expected the full corpus, got {}",
+        records.len()
+    );
+
+    // Every record must be renderable: the table prints these fields directly,
+    // and an empty one would show as a blank cell rather than the missing-value
+    // dash. Checked across all 24k, not a sample — the failures this test exists
+    // to catch live in the rare documents.
+    for (i, r) in records.iter().enumerate() {
+        assert!(!r.title.is_empty(), "record {i} has no title");
+        assert!(!r.authorship.is_empty(), "record {i} has no authorship");
+        assert!(!r.year.is_empty(), "record {i} has no year");
+        assert!(!r.sigla.is_empty(), "record {i} has no sigla");
     }
-    let html = render_html(&records[..10.min(records.len())], "fixture", "now");
+
+    let html = render_html(&records, "fixture", "now");
     assert!(html.contains("<tbody>"));
+    // Rendering the whole corpus is the other half: escaping runs over every
+    // field, and a panic there would reach the user as a failed run.
+    assert!(
+        html.len() > 1_000_000,
+        "the full corpus should render a large document, got {} bytes",
+        html.len()
+    );
 }

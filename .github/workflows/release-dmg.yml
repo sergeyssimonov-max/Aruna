@@ -67,6 +67,66 @@ jobs:
             exit 1
           fi
 
+  # The full 24 000-manuscript parse. It lives in its own job because it needs
+  # the 71 MiB Zenodo archive, which is not in the repository — so until now the
+  # corpus test skipped on every CI run and reported success without parsing
+  # anything, while being the test that caught the character-boundary panic on
+  # real cuneiform.
+  #
+  # Deliberately not a dependency of the release job: the archive comes from an
+  # outside service, and a Zenodo outage should show up as a red corpus job, not
+  # as an inability to cut a release. The parse itself takes about two seconds.
+  corpus:
+    name: Full corpus parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli → target
+
+      # Keyed on the digest the CLI verifies against, so republishing the
+      # archive invalidates the cache by itself.
+      - name: Archive digest
+        id: digest
+        run: |
+          md5="$(sed -n 's/^pub const ZENODO_ZIP_MD5: &str = "\(.*\)";/\1/p' cli/src/download.rs)"
+          test -n "$md5" || { echo "::error::could not read ZENODO_ZIP_MD5"; exit 1; }
+          echo "md5=$md5" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the TLHdig archive
+        id: archive
+        uses: actions/cache@v4
+        with:
+          path: ~/aruna-fixtures
+          key: tlhdig-${{ steps.digest.outputs.md5 }}
+
+      - name: Download the archive
+        if: steps.archive.outputs.cache-hit != 'true'
+        run: |
+          url="$(sed -n 's/^ *"\(https:\/\/zenodo.org[^"]*\)";*/\1/p' cli/src/download.rs | head -1)"
+          test -n "$url" || { echo "::error::could not read ZENODO_ZIP_URL"; exit 1; }
+          mkdir -p ~/aruna-fixtures
+          curl -fsSL --retry 3 --retry-delay 5 -o ~/aruna-fixtures/corpus.zip "$url"
+
+      # The test would parse a corrupt archive into confusing failures; check the
+      # digest first so a bad download is reported as a bad download.
+      - name: Verify the archive
+        run: |
+          echo "${{ steps.digest.outputs.md5 }}  $HOME/aruna-fixtures/corpus.zip" | md5sum -c -
+
+      # ARUNA_REQUIRE_FIXTURE turns a missing archive into a failure, so this job
+      # cannot go back to passing without doing the work.
+      - name: Parse the full corpus
+        env:
+          ARUNA_REQUIRE_FIXTURE: "1"
+        run: |
+          export ARUNA_FIXTURE_ZIP="$HOME/aruna-fixtures/corpus.zip"
+          cargo test --manifest-path cli/Cargo.toml --test integration -- --nocapture
+
   web:
     name: Typecheck + lint (web)
     runs-on: ubuntu-latest
