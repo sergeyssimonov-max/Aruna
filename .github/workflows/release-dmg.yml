@@ -94,8 +94,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Currently matches no files; kept so the first test added to scripts/
-      # runs in CI without anyone remembering to wire it up.
+      # Runs src/**/*.test.ts directly: Node 22 strips the types, so the web
+      # side needs no build step or test runner of its own.
       - name: Test
         run: npm test
 

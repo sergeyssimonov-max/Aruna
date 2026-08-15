@@ -7,6 +7,10 @@
     "jsx": "react-jsx",
     "strict": true,
     "isolatedModules": true,
+    "allowJs": true,
+    // Tests run straight through `node --test`, which resolves the real file
+    // and so needs the real extension in the specifier.
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["vite/client", "node"],

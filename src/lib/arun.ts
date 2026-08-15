@@ -1,14 +1,22 @@
 /**
- * ARUN v3 — single binary inventory container.
- * Header 80 B · items 12 B · prefix-compressed sigla · Lang/Inv/Corpus pools.
+ * ARUN v3 reader — display inventory and search wire from the binary container.
+ *
+ * The layout itself lives in `./arun-format.js`, shared with the writer.
  */
 import type { Inventory, Item, Wire } from "./inventory";
+import {
+  ARUN_MAGIC,
+  ARUN_VERSION,
+  DIR_ENTRY,
+  GROUP,
+  HEADER,
+  ITEM,
+  NO_PREFIX,
+  headerOffset,
+} from "./arun-format.js";
 
-export const ARUN_MAGIC = 0x4e555241;
-export const ARUN_VERSION = 3;
-const HEADER = 80;
-const ITEM = 12;
-const NO_PREFIX = 255;
+export { ARUN_MAGIC, ARUN_VERSION };
+
 const td = new TextDecoder("utf-8");
 
 function u32(v: DataView, o: number) {
@@ -19,17 +27,33 @@ function strAt(bytes: Uint8Array, off: number, len: number): string {
   return td.decode(bytes.subarray(off, off + len));
 }
 
+/**
+ * Read a directory of `(offset, length)` pairs into strings.
+ *
+ * Each entry is checked against its own pool. `subarray` clamps out-of-range
+ * indices instead of throwing, so an entry reaching past the pool used to
+ * produce a short or empty string that looked like real data — and one reaching
+ * into the *next* pool produced a plausible wrong one. Failing here means a
+ * damaged file is reported as damaged.
+ */
 function readDir(
   v: DataView,
   bytes: Uint8Array,
   dirOff: number,
   n: number,
   poolOff: number,
+  poolLen: number,
+  what: string,
 ): string[] {
   const out = new Array<string>(n);
   for (let i = 0; i < n; i++) {
     const base = dirOff + i * 4;
-    out[i] = strAt(bytes, poolOff + v.getUint16(base, true), v.getUint16(base + 2, true));
+    const off = v.getUint16(base, true);
+    const len = v.getUint16(base + 2, true);
+    if (off + len > poolLen) {
+      throw new Error(`ARUN: ${what} entry ${i} runs past its pool`);
+    }
+    out[i] = strAt(bytes, poolOff + off, len);
   }
   return out;
 }
@@ -50,53 +74,57 @@ type Layout = {
   corps: string[];
   prefixes: string[];
   sufPoolOff: number;
+  sufPoolLen: number;
 };
 
 function openArun(buf: ArrayBuffer): Layout {
   if (buf.byteLength < HEADER) throw new Error("ARUN: truncated header");
   const v = new DataView(buf);
   const bytes = new Uint8Array(buf);
-  if (u32(v, 0) !== ARUN_MAGIC) throw new Error("ARUN: bad magic");
-  if (u32(v, 4) !== ARUN_VERSION) throw new Error(`ARUN: unsupported version ${u32(v, 4)}`);
+  const field = (name: Parameters<typeof headerOffset>[0]) => u32(v, headerOffset(name));
 
-  const manuscripts = u32(v, 8);
-  const nGroups = u32(v, 12);
-  const nItems = u32(v, 16);
-  const nAuth = u32(v, 20);
-  const nYear = u32(v, 24);
-  const nLang = u32(v, 28);
-  const nInv = u32(v, 32);
-  const nCorp = u32(v, 36);
-  const nPrefix = u32(v, 40);
-  const sourceLen = u32(v, 44);
-  const sufPoolLen = u32(v, 48);
-  const authPoolLen = u32(v, 52);
-  const yearPoolLen = u32(v, 56);
-  const langPoolLen = u32(v, 60);
-  const invPoolLen = u32(v, 64);
-  const corpPoolLen = u32(v, 68);
-  const prefixPoolLen = u32(v, 72);
-  // search_len at 76 ignored (always 0 in current builds)
+  if (field("magic") !== ARUN_MAGIC) throw new Error("ARUN: bad magic");
+  if (field("version") !== ARUN_VERSION) {
+    throw new Error(`ARUN: unsupported version ${field("version")}`);
+  }
+
+  const manuscripts = field("manuscripts");
+  const nGroups = field("nGroups");
+  const nItems = field("nItems");
+  const nAuth = field("nAuth");
+  const nYear = field("nYear");
+  const nLang = field("nLang");
+  const nInv = field("nInv");
+  const nCorp = field("nCorp");
+  const nPrefix = field("nPrefix");
+  const sourceLen = field("sourceLen");
+  const sufPoolLen = field("sufPoolLen");
+  const authPoolLen = field("authPoolLen");
+  const yearPoolLen = field("yearPoolLen");
+  const langPoolLen = field("langPoolLen");
+  const invPoolLen = field("invPoolLen");
+  const corpPoolLen = field("corpPoolLen");
+  const prefixPoolLen = field("prefixPoolLen");
 
   let o = HEADER;
   const source = strAt(bytes, o, sourceLen);
   o += sourceLen;
   const groupsOff = o;
-  o += nGroups * 8;
+  o += nGroups * GROUP;
   const itemsOff = o;
   o += nItems * ITEM;
   const authDirOff = o;
-  o += nAuth * 4;
+  o += nAuth * DIR_ENTRY;
   const yearDirOff = o;
-  o += nYear * 4;
+  o += nYear * DIR_ENTRY;
   const langDirOff = o;
-  o += nLang * 4;
+  o += nLang * DIR_ENTRY;
   const invDirOff = o;
-  o += nInv * 4;
+  o += nInv * DIR_ENTRY;
   const corpDirOff = o;
-  o += nCorp * 4;
+  o += nCorp * DIR_ENTRY;
   const prefixDirOff = o;
-  o += nPrefix * 4;
+  o += nPrefix * DIR_ENTRY;
   const sufPoolOff = o;
   o += sufPoolLen;
   const authPoolOff = o;
@@ -122,13 +150,14 @@ function openArun(buf: ArrayBuffer): Layout {
     source,
     groupsOff,
     itemsOff,
-    auths: readDir(v, bytes, authDirOff, nAuth, authPoolOff),
-    years: readDir(v, bytes, yearDirOff, nYear, yearPoolOff),
-    langs: readDir(v, bytes, langDirOff, nLang, langPoolOff),
-    invs: readDir(v, bytes, invDirOff, nInv, invPoolOff),
-    corps: readDir(v, bytes, corpDirOff, nCorp, corpPoolOff),
-    prefixes: readDir(v, bytes, prefixDirOff, nPrefix, prefixPoolOff),
+    auths: readDir(v, bytes, authDirOff, nAuth, authPoolOff, authPoolLen, "author"),
+    years: readDir(v, bytes, yearDirOff, nYear, yearPoolOff, yearPoolLen, "year"),
+    langs: readDir(v, bytes, langDirOff, nLang, langPoolOff, langPoolLen, "lang"),
+    invs: readDir(v, bytes, invDirOff, nInv, invPoolOff, invPoolLen, "inv"),
+    corps: readDir(v, bytes, corpDirOff, nCorp, corpPoolOff, corpPoolLen, "corpus"),
+    prefixes: readDir(v, bytes, prefixDirOff, nPrefix, prefixPoolOff, prefixPoolLen, "prefix"),
     sufPoolOff,
+    sufPoolLen,
   };
 }
 
@@ -145,8 +174,16 @@ function itemAt(L: Layout, index: number): {
   const sufOff = b[ib]! | (b[ib + 1]! << 8) | (b[ib + 2]! << 16);
   const sufLen = b[ib + 3]!;
   const pref = b[ib + 4]!;
+  if (sufOff + sufLen > L.sufPoolLen) {
+    throw new Error(`ARUN: item ${index} siglum runs past the suffix pool`);
+  }
   const suf = strAt(b, L.sufPoolOff + sufOff, sufLen);
-  const sig = pref === NO_PREFIX ? suf : (L.prefixes[pref] ?? "") + suf;
+  // A prefix id other than NO_PREFIX must name a real prefix; silently dropping
+  // it would hand back a truncated siglum that reads as a genuine one.
+  if (pref !== NO_PREFIX && pref >= L.prefixes.length) {
+    throw new Error(`ARUN: item ${index} names prefix ${pref}, pool holds ${L.prefixes.length}`);
+  }
+  const sig = pref === NO_PREFIX ? suf : L.prefixes[pref]! + suf;
   return {
     sig,
     auth: b[ib + 5]!,
@@ -162,7 +199,7 @@ export function parseInventory(buf: ArrayBuffer): Inventory {
   const L = openArun(buf);
   const groups = new Array(L.nGroups);
   for (let gi = 0; gi < L.nGroups; gi++) {
-    const gb = L.groupsOff + gi * 8;
+    const gb = L.groupsOff + gi * GROUP;
     const cth = L.v.getUint16(gb, true);
     const count = L.v.getUint16(gb + 2, true);
     const start = L.v.getUint32(gb + 4, true);
@@ -193,7 +230,7 @@ export function parseWire(buf: ArrayBuffer): Wire {
 
   const g: Wire["g"] = new Array(L.nGroups);
   for (let gi = 0; gi < L.nGroups; gi++) {
-    const gb = L.groupsOff + gi * 8;
+    const gb = L.groupsOff + gi * GROUP;
     const cth = L.v.getUint16(gb, true);
     const count = L.v.getUint16(gb + 2, true);
     const start = L.v.getUint32(gb + 4, true);

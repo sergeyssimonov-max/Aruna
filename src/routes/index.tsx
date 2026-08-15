@@ -243,7 +243,7 @@ function InventoryPage() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-[#1a1a1a]">
-      <div className="mx-auto max-w-4xl px-4 pt-[calc(var(--grok-banner-h,0px)+1.5rem)] pb-10 sm:px-6">
+      <div className="mx-auto max-w-4xl px-4 pt-6 pb-10 sm:px-6">
         <header className="mb-6 sm:mb-8">
           <div className="mb-3 min-w-0">
             <h1 className="text-[1.25rem] font-semibold leading-snug tracking-tight sm:text-[1.35rem]">

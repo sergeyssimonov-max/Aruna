@@ -7,15 +7,22 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ARUN_MAGIC,
+  ARUN_VERSION,
+  DIR_ENTRY,
+  GROUP,
+  HEADER_FIELDS,
+  HEADER,
+  ITEM,
+  NO_PREFIX,
+} from "../src/lib/arun-format.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const jsonPath = resolve(root, "public/data/inventory.json");
 const binPath = resolve(root, "public/data/inventory.bin");
 const gzPath = resolve(root, "public/data/inventory.bin.gz");
 
-const ARUN_MAGIC = 0x4e555241;
-const ARUN_VERSION = 3;
-const NO_PREFIX = 255;
 const te = new TextEncoder();
 
 const wire = JSON.parse(readFileSync(jsonPath, "utf8"));
@@ -132,32 +139,50 @@ if (sufP.len > 0xffffff) throw new Error("suffix pool > u24");
 const sourceBytes = te.encode(wire.s);
 const nGroups = groups.length;
 const nItems = groups.reduce((a, g) => a + g.items.length, 0);
-const ITEM = 12;
-
-// Header: magic, ver, m, nG, nI, nAuth, nYear, nLang, nInv, nCorp, nPref, srcL,
-// sufL, authL, yearL, langL, invL, corpL, prefL, searchL — 20 u32 = 80 bytes.
-// Must stay in step with `HEADER` in src/lib/arun.ts, which reads this format.
-const H = 80;
 
 const total =
-  H +
+  HEADER +
   sourceBytes.length +
-  nGroups * 8 +
+  nGroups * GROUP +
   nItems * ITEM +
-  auths.length * 4 + years.length * 4 + langs.length * 4 + invs.length * 4 + corps.length * 4 + prefixes.length * 4 +
+  (auths.length + years.length + langs.length + invs.length + corps.length + prefixes.length) *
+    DIR_ENTRY +
   sufP.len + authP.len + yearP.len + langP.len + invP.len + corpP.len + prefP.len;
 
 const out = new ArrayBuffer(total);
 const view = new DataView(out);
 const u8 = new Uint8Array(out);
-let h = 0;
-const pu = (x) => { view.setUint32(h, x >>> 0, true); h += 4; };
-pu(ARUN_MAGIC); pu(ARUN_VERSION); pu(wire.m); pu(nGroups); pu(nItems);
-pu(auths.length); pu(years.length); pu(langs.length); pu(invs.length); pu(corps.length); pu(prefixes.length);
-pu(sourceBytes.length); pu(sufP.len); pu(authP.len); pu(yearP.len); pu(langP.len); pu(invP.len); pu(corpP.len); pu(prefP.len); pu(0);
-if (h !== H) throw new Error(`header ${h} != ${H}`);
+// Written by name against the shared field list, so the writer cannot drift out
+// of the order the reader expects — an off-by-one here would have silently
+// shifted every pool length by four bytes.
+const headerValues = {
+  magic: ARUN_MAGIC,
+  version: ARUN_VERSION,
+  manuscripts: wire.m,
+  nGroups,
+  nItems,
+  nAuth: auths.length,
+  nYear: years.length,
+  nLang: langs.length,
+  nInv: invs.length,
+  nCorp: corps.length,
+  nPrefix: prefixes.length,
+  sourceLen: sourceBytes.length,
+  sufPoolLen: sufP.len,
+  authPoolLen: authP.len,
+  yearPoolLen: yearP.len,
+  langPoolLen: langP.len,
+  invPoolLen: invP.len,
+  corpPoolLen: corpP.len,
+  prefixPoolLen: prefP.len,
+  searchLen: 0,
+};
+HEADER_FIELDS.forEach((name, i) => {
+  if (!(name in headerValues)) throw new Error(`no value for header field ${name}`);
+  view.setUint32(i * 4, headerValues[name] >>> 0, true);
+});
 
-let o = H;
+let o = HEADER;
 u8.set(sourceBytes, o); o += sourceBytes.length;
 let ic = 0;
 for (const g of groups) {
