@@ -85,6 +85,18 @@ function buildMetaPools() {
   for (const [c, rows] of wire.g) {
     const m = /^CTH\s*(\d+)/i.exec(c);
     const cth = m ? parseInt(m[1], 10) : 0;
+    // A group keeps only this number: the reader rebuilds the label as
+    // `CTH ${cth}`. Every one of the 663 groups in this corpus is exactly that,
+    // so the round trip is currently lossless — but nothing made it stay so. A
+    // future release naming a group `CTH 12.1` would be shown as `CTH 12`, one
+    // with no CTH at all as `CTH 0`, and a number past u16 would wrap silently
+    // in setUint16 into a different, entirely plausible group. Refuse instead:
+    // a label the container cannot carry has to be a format decision, not a
+    // quiet substitution nobody sees.
+    if (cth > 0xffff) throw new Error(`group "${c}": CTH number exceeds u16`);
+    if (`CTH ${cth}` !== c) {
+      throw new Error(`group "${c}" would be published as "CTH ${cth}" — ARUN carries the number only`);
+    }
     const items = rows.map((row) => {
       const [s, ai, yi, li = 0, ii = 0, ci = 0] = row;
       const auth = intern(aMap, auths, pool[ai] ?? "—");
