@@ -1,7 +1,8 @@
 /**
  * The TLH2 index is written in TypeScript and read in Rust, so the two halves
  * cannot share a module the way ARUN's writer and reader do. This reads the
- * constants straight out of `wasm/search/src/lib.rs` and checks the builder
+ * constants straight out of `wasm/search/src/format.rs` — the file the Rust
+ * side keeps the layout in, for exactly this reason — and checks the builder
  * agrees with them.
  *
  * It is here because the last drift was invisible in every other way: the
@@ -13,12 +14,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const rust = readFileSync(new URL("../../wasm/search/src/lib.rs", import.meta.url), "utf8");
+const FORMAT_RS = "../../wasm/search/src/format.rs";
+const rust = readFileSync(new URL(FORMAT_RS, import.meta.url), "utf8");
 
 /** Value of a `const NAME: type = value;` item in the Rust module. */
 function rustConst(name: string): number {
   const m = new RegExp(`const\\s+${name}\\s*:\\s*\\w+\\s*=\\s*([0-9_a-fA-Fx]+)`).exec(rust);
-  assert.ok(m, `wasm/search/src/lib.rs no longer defines ${name}`);
+  assert.ok(m, `${FORMAT_RS} no longer defines ${name}`);
   return Number(m![1]!.replace(/_/g, ""));
 }
 
