@@ -111,11 +111,25 @@ const EDITOR_ROLE_PRIORITY: &[&[u8]] = &[
     b"kor",
     b"kor2",
     b"annot",
+    b"author",
     b"val",
     b"format",
     b"kolon",
     b"cth",
 ];
+
+/// Attributes that name the person, in the order they are believed.
+///
+/// `editor=` is what most of the corpus uses. `author=` is the newer TLH
+/// files' spelling — `<author date="2026-05-11" author="Daniel Schwemer"/>` —
+/// and reading only the first name left 549 manuscripts crediting nobody while
+/// the document named someone all along.
+///
+/// `src=` is deliberately not here, though it sits on 27% of documents and
+/// looks like initials. It appears only on `<uebern>`, beside that element's
+/// own `editor=`, and holds where the transliteration was taken over *from*
+/// (`MZ`, `JL`, `DBH`) — the provenance of the takeover, not who made it.
+const EDITOR_ATTRS: &[&[u8]] = &[b"editor", b"author"];
 
 /// Editor and, when the same element carries it, the year of that edition.
 ///
@@ -139,7 +153,7 @@ pub(super) fn extract_editor_and_year(header: &str) -> (Option<String>, Option<S
     let mut best: Option<(usize, String, Option<String>)> = None;
 
     for_each_start_tag(header.as_bytes(), |local, attrs| {
-        let Some(ed_raw) = attr_value(attrs, b"editor") else {
+        let Some(ed_raw) = EDITOR_ATTRS.iter().find_map(|key| attr_value(attrs, key)) else {
             return false;
         };
         let editor = normalize_ws(utf8(ed_raw));
