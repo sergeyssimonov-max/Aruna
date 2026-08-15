@@ -6,12 +6,15 @@ export function InventoryHeader({
   manuscripts,
   groups,
   matches,
+  degraded,
 }: {
   source: string;
   manuscripts: number;
   groups: number;
   /** Shown only while a search is running; `pending` marks a stale count. */
   matches: { count: number; pending: boolean } | null;
+  /** True when search fell back to the slower engine — see `SearchEngineNote`. */
+  degraded: boolean;
 }) {
   return (
     <header className="mb-6 sm:mb-8">
@@ -29,8 +32,29 @@ export function InventoryHeader({
             {matches.pending ? <span className="ml-1 text-[#aaa]">…</span> : null}
           </Count>
         )}
+        {degraded && <SearchEngineNote />}
       </div>
     </header>
+  );
+}
+
+/**
+ * Said out loud only when it is true.
+ *
+ * The worker refuses the binary index when the inventory outgrows it — more
+ * than 64 distinct editors or years — and searches by scanning strings instead.
+ * Results stay correct and the page keeps working, which is why it was worth
+ * doing silently; but silence also meant nobody would ever learn that the fast
+ * path had been off for a year.
+ */
+function SearchEngineNote() {
+  return (
+    <span
+      className="text-[#999]"
+      title="The compact search index did not fit this inventory, so search is scanning strings instead. Results are the same; large queries take longer."
+    >
+      Search: fallback engine
+    </span>
   );
 }
 
