@@ -4,6 +4,9 @@ import type { WorkerIn, WorkerOut } from "./search-protocol";
 
 type Status = "boot" | "ready" | "error";
 
+/** Which engine answered: the WASM index, or the JavaScript scan behind it. */
+type Engine = "wasm" | "js";
+
 /** Search off the main thread. Init with a copy of the ARUN buffer. */
 export function useSearchWorker(arun: ArrayBuffer | null) {
   const workerRef = useRef<Worker | null>(null);
@@ -11,6 +14,7 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
   /** Query of the request currently in flight — the one `reqId` refers to. */
   const sentQuery = useRef("");
   const [status, setStatus] = useState<Status>("boot");
+  const [engine, setEngine] = useState<Engine | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A result carries the query it answers. Matches alone cannot say whether
   // they are still current, so a caller holding them would go on drawing the
@@ -34,6 +38,10 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
       const msg = ev.data;
       if (msg.type === "ready") {
         setStatus("ready");
+        // Which engine the worker settled on. The message has carried this
+        // since the fallback existed and nothing read it, so the page could not
+        // tell a fast search from a slow one — see `engine` in the return value.
+        setEngine(msg.engine);
         return;
       }
       if (msg.type === "result") {
@@ -66,6 +74,7 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
       worker.terminate();
       workerRef.current = null;
       setStatus("boot");
+      setEngine(null);
       setResult(null);
     };
   }, [arun]);
@@ -89,6 +98,14 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
 
   return {
     status,
+    /**
+     * `"js"` means the binary index was refused and the worker is scanning
+     * strings instead: still correct, measurably slower, and until now
+     * indistinguishable from the fast path. The usual cause is the corpus
+     * outgrowing the container — more than 64 distinct editors or years, which
+     * the WASM module matches through `u64` bitsets.
+     */
+    engine,
     error,
     matches: result?.matches ?? null,
     /** Query `matches` answers; compare with the live one before trusting it. */
