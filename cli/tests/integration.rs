@@ -228,6 +228,8 @@ fn real_fixture_zip_if_present() {
         assert!(!r.sigla.is_empty(), "record {i} has no sigla");
     }
 
+    report_coverage(&records);
+
     let html = render_html(&records, "fixture", "now");
     assert!(html.contains("<tbody>"));
     // Rendering the whole corpus is the other half: escaping runs over every
@@ -237,4 +239,61 @@ fn real_fixture_zip_if_present() {
         "the full corpus should render a large document, got {} bytes",
         html.len()
     );
+}
+
+/// How much of each column the corpus actually fills — printed, and floored.
+///
+/// A field that is present in the document but not in the record shows as the
+/// missing-value dash, exactly like a field the corpus never recorded, and
+/// nothing distinguished the two. The editor column was 62% dashes for months;
+/// measured against the archive, 549 of those documents did name a person, in
+/// an `author=` attribute the parser did not read. The rest — 14 349 — name
+/// nobody anywhere in the file, which is a fact about TLHdig and not about
+/// this program.
+///
+/// The floors below are what the corpus supports today, a little under the
+/// measured values. They are a tripwire rather than a target: a drop means the
+/// parser stopped seeing something it used to see, and it is worth finding out
+/// which before shipping a table full of dashes.
+///
+/// Measured on TLHdig Beta 0.3 (23 936 manuscripts):
+/// editor 40.1%, year 100%, lang 99.1%, corpus 100%, inventory number 11.6%.
+fn report_coverage(records: &[ManuscriptRecord]) {
+    let total = records.len();
+    let share = |filled: usize| 100.0 * filled as f64 / total as f64;
+    let count = |f: fn(&ManuscriptRecord) -> &str| {
+        records.iter().filter(|r| f(r) != MISSING).count()
+    };
+
+    let editor = count(|r| &r.authorship);
+    let year = count(|r| &r.year);
+    let lang = count(|r| &r.lang);
+    let corpus = count(|r| &r.corpus);
+    let inv = count(|r| &r.inv);
+
+    eprintln!("corpus coverage over {total} manuscripts:");
+    for (name, filled) in [
+        ("editor", editor),
+        ("year", year),
+        ("lang", lang),
+        ("corpus", corpus),
+        ("inv", inv),
+    ] {
+        eprintln!("  {name:<8} {filled:>6}  {:.1}%", share(filled));
+    }
+
+    for (name, filled, floor) in [
+        ("editor", editor, 39.0),
+        ("year", year, 99.0),
+        ("lang", lang, 98.0),
+        ("corpus", corpus, 99.0),
+        ("inv", inv, 10.0),
+    ] {
+        assert!(
+            share(filled) >= floor,
+            "{name} is filled for {:.1}% of the corpus, below the {floor}% this archive supports \
+             — the parser has stopped reading something it used to read",
+            share(filled)
+        );
+    }
 }
