@@ -133,6 +133,31 @@ pub fn group_label(rec: &ManuscriptRecord) -> &str {
     rec.cth.as_deref().unwrap_or(MISSING)
 }
 
+/// The CTH groups, as consecutive runs of records sharing a label.
+///
+/// A group is a run rather than a bucket because the records arrive sorted
+/// from [`crate::archive::sort_records`], and both outputs — the HTML and the
+/// site's catalog — must list manuscripts in that one order. Collecting into a
+/// map would lose it.
+///
+/// Both writers used to carry their own copy of this loop.
+pub fn group_runs(records: &[ManuscriptRecord]) -> impl Iterator<Item = &[ManuscriptRecord]> {
+    let mut start = 0;
+    std::iter::from_fn(move || {
+        if start >= records.len() {
+            return None;
+        }
+        let label = group_label(&records[start]);
+        let mut end = start + 1;
+        while end < records.len() && group_label(&records[end]) == label {
+            end += 1;
+        }
+        let run = &records[start..end];
+        start = end;
+        Some(run)
+    })
+}
+
 fn format_title(sigla: &str, cth: &Option<String>) -> String {
     match cth {
         Some(c) if !sigla.is_empty() && sigla != MISSING => format!("{sigla} · {c}"),

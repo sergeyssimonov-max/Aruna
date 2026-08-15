@@ -3,6 +3,7 @@
 //! Library surface used by the CLI binary and integration tests.
 
 pub mod archive;
+pub mod catalog;
 pub mod xml_scan;
 pub mod download;
 pub mod error;
