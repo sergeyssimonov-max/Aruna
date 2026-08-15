@@ -32,7 +32,7 @@
 
 ## Что уже решено замерами
 
-Замеры на `cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip` (23 937 манускриптов),
+Замеры на `cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip` (23 936 манускриптов),
 release, 3 прогона, медиана.
 
 | Место              | Результат                          | Решение          |

@@ -17,3 +17,8 @@ the same manuscripts:
 
 CI rebuilds both from the archive and fails if either differs from what is
 committed, so the catalog cannot drift away from the parser again.
+
+That check needs the archive. scripts/inventory-data.test.mjs needs nothing:
+it reads the three files as committed and asserts they describe one catalog —
+including that the .gz decompresses to the .bin, which no other check looked
+at, though it is the file every visitor downloads.
