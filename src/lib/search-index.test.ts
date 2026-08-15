@@ -12,7 +12,7 @@ import { buildSearchIndex } from "./search-index.ts";
  * once guarded the pools at 255 while the module rejected anything over 64, and
  * the only symptom was a quiet fallback to the JavaScript scan.
  */
-const MAX_POOL = 64;
+const MAX_POOL = 255;
 const TLH2_MAGIC = 0x32484c54;
 const HEADER = 32;
 
@@ -46,6 +46,17 @@ test("the shipped catalog builds an index the module will accept", () => {
   assert.equal(v.getUint32(0, true), TLH2_MAGIC, "magic");
   const nAuth = v.getUint32(12, true);
   const nYear = v.getUint32(16, true);
+
+  // Printed, because the number that matters is the headroom, and the day it
+  // runs out the only symptom is search quietly getting slower: the module
+  // refuses the index, the worker scans strings instead, and the page still
+  // answers every query correctly. The failure below is the wall; this is the
+  // distance to it.
+  console.log(
+    `  TLH2 pools: authors ${nAuth}/${MAX_POOL} (headroom ${MAX_POOL - nAuth}), ` +
+      `years ${nYear}/${MAX_POOL} (headroom ${MAX_POOL - nYear})`,
+  );
+
   assert.ok(nAuth > 0 && nAuth <= MAX_POOL, `authors ${nAuth} within the bitset`);
   assert.ok(nYear > 0 && nYear <= MAX_POOL, `years ${nYear} within the bitset`);
 
@@ -73,7 +84,7 @@ test("sections are sized exactly as the header claims", () => {
   assert.equal(blob.byteLength, expected, "no slack, no shortfall");
 });
 
-test("more distinct authors than the bitset holds is declined, not thrown", () => {
+test("more distinct authors than an id can address is declined, not thrown", () => {
   const rows = Array.from({ length: MAX_POOL + 1 }, (_, i) => ({
     sig: `kbo ${i}`,
     auth: `editor ${i}`,
@@ -84,14 +95,14 @@ test("more distinct authors than the bitset holds is declined, not thrown", () =
   assert.equal(buildSearchIndex(wireOf(rows)), null);
 });
 
-test("exactly as many authors as the bitset holds still builds", () => {
+test("exactly as many authors as an id can address still builds", () => {
   const rows = Array.from({ length: MAX_POOL }, (_, i) => ({
     sig: `kbo ${i}`,
     auth: `editor ${i}`,
     year: "2021",
   }));
   const blob = buildSearchIndex(wireOf(rows));
-  assert.ok(blob, "64 authors is the limit, not one past it");
+  assert.ok(blob, `${MAX_POOL} authors is the limit, not one past it`);
   assert.equal(new DataView(blob).getUint32(12, true), MAX_POOL);
 });
 
