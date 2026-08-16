@@ -3,6 +3,7 @@
 //! Library surface used by the CLI binary and integration tests.
 
 pub mod archive;
+pub mod cache;
 pub mod catalog;
 pub mod xml_scan;
 pub mod download;
@@ -34,28 +35,13 @@ pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 ///
 /// When `local_zip` is `Some`, the download step is skipped (tests / offline).
 pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
-    let work_dir = work_dir_for_process();
-    fs::create_dir_all(&work_dir).map_err(|source| ArunaError::Io {
-        path: work_dir.clone(),
-        source,
-    })?;
-
-    let zip_path = match local_zip {
-        Some(p) => p.to_path_buf(),
-        None => {
-            let dest = work_dir.join("TLHbasisONLINE25_1_ZENODO_Beta_03.zip");
-            eprintln!("Downloading TLHdig archive from Zenodo…");
-            download::download_verified(
-                download::ZENODO_ZIP_URL,
-                &dest,
-                Some(download::ZENODO_ZIP_MD5),
-            )?;
-            dest
-        }
+    let source = match local_zip {
+        Some(p) => cache::Archive::Cached(p.to_path_buf()),
+        None => obtain_archive()?,
     };
 
     eprintln!("Parsing XML manuscripts…");
-    let records = archive::parse_zip(&zip_path)?;
+    let records = archive::parse_zip(source.path())?;
     eprintln!("Indexed {} manuscripts.", records.len());
 
     let generated_at = format_now_local();
@@ -67,14 +53,59 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
     // in place — see `paths::write_atomic`.
     paths::write_atomic(&out, html.as_bytes())?;
 
-    if local_zip.is_none() {
-        // The archive is downloaded fresh on every run, so keeping a 71 MiB copy
-        // per process id would slowly fill the temp directory. A failed run
-        // keeps its directory on purpose: the partial state is worth inspecting.
-        let _ = fs::remove_dir_all(&work_dir);
+    if let cache::Archive::Temporary(path) = &source {
+        // Nowhere to cache it, so this copy was only ever for this run. A failed
+        // run keeps it on purpose: the partial state is worth inspecting.
+        if let Some(dir) = path.parent() {
+            let _ = fs::remove_dir_all(dir);
+        }
     }
 
     Ok(out)
+}
+
+/// The archive: from the cache when it is there, otherwise downloaded.
+///
+/// A hit costs the 267 ms of rereading 71 MiB to check the digest; a miss costs
+/// the download, which is about a minute. That is the whole reason this exists.
+fn obtain_archive() -> Result<cache::Archive> {
+    let url = download::ZENODO_ZIP_URL;
+    let md5 = download::ZENODO_ZIP_MD5;
+
+    let Some(dir) = cache::cache_dir() else {
+        // No cache directory on this platform: download into a scratch
+        // directory this run owns, and delete it at the end as before.
+        let work_dir = work_dir_for_process();
+        fs::create_dir_all(&work_dir).map_err(|source| ArunaError::Io {
+            path: work_dir.clone(),
+            source,
+        })?;
+        let dest = work_dir.join(cache::archive_name(url, md5));
+        eprintln!("Downloading TLHdig archive from Zenodo…");
+        download::download_verified(url, &dest, Some(md5))?;
+        return Ok(cache::Archive::Temporary(dest));
+    };
+
+    // Leftovers from runs that were killed mid-download; see `sweep_unfinished`.
+    cache::sweep_unfinished(&dir);
+
+    if let Some(hit) = cache::lookup(&dir, url, md5) {
+        eprintln!("Using the archive already downloaded: {}", hit.display());
+        return Ok(cache::Archive::Cached(hit));
+    }
+
+    fs::create_dir_all(&dir).map_err(|source| ArunaError::Io {
+        path: dir.clone(),
+        source,
+    })?;
+    let dest = dir.join(cache::archive_name(url, md5));
+    eprintln!("Downloading TLHdig archive from Zenodo…");
+    // The download lands through a scratch file and a rename, so an interrupted
+    // run cannot leave half an archive under a name that promises a whole one.
+    download::download_verified(url, &dest, Some(md5))?;
+    eprintln!("Kept for the next run: {}", dest.display());
+    cache::prune(&dir, &dest);
+    Ok(cache::Archive::Cached(dest))
 }
 
 /// Scratch directory for this process.
