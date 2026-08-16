@@ -32,6 +32,9 @@ h1 {
   line-height: 1.65;
 }
 .meta span { display: block; }
+/* The two counts are one fact about the corpus, so they share a line. */
+.meta .count { display: inline-block; margin-right: 1.5rem; }
+.meta .count:last-child { margin-right: 0; }
 
 /* legend */
 .legend {
@@ -100,6 +103,23 @@ h1 {
   border-color: #ccc;
   box-shadow: 0 0 0 3px #eee;
 }
+.toolbar .fold-all {
+  flex: 0 0 auto;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #444;
+  cursor: pointer;
+}
+.toolbar .fold-all:hover { background: #fafafa; }
+.toolbar .fold-all:focus-visible {
+  outline: none;
+  border-color: #ccc;
+  box-shadow: 0 0 0 3px #eee;
+}
 .toolbar .hint {
   font-size: 0.8125rem;
   color: #888;
@@ -165,11 +185,45 @@ tr.group td {
   background: #fff;
 }
 tr.group:first-child td { padding-top: 0.2rem; }
+
+/* The heading is the control: a real button, so it works from the keyboard,
+   stripped of the chrome a button normally brings. */
+.group-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.group-toggle:focus-visible {
+  outline: 2px solid #ccc;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Drawn rather than an image: 663 copies of an inline SVG would be most of the
+   document. Points down while the group is open, right while it is folded. */
+.chevron {
+  align-self: center;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid #bbb;
+  border-bottom: 1.5px solid #bbb;
+  transform: rotate(45deg);
+  transform-origin: 55% 55%;
+  transition: transform 0.12s ease;
+}
+tr.group.folded .chevron { transform: rotate(-45deg); }
+
 .group-label {
   font-weight: 600;
   font-size: 0.95rem;
   letter-spacing: -0.01em;
-  margin-right: 0.55rem;
 }
 .group-count {
   font-size: 0.75rem;

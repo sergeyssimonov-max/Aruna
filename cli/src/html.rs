@@ -120,11 +120,17 @@ fn render_rows(records: &[ManuscriptRecord]) -> (String, usize) {
     (rows, groups)
 }
 
+/// A section heading, and the control that folds the manuscripts under it.
+///
+/// The whole heading is a `<button>` rather than a row with a click handler, so
+/// the group can be folded from the keyboard and a screen reader is told what
+/// the control does and what state it is in. `aria-expanded` starts `true`
+/// because a document opened without JavaScript shows everything.
 fn write_group_row(out: &mut String, label: &str, count: usize) {
     let label = escape_html(label);
     let _ = writeln!(
         out,
-        "        <tr class=\"group\">\n          <td colspan=\"6\"><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></td>\n        </tr>"
+        "        <tr class=\"group\">\n          <td colspan=\"6\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></button></td>\n        </tr>"
     );
 }
 
@@ -148,6 +154,9 @@ fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord) {
 }
 
 /// The line under the title: where the data came from and how much of it there is.
+///
+/// The two counts share a line — they are one fact about the corpus, and each
+/// on its own row made a four-line block out of a header.
 fn write_summary(
     out: &mut String,
     source: &str,
@@ -160,8 +169,10 @@ fn write_summary(
     out.push_str("    <p class=\"meta\">\n");
     let _ = writeln!(out, "      <span>Source: {source}</span>");
     let _ = writeln!(out, "      <span>Generated: {generated}</span>");
-    let _ = writeln!(out, "      <span>Manuscripts: {count}</span>");
-    let _ = writeln!(out, "      <span>Groups (CTH): {groups}</span>");
+    let _ = writeln!(
+        out,
+        "      <span class=\"counts\"><span class=\"count\">Manuscripts: {count}</span><span class=\"count\">Groups (CTH): {groups}</span></span>"
+    );
     out.push_str("    </p>\n");
 }
 
@@ -225,9 +236,11 @@ const HEAD_TO_BODY: &str = r#"  </style>
     <h1>Thesaurus Linguarum Hethaeorum Digitalis</h1>
 "#;
 
-/// The search box. Filtering itself is `html_filter.js`.
+/// The search box and the fold-everything control. Both act through
+/// `html_filter.js`; without it the document is a plain, fully expanded table.
 const TOOLBAR: &str = r#"    <div class="toolbar">
       <input type="search" id="q" placeholder="Search CTH, siglum, lang, corpus, editor, year…" autocomplete="off" spellcheck="false" />
+      <button type="button" id="fold-all" class="fold-all" aria-expanded="true">Collapse fragments</button>
       <span class="hint" id="hint"></span>
     </div>
 "#;
@@ -348,6 +361,34 @@ mod tests {
         assert!(html.contains("Manuscripts: 0"));
         assert!(html.contains("<tbody>"));
         assert!(html.contains("Groups (CTH): 0"));
+    }
+
+    /// Folding is what the group headings are for, so every heading has to be
+    /// a control — not a row that happens to have a click handler attached to
+    /// it somewhere in the script.
+    #[test]
+    fn every_group_heading_is_a_button_the_keyboard_can_reach() {
+        let records = vec![
+            rec("KBo 1", Some("CTH 1"), 1, "A", "2020"),
+            rec("KUB 9", Some("CTH 547"), 547, "B", "2021"),
+        ];
+        let html = render_html(&records, "src", "now");
+
+        assert_eq!(
+            html.matches("<button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\">")
+                .count(),
+            2,
+            "one control per CTH group, open by default"
+        );
+        assert_eq!(
+            html.matches("class=\"chevron\"").count(),
+            2,
+            "each heading shows which way it is folded"
+        );
+        assert!(
+            html.contains("id=\"fold-all\""),
+            "the toolbar carries the fold-everything control"
+        );
     }
 
     /// The legend, the column widths and the headings are generated from one

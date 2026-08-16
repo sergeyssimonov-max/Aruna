@@ -21,12 +21,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///
 /// This is the line the generated HTML prints and the string that travels into
 /// `inventory.json` and from there into the ARUN binary the site loads — so it
-/// is what every reader is told the data came from. It repeats, in prose, the
-/// record and file name that [`download::ZENODO_ZIP_URL`] points at;
-/// `source_label_names_the_archive_it_downloads` keeps the two from drifting
-/// apart when the archive is republished.
-pub const SOURCE_LABEL: &str =
-    "Zenodo record 20328284 — TLHdig Beta 0.3 (TLHbasisONLINE25_1_ZENODO_Beta_03.zip)";
+/// is what every reader is told the data came from.
+///
+/// It names the record and the edition, not the file: the ZIP's name told a
+/// reader nothing they could act on — the record number is what identifies the
+/// data and what a citation needs. `source_label_names_the_record_it_downloads`
+/// keeps it and [`download::ZENODO_ZIP_URL`] from drifting apart when the
+/// archive is republished.
+pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 
 /// Full pipeline: download → parse → write HTML → return output path.
 ///
@@ -135,36 +137,30 @@ mod tests {
         assert_eq!(dir, work_dir_for_process(), "must be stable within a run");
     }
 
-    /// The attribution the reader sees must name the archive the tool fetches.
+    /// The attribution the reader sees must name the record the tool fetches.
     ///
-    /// `SOURCE_LABEL` spells out the record number and the file name a second
-    /// time, in prose, and nothing so far connected the two: republishing the
-    /// archive means editing `ZENODO_ZIP_URL` and `ZENODO_ZIP_MD5` — the digest
-    /// mismatch makes forgetting the second one loud — while a stale label goes
-    /// on quietly crediting the old record on the page and in the catalog the
-    /// site ships. Derive both halves from the URL so that edit cannot be
-    /// half-finished.
+    /// `SOURCE_LABEL` spells out the record number a second time, in prose, and
+    /// nothing so far connected the two: republishing the archive means editing
+    /// `ZENODO_ZIP_URL` and `ZENODO_ZIP_MD5` — the digest mismatch makes
+    /// forgetting the second one loud — while a stale label goes on quietly
+    /// crediting the old record on the page and in the catalog the site ships.
+    /// Derive the number from the URL so that edit cannot be half-finished.
+    ///
+    /// The label no longer repeats the file name, so there is nothing else here
+    /// to check: a reader cites the record, and the ZIP's name was noise in a
+    /// line that has to fit on one.
     #[test]
-    fn source_label_names_the_archive_it_downloads() {
+    fn source_label_names_the_record_it_downloads() {
         let url = download::ZENODO_ZIP_URL;
         let record = url
             .split("/records/")
             .nth(1)
             .and_then(|rest| rest.split('/').next())
             .expect("the Zenodo URL names a record");
-        let file = url
-            .rsplit("/files/")
-            .next()
-            .and_then(|rest| rest.split('?').next())
-            .expect("the Zenodo URL names a file");
 
         assert!(
             SOURCE_LABEL.contains(&format!("record {record}")),
             "SOURCE_LABEL credits a different record than {url} — it reads {SOURCE_LABEL:?}"
-        );
-        assert!(
-            SOURCE_LABEL.contains(file),
-            "SOURCE_LABEL names a different archive than {file} — it reads {SOURCE_LABEL:?}"
         );
     }
 
