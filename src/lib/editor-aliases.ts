@@ -54,7 +54,7 @@ const GROUPS: string[][] = EDITOR_ALIASES.map((alias) =>
  *
  * Returned as one newline-joined string because that is how the index stores a
  * pooled value — the matcher is a substring test, so appending a spelling makes
- * it findable without adding an entry to a pool that is capped at 64.
+ * the person findable under it without spending a second pool entry on them.
  */
 export function searchableEditor(editor: string): string {
   const key = editor.trim().toLowerCase();
