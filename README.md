@@ -2,53 +2,75 @@
 
 Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (Hittite cuneiform transliterations).
 
+Two programs share one parser. The CLI downloads the corpus from Zenodo and writes a standalone HTML inventory; the web app serves the same catalog as a searchable page. The parser in [`cli/`](cli/) is the source of truth for both, and CI fails if the two ever describe different manuscripts.
+
 ## Layout
 
 | Path | Description |
 |------|-------------|
-| [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → HTML inventory; macOS Universal `.app` via `build_app.sh` |
-| [`src/`](src/) | Web inventory UI (TanStack Start + WASM search + virtual list) |
-| [`wasm/search/`](wasm/search/) | Rust → WASM search engine (BMH + bitmasks) |
-| [`public/data/`](public/data/) | ARUN v3 binary catalog (`inventory.bin` / `.gz`) |
+| [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → HTML inventory. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
+| [`src/`](src/) | Web inventory UI (TanStack Start, virtual list, search in a Web Worker) |
+| [`wasm/search/`](wasm/search/) | Rust → WASM search engine: plain substring matching over a compact index |
+| [`src/data/`](src/data/) | ARUN v3 catalog (`inventory.bin` / `.gz`) and the `inventory.json` it is built from |
+| [`src/wasm/search.wasm`](src/wasm/) | The compiled search module the site loads |
 | [`scripts/build-inventory-bin.mjs`](scripts/build-inventory-bin.mjs) | Rebuild ARUN from `inventory.json` |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Rebuild `inventory.json` from the archive — the parser is the source of truth for both the site and the CLI |
 
-## CLI (Aruna) — macOS only
+Data and the WASM module live under `src/` rather than `public/` so the build can give each a name containing a hash of its contents: new data is a new URL, and a visitor never keeps a stale catalog. See [`src/data/README.txt`](src/data/README.txt).
 
-Prebuilt: GitHub Actions → `Aruna-macos-universal.dmg` (Universal Binary).
+## CLI (Aruna)
+
+Builds and is tested on macOS 13+ and Linux — both run in CI. Windows is untried. Only the `.app` bundle and the DMG are macOS-only.
 
 ```bash
 cd cli
-# on macOS 13+:
+cargo build --release        # any supported platform
+./target/release/aruna       # → ~/Downloads/TLHdig_Beta_0.3.html
+```
+
+The first run downloads 71 MiB from Zenodo and keeps it in the OS cache directory, so later runs take about two seconds and need no network. `ARUNA_ZIP=/path/to.zip` uses a local archive instead. Details in [`cli/README.md`](cli/README.md).
+
+Packaging, on macOS 13+ only:
+
+```bash
 bash scripts/make_release.sh   # Aruna.app + releases/Aruna-macos-universal.dmg
 ./build_app.sh                 # .app only
 ```
 
-CI: `.github/workflows/release-dmg.yml` (runner `macos-14`).  
-Docs: [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
+Prebuilt DMG: [Releases](https://github.com/sergeyssimonov-max/Aruna/releases) (Universal Binary).
 
 ## Web app
 
 ```bash
-npm install          # if needed (deps preinstalled in sandbox)
-npm run build:data   # ARUN binary + gzip
-npm run build:wasm   # optional: rebuild search.wasm
+npm ci
 npm run dev          # 0.0.0.0:8080
+npm run build:data   # ARUN binary + gzip, from src/data/inventory.json
+npm run build:wasm   # rebuild src/wasm/search.wasm (needs the pinned toolchain)
 npm run typecheck
+npm test
 npm run build
 ```
 
-Table columns: **№ · Siglum · Lang · Corpus · Editor · Year**  
-Search: Web Worker + WASM over the ARUN catalog.
+Table columns: **№ · Siglum · Lang · Corpus · Editor · Year**
 
-## License
+Search runs in a Web Worker against the ARUN catalog, through the WASM module when it loads and a JavaScript scan when it does not. Both answer identically; the page says which one is running whenever it is the slower one.
 
-MIT (see `cli/` package metadata).
+## CI
 
-## CI — macOS DMG
+[`.github/workflows/release-dmg.yml`](.github/workflows/release-dmg.yml) · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
-`.github/workflows/release-dmg.yml` · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
+Four jobs on every push: tests and clippy for both Rust crates (Ubuntu), typecheck, lint and tests for the web side (Ubuntu), a full parse of all 23 936 manuscripts against the real archive (Ubuntu), and the Universal `.app` and DMG (macOS). A tag publishes the release:
 
 ```bash
 git tag v1.0.6 && git push origin v1.0.6   # → GitHub Release with DMG
 ```
+
+The corpus job is what keeps the two halves honest: it rebuilds the catalog from the archive and fails if it differs from what is committed.
+
+## Performance and reliability
+
+Measured numbers, and the rules for changing them, are in [`PERFORMANCE.md`](PERFORMANCE.md).
+
+## License
+
+MIT — declared in [`cli/Cargo.toml`](cli/Cargo.toml).
