@@ -12,11 +12,19 @@ pub mod html;
 pub mod md5;
 pub mod parse;
 pub mod paths;
+pub mod zenodo;
 
 use error::{ArunaError, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Zenodo record this build is pinned to.
+///
+/// Derived from nothing: it is written here and checked against
+/// [`download::ZENODO_ZIP_URL`] by `the_pinned_record_is_the_one_downloaded`,
+/// so the two cannot name different records.
+pub const ZENODO_RECORD: u64 = 20328284;
 
 /// Human-readable Zenodo source attribution.
 ///
@@ -102,6 +110,13 @@ fn obtain_archive() -> Result<cache::Archive> {
         source,
     })?;
     let dest = dir.join(cache::archive_name(url, md5));
+
+    // Asked here and nowhere else. The archive is about to be fetched, so the
+    // network is required anyway and one small request costs nothing against
+    // 71 MiB; a run served from the cache stays offline and stays fast, which
+    // is worth more than telling it about a new edition it is not fetching.
+    announce_release();
+
     eprintln!("Downloading TLHdig archive from Zenodo…");
     // The download lands through a scratch file and a rename, so an interrupted
     // run cannot leave half an archive under a name that promises a whole one.
@@ -109,6 +124,26 @@ fn obtain_archive() -> Result<cache::Archive> {
     eprintln!("Kept for the next run: {}", dest.display());
     cache::prune(&dir, &dest);
     Ok(cache::Archive::Cached(dest))
+}
+
+/// Say what Zenodo publishes, when it differs from what this build expects.
+///
+/// Advisory in both directions: a repository that will not answer is not a
+/// reason to refuse an archive it will happily serve, and what it says never
+/// overrides the pinned digest — see [`zenodo::report`].
+fn announce_release() {
+    match zenodo::latest_release(ZENODO_RECORD) {
+        Ok(latest) => zenodo::report(ZENODO_RECORD, download::ZENODO_ZIP_MD5, &latest),
+        Err(err) => {
+            // The innermost cause, not the chain: our wrapper and the HTTP
+            // client both name the URL, and this is an aside on the way to a
+            // download that is about to report its own failures properly.
+            let cause = std::error::Error::source(&err)
+                .map(|source| source.to_string())
+                .unwrap_or_else(|| err.to_string());
+            eprintln!("Could not check the record on Zenodo ({cause}); continuing.");
+        }
+    }
 }
 
 /// Scratch directory for this process.
@@ -180,6 +215,24 @@ mod tests {
     /// crediting the old record on the page and in the catalog the site ships.
     /// Derive the number from the URL so that edit cannot be half-finished.
     ///
+    /// The record number is written out three times — in the URL, in the
+    /// attribution and as [`ZENODO_RECORD`] — and only the URL is load-bearing.
+    /// Deriving the others from it is what keeps a republished archive from
+    /// leaving one of them behind.
+    #[test]
+    fn the_pinned_record_is_the_one_downloaded() {
+        let from_url: u64 = download::ZENODO_ZIP_URL
+            .split("/records/")
+            .nth(1)
+            .and_then(|rest| rest.split('/').next())
+            .and_then(|id| id.parse().ok())
+            .expect("the Zenodo URL names a record");
+        assert_eq!(
+            ZENODO_RECORD, from_url,
+            "the record asked about is not the record downloaded from"
+        );
+    }
+
     /// The label no longer repeats the file name, so there is nothing else here
     /// to check: a reader cites the record, and the ZIP's name was noise in a
     /// line that has to fit on one.

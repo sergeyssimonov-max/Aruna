@@ -192,6 +192,28 @@ fn request(url: &str) -> Result<ureq::Response> {
     request_within(url, ATTEMPT_DEADLINE)
 }
 
+/// Fetch a small document as text, for asking questions rather than moving data.
+///
+/// Bounded twice over: by `deadline`, and by refusing a body larger than a
+/// metadata response has any business being. A repository answering a question
+/// with a gigabyte is not answering the question.
+pub fn fetch_text(url: &str, deadline: Duration) -> Result<String> {
+    /// Zenodo's record documents run to a few tens of KiB.
+    const MAX_METADATA: u64 = 4 * 1024 * 1024;
+
+    let response = request_within(url, deadline)?;
+    let mut body = String::new();
+    response
+        .into_reader()
+        .take(MAX_METADATA)
+        .read_to_string(&mut body)
+        .map_err(|source| ArunaError::Network {
+            url: url.to_string(),
+            source: Box::new(source),
+        })?;
+    Ok(body)
+}
+
 /// As [`request`], with the deadline given — the tests need one they can wait for.
 fn request_within(url: &str, deadline: Duration) -> Result<ureq::Response> {
     let agent = ureq::AgentBuilder::new()
