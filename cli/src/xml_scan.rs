@@ -35,7 +35,9 @@ fn is_name_char(b: u8) -> bool {
 
 /// Local part of a possibly prefixed XML Name (`AO:docID` → `docID`).
 fn local_part(name: &[u8]) -> &[u8] {
-    match memchr(b':', name) {
+    // A plain scan, not `memchr`: a name is a dozen bytes and this runs once
+    // per tag, where setting up the vectorised search costs more than it saves.
+    match name.iter().position(|&b| b == b':') {
         Some(colon) => &name[colon + 1..],
         None => name,
     }
@@ -138,60 +140,158 @@ fn skip_non_element(hay: &[u8], i: usize) -> usize {
     }
 }
 
+/// One element boundary: `<name …>` or `</name>`.
+///
+/// Offsets are into the document the [`Tags`] walker was given, so a caller can
+/// slice text between two of them.
+enum Tag<'a> {
+    Start(StartTag<'a>),
+    End(EndTag<'a>),
+}
+
+/// A `</name>`, with the name left unread until asked for.
+///
+/// Lazy for the same reason as [`StartTag`], and it matters more: a manuscript
+/// body is mostly end tags, and only `find_close_tag` ever wants their names.
+/// Reading every one of them cost around 50 ms of the parse stage.
+struct EndTag<'a> {
+    /// Offset of the `<`.
+    at: usize,
+    hay: &'a [u8],
+}
+
+impl<'a> EndTag<'a> {
+    fn name(&self) -> &'a [u8] {
+        element_name(self.hay, self.at + 2).0
+    }
+}
+
+/// A `<name …>`, with everything past the name left unread until asked for.
+///
+/// Laziness is the point. [`find_open_tag`] walks every start tag in a document
+/// and wants the attributes of at most one of them; searching for the `>` of
+/// each tag on the way cost 47 % of the parse stage when this was measured.
+struct StartTag<'a> {
+    /// Offset of the `<`.
+    at: usize,
+    /// Local part of the name — the namespace prefix is already dropped.
+    name: &'a [u8],
+    hay: &'a [u8],
+    /// Offset just past the name, where the attributes begin.
+    after_name: usize,
+}
+
+impl<'a> StartTag<'a> {
+    /// The rest of the tag: its attributes, and where the element's content
+    /// begins. `None` when the document holds no `>` after the name.
+    ///
+    /// One search for both, because every caller that wants either wants both,
+    /// and the search is the expensive part.
+    #[inline]
+    fn rest(&self) -> Option<(&'a [u8], usize)> {
+        let gt = self.after_name + memchr(b'>', self.hay.get(self.after_name..)?)?;
+        let attrs = trim_ascii_start(&self.hay[self.after_name..gt]);
+        Some((attrs, gt + 1))
+    }
+}
+
+/// The element boundaries of a document, in order.
+///
+/// Everything that is markup but not an element — comments, CDATA sections,
+/// declarations, processing instructions — is stepped over rather than
+/// reported, because the header heuristics take the first match they find and
+/// a commented-out `<uebern editor="…"/>` would otherwise outrank the live one.
+///
+/// This walk was written out three times, in `find_open_tag`, `find_close_tag`
+/// and `for_each_start_tag`, and the three had drifted: two of them resumed one
+/// byte past the `<` while the third resumed past the `>`, so the same
+/// malformed document could be read differently depending on which function
+/// looked at it. One walker, one answer.
+struct Tags<'a> {
+    hay: &'a [u8],
+    pos: usize,
+}
+
+fn tags(hay: &[u8]) -> Tags<'_> {
+    Tags { hay, pos: 0 }
+}
+
+impl Tags<'_> {
+    /// Carry on from `pos`, skipping whatever lies before it.
+    ///
+    /// For a caller that has already found where the current tag ends: the walk
+    /// itself will not look for a `>`, since most callers never need one.
+    fn resume_at(&mut self, pos: usize) {
+        self.pos = pos.max(self.pos).min(self.hay.len());
+    }
+}
+
+fn tags_from(hay: &[u8], from: usize) -> Tags<'_> {
+    Tags {
+        hay,
+        pos: from.min(hay.len()),
+    }
+}
+
+impl<'a> Iterator for Tags<'a> {
+    type Item = Tag<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Tag<'a>> {
+        loop {
+            let at = self.pos + memchr(b'<', self.hay.get(self.pos..)?)?;
+            let after = *self.hay.get(at + 1)?;
+
+            if after == b'!' || after == b'?' {
+                self.pos = skip_non_element(self.hay, at);
+                continue;
+            }
+
+            if after == b'/' {
+                self.pos = at + 2;
+                return Some(Tag::End(EndTag { at, hay: self.hay }));
+            }
+
+            let (name, after_name) = element_name(self.hay, at + 1);
+            // Resume just past the `<` rather than past the `>`: finding the
+            // `>` is what this walk deliberately does not pay for.
+            self.pos = at + 1;
+            return Some(Tag::Start(StartTag {
+                at,
+                name,
+                hay: self.hay,
+                after_name,
+            }));
+        }
+    }
+}
+
+fn trim_ascii_start(bytes: &[u8]) -> &[u8] {
+    let start = bytes
+        .iter()
+        .position(|b| !b.is_ascii_whitespace())
+        .unwrap_or(bytes.len());
+    &bytes[start..]
+}
+
 /// Find the opening tag `<…local…>` (with optional namespace prefix).
 /// Returns `(start_of_tag, end_of_opening_tag)` so the caller can slice attributes or text.
 pub fn find_open_tag(hay: &[u8], local: &[u8]) -> Option<(usize, usize)> {
-    let mut pos = 0;
-    while let Some(rel) = memchr(b'<', &hay[pos..]) {
-        let i = pos + rel;
-        if i + 1 >= hay.len() {
-            break;
+    tags(hay).find_map(|tag| match tag {
+        Tag::Start(start) if eq_ci(start.name, local) => {
+            let (_, content) = start.rest()?;
+            Some((start.at, content))
         }
-        if hay[i + 1] == b'!' || hay[i + 1] == b'?' {
-            pos = skip_non_element(hay, i);
-            continue;
-        }
-        if hay[i + 1] == b'/' {
-            pos = i + 1;
-            continue;
-        }
-
-        // Read the name, then compare only its local part.
-        let (name, j) = element_name(hay, i + 1);
-        if eq_ci(name, local) {
-            // Find the end of the opening tag.
-            if let Some(end) = memchr(b'>', &hay[j..]) {
-                return Some((i, j + end + 1));
-            }
-            return None;
-        }
-        pos = i + 1;
-    }
-    None
+        _ => None,
+    })
 }
 
 /// Find the matching closing tag `</…local…>` starting search from `from`.
 pub fn find_close_tag(hay: &[u8], from: usize, local: &[u8]) -> Option<usize> {
-    let mut pos = from;
-    while let Some(rel) = memchr(b'<', &hay[pos..]) {
-        let i = pos + rel;
-        if i + 1 >= hay.len() {
-            break;
-        }
-        // A comment inside the element may hold a `</…>` that closes nothing.
-        if hay[i + 1] == b'!' || hay[i + 1] == b'?' {
-            pos = skip_non_element(hay, i);
-            continue;
-        }
-        if hay[i + 1] == b'/' {
-            let (name, _) = element_name(hay, i + 2);
-            if eq_ci(name, local) {
-                return Some(i);
-            }
-        }
-        pos = i + 1;
-    }
-    None
+    tags_from(hay, from).find_map(|tag| match tag {
+        Tag::End(end) if eq_ci(end.name(), local) => Some(end.at),
+        _ => None,
+    })
 }
 
 /// Convenience: text content of the first occurrence of an element.
@@ -244,91 +344,82 @@ pub fn strip_tags_bytes(hay: &[u8]) -> Vec<u8> {
 /// Call `f(local_name, attributes_slice)` for every start tag.
 /// If `f` returns `true`, scanning stops early.
 pub fn for_each_start_tag(hay: &[u8], mut f: impl FnMut(&[u8], &[u8]) -> bool) {
-    let mut pos = 0;
-    while let Some(rel) = memchr(b'<', &hay[pos..]) {
-        let i = pos + rel;
-        if i + 1 >= hay.len() {
-            break;
-        }
-        let next = hay[i + 1];
-        if next == b'!' || next == b'?' {
-            pos = skip_non_element(hay, i);
-            continue;
-        }
-        if next == b'/' {
-            pos = i + 1;
-            continue;
-        }
-
-        let (local, j) = element_name(hay, i + 1);
-
-        // attributes run until '>' or '/>'
-        let end = match memchr(b'>', &hay[j..]) {
-            Some(e) => j + e,
-            None => break,
+    let mut walk = tags(hay);
+    while let Some(tag) = walk.next() {
+        let Tag::Start(start) = tag else { continue };
+        let Some((attrs, content)) = start.rest() else {
+            return;
         };
-        let mut attr_start = j;
-        while attr_start < end && hay[attr_start].is_ascii_whitespace() {
-            attr_start += 1;
-        }
-        let attrs = &hay[attr_start..end];
-
-        if f(local, attrs) {
+        // This caller has just located the `>`, so tell the walk to carry on
+        // from there. Without it the next `<` is looked for inside this tag's
+        // own attributes — over a body of `<w mrp1="…">` elements that is most
+        // of the document, scanned twice.
+        walk.resume_at(content);
+        if f(start.name, attrs) {
             return;
         }
-        pos = end + 1;
+    }
+}
+
+/// The `name="value"` pairs of one start tag, in order.
+///
+/// Quotes may be single or double. An attribute with no quoted value — a
+/// boolean, or something malformed — is stepped over rather than reported: this
+/// scanner is looking for values, and there is nothing to hand back.
+struct Attrs<'a> {
+    rest: &'a [u8],
+}
+
+impl<'a> Iterator for Attrs<'a> {
+    type Item = (&'a [u8], &'a [u8]);
+
+    fn next(&mut self) -> Option<(&'a [u8], &'a [u8])> {
+        loop {
+            self.rest = trim_ascii_start(self.rest);
+            if self.rest.is_empty() {
+                return None;
+            }
+
+            let name_len = self
+                .rest
+                .iter()
+                .position(|&b| !is_name_char(b))
+                .unwrap_or(self.rest.len());
+            let (name, after_name) = self.rest.split_at(name_len);
+
+            // The `=` may be surrounded by space, or — in this corpus — missing.
+            let value_start = after_name
+                .iter()
+                .position(|&b| !b.is_ascii_whitespace() && b != b'=')
+                .unwrap_or(after_name.len());
+            let after_eq = &after_name[value_start..];
+
+            let &quote = after_eq.first()?;
+            if quote != b'"' && quote != b'\'' {
+                // Nothing quoted here: skip the token and look at the next one.
+                let skip = after_eq
+                    .iter()
+                    .position(|&b| b.is_ascii_whitespace() || b == b'>')
+                    .unwrap_or(after_eq.len());
+                self.rest = &after_eq[skip..];
+                // A name that consumed nothing would spin here forever.
+                if name.is_empty() && skip == 0 {
+                    return None;
+                }
+                continue;
+            }
+
+            let quoted = &after_eq[1..];
+            let value_len = quoted.iter().position(|&b| b == quote).unwrap_or(quoted.len());
+            self.rest = quoted.get(value_len + 1..).unwrap_or(&[]);
+            return Some((name, &quoted[..value_len]));
+        }
     }
 }
 
 /// Extract the value of an attribute `name="value"` or `name='value'` (case-insensitive name).
 pub fn attr_value<'a>(attrs: &'a [u8], name: &[u8]) -> Option<&'a [u8]> {
-    let mut pos = 0;
-    while pos < attrs.len() {
-        // skip whitespace
-        while pos < attrs.len() && attrs[pos].is_ascii_whitespace() {
-            pos += 1;
-        }
-        if pos >= attrs.len() {
-            break;
-        }
-
-        let name_start = pos;
-        while pos < attrs.len() && is_name_char(attrs[pos]) {
-            pos += 1;
-        }
-        let found_name = &attrs[name_start..pos];
-
-        // skip whitespace and '='
-        while pos < attrs.len() && (attrs[pos].is_ascii_whitespace() || attrs[pos] == b'=') {
-            pos += 1;
-        }
-        if pos >= attrs.len() {
-            break;
-        }
-
-        let quote = attrs[pos];
-        if quote != b'"' && quote != b'\'' {
-            // malformed or boolean attribute
-            while pos < attrs.len() && !attrs[pos].is_ascii_whitespace() && attrs[pos] != b'>' {
-                pos += 1;
-            }
-            continue;
-        }
-        pos += 1; // skip opening quote
-        let value_start = pos;
-        while pos < attrs.len() && attrs[pos] != quote {
-            pos += 1;
-        }
-        let value = &attrs[value_start..pos];
-        if pos < attrs.len() {
-            pos += 1; // skip closing quote
-        }
-
-        if eq_ci(found_name, name) {
-            return Some(value);
-        }
-    }
-    None
+    Attrs { rest: attrs }.find_map(|(found, value)| eq_ci(found, name).then_some(value))
 }
 
 /// Find a standalone `19xx` / `20xx` year.
