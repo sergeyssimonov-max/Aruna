@@ -40,6 +40,17 @@ pub const CACHE_DIR_ENV: &str = "ARUNA_CACHE_DIR";
 
 /// Where archives are kept, or `None` when the platform offers nowhere to keep
 /// them — in which case the tool still works, it just pays the download again.
+///
+/// `~/Library/Caches/aruna` on macOS, `~/.cache/aruna` elsewhere, and that is
+/// the right place even though a cleaning tool will empty it: the file is
+/// re-downloadable, and a directory the user can clear without losing anything
+/// is exactly what a cache is. CleanMyMac and its like do delete it, which
+/// costs the next run a minute and nothing else — verified by removing the
+/// directory between runs.
+///
+/// So do not move this to Application Support to make it survive. That was
+/// considered and declined: it would hide 71 MiB from the tools people use to
+/// find 71 MiB.
 pub fn cache_dir() -> Option<PathBuf> {
     if let Some(dir) = std::env::var_os(CACHE_DIR_ENV) {
         return Some(PathBuf::from(dir));
