@@ -35,6 +35,11 @@ pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 ///
 /// When `local_zip` is `Some`, the download step is skipped (tests / offline).
 pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
+    // Asked before anything expensive: the inventory is written last, and a
+    // destination that will refuse it refuses it just as well now.
+    let out = paths::output_html_path()?;
+    paths::check_output_writable(&out)?;
+
     let source = match local_zip {
         Some(p) => cache::Archive::Cached(p.to_path_buf()),
         None => obtain_archive()?,
@@ -47,8 +52,6 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
     let generated_at = format_now_local();
     let html = html::render_html(&records, SOURCE_LABEL, &generated_at);
 
-    let out = paths::output_html_path()?;
-    paths::ensure_output_parent(&out)?;
     // Atomic: a failure here must not destroy the inventory an earlier run left
     // in place — see `paths::write_atomic`.
     paths::write_atomic(&out, html.as_bytes())?;

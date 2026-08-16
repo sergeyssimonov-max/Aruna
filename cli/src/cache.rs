@@ -150,6 +150,23 @@ pub fn sweep_unfinished(dir: &Path) {
     }
 }
 
+/// Whether `dir` can be created and written to.
+///
+/// Asked before the cache is relied on, because a cache that cannot be written
+/// is a reason to skip caching — not a reason to fail a run that would
+/// otherwise succeed. A directory can be unwritable for ordinary reasons: a
+/// restricted account, a volume mounted read-only, a permissions repair gone
+/// wrong.
+pub fn is_usable(dir: &Path) -> bool {
+    if std::fs::create_dir_all(dir).is_err() {
+        return false;
+    }
+    let probe = dir.join(format!(".aruna-write-test.{}", std::process::id()));
+    let ok = std::fs::write(&probe, b"").is_ok();
+    let _ = std::fs::remove_file(&probe);
+    ok
+}
+
 /// Stream a file through MD5.
 fn digest_of(path: &Path) -> Result<String> {
     let io = |source| ArunaError::Io {

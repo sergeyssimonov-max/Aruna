@@ -108,6 +108,28 @@ fn replace_with_retries(scratch: &Path, path: &Path) -> Result<()> {
     })
 }
 
+/// Fail now if the inventory could not be written when it is ready.
+///
+/// The write is the last step of a run that costs a download and a full parse,
+/// and a destination that cannot be written to is knowable at the start: an
+/// account without permission, a read-only volume, a Downloads folder replaced
+/// by something else. Reporting it a minute later, after the work, is the same
+/// error delivered as late as possible.
+///
+/// The probe writes and removes a scratch file rather than reading permission
+/// bits, which are not the whole answer on macOS — sandboxing and ACLs decide
+/// too, and only an attempt reflects them.
+pub fn check_output_writable(path: &Path) -> Result<()> {
+    ensure_output_parent(path)?;
+    let probe = scratch_sibling(path);
+    std::fs::write(&probe, b"").map_err(|source| ArunaError::Io {
+        path: probe.clone(),
+        source,
+    })?;
+    let _ = std::fs::remove_file(&probe);
+    Ok(())
+}
+
 /// Ensure the parent Downloads directory exists.
 pub fn ensure_output_parent(path: &std::path::Path) -> Result<()> {
     if let Some(parent) = path.parent() {
@@ -122,6 +144,7 @@ pub fn ensure_output_parent(path: &std::path::Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     /// The README tells the reader where the inventory lands, by hand.
     ///
@@ -164,6 +187,48 @@ mod tests {
             }
             Err(e) => panic!("unexpected error: {e}"),
         }
+    }
+
+    /// The point of the check is that it costs nothing and leaves nothing.
+    #[test]
+    fn the_writability_probe_leaves_the_directory_as_it_found_it() {
+        let dir = tempdir().unwrap();
+        let out = dir.path().join("inventory").join(OUTPUT_FILE_NAME);
+
+        check_output_writable(&out).expect("a fresh temp directory is writable");
+
+        assert!(out.parent().unwrap().is_dir(), "the parent is created, as the write needs");
+        assert!(!out.exists(), "the inventory itself is not created by a probe");
+        let leftovers: Vec<_> = std::fs::read_dir(out.parent().unwrap())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name())
+            .collect();
+        assert!(leftovers.is_empty(), "the probe left {leftovers:?} behind");
+    }
+
+    /// A destination that will refuse the inventory refuses the probe, which is
+    /// the whole point: the run stops in half a second rather than after a
+    /// download and a full parse.
+    #[cfg(unix)]
+    #[test]
+    fn an_unwritable_destination_is_refused_up_front() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let locked = dir.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o500)).unwrap();
+
+        let err = check_output_writable(&locked.join(OUTPUT_FILE_NAME))
+            .expect_err("a read-only directory cannot take the inventory");
+        assert!(
+            matches!(err, ArunaError::Io { .. }),
+            "the reader is told which path refused them: {err}"
+        );
+
+        // Leave it removable for the temp dir's own cleanup.
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).unwrap();
     }
 
     #[test]
