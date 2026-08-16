@@ -11,7 +11,7 @@
 //! Deliberately dependency-free: the numbers only need to be good enough to
 //! decide whether an optimisation earns its complexity.
 
-use aruna::archive::{parse_sources, read_sources, sort_records};
+use aruna::archive::parse_zip_timed;
 use aruna::html::render_html;
 use std::env;
 use std::path::PathBuf;
@@ -35,29 +35,23 @@ fn main() -> ExitCode {
 
     let mut read = Vec::with_capacity(runs);
     let mut parse = Vec::with_capacity(runs);
-    let mut sort = Vec::with_capacity(runs);
     let mut render = Vec::with_capacity(runs);
     let mut manuscripts = 0;
     let mut html_bytes = 0;
 
     for run in 1..=runs {
-        let start = Instant::now();
-        let sources = match read_sources(&zip) {
-            Ok(sources) => sources,
+        // The pipeline reads, parses and sorts in one pass — an entry is
+        // finished with before the next is read — so the stages are timed
+        // inside it rather than around it.
+        let (records, times) = match parse_zip_timed(&zip) {
+            Ok(parsed) => parsed,
             Err(err) => {
                 eprintln!("failed to read {}: {err}", zip.display());
                 return ExitCode::FAILURE;
             }
         };
-        read.push(start.elapsed());
-
-        let start = Instant::now();
-        let mut records = parse_sources(&sources);
-        parse.push(start.elapsed());
-
-        let start = Instant::now();
-        sort_records(&mut records);
-        sort.push(start.elapsed());
+        read.push(times.inflate);
+        parse.push(times.parse);
 
         let start = Instant::now();
         let html = render_html(&records, "bench", "bench");
@@ -77,12 +71,11 @@ fn main() -> ExitCode {
     println!("{:<14} {:>10} {:>10} {:>10}", "stage", "min", "median", "max");
     println!("{}", "-".repeat(48));
     report("read (zip)", &mut read);
-    report("parse", &mut parse);
-    report("sort", &mut sort);
+    report("parse + sort", &mut parse);
     report("render html", &mut render);
     println!("{}", "-".repeat(48));
 
-    let total: Duration = [&read, &parse, &sort, &render]
+    let total: Duration = [&read, &parse, &render]
         .into_iter()
         .filter_map(|stage| stage.iter().min())
         .sum();

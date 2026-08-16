@@ -1,4 +1,4 @@
-//! ZIP archive traversal and batch parsing.
+//! ZIP archive traversal and parsing.
 
 use crate::error::{ArunaError, Result};
 use crate::parse::{
@@ -7,36 +7,42 @@ use crate::parse::{
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use zip::ZipArchive;
 
-/// One archive entry worth indexing: its path and the header window read from it.
-pub struct ManuscriptSource {
-    pub path: String,
-    pub xml: String,
+/// Where the time went, for `examples/bench_parse.rs`.
+///
+/// Collected by the same function that ships rather than by a second one built
+/// for measuring: a benchmark that runs a different shape from the program
+/// measures the benchmark.
+#[derive(Default, Clone, Copy)]
+pub struct StageTimes {
+    /// Inflating header windows out of the ZIP.
+    pub inflate: Duration,
+    /// Turning those windows into records.
+    pub parse: Duration,
 }
 
 /// Open `zip_path`, parse every manuscript XML, return records ordered for display.
-///
-/// The three stages are separate so each can be timed on its own — see
-/// `examples/bench_parse.rs`.
 pub fn parse_zip(zip_path: &Path) -> Result<Vec<ManuscriptRecord>> {
-    let sources = read_sources(zip_path)?;
-    let mut records = parse_sources(&sources);
-    sort_records(&mut records);
-    Ok(records)
+    Ok(parse_zip_timed(zip_path)?.0)
 }
 
-/// Inflate the header window of every manuscript XML in the archive.
+/// As [`parse_zip`], and how long each stage took.
 ///
-/// Reads at most [`HEADER_READ_LIMIT`] bytes per entry — the AOHeader always
-/// fits within it, while bodies run to hundreds of KiB of cuneiform that nothing
-/// downstream looks at.
-pub fn read_sources(zip_path: &Path) -> Result<Vec<ManuscriptSource>> {
+/// Each entry is inflated, parsed and dropped before the next is read. Holding
+/// the whole corpus first — 23 936 windows of up to 16 KiB — cost 240 MiB of
+/// peak memory for data that is finished with the moment it becomes a record,
+/// and grew with the archive rather than with the inventory.
+pub fn parse_zip_timed(zip_path: &Path) -> Result<(Vec<ManuscriptRecord>, StageTimes)> {
     let mut archive = open_archive(zip_path)?;
 
-    let mut sources = Vec::new();
+    let mut records = Vec::new();
     let mut skipped = Skipped::default();
+    let mut times = StageTimes::default();
+
     for i in 0..archive.len() {
+        let started = Instant::now();
         let entry = archive.by_index(i)?;
         let path = entry.name().to_string();
 
@@ -44,10 +50,12 @@ pub fn read_sources(zip_path: &Path) -> Result<Vec<ManuscriptSource>> {
         // inflated.
         if !is_manuscript_xml(&path) {
             skipped.by_path(&path);
+            times.inflate += started.elapsed();
             continue;
         }
 
         let xml = read_header_window(entry, &path)?;
+        times.inflate += started.elapsed();
 
         // The content gate. A path can only be checked against junk that is
         // already known; this asks whether the bytes are a manuscript, which is
@@ -56,14 +64,22 @@ pub fn read_sources(zip_path: &Path) -> Result<Vec<ManuscriptSource>> {
             skipped.by_content += 1;
             continue;
         }
-        sources.push(ManuscriptSource { path, xml });
+
+        let started = Instant::now();
+        records.push(parse_manuscript(&path, &xml));
+        times.parse += started.elapsed();
     }
     skipped.report();
 
-    if sources.is_empty() {
+    if records.is_empty() {
         return Err(ArunaError::EmptyArchive);
     }
-    Ok(sources)
+
+    let started = Instant::now();
+    sort_records(&mut records);
+    times.parse += started.elapsed();
+
+    Ok((records, times))
 }
 
 /// Open the ZIP, refusing one with nothing in it.
@@ -132,23 +148,14 @@ impl Skipped {
     }
 }
 
-/// Parse every source into a record. Pure CPU work, one source at a time.
-///
-/// Sequential on purpose. On a real TLHdig archive this stage is ~294 ms of a
-/// ~1.67 s run; inflating the ZIP is the other ~82 %, and a single
-/// `ZipArchive` reader cannot be read in parallel. So even a parse that cost
-/// nothing would buy 1.21× — under the 1.5–2× a dependency has to earn here.
-/// A thread pool was tried and removed at 1.07×, when the parse was cheaper.
-/// See `PERFORMANCE.md`.
-pub fn parse_sources(sources: &[ManuscriptSource]) -> Vec<ManuscriptRecord> {
-    sources
-        .iter()
-        .map(|source| parse_manuscript(&source.path, &source.xml))
-        .collect()
-}
-
 /// Order records for display: by CTH number, then natural-order sigla
 /// (`KBo 3.22` before `KBo 22.5`), then editor and year.
+///
+/// Sequential, like the parsing above. A thread pool was tried on the parse and
+/// removed at 1.07×; inflating the ZIP is ~80 % of the run and a single
+/// `ZipArchive` reader cannot be read in parallel, so even free parsing and
+/// sorting would buy about 1.2× — under the 1.5–2× a dependency has to earn
+/// here. See `PERFORMANCE.md`.
 pub fn sort_records(records: &mut Vec<ManuscriptRecord>) {
     // Sigla keys are built once per record rather than on every comparison.
     let mut keyed: Vec<(u32, Vec<NatPart>, ManuscriptRecord)> = std::mem::take(records)
