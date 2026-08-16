@@ -9,6 +9,9 @@ import { useScrollWindow } from "@/lib/use-scroll-window";
 import { useSearchWorker } from "@/lib/use-search-worker";
 import { buildLayout, countItems, visibleRows } from "@/lib/virtual-list";
 
+/** How long a search may take before the page admits it is still working. */
+const SLOW_SEARCH_MS = 200;
+
 export const Route = createFileRoute("/")({
   component: InventoryPage,
   head: () => ({
@@ -54,12 +57,27 @@ function InventoryPage() {
     search(deferredQuery);
   }, [deferredQuery, search, workerStatus]);
 
-  const filtered: Group[] = useMemo(() => {
-    if (!data) return [];
+  /** The groups this query calls for, or null while its result is in flight. */
+  const answered: Group[] | null = useMemo(() => {
+    if (!data) return null;
     if (!normalizedQuery) return data.groups;
-    if (!currentMatches) return [];
+    if (!currentMatches) return null;
     return applyMatches(data, currentMatches);
   }, [data, normalizedQuery, currentMatches]);
+
+  // What is on screen. While a query is in flight the previous rows stay,
+  // dimmed, rather than the table emptying: a keystroke used to blank it and
+  // refill it a moment later, so typing a word flashed the list eight times.
+  //
+  // The rows shown are the previous query's, which is the thing an earlier fix
+  // set out to stop — but the fault there was that stale hits were presented as
+  // current. They are marked pending now, in the header and by the dimming, so
+  // the page says "not updated yet" instead of either lying or blinking.
+  const [shown, setShown] = useState<Group[]>([]);
+  useEffect(() => {
+    if (answered) setShown(answered);
+  }, [answered]);
+  const filtered: Group[] = answered ?? shown;
 
   const layout = useMemo(() => buildLayout(filtered, openAll), [filtered, openAll]);
 
@@ -87,6 +105,19 @@ function InventoryPage() {
   // through every re-search.
   const searchPending = searching && (workerStatus !== "ready" || currentMatches === null);
 
+  // Shown only once the wait is long enough to notice. The worker usually
+  // answers within a frame or two, and an indicator that appears and vanishes
+  // on every keystroke is the same churn as the blanking it replaced.
+  const [waiting, setWaiting] = useState(false);
+  useEffect(() => {
+    if (!searchPending) {
+      setWaiting(false);
+      return;
+    }
+    const timer = setTimeout(() => setWaiting(true), SLOW_SEARCH_MS);
+    return () => clearTimeout(timer);
+  }, [searchPending]);
+
   const error = loadError || workerError;
   if (error) return <Notice tone="error">{error}</Notice>;
   if (!data) return <Notice tone="muted">Loading inventory…</Notice>;
@@ -98,7 +129,7 @@ function InventoryPage() {
           source={data.source}
           manuscripts={data.manuscripts}
           groups={data.groups.length}
-          matches={searching ? { count: visibleCount, pending: searchPending } : null}
+          matches={searching ? { count: visibleCount, pending: waiting } : null}
           fallbackReason={searchFallback}
         />
 
@@ -115,6 +146,7 @@ function InventoryPage() {
           rows={rows}
           layout={layout}
           openAll={openAll}
+          pending={waiting}
           frameRef={frameRef}
           scrollerRef={scrollerRef}
         />

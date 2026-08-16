@@ -16,12 +16,15 @@ export function InventoryTable({
   rows,
   layout,
   openAll,
+  pending,
   frameRef,
   scrollerRef,
 }: {
   rows: VisRow[];
   layout: Layout;
   openAll: boolean;
+  /** A query is in flight: these rows answer the previous one. */
+  pending: boolean;
   frameRef: React.RefObject<HTMLDivElement | null>;
   scrollerRef: React.RefObject<HTMLDivElement | null>;
 }) {
@@ -40,7 +43,14 @@ export function InventoryTable({
           ))}
         </div>
       </div>
-      <div ref={scrollerRef} className="vl-scroll">
+      {/* Dimmed while a query is in flight, so rows that answer the previous
+          one are visibly not the answer yet. `aria-busy` says the same thing to
+          a screen reader, which cannot see the dimming. */}
+      <div
+        ref={scrollerRef}
+        className={`vl-scroll transition-opacity duration-150 ${pending ? "opacity-50" : ""}`}
+        aria-busy={pending}
+      >
         <div
           className="vl-spacer"
           style={{ height: layout.totalH }}
