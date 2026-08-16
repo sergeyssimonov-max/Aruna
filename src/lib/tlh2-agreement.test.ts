@@ -33,6 +33,20 @@ test("the builder and the module agree on the TLH2 layout", () => {
   assert.equal(rustConst("DIR_STRIDE"), 4, "directory entry");
 });
 
+test("the reader of the result buffer agrees with its writer", () => {
+  const glue = readFileSync(new URL("./wasm-search.ts", import.meta.url), "utf8");
+  const constant = (name: string) => {
+    const m = new RegExp(`const ${name} = (\\d+)`).exec(glue);
+    assert.ok(m, `wasm-search.ts no longer declares ${name}`);
+    return Number(m![1]);
+  };
+  // The module writes `count` then fixed-width entries; the glue walks that
+  // buffer by hand. A stride that disagreed would read every field but the
+  // first from the wrong place — and still return plausible group indices.
+  assert.equal(constant("RESULT_STRIDE"), rustConst("RESULT_STRIDE"), "entry size");
+  assert.equal(constant("RESULT_COUNT_BYTES"), 4, "the count is one u32");
+});
+
 test("the pool cap the builder enforces is the one the module enforces", () => {
   const source = readFileSync(new URL("./search-index.ts", import.meta.url), "utf8");
   const m = /const MAX_POOL = (\d+)/.exec(source);
