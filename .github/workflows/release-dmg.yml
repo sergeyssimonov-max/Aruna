@@ -46,7 +46,7 @@ jobs:
       - name: Build wasm module for its real target
         run: cargo build --release --target wasm32-unknown-unknown --manifest-path wasm/search/Cargo.toml
 
-      # public/wasm/search.wasm is served to every visitor, so it must be the
+      # src/wasm/search.wasm is served to every visitor, so it must be the
       # module this commit actually contains.
       #
       # Two conditions make the comparison meaningful. The compiler is pinned by
@@ -62,8 +62,8 @@ jobs:
           export CARGO_TARGET_DIR="$(mktemp -d)"
           cargo build --release --target wasm32-unknown-unknown
           built="$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/tlhdig_search.wasm"
-          if ! cmp -s "$built" ../../public/wasm/search.wasm; then
-            echo "::error file=public/wasm/search.wasm::Stale artifact — run 'npm run build:wasm' and commit the result"
+          if ! cmp -s "$built" ../../src/wasm/search.wasm; then
+            echo "::error file=src/wasm/search.wasm::Stale artifact — run 'npm run build:wasm' and commit the result"
             exit 1
           fi
 

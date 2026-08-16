@@ -45,7 +45,7 @@ const MAX_SMALL_POOL_BYTES = 0xffff;
 const te = new TextEncoder();
 
 /**
- * Build the compact TLH2 binary index for `public/wasm/search.wasm`.
+ * Build the compact TLH2 binary index for `src/wasm/search.wasm`.
  *
  * Returns null when the inventory does not fit the format — too many distinct
  * authors or years, a siglum past 255 bytes, a CTH past `u16`. The caller then

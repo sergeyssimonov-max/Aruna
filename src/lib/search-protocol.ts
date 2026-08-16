@@ -17,7 +17,7 @@ export type WorkerIn =
  *
  * `"unavailable"` — the index was built, but the module could not be fetched,
  * instantiated or made to accept it. Usually the environment: no WebAssembly,
- * a blocked or missing `/wasm/search.wasm`.
+ * a blocked or missing search module.
  *
  * `"trapped"` — a query made the loaded module trap, so the worker switched
  * engines mid-session and will not go back. Arrives after `ready`.

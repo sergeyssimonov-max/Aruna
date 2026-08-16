@@ -1,4 +1,10 @@
 import type { SearchMatch } from "./inventory";
+// Imported rather than written out as `/wasm/search.wasm`, so the build emits
+// the module under a name carrying a hash of its contents. The fetch below
+// asks for it with `force-cache`: on a stable name that meant a visitor kept
+// whichever module they first loaded, however often the search code changed
+// underneath them.
+import WASM_URL from "@/wasm/search.wasm?url";
 
 type Exports = {
   memory: WebAssembly.Memory;
@@ -9,7 +15,6 @@ type Exports = {
   search(qPtr: number, qLen: number, outPtr: number, outCap: number): number;
 };
 
-const WASM_URL = "/wasm/search.wasm";
 // Worst case: every item is a hit → 24k entries * 12 + 4 ≈ 288 KB; allocate 1 MB.
 const OUT_CAP = 1 << 20;
 
