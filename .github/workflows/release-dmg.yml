@@ -18,6 +18,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The reference-release check below reads tags, which a default
+          # checkout does not fetch.
+          fetch-depth: 0
+
+      # GitHub-side tag protection is not available here: rulesets need Pro or a
+      # public repository, and immutable releases are not offered on this plan.
+      # So the guarantee is enforced where it can be — a build that no longer
+      # finds the reference tag where it was recorded fails.
+      - name: Reference release is intact
+        run: |
+          tag="$(jq -r .reference.tag .github/reference-release.json)"
+          want="$(jq -r .reference.commit .github/reference-release.json)"
+          got="$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)"
+          if [ -z "$got" ]; then
+            echo "::error file=.github/reference-release.json::Reference tag $tag is gone. It is the release this project measures itself against; restore it, or record the decision to move on."
+            exit 1
+          fi
+          if [ "$got" != "$want" ]; then
+            echo "::error file=.github/reference-release.json::Reference tag $tag points at $got, but $want is recorded. A tag that moves is not a reference."
+            exit 1
+          fi
+          echo "$tag is intact at $got"
 
       - uses: dtolnay/rust-toolchain@stable
         with:

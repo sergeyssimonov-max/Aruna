@@ -1,0 +1,17 @@
+{
+  "$comment": [
+    "The release this project measures itself against, and the facts that identify it.",
+    "Read by the `Reference release is intact` step in release-dmg.yml, which fails the",
+    "build if the tag disappears or moves. GitHub-side tag protection is not available on",
+    "this repository's plan — rulesets need Pro or a public repository, and immutable",
+    "releases are not offered — so the guarantee lives here, where it is ours to enforce.",
+    "Changing any value below is a deliberate act and shows up in the diff as one."
+  ],
+  "reference": {
+    "tag": "v1.0.5",
+    "commit": "343b55cd823deb0b39e6db7096df33eb5a68452f",
+    "published": "2026-08-16T15:37:48Z",
+    "dmg_sha256": "43574f10617a10dba49b32a8caa814035dee9bf141ff6324577d3bbdf2da3233",
+    "why": "First release of the numbering that survives; everything before it was withdrawn."
+  }
+}
