@@ -62,14 +62,14 @@ Search runs in a Web Worker against the ARUN catalog, through the WASM module wh
 Four jobs on every push: tests and clippy for both Rust crates (Ubuntu), typecheck, lint and tests for the web side (Ubuntu), a full parse of all 23 936 manuscripts against the real archive (Ubuntu), and the Universal `.app` and DMG (macOS). A tag publishes the release:
 
 ```bash
-git tag v1.0.6 && git push origin v1.0.6   # → GitHub Release with DMG
+git tag v1.0.8 && git push origin v1.0.8   # → GitHub Release with DMG
 ```
 
 The corpus job is what keeps the two halves honest: it rebuilds the catalog from the archive and fails if it differs from what is committed.
 
 ## Releases
 
-[v1.0.6](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.6) is current; work continues from it.
+[v1.0.7](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.7) is current; work continues from it.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the reference: the first release of the numbering that survives, kept as a known-good state to fall back to. Its tag and commit are recorded in [`.github/reference-release.json`](.github/reference-release.json), and CI fails if that tag disappears or moves — GitHub's own tag protection needs a plan this repository is not on, so the guarantee is enforced where it can be.
 
