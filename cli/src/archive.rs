@@ -134,11 +134,12 @@ impl Skipped {
 
 /// Parse every source into a record. Pure CPU work, one source at a time.
 ///
-/// Sequential on purpose: on a real TLHdig archive this stage takes ~115 ms
-/// against ~18 ms with a thread pool, but the whole run only moves from 1.50 s
-/// to 1.39 s — 1.07×, well under the 1.5–2× a dependency has to earn. Inflating
-/// the ZIP is ~91 % of the run and is not parallelisable through a single
-/// `ZipArchive` reader. See `PERFORMANCE.md`.
+/// Sequential on purpose. On a real TLHdig archive this stage is ~294 ms of a
+/// ~1.67 s run; inflating the ZIP is the other ~82 %, and a single
+/// `ZipArchive` reader cannot be read in parallel. So even a parse that cost
+/// nothing would buy 1.21× — under the 1.5–2× a dependency has to earn here.
+/// A thread pool was tried and removed at 1.07×, when the parse was cheaper.
+/// See `PERFORMANCE.md`.
 pub fn parse_sources(sources: &[ManuscriptSource]) -> Vec<ManuscriptRecord> {
     sources
         .iter()
