@@ -112,7 +112,10 @@ table {
   border-collapse: collapse;
   table-layout: fixed;
 }
-col.c-num { width: 3.25rem; }
+/* Wide enough for six digits at 15px tabular-nums plus the gap to the siglum:
+   the table is `table-layout: fixed` and its cells clip, so a column that is
+   too narrow loses characters instead of widening. */
+col.c-num { width: 4.75rem; }
 col.c-sig { width: auto; }
 col.c-lang { width: 3.5rem; }
 col.c-corp { width: 5rem; }
@@ -143,8 +146,11 @@ tbody td:last-child { padding-right: 0; }
 td.num {
   color: #999;
   font-variant-numeric: tabular-nums;
-  text-align: right;
-  padding-right: 0.65rem;
+  /* Left, under the "№" heading. Right alignment put the digits against the
+     siglum and left the gap on the outside, so a long number read as though it
+     had been cut off. */
+  text-align: left;
+  padding-right: 0.75rem;
 }
 td.year {
   font-variant-numeric: tabular-nums;
