@@ -325,6 +325,116 @@ mod tests {
         assert!(parse(&fine).is_some());
     }
 
+    /// A real record, near enough: every shape the parser has to walk.
+    const REAL: &str = r#"{"created":"2026-05-21T10:00:00+00:00","id":20328284,
+      "conceptrecid":"15459133","doi":"10.5281/zenodo.20328284","revision":4,
+      "files":[{"id":"744d460e","key":"TLHbasisONLINE25_1_ZENODO_Beta_03.zip",
+        "size":74449198,"checksum":"md5:f9acbc8db3111cc7dd88d82f7819a912",
+        "links":{"self":"https://zenodo.org/api/records/20328284/files/x/content"}}],
+      "metadata":{"title":"Thesaurus Linguarum Hethaeorum digitalis","publication_date":"2026-05-21",
+        "license":{"id":"cc-by-4.0"},"creators":[{"name":"Rieken, E."},{"name":"Schwemer, D."}],
+        "keywords":["Hittite","cuneiform"],"notes":null,"open":true,"version":1.0},
+      "stats":{"downloads":1234,"views":5678.0},"swh":{}}"#;
+
+    /// Every prefix of a real response must be refused, never fatal.
+    ///
+    /// This is the shape a truncated transfer actually takes, and the parser
+    /// reads bytes from the network by hand — the one place in this program
+    /// where an index off the end would be a crash rather than an error.
+    #[test]
+    fn every_truncation_of_a_real_record_is_survivable() {
+        for cut in 0..=REAL.len() {
+            let Some(prefix) = REAL.get(..cut) else {
+                continue; // not a character boundary
+            };
+            let parsed = parse(prefix);
+            if cut == REAL.len() {
+                assert!(parsed.is_some(), "the whole document must parse");
+            } else {
+                assert!(parsed.is_none(), "a prefix is not a document: {cut}");
+            }
+        }
+    }
+
+    /// Corruption anywhere in the response must be refused or read, never fatal.
+    ///
+    /// Deterministic rather than random: every byte position, replaced with the
+    /// characters that actually break parsers — quotes, braces, backslashes,
+    /// control bytes.
+    #[test]
+    fn corruption_at_any_position_is_survivable() {
+        let bytes = REAL.as_bytes();
+        for at in 0..bytes.len() {
+            for replacement in [b'"', b'{', b'}', b'[', b']', b'\\', b':', b',', b'0', 0x01, 0x7f]
+            {
+                let mut broken = bytes.to_vec();
+                broken[at] = replacement;
+                // Only valid UTF-8 reaches the parser: the caller holds a String.
+                if let Ok(text) = std::str::from_utf8(&broken) {
+                    let _ = parse(text); // must not panic; either answer is fine
+                }
+            }
+        }
+    }
+
+    /// Insertions and deletions, which truncation and single-byte edits miss.
+    #[test]
+    fn edits_anywhere_are_survivable() {
+        let bytes = REAL.as_bytes();
+        let mut seed = 0x2026_0816_u64;
+        let mut next = move || {
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            (seed >> 33) as usize
+        };
+        for _ in 0..2000 {
+            let mut broken = bytes.to_vec();
+            let at = next() % broken.len();
+            match next() % 3 {
+                0 => {
+                    broken.remove(at);
+                }
+                1 => broken.insert(at, b"\"{}[]:,\\ "[next() % 9]),
+                _ => broken.truncate(at),
+            }
+            if let Ok(text) = std::str::from_utf8(&broken) {
+                let _ = parse(text);
+            }
+        }
+    }
+
+    /// Documents built to break a parser rather than to be read.
+    #[test]
+    fn hostile_documents_are_refused_rather_than_fatal() {
+        let cases = vec![
+            "\u{feff}{}".to_string(),                 // byte-order mark
+            "{\"a\":".to_string() + &"[".repeat(500) + "1" + &"]".repeat(500) + "}",
+            format!("{{\"a\":\"{}\"}}", "x".repeat(100_000)), // a very long string
+            format!("{{\"a\":{}}}", "9".repeat(400)),        // a number past f64
+            "{\"a\":1e999}".to_string(),                    // infinity
+            "{\"a\":-1e999}".to_string(),
+            "{\"\":\"empty key\"}".to_string(),
+            "{\"a\":\"\\ud83d\\ude00\"}".to_string(),        // a valid surrogate pair
+            "{\"a\":\"\\udc00\\ud800\"}".to_string(),        // surrogates the wrong way round
+            "{\"a\":\"\\u0000\"}".to_string(),                // escaped NUL
+            "[".repeat(100_000),                              // deeper than the cap
+            "{\"a\":{\"a\":{\"a\":1}}}".to_string(),
+        ];
+        for text in cases {
+            let _ = parse(&text); // no panic, no stack overflow
+        }
+    }
+
+    /// A response of the wrong shape entirely: HTML, an error document, a bare
+    /// value. Each must parse or refuse without pretending to be a record.
+    #[test]
+    fn responses_that_are_not_records_do_not_pretend_to_be() {
+        assert!(parse("<html><body>502 Bad Gateway</body></html>").is_none());
+        let error = parse(r#"{"status":404,"message":"PID does not exist."}"#).unwrap();
+        assert_eq!(error.get("id"), None, "an error document has no record id");
+        assert_eq!(parse("[]").unwrap().get("id"), None);
+        assert_eq!(parse("42").unwrap().get("id"), None);
+    }
+
     /// Ids are integers even though JSON calls them numbers.
     #[test]
     fn only_whole_non_negative_numbers_are_ids() {

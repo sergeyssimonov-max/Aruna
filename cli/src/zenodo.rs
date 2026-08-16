@@ -31,9 +31,14 @@ pub struct Release {
     pub published: Option<String>,
 }
 
-/// How long to wait for metadata. Short on purpose: this is an aside, not the
-/// work, and a slow repository must not hold up a download that would succeed.
-const METADATA_TIMEOUT: Duration = Duration::from_secs(20);
+/// How long to wait for metadata.
+///
+/// Short on purpose: this is an aside, not the work. The document is a few tens
+/// of KiB, so a connection that cannot deliver it in ten seconds will not be
+/// delivering 71 MiB either — and the cost of giving up early is only that the
+/// run goes ahead unadvised, which is what happens when Zenodo is unreachable
+/// anyway.
+const METADATA_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Ask which record is the newest edition of `record_id`.
 ///
@@ -70,38 +75,50 @@ fn parse_release(body: &str) -> Option<Release> {
     })
 }
 
-/// Compare what is published against what this build is pinned to, and say
-/// anything worth saying.
+/// What is worth telling the reader, comparing what Zenodo publishes against
+/// what this build is pinned to. `None` when the two agree — silence is the
+/// right answer to no news.
+///
+/// A pure function so every branch can be tested; [`report`] does the printing.
 ///
 /// Deliberately advisory. The pinned digest stays the authority — it records
 /// the archive this parser was tested against, and taking Zenodo's word for it
 /// instead would turn a check of *which* archive arrived into a check of
 /// whether the transfer corrupted it. A republished corpus would then be
 /// accepted in silence, which is the failure this pin exists to prevent.
-pub fn report(pinned_record: u64, pinned_md5: &str, latest: &Release) {
+pub fn advice(pinned_record: u64, pinned_md5: &str, latest: &Release) -> Option<String> {
     if latest.record_id != pinned_record {
-        eprintln!(
-            "A newer edition of the corpus is published: Zenodo record {} ({}), file {}.",
+        return Some(format!(
+            "A newer edition of the corpus is published: Zenodo record {} ({}), file {}.\n\
+             This build is pinned to record {pinned_record} and will keep using it — \
+             the parser is tested against that edition.",
             latest.record_id,
             latest.published.as_deref().unwrap_or("date unknown"),
-            latest.file
-        );
-        eprintln!(
-            "This build is pinned to record {pinned_record} and will keep using it — \
-             the parser is tested against that edition."
-        );
-        return;
+            latest.file,
+        ));
     }
 
-    match latest.md5.as_deref() {
-        Some(published) if !published.eq_ignore_ascii_case(pinned_md5) => {
-            eprintln!(
-                "Zenodo publishes MD5 {published} for record {pinned_record}, \
-                 but this build expects {pinned_md5}."
-            );
-            eprintln!("The download will be checked against the expected digest and will fail.");
-        }
-        _ => {}
+    let published = latest.md5.as_deref()?;
+    if published.eq_ignore_ascii_case(pinned_md5) {
+        return None;
+    }
+    // The download goes ahead regardless, and fails on its own check a minute
+    // later. Aborting here would save that minute in a case that has never
+    // happened — Zenodo does not modify a published record — at the price of
+    // refusing to run whenever the API is wrong or this parser misreads it.
+    // A false refusal is worse than a wasted minute, so the pin stays the only
+    // thing that can stop a download.
+    Some(format!(
+        "Zenodo publishes MD5 {published} for record {pinned_record}, but this build \
+         expects {pinned_md5}.\n\
+         The download will be checked against the expected digest and will fail."
+    ))
+}
+
+/// Print [`advice`], if there is any.
+pub fn report(pinned_record: u64, pinned_md5: &str, latest: &Release) {
+    if let Some(message) = advice(pinned_record, pinned_md5, latest) {
+        eprintln!("{message}");
     }
 }
 
@@ -166,9 +183,82 @@ mod tests {
             r#"{"id": 1, "files": []}"#,          // no file in them
             r#"{"files": [{"key": "a.zip"}]}"#,   // no id
             r#"{"status": 404, "message": "PID does not exist."}"#,
+            // What `/versions/latest` answers when a client does not follow
+            // redirects. It is JSON, and it is not a record.
+            r#"{"status": 301, "message": "Redirecting...", "location": "https://zenodo.org/api/records/20328284"}"#,
+            "<html><body>502 Bad Gateway</body></html>",
+            "[]",
+            "null",
+            // A record whose id is not a number.
+            r#"{"id": "20328284", "files": [{"key": "a.zip"}]}"#,
+            // Files as an object rather than a list.
+            r#"{"id": 1, "files": {"key": "a.zip"}}"#,
+            // A file with no name.
+            r#"{"id": 1, "files": [{"checksum": "md5:abc"}]}"#,
         ] {
             assert!(parse_release(body).is_none(), "accepted {body:?}");
         }
+    }
+
+    fn release(id: u64, md5: Option<&str>) -> Release {
+        Release {
+            record_id: id,
+            file: "corpus.zip".into(),
+            md5: md5.map(str::to_string),
+            published: Some("2026-05-21".into()),
+        }
+    }
+
+    /// Agreement is silence. This is the case every ordinary run takes, and a
+    /// line printed here would be printed on every download for ever.
+    #[test]
+    fn nothing_is_said_when_the_published_record_is_the_pinned_one() {
+        assert_eq!(advice(7, "abc", &release(7, Some("abc"))), None);
+        // Digests are hex; case is not part of the value.
+        assert_eq!(advice(7, "ABC", &release(7, Some("abc"))), None);
+        // No digest published is not a disagreement — the download is checked
+        // against the pin regardless.
+        assert_eq!(advice(7, "abc", &release(7, None)), None);
+    }
+
+    /// A newer edition must be named, and the reader told which one they are
+    /// getting — otherwise the message reads as a warning to act on now.
+    #[test]
+    fn a_newer_edition_is_announced_without_switching_to_it() {
+        let message = advice(7, "abc", &release(9, Some("zzz"))).expect("news");
+        assert!(message.contains("record 9"), "{message}");
+        assert!(message.contains("2026-05-21"), "the edition is dated: {message}");
+        assert!(message.contains("corpus.zip"), "{message}");
+        assert!(
+            message.contains("pinned to record 7") && message.contains("keep using it"),
+            "the reader must learn which edition this run uses: {message}"
+        );
+    }
+
+    /// A record with no date still produces a sentence rather than a hole.
+    #[test]
+    fn a_newer_edition_without_a_date_still_reads() {
+        let mut newer = release(9, None);
+        newer.published = None;
+        let message = advice(7, "abc", &newer).expect("news");
+        assert!(message.contains("date unknown"), "{message}");
+    }
+
+    /// A digest that disagrees is the one case where the run is heading for a
+    /// failure, and the message has to say so — the download will refuse it.
+    #[test]
+    fn a_disagreeing_digest_warns_and_predicts_the_failure() {
+        let message = advice(7, "abc", &release(7, Some("def"))).expect("warning");
+        assert!(message.contains("def") && message.contains("abc"), "both digests: {message}");
+        assert!(message.contains("will fail"), "{message}");
+    }
+
+    /// A newer edition outranks a digest difference: of course the digest
+    /// differs, it describes a different archive. Saying both would be noise.
+    #[test]
+    fn a_newer_edition_is_not_also_reported_as_a_digest_mismatch() {
+        let message = advice(7, "abc", &release(9, Some("def"))).expect("news");
+        assert!(!message.contains("will fail"), "one story, not two: {message}");
     }
 
     /// A record without a checksum is still usable — the digest is an extra,

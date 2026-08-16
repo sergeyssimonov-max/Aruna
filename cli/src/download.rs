@@ -676,6 +676,74 @@ mod tests {
         }
     }
 
+    /// The metadata request is an aside: every way it can fail must come back
+    /// as an error the caller can shrug off, never as a panic or a hang.
+    #[test]
+    fn asking_a_question_fails_as_an_error_rather_than_a_surprise() {
+        // A refusal is a refusal, whatever the status.
+        for status in [404u16, 410, 500, 503] {
+            let server = FakeServer::start(vec![Reply::Status(status, None)]);
+            let err = fetch_text(&server.url(), Duration::from_secs(5))
+                .expect_err("a status is not an answer");
+            assert!(
+                matches!(err, ArunaError::Http { status: got, .. } if got == status),
+                "status {status} came back as {err}"
+            );
+        }
+
+        // An answer that is not JSON is still handed over: refusing it is the
+        // caller's job, and it is the caller that knows what it asked for.
+        let server = FakeServer::start(vec![Reply::Body(b"<html>502</html>".to_vec())]);
+        assert_eq!(
+            fetch_text(&server.url(), Duration::from_secs(5)).unwrap(),
+            "<html>502</html>"
+        );
+    }
+
+    /// An answer that is not text at all is refused, not mangled.
+    ///
+    /// A captive portal or a proxy answering with binary is the ordinary way
+    /// this happens on a hotel network.
+    #[test]
+    fn an_answer_that_is_not_text_is_refused() {
+        let server = FakeServer::start(vec![Reply::Body(vec![0xff, 0xfe, 0x00, 0x01])]);
+        assert!(
+            fetch_text(&server.url(), Duration::from_secs(5)).is_err(),
+            "bytes that are not UTF-8 are not an answer"
+        );
+    }
+
+    /// A fast flood is capped by size, where the endless dribble below is
+    /// capped by time. Both matter: only one of them is slow.
+    #[test]
+    fn a_flood_is_capped_by_size() {
+        let flood = vec![b'x'; 8 * 1024 * 1024];
+        let server = FakeServer::start(vec![Reply::Body(flood)]);
+        let body = fetch_text(&server.url(), Duration::from_secs(30)).expect("read succeeds");
+        assert!(
+            body.len() <= 4 * 1024 * 1024,
+            "read {} bytes, which is not a cap",
+            body.len()
+        );
+    }
+
+    /// A repository answering a small question with an endless body must not
+    /// be able to exhaust memory: the read is capped.
+    #[test]
+    fn an_oversized_answer_is_cut_rather_than_swallowed() {
+        let server = FakeServer::start(vec![Reply::Dribble]);
+        let started = std::time::Instant::now();
+        // The dribble never ends; the deadline is what stops it, and the cap is
+        // what would stop a fast flood.
+        let outcome = fetch_text(&server.url(), Duration::from_millis(400));
+        assert!(outcome.is_err(), "an endless answer must not be waited out");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "gave up after {:?}",
+            started.elapsed()
+        );
+    }
+
     /// A server that never stops sending must not stop the program either.
     ///
     /// `timeout_read` cannot catch this: every read returns a byte, so no
