@@ -228,5 +228,5 @@ bash scripts/make_release.sh   # Universal .app + UDIF DMG
 CI / tags: [docs/AUTO_DMG.md](docs/AUTO_DMG.md)
 
 ```bash
-git tag v1.0.3 && git push origin v1.0.3   # тег должен совпадать с version в cli/Cargo.toml
+git tag v1.0.6 && git push origin v1.0.6   # тег должен совпадать с version в cli/Cargo.toml
 ```

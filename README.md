@@ -50,5 +50,5 @@ MIT (see `cli/` package metadata).
 `.github/workflows/release-dmg.yml` · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
 ```bash
-git tag v1.0.3 && git push origin v1.0.3   # → GitHub Release with DMG
+git tag v1.0.6 && git push origin v1.0.6   # → GitHub Release with DMG
 ```
