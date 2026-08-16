@@ -19,7 +19,7 @@ export type Item = {
   editor: string;
   /** Edition year. */
   year: string;
-  /** Dominant language code (Hit, Hur, Akk…). */
+  /** Language codes, most-used first (`Hit`, `Hit, Hur`…). */
   lang: string;
   /** Edition series (HFR, TLH, HAnn…). */
   corpus: string;

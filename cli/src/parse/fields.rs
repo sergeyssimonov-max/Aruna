@@ -288,13 +288,25 @@ pub(super) fn extract_inv(header: &str, window: &str) -> String {
         .unwrap_or_else(|| MISSING.to_string())
 }
 
-/// How much of the body to sample when deciding the dominant language.
+/// How much of the body to sample when deciding which languages a text is in.
 const LANG_WINDOW: usize = 12 * 1024;
 
-/// Dominant `lg="…"` code among the line elements in the early body window.
+/// Separator between language codes, when a manuscript carries more than one.
+const LANG_SEPARATOR: &str = ", ";
+
+/// Every `lg="…"` code among the line elements, most-used first.
+///
+/// A manuscript is not always in one language: 7% of this corpus mixes two or
+/// three, which is a fact about the text rather than noise — a Hittite ritual
+/// quoting Hurrian incantations is a different object from a Hittite one, and
+/// reporting only the dominant code hid that from anyone reading the table.
+///
+/// Ordered by how much of the sampled window each language holds, so the first
+/// code is the one that used to be reported alone. Ties break on the code
+/// itself, so the output never depends on hash order.
 pub(super) fn extract_lang(xml: &str) -> String {
     let window = truncate_on_char_boundary(xml, LANG_WINDOW);
-    let mut counts: HashMap<&str, u32> = HashMap::new();
+    let mut counts: HashMap<String, u32> = HashMap::new();
 
     for (at, _) in window.match_indices("lg=") {
         // Require a token boundary, otherwise `flg="…"` counts as `lg="…"`.
@@ -311,19 +323,29 @@ pub(super) fn extract_lang(xml: &str) -> String {
         };
         let code = &value[..end];
         // Language codes are short; anything longer is some other attribute.
-        if !code.is_empty() && code.len() <= 8 {
-            *counts.entry(code).or_default() += 1;
+        if code.is_empty() || code.len() > 8 {
+            continue;
         }
+        // Folded before counting, so `Hit` and `Hitt` are one language rather
+        // than two entries that would both be listed.
+        let folded = normalise_lang(code);
+        if folded == MISSING {
+            continue;
+        }
+        *counts.entry(folded).or_default() += 1;
     }
 
-    // Ties break on the code itself, so the output does not depend on hash order.
-    let winner = counts
-        .into_iter()
-        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)));
-    match winner {
-        Some((code, _)) => normalise_lang(code),
-        None => MISSING.to_string(),
+    if counts.is_empty() {
+        return MISSING.to_string();
     }
+
+    let mut ranked: Vec<(String, u32)> = counts.into_iter().collect();
+    ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    ranked
+        .into_iter()
+        .map(|(code, _)| code)
+        .collect::<Vec<_>>()
+        .join(LANG_SEPARATOR)
 }
 
 fn is_name_char(c: char) -> bool {
@@ -331,12 +353,30 @@ fn is_name_char(c: char) -> bool {
 }
 
 /// Fold the spelling variants used across TLHdig into one code per language.
+///
+/// Every entry here is a reading of what the corpus wrote, never a guess about
+/// what it meant. `Hattian` is the language `Hat` spelled out — the corpus uses
+/// both, and listing them side by side would show one language twice in the
+/// same row, which is what surfaced when the column began naming all of them.
+///
+/// Codes left alone on purpose, because folding them would be an inference
+/// rather than a reading: `Lu` (one line, in a manuscript from a Luwian volume,
+/// so probably `Luw` — but one occurrence is not evidence enough to merge two
+/// languages), and `Lin`, which appears on words rather than lines and whose
+/// meaning is not recoverable from the data. Both are shown as the corpus
+/// writes them.
 fn normalise_lang(code: &str) -> String {
     match code {
         "Hit" | "Hitt" => "Hit".to_string(),
         "Hur" | "Hurr" => "Hur".to_string(),
         "Akk" | "Akkd" => "Akk".to_string(),
-        "ign" | "" => MISSING.to_string(),
+        "Hat" | "Hattian" => "Hat".to_string(),
+        // `ign` is the corpus saying "not identified". `5f_` is not a language
+        // at all: it sits where one belongs on 100 lines whose cuneiform is
+        // empty or unreadable, an artefact of data entry. Named outright rather
+        // than matched by shape, so a real code that is new to us can never be
+        // swallowed by the same rule.
+        "ign" | "5f_" | "" => MISSING.to_string(),
         other => other.to_string(),
     }
 }
@@ -395,10 +435,60 @@ fn normalize_ws(s: &str) -> String {
 mod tests {
     use super::*;
 
+    /// Every language the text uses, and the one it mostly is first.
     #[test]
-    fn language_is_the_most_frequent_code() {
+    fn languages_are_listed_with_the_dominant_one_first() {
         let xml = r#"<body><l lg="Hit"/><l lg="Hit"/><l lg="Akk"/></body>"#;
-        assert_eq!(extract_lang(xml), "Hit");
+        assert_eq!(extract_lang(xml), "Hit, Akk");
+
+        // The order follows the text, not the alphabet.
+        let hurrian = r#"<body><l lg="Hur"/><l lg="Hur"/><l lg="Hit"/></body>"#;
+        assert_eq!(extract_lang(hurrian), "Hur, Hit");
+    }
+
+    /// A single-language manuscript reads exactly as it did before — which is
+    /// 93% of this corpus.
+    #[test]
+    fn one_language_is_still_one_word() {
+        assert_eq!(extract_lang(r#"<body><l lg="Hit"/><l lg="Hit"/></body>"#), "Hit");
+    }
+
+    /// Spelling variants are one language, not two entries side by side.
+    ///
+    /// The corpus really does write `Hat` and `Hattian` in one manuscript, and
+    /// listing both was the first thing this column got wrong.
+    #[test]
+    fn variants_fold_before_they_are_listed() {
+        assert_eq!(extract_lang(r#"<l lg="Hit"/><l lg="Hitt"/>"#), "Hit");
+        assert_eq!(extract_lang(r#"<l lg="Akk"/><l lg="Akkd"/><l lg="Hit"/>"#), "Akk, Hit");
+        assert_eq!(extract_lang(r#"<l lg="Hat"/><l lg="Hattian"/><l lg="Hit"/>"#), "Hat, Hit");
+    }
+
+    /// `5f_` is not a language: it stands where one belongs on lines with no
+    /// readable cuneiform. It must not reach the table as though it were.
+    #[test]
+    fn the_data_entry_artefact_is_not_a_language() {
+        assert_eq!(extract_lang(r#"<l lg="5f_"/>"#), MISSING);
+        assert_eq!(extract_lang(r#"<l lg="5f_"/><l lg="Hit"/>"#), "Hit");
+    }
+
+    /// Codes we cannot resolve are shown as written rather than guessed at.
+    #[test]
+    fn unresolved_codes_are_passed_through_unchanged() {
+        assert_eq!(extract_lang(r#"<l lg="Lu"/>"#), "Lu");
+        assert_eq!(extract_lang(r#"<l lg="Lin"/>"#), "Lin");
+        assert_eq!(extract_lang(r#"<l lg="Sum"/><l lg="Pal"/>"#), "Pal, Sum");
+    }
+
+    /// A tie must not depend on hash order, or the catalog would differ
+    /// between runs of the same parser over the same archive.
+    #[test]
+    fn equal_counts_are_ordered_by_the_code_itself() {
+        let xml = r#"<l lg="Luw"/><l lg="Hat"/><l lg="Akk"/>"#;
+        assert_eq!(extract_lang(xml), "Akk, Hat, Luw");
+        // Same input, opposite document order: same answer.
+        let other = r#"<l lg="Akk"/><l lg="Luw"/><l lg="Hat"/>"#;
+        assert_eq!(extract_lang(other), "Akk, Hat, Luw");
     }
 
     #[test]
@@ -407,6 +497,13 @@ mod tests {
         assert_eq!(extract_lang(r#"<l lg="Akkd"/>"#), "Akk");
         assert_eq!(extract_lang(r#"<l lg="ign"/>"#), MISSING);
         assert_eq!(extract_lang("<body/>"), MISSING);
+    }
+
+    /// `ign` means "not identified" and is dropped, but dropping it must not
+    /// hide the languages that *are* named beside it.
+    #[test]
+    fn unidentified_lines_do_not_erase_the_identified_ones() {
+        assert_eq!(extract_lang(r#"<l lg="ign"/><l lg="ign"/><l lg="Hit"/>"#), "Hit");
     }
 
     /// `lg=` must be a whole attribute name, not the tail of another one.

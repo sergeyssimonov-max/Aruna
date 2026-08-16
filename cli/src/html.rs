@@ -55,7 +55,7 @@ const COLUMNS: [Column; 6] = [
     Column {
         head: "Lang",
         class: "c-lang",
-        legend: "dominant language (Hit, Hur, Akk…)",
+        legend: "languages, most-used first (Hit, Hur…)",
     },
     Column {
         head: "Corpus",

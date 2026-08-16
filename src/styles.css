@@ -31,7 +31,7 @@ body {
 .vl-frame {
   --vl-pad-x: 0.75rem;
   --vl-gap: 0.5rem;
-  --vl-cols: 2.75rem minmax(7rem, 1.4fr) 3rem 4.5rem minmax(6rem, 1.1fr) 3.5rem;
+  --vl-cols: 2.75rem minmax(7rem, 1.4fr) 6.5rem 4.5rem minmax(6rem, 1.1fr) 3.5rem;
   --vl-sb: 0px;
   display: flex;
   flex-direction: column;
@@ -42,7 +42,7 @@ body {
   .vl-frame {
     --vl-pad-x: 1rem;
     --vl-gap: 0.65rem;
-    --vl-cols: 3rem minmax(8rem, 1.5fr) 3.25rem 5rem minmax(7rem, 1.15fr) 3.75rem;
+    --vl-cols: 3rem minmax(8rem, 1.5fr) 7rem 5rem minmax(7rem, 1.15fr) 3.75rem;
   }
 }
 
@@ -141,7 +141,7 @@ body {
 
 @media (max-width: 639px) {
   .vl-frame {
-    --vl-cols: 2.4rem minmax(0, 1.4fr) 2.6rem 3.75rem 3.1rem;
+    --vl-cols: 2.4rem minmax(0, 1.4fr) 5.5rem 3.75rem 3.1rem;
     --vl-gap: 0.4rem;
   }
   .vl-c-ed {

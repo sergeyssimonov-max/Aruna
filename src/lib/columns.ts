@@ -21,7 +21,7 @@ export type Column = {
 export const COLUMNS: readonly Column[] = [
   { className: "vl-c-num", head: "№", legend: "row number" },
   { className: "vl-c-sig", head: "Siglum", legend: "publication id (e.g. KBo 3.22)" },
-  { className: "vl-c-lang", head: "Lang", legend: "dominant language (Hit, Hur, Akk…)" },
+  { className: "vl-c-lang", head: "Lang", legend: "languages, most-used first (Hit, Hur…)" },
   { className: "vl-c-corp", head: "Corpus", legend: "edition series (HFR, TLH, HAnn…)" },
   { className: "vl-c-ed", head: "Editor", legend: "transliteration / edition author" },
   { className: "vl-c-year", head: "Year", legend: "edition year" },

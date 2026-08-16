@@ -44,7 +44,7 @@ pub struct ManuscriptRecord {
     pub authorship: String,
     /// Edition / digitalisation year.
     pub year: String,
-    /// Dominant text language code (Hit, Hur, Akk, …).
+    /// Language codes the text uses, most-used first (`Hit`, `Hit, Hur`, …).
     pub lang: String,
     /// Museum / excavation inventory number (`AO:InvNr`), if any.
     pub inv: String,

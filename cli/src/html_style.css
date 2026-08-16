@@ -137,7 +137,10 @@ table {
    too narrow loses characters instead of widening. */
 col.c-num { width: 4.75rem; }
 col.c-sig { width: auto; }
-col.c-lang { width: 3.5rem; }
+/* Wide enough for three codes — `Hit, Akk, Sum` is 92px at 15px, and 6% of the
+   corpus names more than one language. The table is `table-layout: fixed` and
+   its cells clip, so a column that is too narrow loses characters. */
+col.c-lang { width: 7rem; }
 col.c-corp { width: 5rem; }
 col.c-ed { width: 28%; }
 col.c-year { width: 4rem; }
