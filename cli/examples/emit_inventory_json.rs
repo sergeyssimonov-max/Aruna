@@ -1,4 +1,4 @@
-//! Emit `public/data/inventory.json` from the archive — the web catalog, built
+//! Emit `src/data/inventory.json` from the archive — the web catalog, built
 //! by the same parser the CLI uses.
 //!
 //! ```text

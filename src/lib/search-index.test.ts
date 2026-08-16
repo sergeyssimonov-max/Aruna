@@ -17,7 +17,7 @@ const TLH2_MAGIC = 0x32484c54;
 const HEADER = 32;
 
 function realWire(): Wire {
-  const gz = readFileSync(new URL("../../public/data/inventory.bin.gz", import.meta.url));
+  const gz = readFileSync(new URL("../data/inventory.bin.gz", import.meta.url));
   const raw = gunzipSync(gz);
   const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   return parseWire(buf);

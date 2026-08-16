@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Build the ARUN v3 container the site downloads, from the catalog the CLI
- * emits: `public/data/inventory.json` → `inventory.bin` + `inventory.bin.gz`.
+ * emits: `src/data/inventory.json` → `inventory.bin` + `inventory.bin.gz`.
  *
  * Four stages, in the order the format forces — the header declares every
  * length, so nothing can be written until all of them are known:
@@ -31,9 +31,9 @@ import {
 } from "../src/lib/arun-format.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const jsonPath = resolve(root, "public/data/inventory.json");
-const binPath = resolve(root, "public/data/inventory.bin");
-const gzPath = resolve(root, "public/data/inventory.bin.gz");
+const jsonPath = resolve(root, "src/data/inventory.json");
+const binPath = resolve(root, "src/data/inventory.bin");
+const gzPath = resolve(root, "src/data/inventory.bin.gz");
 
 const te = new TextEncoder();
 

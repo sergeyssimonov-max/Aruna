@@ -1,8 +1,17 @@
 import { isArun, parseInventory } from "./arun";
 import type { Inventory } from "./inventory";
 
-const BIN_URL = "/data/inventory.bin";
-const GZIP_URL = "/data/inventory.bin.gz";
+// Imported rather than written out as `/data/inventory.bin.gz`, so the build
+// emits each file under a name carrying a hash of its contents.
+//
+// The name is what makes `force-cache` below safe. A stable path plus a cache
+// that is told never to revalidate is how a visitor keeps yesterday's catalog
+// after a deploy — the file they hold answers to the same URL as the new one,
+// and nothing asks the server whether it changed. A content hash makes new
+// data a new URL, so the old entry is simply never asked for again, and the
+// one they do hold can be kept forever.
+import BIN_URL from "@/data/inventory.bin?url";
+import GZIP_URL from "@/data/inventory.bin.gz?url";
 
 const fetchOpts: RequestInit = {
   credentials: "same-origin",

@@ -140,9 +140,9 @@ jobs:
           out="$(mktemp -d)/inventory.json"
           cargo run --release --manifest-path cli/Cargo.toml \
             --example emit_inventory_json -- "$HOME/aruna-fixtures/corpus.zip" "$out"
-          if ! cmp -s "$out" public/data/inventory.json; then
-            echo "::error file=public/data/inventory.json::Catalog is stale — regenerate it (see public/data/README.txt) and commit the result"
-            diff <(head -c 2000 "$out") <(head -c 2000 public/data/inventory.json) | head -20 || true
+          if ! cmp -s "$out" src/data/inventory.json; then
+            echo "::error file=src/data/inventory.json::Catalog is stale — regenerate it (see src/data/README.txt) and commit the result"
+            diff <(head -c 2000 "$out") <(head -c 2000 src/data/inventory.json) | head -20 || true
             exit 1
           fi
 
@@ -152,11 +152,11 @@ jobs:
           node-version: "22"
       - name: The ARUN binary matches the catalog
         run: |
-          before="$(shasum -a 256 < public/data/inventory.bin)"
+          before="$(shasum -a 256 < src/data/inventory.bin)"
           node scripts/build-inventory-bin.mjs
-          after="$(shasum -a 256 < public/data/inventory.bin)"
+          after="$(shasum -a 256 < src/data/inventory.bin)"
           if [ "$before" != "$after" ]; then
-            echo "::error file=public/data/inventory.bin::Stale binary — run 'npm run build:data' and commit the result"
+            echo "::error file=src/data/inventory.bin::Stale binary — run 'npm run build:data' and commit the result"
             exit 1
           fi
 

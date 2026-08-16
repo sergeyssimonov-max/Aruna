@@ -1,6 +1,6 @@
 //! The site's catalog: the same records the HTML shows, as the JSON wire form.
 //!
-//! `public/data/inventory.json` is what `scripts/build-inventory-bin.mjs` reads
+//! `src/data/inventory.json` is what `scripts/build-inventory-bin.mjs` reads
 //! to build the binary the browser downloads, so this module and that script
 //! are the two halves of one format:
 //!

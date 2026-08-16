@@ -1,7 +1,7 @@
 /**
  * The three committed data files describe one catalog — check they agree.
  *
- * `public/data/inventory.json` is the parser's output, `inventory.bin` is the
+ * `src/data/inventory.json` is the parser's output, `inventory.bin` is the
  * ARUN container built from it, and `inventory.bin.gz` is the file the browser
  * actually downloads (`load-inventory.ts` asks for the gzip first and only falls
  * back to the plain binary). CI rebuilds the binary from the catalog and fails
@@ -30,7 +30,7 @@ import {
 } from "../src/lib/arun-format.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (name) => readFileSync(resolve(root, "public/data", name));
+const read = (name) => readFileSync(resolve(root, "src/data", name));
 
 const catalog = JSON.parse(read("inventory.json").toString("utf8"));
 const bin = read("inventory.bin");

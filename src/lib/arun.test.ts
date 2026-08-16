@@ -6,7 +6,7 @@ import { ARUN_MAGIC, isArun, parseInventory, parseWire } from "./arun.ts";
 
 /** The catalog the app actually ships, as the browser receives it. */
 function realArun(): ArrayBuffer {
-  const gz = readFileSync(new URL("../../public/data/inventory.bin.gz", import.meta.url));
+  const gz = readFileSync(new URL("../data/inventory.bin.gz", import.meta.url));
   const raw = gunzipSync(gz);
   return raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
 }

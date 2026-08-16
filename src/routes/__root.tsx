@@ -1,5 +1,9 @@
 import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
+// The same import `load-inventory` uses, so the preload below cannot point at a
+// name the build no longer emits — which is exactly what it did once the file
+// gained a content hash.
+import inventoryGzip from "@/data/inventory.bin.gz?url";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -17,7 +21,7 @@ export const Route = createRootRoute({
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       {
         rel: "preload",
-        href: "/data/inventory.bin.gz",
+        href: inventoryGzip,
         as: "fetch",
         type: "application/octet-stream",
         crossOrigin: "anonymous" as const,
