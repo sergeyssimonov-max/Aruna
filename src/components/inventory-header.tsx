@@ -8,6 +8,7 @@ export function InventoryHeader({
   groups,
   matches,
   fallbackReason,
+  searchError,
 }: {
   source: string;
   manuscripts: number;
@@ -16,6 +17,8 @@ export function InventoryHeader({
   matches: { count: number; pending: boolean } | null;
   /** Set when search fell back to the slower engine — see `SearchEngineNote`. */
   fallbackReason: FallbackReason | null;
+  /** Set when search is gone for this session; the table below still stands. */
+  searchError: string | null;
 }) {
   return (
     <header className="mb-6 sm:mb-8">
@@ -34,6 +37,7 @@ export function InventoryHeader({
           </Count>
         )}
         {fallbackReason && <SearchEngineNote reason={fallbackReason} />}
+        {searchError && <SearchUnavailableNote />}
       </div>
     </header>
   );
@@ -56,6 +60,21 @@ const EXPLANATION: Record<FallbackReason, string> = {
   trapped:
     "The compact search index stopped responding and was dropped for this session, so search is scanning the table directly. Results are the same; a long query takes a little longer.",
 };
+
+/**
+ * Search died and could not be rebuilt. Said plainly, and next to a table that
+ * still works: the inventory is complete on screen, only filtering is gone.
+ */
+function SearchUnavailableNote() {
+  return (
+    <span
+      className="text-[#999]"
+      title="The search worker stopped and could not be restarted, so filtering is unavailable. The full inventory is still listed below; reloading the page usually brings search back."
+    >
+      Search unavailable
+    </span>
+  );
+}
 
 function SearchEngineNote({ reason }: { reason: FallbackReason }) {
   return (

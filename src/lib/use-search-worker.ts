@@ -2,7 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SearchMatch } from "./inventory";
 import type { FallbackReason, WorkerIn, WorkerOut } from "./search-protocol";
 
+/**
+ * `"error"` means search is unavailable — not that the page is broken. The
+ * inventory is already loaded and rendered by the time a worker exists, so a
+ * worker that dies costs the reader filtering and nothing else.
+ */
 type Status = "boot" | "ready" | "error";
+
+/**
+ * How many times a failed worker is rebuilt before search is given up on.
+ *
+ * A worker can die for reasons that have nothing to do with this code — a
+ * memory spike elsewhere in the tab, the browser reclaiming a background
+ * thread. One rebuild costs a second and covers those; a second failure is a
+ * real fault, and retrying it forever would only hide it.
+ */
+const REBUILD_ATTEMPTS = 1;
 
 /** Which engine answered: the WASM index, or the JavaScript scan behind it. */
 type Engine = "wasm" | "js";
@@ -14,6 +29,9 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
   /** Query of the request currently in flight — the one `reqId` refers to. */
   const sentQuery = useRef("");
   const [status, setStatus] = useState<Status>("boot");
+  /** Bumped to rebuild the worker after a failure. */
+  const [generation, setGeneration] = useState(0);
+  const rebuilds = useRef(0);
   const [engine, setEngine] = useState<Engine | null>(null);
   const [fallbackReason, setFallbackReason] = useState<FallbackReason | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +46,8 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
   useEffect(() => {
     if (!arun) return;
     let alive = true;
+    // `generation` is a dependency so a failed worker can be rebuilt by
+    // bumping it; the buffer itself is unchanged.
     const worker = new Worker(new URL("./search.worker.ts", import.meta.url), {
       type: "module",
       name: "tlhdig-search",
@@ -66,6 +86,17 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
     };
     const onError = (e: ErrorEvent) => {
       if (!alive) return;
+      worker.terminate();
+      workerRef.current = null;
+
+      if (rebuilds.current < REBUILD_ATTEMPTS) {
+        rebuilds.current += 1;
+        setStatus("boot");
+        setGeneration((n) => n + 1);
+        return;
+      }
+      // Out of attempts: search is unavailable for this session. The caller
+      // keeps the inventory on screen and says so — this is not a page error.
       setStatus("error");
       setError(e.message || "Search worker failed");
     };
@@ -88,7 +119,7 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
       setFallbackReason(null);
       setResult(null);
     };
-  }, [arun]);
+  }, [arun, generation]);
 
   const search = useCallback(
     (q: string) => {

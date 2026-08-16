@@ -57,13 +57,19 @@ function InventoryPage() {
     search(deferredQuery);
   }, [deferredQuery, search, workerStatus]);
 
+  /** Search is gone for this session; the inventory is not. */
+  const searchBroken = workerStatus === "error";
+
   /** The groups this query calls for, or null while its result is in flight. */
   const answered: Group[] | null = useMemo(() => {
     if (!data) return null;
+    // Nothing can filter, so show everything rather than an empty table or the
+    // last query's leftovers. The header says why.
+    if (searchBroken) return data.groups;
     if (!normalizedQuery) return data.groups;
     if (!currentMatches) return null;
     return applyMatches(data, currentMatches);
-  }, [data, normalizedQuery, currentMatches]);
+  }, [data, normalizedQuery, currentMatches, searchBroken]);
 
   // What is on screen. While a query is in flight the previous rows stay,
   // dimmed, rather than the table emptying: a keystroke used to blank it and
@@ -103,7 +109,8 @@ function InventoryPage() {
   // Pending until a result for *this* query is in hand — the previous query's
   // matches are never null, so keying off that alone kept the indicator dark
   // through every re-search.
-  const searchPending = searching && (workerStatus !== "ready" || currentMatches === null);
+  const searchPending =
+    searching && !searchBroken && (workerStatus !== "ready" || currentMatches === null);
 
   // Shown only once the wait is long enough to notice. The worker usually
   // answers within a frame or two, and an indicator that appears and vanishes
@@ -118,8 +125,11 @@ function InventoryPage() {
     return () => clearTimeout(timer);
   }, [searchPending]);
 
-  const error = loadError || workerError;
-  if (error) return <Notice tone="error">{error}</Notice>;
+  // Only a failed load replaces the page: without the inventory there is
+  // nothing to show. A failed search worker leaves a complete, readable table —
+  // taking that away over a feature that is not working would be the worse
+  // outcome, and it is what this page used to do.
+  if (loadError) return <Notice tone="error">{loadError}</Notice>;
   if (!data) return <Notice tone="muted">Loading inventory…</Notice>;
 
   return (
@@ -129,8 +139,9 @@ function InventoryPage() {
           source={data.source}
           manuscripts={data.manuscripts}
           groups={data.groups.length}
-          matches={searching ? { count: visibleCount, pending: waiting } : null}
-          fallbackReason={searchFallback}
+          matches={searching && !searchBroken ? { count: visibleCount, pending: waiting } : null}
+          fallbackReason={searchBroken ? null : searchFallback}
+          searchError={searchBroken ? workerError : null}
         />
 
         <ColumnLegend />
