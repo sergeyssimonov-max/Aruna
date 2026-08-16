@@ -8,6 +8,12 @@
 //! Hashing is incremental so the 71 MiB archive is digested as it streams to
 //! disk, without a second pass over the file.
 
+/// Bytes per compression block, as MD5 defines it.
+const BLOCK: usize = 64;
+
+/// Where the message length goes in the final block: the last eight bytes.
+const LENGTH_AT: usize = BLOCK - 8;
+
 /// Per-round left-rotation amounts.
 const SHIFTS: [u32; 64] = [
     7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, //
@@ -34,7 +40,7 @@ pub struct Md5 {
     /// Total message length in bytes; the padding encodes it in bits.
     len: u64,
     /// Bytes of the block currently being filled.
-    block: [u8; 64],
+    block: [u8; BLOCK],
     filled: usize,
 }
 
@@ -49,7 +55,7 @@ impl Md5 {
         Md5 {
             state: [0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476],
             len: 0,
-            block: [0; 64],
+            block: [0; BLOCK],
             filled: 0,
         }
     }
@@ -59,12 +65,12 @@ impl Md5 {
         self.len = self.len.wrapping_add(data.len() as u64);
 
         if self.filled > 0 {
-            let need = 64 - self.filled;
+            let need = BLOCK - self.filled;
             let take = need.min(data.len());
             self.block[self.filled..self.filled + take].copy_from_slice(&data[..take]);
             self.filled += take;
             data = &data[take..];
-            if self.filled < 64 {
+            if self.filled < BLOCK {
                 // Still short of a block, and `data` is now empty — keep the
                 // partial block for the next call rather than falling through
                 // to the tail below, which would overwrite it.
@@ -75,9 +81,9 @@ impl Md5 {
             self.filled = 0;
         }
 
-        let mut chunks = data.chunks_exact(64);
+        let mut chunks = data.chunks_exact(BLOCK);
         for chunk in &mut chunks {
-            let mut block = [0u8; 64];
+            let mut block = [0u8; BLOCK];
             block.copy_from_slice(chunk);
             self.compress(&block);
         }
@@ -93,7 +99,7 @@ impl Md5 {
 
         // Padding: a single 1 bit, zeroes, then the length in bits (LE).
         self.pad_byte(0x80);
-        while self.filled != 56 {
+        while self.filled != LENGTH_AT {
             self.pad_byte(0x00);
         }
         let len_bytes = bit_len.to_le_bytes();
@@ -118,21 +124,27 @@ impl Md5 {
     fn pad_byte(&mut self, byte: u8) {
         self.block[self.filled] = byte;
         self.filled += 1;
-        if self.filled == 64 {
+        if self.filled == BLOCK {
             let block = self.block;
             self.compress(&block);
             self.filled = 0;
         }
     }
 
-    fn compress(&mut self, block: &[u8; 64]) {
+    /// One block through the four rounds of RFC 1321, section 3.4.
+    ///
+    /// The rounds differ in two ways only: how three of the four working words
+    /// are mixed, and which message word each step reads. Both are chosen by
+    /// the step number below, which is why this is one loop rather than four.
+    fn compress(&mut self, block: &[u8; BLOCK]) {
         let mut m = [0u32; 16];
         for (word, bytes) in m.iter_mut().zip(block.chunks_exact(4)) {
             *word = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         }
 
         let [mut a, mut b, mut c, mut d] = self.state;
-        for i in 0..64 {
+        for i in 0..BLOCK {
+            // (F, G, H, I) of the RFC, and its message-word schedule.
             let (mix, index) = match i / 16 {
                 0 => ((b & c) | (!b & d), i),
                 1 => ((d & b) | (!d & c), (5 * i + 1) % 16),
