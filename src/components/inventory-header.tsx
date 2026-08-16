@@ -1,4 +1,5 @@
 import { COLUMNS } from "@/lib/columns";
+import type { FallbackReason } from "@/lib/search-protocol";
 
 /** Title, provenance, and the counts — what this page is and how much is in it. */
 export function InventoryHeader({
@@ -6,15 +7,15 @@ export function InventoryHeader({
   manuscripts,
   groups,
   matches,
-  degraded,
+  fallbackReason,
 }: {
   source: string;
   manuscripts: number;
   groups: number;
   /** Shown only while a search is running; `pending` marks a stale count. */
   matches: { count: number; pending: boolean } | null;
-  /** True when search fell back to the slower engine — see `SearchEngineNote`. */
-  degraded: boolean;
+  /** Set when search fell back to the slower engine — see `SearchEngineNote`. */
+  fallbackReason: FallbackReason | null;
 }) {
   return (
     <header className="mb-6 sm:mb-8">
@@ -32,27 +33,33 @@ export function InventoryHeader({
             {matches.pending ? <span className="ml-1 text-[#aaa]">…</span> : null}
           </Count>
         )}
-        {degraded && <SearchEngineNote />}
+        {fallbackReason && <SearchEngineNote reason={fallbackReason} />}
       </div>
     </header>
   );
 }
 
 /**
- * Said out loud only when it is true.
+ * Said out loud only when it is true — and only about what actually happened.
  *
- * The worker refuses the binary index when the inventory outgrows it — more
- * than 64 distinct editors or years — and searches by scanning strings instead.
- * Results stay correct and the page keeps working, which is why it was worth
- * doing silently; but silence also meant nobody would ever learn that the fast
- * path had been off for a year.
+ * Results stay correct and the page keeps working when the binary index is out
+ * of the picture, which is why the fallback was worth doing silently; silence
+ * only meant nobody would learn the fast path had been off. That argument dies
+ * the moment the explanation is wrong, so the reason comes from the worker
+ * rather than from an assumption about which limit was hit.
  */
-function SearchEngineNote() {
+const EXPLANATION: Record<FallbackReason, string> = {
+  unsupported:
+    "This inventory does not fit the compact search index, so search is scanning the table directly. Results are the same; a long query takes a little longer.",
+  unavailable:
+    "The compact search index could not be loaded, so search is scanning the table directly. Results are the same; a long query takes a little longer.",
+  trapped:
+    "The compact search index stopped responding and was dropped for this session, so search is scanning the table directly. Results are the same; a long query takes a little longer.",
+};
+
+function SearchEngineNote({ reason }: { reason: FallbackReason }) {
   return (
-    <span
-      className="text-[#999]"
-      title="The compact search index did not fit this inventory, so search is scanning strings instead. Results are the same; large queries take longer."
-    >
+    <span className="text-[#999]" title={EXPLANATION[reason]}>
       Search: fallback engine
     </span>
   );

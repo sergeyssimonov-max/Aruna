@@ -2,7 +2,7 @@
 import { parseWire } from "./arun";
 import { searchableEditor } from "./editor-aliases.ts";
 import type { SearchMatch, Wire } from "./inventory";
-import type { WorkerIn, WorkerOut } from "./search-protocol";
+import type { FallbackReason, WorkerIn, WorkerOut } from "./search-protocol";
 import { buildSearchIndex } from "./search-index";
 import { WasmSearch } from "./wasm-search";
 
@@ -20,6 +20,8 @@ type JsGroup = {
 let wasm: WasmSearch | null = null;
 let jsIndex: JsGroup[] | null = null;
 let engine: "wasm" | "js" = "js";
+/** Why `engine` is `"js"`; null while the binary index is in use. */
+let fallback: FallbackReason | null = null;
 let nGroups = 0;
 let nManuscripts = 0;
 
@@ -82,7 +84,11 @@ function runSearch(q: string): SearchMatch[] {
       // built and sitting right here. Switch to it for good and answer the
       // query that just failed.
       engine = "js";
+      fallback = "trapped";
       wasm = null;
+      // Said out loud: the page shows which engine is answering, and until now
+      // this switch happened behind its back.
+      ctx.postMessage({ type: "engine", engine: "js", reason: fallback } satisfies WorkerOut);
     }
   }
   return searchJs(q);
@@ -100,16 +106,20 @@ ctx.onmessage = async (ev: MessageEvent<WorkerIn>) => {
       nManuscripts = wire.m;
       nGroups = wire.g.length;
       jsIndex = buildJsIndex(wire);
-      // Null when the inventory outgrew the binary format; the JavaScript index
-      // covers that case, so it is a downgrade rather than a failure.
+      // Two different failures, kept apart because the page reports them to the
+      // reader: the inventory not fitting the container, and the module not
+      // being usable. Either way the JavaScript index covers it, so this is a
+      // downgrade rather than a failure.
       const blob = buildSearchIndex(wire);
       wasm = blob ? await WasmSearch.create(blob) : null;
       engine = wasm ? "wasm" : "js";
+      fallback = wasm ? null : blob ? "unavailable" : "unsupported";
       ctx.postMessage({
         type: "ready",
         manuscripts: nManuscripts,
         groups: nGroups,
         engine,
+        ...(fallback ? { reason: fallback } : {}),
       } satisfies WorkerOut);
       return;
     }

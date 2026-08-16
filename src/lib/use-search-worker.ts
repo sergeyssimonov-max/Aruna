@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SearchMatch } from "./inventory";
-import type { WorkerIn, WorkerOut } from "./search-protocol";
+import type { FallbackReason, WorkerIn, WorkerOut } from "./search-protocol";
 
 type Status = "boot" | "ready" | "error";
 
@@ -15,6 +15,7 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
   const sentQuery = useRef("");
   const [status, setStatus] = useState<Status>("boot");
   const [engine, setEngine] = useState<Engine | null>(null);
+  const [fallbackReason, setFallbackReason] = useState<FallbackReason | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A result carries the query it answers. Matches alone cannot say whether
   // they are still current, so a caller holding them would go on drawing the
@@ -38,10 +39,19 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
       const msg = ev.data;
       if (msg.type === "ready") {
         setStatus("ready");
-        // Which engine the worker settled on. The message has carried this
-        // since the fallback existed and nothing read it, so the page could not
-        // tell a fast search from a slow one — see `engine` in the return value.
+        // Which engine the worker settled on, and why if it is the slow one.
+        // The message carried the engine since the fallback existed and nothing
+        // read it, so the page could not tell a fast search from a slow one.
         setEngine(msg.engine);
+        setFallbackReason(msg.reason ?? null);
+        return;
+      }
+      if (msg.type === "engine") {
+        // A trap during a query drops the module for the rest of the session.
+        // Reported, because the note on screen would otherwise go on claiming
+        // the fast engine while the worker scans strings.
+        setEngine(msg.engine);
+        setFallbackReason(msg.reason);
         return;
       }
       if (msg.type === "result") {
@@ -75,6 +85,7 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
       workerRef.current = null;
       setStatus("boot");
       setEngine(null);
+      setFallbackReason(null);
       setResult(null);
     };
   }, [arun]);
@@ -99,13 +110,13 @@ export function useSearchWorker(arun: ArrayBuffer | null) {
   return {
     status,
     /**
-     * `"js"` means the binary index was refused and the worker is scanning
-     * strings instead: still correct, measurably slower, and until now
-     * indistinguishable from the fast path. The usual cause is the corpus
-     * outgrowing the container — more than 64 distinct editors or years, which
-     * the WASM module matches through `u64` bitsets.
+     * `"js"` means the worker is scanning strings rather than searching the
+     * binary index: still correct, measurably slower, and until recently
+     * indistinguishable from the fast path.
      */
     engine,
+    /** Why, when `engine` is `"js"`. Null while the binary index is in use. */
+    fallbackReason,
     error,
     matches: result?.matches ?? null,
     /** Query `matches` answers; compare with the live one before trusting it. */

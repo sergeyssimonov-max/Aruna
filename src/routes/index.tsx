@@ -37,7 +37,7 @@ function InventoryPage() {
 
   const {
     status: workerStatus,
-    engine: searchEngine,
+    fallbackReason: searchFallback,
     error: workerError,
     matches,
     matchesQuery,
@@ -99,7 +99,7 @@ function InventoryPage() {
           manuscripts={data.manuscripts}
           groups={data.groups.length}
           matches={searching ? { count: visibleCount, pending: searchPending } : null}
-          degraded={searchEngine === "js"}
+          fallbackReason={searchFallback}
         />
 
         <ColumnLegend />
