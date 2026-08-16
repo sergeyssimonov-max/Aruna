@@ -80,9 +80,14 @@ fn item_matches(
 ///
 /// Sized to the pool rather than to a machine word. It was a single `u64`,
 /// which capped both pools at 64 entries — a limit belonging to the matcher and
-/// not to the format, whose ids are `u8`. Two words cover the 255 the container
-/// can express, and the allocation is two `Vec`s per query against ~25 000
-/// substring tests.
+/// not to the format, whose ids are `u8`. Four words cover the 255 the
+/// container can express.
+///
+/// The allocation is two `Vec`s per query, and it costs nothing measurable: the
+/// worker answers in the same time as before, medians equal to 0.1 ms across
+/// eight queries over the full corpus, measured in Chrome by swapping the
+/// module back to the single-`u64` version and forward again. `PERFORMANCE.md`
+/// has the numbers.
 struct PoolHits(Vec<u64>);
 
 impl PoolHits {
