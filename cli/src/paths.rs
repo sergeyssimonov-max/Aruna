@@ -5,10 +5,17 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Canonical output file name (with spaces, as specified).
-pub const OUTPUT_FILE_NAME: &str = "Thesaurus Linguarum Hethaeorum Digitalis.html";
+/// Canonical output file name.
+///
+/// Names the edition the inventory was built from rather than the work it
+/// catalogues: the title inside the document stays *Thesaurus Linguarum
+/// Hethaeorum Digitalis*, while the file says which release of TLHdig produced
+/// it — which is what tells two downloads apart in a Downloads folder.
+///
+/// No spaces, so it survives a shell, a URL and an email attachment unquoted.
+pub const OUTPUT_FILE_NAME: &str = "TLHdig_Beta_0.3.html";
 
-/// Resolve `~/Downloads/Thesaurus Linguarum Hethaeorum Digitalis.html`.
+/// Resolve `~/Downloads/TLHdig_Beta_0.3.html`.
 pub fn output_html_path() -> Result<PathBuf> {
     let downloads = dirs::download_dir().or_else(|| {
         dirs::home_dir().map(|h| h.join("Downloads"))
@@ -115,6 +122,31 @@ pub fn ensure_output_parent(path: &std::path::Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The README tells the reader where the inventory lands, by hand.
+    ///
+    /// It is the only statement of the path a person reads before running the
+    /// tool, and renaming the output is exactly the change that leaves it
+    /// pointing at a file that will never appear again. Included at compile
+    /// time, so a moved README breaks the build rather than emptying the check.
+    #[test]
+    fn the_readme_names_the_file_the_tool_writes() {
+        let readme = include_str!("../README.md");
+        assert!(
+            readme.contains(OUTPUT_FILE_NAME),
+            "cli/README.md does not mention {OUTPUT_FILE_NAME} — it still documents an older name"
+        );
+    }
+
+    /// The name has to survive being pasted somewhere without quoting.
+    #[test]
+    fn the_output_name_needs_no_quoting() {
+        assert!(
+            !OUTPUT_FILE_NAME.contains(' '),
+            "a space here means every shell command and URL carrying this name has to quote it"
+        );
+        assert!(OUTPUT_FILE_NAME.ends_with(".html"));
+    }
 
     #[test]
     fn output_path_ends_with_expected_name() {

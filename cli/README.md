@@ -6,12 +6,12 @@
 2. распаковывает и эвристически парсит все XML-транслитерации хеттских клинописных манускриптов;
 3. собирает минималистичную HTML-опись в скандинавском стиле;
 4. сохраняет результат в  
-   `~/Downloads/Thesaurus Linguarum Hethaeorum Digitalis.html`.
+   `~/Downloads/TLHdig_Beta_0.3.html`.
 
 Запуск **без аргументов**. По завершении:
 
 ```text
-Готово. Опись сохранена: /Users/…/Downloads/Thesaurus Linguarum Hethaeorum Digitalis.html
+Готово. Опись сохранена: /Users/…/Downloads/TLHdig_Beta_0.3.html
 ```
 
 Источник данных:  
