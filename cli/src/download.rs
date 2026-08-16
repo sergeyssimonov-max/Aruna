@@ -28,6 +28,19 @@ pub fn download_file(url: &str, dest: &Path) -> Result<()> {
     download_verified(url, dest, None)
 }
 
+/// Longest one attempt may take, headers and body together.
+///
+/// `timeout_read` below bounds a single read, not the transfer: a server that
+/// dribbles a byte before each deadline keeps the connection alive for as long
+/// as it likes, and the program sits there looking frozen with no way out but
+/// Ctrl-C. This is the ceiling on that.
+///
+/// Fifteen minutes is 71 MiB at 79 KiB/s sustained — a floor no working
+/// connection is under, and twelve times slower than the archive actually
+/// arrives. A run that hits it says so and can be retried; before, it did not
+/// end.
+const ATTEMPT_DEADLINE: Duration = Duration::from_secs(15 * 60);
+
 /// Longest we will wait on a server's `Retry-After` before giving up on it.
 ///
 /// Zenodo can answer a 429 with a delay measured in minutes. Sleeping that long
@@ -176,9 +189,15 @@ fn create_parent(dest: &Path) -> Result<()> {
 /// network failure and, because network failures are retried, fetched three
 /// times before the user heard about it.
 fn request(url: &str) -> Result<ureq::Response> {
+    request_within(url, ATTEMPT_DEADLINE)
+}
+
+/// As [`request`], with the deadline given — the tests need one they can wait for.
+fn request_within(url: &str, deadline: Duration) -> Result<ureq::Response> {
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(Duration::from_secs(300))
+        .timeout(deadline)
         .user_agent("Aruna/1.0 (+https://github.com/sergeyssimonov-max/Aruna)")
         .build();
 
@@ -335,6 +354,9 @@ mod tests {
         Truncated,
         /// Answer with this status, optionally carrying `Retry-After`.
         Status(u16, Option<u64>),
+        /// Announce a body and then send it a byte at a time, for ever: the
+        /// stall that no per-read timeout can catch.
+        Dribble,
     }
 
     /// A one-shot HTTP server that serves `replies[i]` to request `i`, counting
@@ -395,6 +417,18 @@ mod tests {
                             );
                             let _ = stream.write_all(head.as_bytes());
                             let _ = stream.write_all(bytes);
+                        }
+                        Some(Reply::Dribble) => {
+                            let _ = stream.write_all(
+                                b"HTTP/1.1 200 OK\r\nContent-Length: 1048576\r\n\r\n",
+                            );
+                            let _ = stream.flush();
+                            // Slowly enough to outlast any sane deadline, and
+                            // for ever: the client must be the one to give up.
+                            while stream.write_all(b"x").is_ok() {
+                                let _ = stream.flush();
+                                std::thread::sleep(std::time::Duration::from_millis(20));
+                            }
                         }
                         Some(Reply::Status(status, retry_after)) => {
                             let mut head = format!(
@@ -618,6 +652,45 @@ mod tests {
                 "{kind:?} deserves another attempt"
             );
         }
+    }
+
+    /// A server that never stops sending must not stop the program either.
+    ///
+    /// `timeout_read` cannot catch this: every read returns a byte, so no
+    /// single read ever times out. Without an overall deadline the download sat
+    /// there for as long as the server cared to dribble — for ever, in this
+    /// test — and the only way out was killing the process.
+    #[test]
+    fn a_server_that_dribbles_for_ever_is_given_up_on() {
+        let server = FakeServer::start(vec![Reply::Dribble]);
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("archive.zip");
+
+        let started = std::time::Instant::now();
+        // The two steps `attempt_download` takes, with a deadline a test can
+        // wait for: the headers arrive at once, and the body never ends.
+        let response = request_within(&server.url(), Duration::from_millis(400))
+            .expect("headers are sent immediately");
+        let outcome = stream_to_file(&mut response.into_reader(), &dest);
+        let waited = started.elapsed();
+
+        assert!(outcome.is_err(), "a transfer that never ends must not be waited out");
+        assert!(
+            waited < Duration::from_secs(5),
+            "gave up after {waited:?}, which is not giving up"
+        );
+    }
+
+    /// The deadline the program actually runs with is generous enough that no
+    /// working connection meets it: 71 MiB at the floor it implies.
+    #[test]
+    fn the_deadline_is_a_stall_guard_not_a_speed_limit() {
+        let archive_bytes = 74_449_198u64;
+        let floor = archive_bytes / ATTEMPT_DEADLINE.as_secs();
+        assert!(
+            (60_000..200_000).contains(&floor),
+            "the deadline implies {floor} B/s sustained, which is no longer a stall guard"
+        );
     }
 
     #[test]
