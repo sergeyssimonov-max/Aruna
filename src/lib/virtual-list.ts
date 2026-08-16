@@ -129,13 +129,10 @@ export function visibleRows(
     if (!openAll) continue;
 
     const itemsTop = gTop + GROUP_H;
-    const gBottom = groupY[gi + 1]!;
-    if (itemsTop >= y1 || gBottom <= y0 || nItems === 0) continue;
+    const groupBottom = groupY[gi + 1]!;
+    if (itemsTop >= y1 || groupBottom <= y0 || nItems === 0) continue;
 
-    let first = ((y0 - itemsTop) / ROW_H) | 0;
-    if (first < 0) first = 0;
-    let last = ((y1 - itemsTop + ROW_H - 1) / ROW_H) | 0;
-    if (last > nItems) last = nItems;
+    const { first, last } = itemsInWindow(itemsTop, nItems, y0, y1);
     const base = itemBase[gi]!;
     for (let li = first; li < last; li++) {
       const item = group.items[li]!;
@@ -156,20 +153,45 @@ export function visibleRows(
 }
 
 /**
- * React keys, packed as one number: the group index in the high bits, the item
- * within it in the low twenty. A heading takes the highest slot of its own
- * group, which no item can occupy, so headings and items never collide.
+ * Which of a group's items the window `[y0, y1)` touches.
+ *
+ * The rows are a fixed height, so this is division rather than a search:
+ * `first` is the row containing the top of the window, `last` is one past the
+ * row containing its bottom — rounded up, so a row showing by a single pixel is
+ * still built. Both are clamped to the group, which is what makes the caller's
+ * loop safe without checking each index.
  */
+function itemsInWindow(
+  itemsTop: number,
+  count: number,
+  y0: number,
+  y1: number,
+): { first: number; last: number } {
+  const first = Math.max(0, Math.floor((y0 - itemsTop) / ROW_H));
+  const last = Math.min(count, Math.ceil((y1 - itemsTop) / ROW_H));
+  return { first, last: Math.max(first, last) };
+}
+
+/**
+ * React keys, packed as one number: the group index above the low twenty bits,
+ * the item within it below them.
+ *
+ * A heading takes the highest slot of its own group — one no item can occupy,
+ * since a group would need a million manuscripts to reach it — so headings and
+ * items never collide. Two rows sharing a key would make React drop one of
+ * them, which is why `keys are unique within a window` is a test.
+ */
+const ITEM_BITS = 20;
+const HEADING_SLOT = (1 << ITEM_BITS) - 1;
+
 function groupKey(gi: number): number {
-  return (gi << 20) | 0xfffff;
+  return (gi << ITEM_BITS) | HEADING_SLOT;
 }
 
 function itemKey(gi: number, li: number): number {
-  return (gi << 20) | li;
+  return (gi << ITEM_BITS) | li;
 }
 
 export function countItems(groups: Group[]): number {
-  let n = 0;
-  for (let i = 0; i < groups.length; i++) n += groups[i]!.items.length;
-  return n;
+  return groups.reduce((total, group) => total + group.items.length, 0);
 }
