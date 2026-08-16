@@ -31,32 +31,40 @@ fn utf8(b: &[u8]) -> &str {
 /// The filename is the last resort rather than the first: it is always present,
 /// so consulting it earlier would mask the documents that do carry a siglum.
 pub(super) fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
-    if let Some(v) = first_tag_text(header, b"docID").or_else(|| first_tag_text(xml, b"docID")) {
-        let t = normalize_ws(&v);
-        if !t.is_empty() {
-            return t;
+    // `docID` and `TxtPubl` are looked for in the wider window as well: TLHdig
+    // puts `<AO:TxtPubl>` in the body, beside the inventory number.
+    if let Some(text) = text_of(header, b"docID").or_else(|| text_of(xml, b"docID")) {
+        return text;
+    }
+    if let Some(text) = text_of(header, b"TxtPubl").or_else(|| text_of(xml, b"TxtPubl")) {
+        // `KBo 17.86 {€1}+KBo 15.62 {€2}` — the join marks belong to the
+        // manuscript list, not to the siglum this row is filed under.
+        let primary = text.split('{').next().unwrap_or(&text);
+        let primary = normalize_ws(primary);
+        if !primary.is_empty() {
+            return primary;
         }
     }
-    if let Some(v) = first_tag_text(header, b"TxtPubl").or_else(|| first_tag_text(xml, b"TxtPubl"))
-    {
-        let primary = v.split('{').next().unwrap_or(&v);
-        let t = normalize_ws(primary);
-        if !t.is_empty() {
-            return t;
-        }
+    if let Some(text) = text_of(header, b"title") {
+        return text;
     }
-    if let Some(v) = first_tag_text(header, b"title") {
-        let t = normalize_ws(&v);
-        if !t.is_empty() {
-            return t;
-        }
-    }
-    Path::new(path)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| MISSING.to_string())
+    file_stem(path).unwrap_or_else(|| MISSING.to_string())
+}
+
+/// Text of the first `<tag>`, whitespace collapsed, or `None` if it says nothing.
+///
+/// The three steps went together at every call site — read, normalise, discard
+/// if blank — and writing them out each time is what made the fallback chains
+/// above hard to see for what they are.
+fn text_of(hay: &str, tag: &[u8]) -> Option<String> {
+    let text = normalize_ws(&first_tag_text(hay, tag)?);
+    (!text.is_empty()).then_some(text)
+}
+
+/// The file's own name, without extension or surrounding space.
+fn file_stem(path: &str) -> Option<String> {
+    let stem = Path::new(path).file_stem()?.to_str()?.trim();
+    (!stem.is_empty()).then(|| stem.to_string())
 }
 
 /// Catalogue number: the path first, then `<cth>` attributes, then loose text.
@@ -69,28 +77,24 @@ pub(super) fn extract_cth(header: &str, xml: &str, path: &str) -> Option<String>
         return Some(format!("CTH {}", utf8(n)));
     }
     // <cth neu="CTH 786" …>
-    let mut found: Option<String> = None;
-    for_each_start_tag(header.as_bytes(), |local, attrs| {
+    let from_attribute = first_in_start_tags(header, |local, attrs| {
         if !eq_ci(local, b"cth") {
-            return false;
+            return None;
         }
-        for key in [b"neu".as_slice(), b"alt", b"n"] {
-            if let Some(v) = attr_value(attrs, key) {
-                if let Some(num) = find_cth_number(v) {
-                    found = Some(format!("CTH {}", utf8(num)));
-                    return true;
+        [b"neu".as_slice(), b"alt", b"n"]
+            .iter()
+            .filter_map(|key| attr_value(attrs, key))
+            .find_map(|value| match find_cth_number(value) {
+                Some(number) => Some(format!("CTH {}", utf8(number))),
+                // The attribute may hold the bare number instead.
+                None if value.first().is_some_and(u8::is_ascii_digit) => {
+                    Some(format!("CTH {}", utf8(value)))
                 }
-                // value may be bare number
-                if !v.is_empty() && v[0].is_ascii_digit() {
-                    found = Some(format!("CTH {}", utf8(v)));
-                    return true;
-                }
-            }
-        }
-        false
+                None => None,
+            })
     });
-    if found.is_some() {
-        return found;
+    if from_attribute.is_some() {
+        return from_attribute;
     }
     if let Some(n) = find_cth_number(header.as_bytes()) {
         return Some(format!("CTH {}", utf8(n)));
@@ -139,47 +143,71 @@ const EDITOR_ATTRS: &[&[u8]] = &[b"editor", b"author"];
 /// is optional here; [`extract_year_fallback`] takes over when the winning
 /// element carries no date.
 pub(super) fn extract_editor_and_year(header: &str) -> (Option<String>, Option<String>) {
-    // TEI-like name / author elements first (full names).
+    // A TEI-like element naming a person wins outright: it spells out a full
+    // name, where the AOxml roles below carry initials.
     for tag in [b"name".as_slice(), b"persName", b"author"] {
-        if let Some(v) = first_tag_text(header, tag) {
-            let n = normalize_ws(&v);
-            if !n.is_empty() && !is_auto_editor(&n) {
-                let year = find_year(header.as_bytes()).map(|y| utf8(&y).to_string());
-                return (Some(n), year);
-            }
+        if let Some(name) = text_of(header, tag).filter(|text| !is_auto_editor(text)) {
+            return (Some(name), find_year(header.as_bytes()).map(|y| utf8(&y).to_string()));
         }
     }
 
-    let mut best: Option<(usize, String, Option<String>)> = None;
-
+    // Otherwise the best `editor=`/`author=` attribute in the header, by role.
+    let mut best: Option<Credit> = None;
     for_each_start_tag(header.as_bytes(), |local, attrs| {
-        let Some(ed_raw) = EDITOR_ATTRS.iter().find_map(|key| attr_value(attrs, key)) else {
-            return false;
-        };
-        let editor = normalize_ws(utf8(ed_raw));
-        if editor.is_empty() || is_auto_editor(&editor) {
-            return false;
+        if let Some(candidate) = Credit::read(local, attrs) {
+            if candidate.beats(best.as_ref()) {
+                best = Some(candidate);
+            }
         }
-        let year = attr_value(attrs, b"date").and_then(|d| year_from_date_value(utf8(d)));
-        let prio = EDITOR_ROLE_PRIORITY
-            .iter()
-            .position(|r| eq_ci(local, r))
-            .unwrap_or(EDITOR_ROLE_PRIORITY.len() + 10);
-
-        // Special-case übern (UTF-8) — local name may be multi-byte; already handled as uebern.
-        let replace = match &best {
-            None => true,
-            Some((bp, _, by)) => prio < *bp || (prio == *bp && by.is_none() && year.is_some()),
-        };
-        if replace {
-            best = Some((prio, editor, year));
-        }
-        false // continue scanning for better priority
+        false // every element is considered; the ranking decides
     });
 
     match best {
-        Some((_, ed, yr)) => (Some(ed), yr),
+        Some(credit) => (Some(credit.editor), credit.year),
         None => (None, None),
+    }
+}
+
+/// Someone credited on one element of the header, and how strong the claim is.
+struct Credit {
+    /// Index into [`EDITOR_ROLE_PRIORITY`]; lower is a stronger claim.
+    rank: usize,
+    editor: String,
+    /// The date on the same element, when it carries a usable one.
+    year: Option<String>,
+}
+
+impl Credit {
+    /// Read one element's claim, or `None` if it credits nobody.
+    fn read(local: &[u8], attrs: &[u8]) -> Option<Credit> {
+        let raw = EDITOR_ATTRS.iter().find_map(|key| attr_value(attrs, key))?;
+        let editor = normalize_ws(utf8(raw));
+        if editor.is_empty() || is_auto_editor(&editor) {
+            return None;
+        }
+        Some(Credit {
+            rank: EDITOR_ROLE_PRIORITY
+                .iter()
+                .position(|role| eq_ci(local, role))
+                .unwrap_or(usize::MAX),
+            editor,
+            year: attr_value(attrs, b"date").and_then(|date| year_from_date_value(utf8(date))),
+        })
+    }
+
+    /// Whether this claim should replace `current`.
+    ///
+    /// A stronger role wins. Between equals the one carrying a date wins,
+    /// because the year is taken from the same element as the editor — a date
+    /// borrowed from elsewhere would credit one person's work to another's.
+    fn beats(&self, current: Option<&Credit>) -> bool {
+        match current {
+            None => true,
+            Some(best) => {
+                self.rank < best.rank
+                    || (self.rank == best.rank && best.year.is_none() && self.year.is_some())
+            }
+        }
     }
 }
 
@@ -191,35 +219,35 @@ fn is_auto_editor(s: &str) -> bool {
 
 /// Year when the editor's own element carried no usable date.
 pub(super) fn extract_year_fallback(header: &str, xml: &str) -> Option<String> {
-    // Prefer date= on known meta tags.
-    let mut year: Option<String> = None;
-    for_each_start_tag(header.as_bytes(), |local, attrs| {
-        let interesting = eq_ci(local, b"creation-date")
-            || eq_ci(local, b"AOxml-creation")
-            || eq_ci(local, b"kor2")
-            || eq_ci(local, b"kor1")
-            || eq_ci(local, b"date");
-        if !interesting {
-            return false;
-        }
-        if let Some(d) = attr_value(attrs, b"date").and_then(|d| year_from_date_value(utf8(d))) {
-            year = Some(d);
-            return true;
-        }
-        // TEI <date>2019</date> text content handled below
-        false
+    /// Elements whose `date=` says when this edition was made.
+    const DATED_ELEMENTS: &[&[u8]] = &[
+        b"creation-date",
+        b"AOxml-creation",
+        b"kor2",
+        b"kor1",
+        b"date",
+    ];
+
+    let dated = first_in_start_tags(header, |local, attrs| {
+        DATED_ELEMENTS.iter().any(|tag| eq_ci(local, tag)).then(|| {
+            attr_value(attrs, b"date").and_then(|date| year_from_date_value(utf8(date)))
+        })?
     });
-    if year.is_some() {
-        return year;
+    if dated.is_some() {
+        return dated;
     }
-    // <date>…</date> element text
-    if let Some(t) = first_tag_text(header, b"date") {
-        if let Some(y) = year_from_date_value(&t)
-            .or_else(|| find_year(t.as_bytes()).map(|y| utf8(&y).to_string()))
-        {
-            return Some(y);
+
+    // TEI writes it as text: `<date>2019</date>`.
+    if let Some(text) = first_tag_text(header, b"date") {
+        let from_text = year_from_date_value(&text)
+            .or_else(|| find_year(text.as_bytes()).map(|y| utf8(&y).to_string()));
+        if from_text.is_some() {
+            return from_text;
         }
     }
+
+    // Last resort: any plausible year in the header, then in the document's
+    // opening bytes.
     find_year(header.as_bytes())
         .or_else(|| find_year(xml.as_bytes().get(..2048.min(xml.len())).unwrap_or(b"")))
         .map(|y| utf8(&y).to_string())
@@ -248,17 +276,16 @@ fn year_from_date_value(raw: &str) -> Option<String> {
 /// every one of the 24 000 records carried the missing-value dash — while the
 /// numbers are what makes a manuscript findable by its museum id in search.
 pub(super) fn extract_inv(header: &str, window: &str) -> String {
-    for hay in [header, window] {
-        for tag in [b"InvNr".as_slice(), b"invNr", b"inv"] {
-            if let Some(v) = first_tag_text(hay, tag) {
-                let t = normalize_ws(&v);
-                if !t.is_empty() {
-                    return t;
-                }
-            }
-        }
-    }
-    MISSING.to_string()
+    // Lazily: the first place that answers wins, and the rest is not read.
+    [header, window]
+        .into_iter()
+        .flat_map(|hay| {
+            [b"InvNr".as_slice(), b"invNr", b"inv"]
+                .into_iter()
+                .map(move |tag| (hay, tag))
+        })
+        .find_map(|(hay, tag)| text_of(hay, tag))
+        .unwrap_or_else(|| MISSING.to_string())
 }
 
 /// How much of the body to sample when deciding the dominant language.
@@ -330,6 +357,20 @@ pub(super) fn extract_corpus(path: &str) -> String {
         from = start;
     }
     MISSING.to_string()
+}
+
+/// First start tag `pick` has an answer for.
+///
+/// `for_each_start_tag` reports every tag and asks whether to stop, which left
+/// each caller carrying a mutable `found` and remembering to return `true`.
+/// This says what those callers meant: the first answer, then stop.
+fn first_in_start_tags<T>(hay: &str, mut pick: impl FnMut(&[u8], &[u8]) -> Option<T>) -> Option<T> {
+    let mut found = None;
+    for_each_start_tag(hay.as_bytes(), |local, attrs| {
+        found = pick(local, attrs);
+        found.is_some()
+    });
+    found
 }
 
 /// Text of the first `<local>` element, tags stripped, or `None` if it is blank.
