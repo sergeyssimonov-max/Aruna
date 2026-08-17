@@ -71,8 +71,10 @@ gh workflow run release-dmg.yml --ref main
 A tag builds it and publishes the release:
 
 ```bash
-git tag v1.0.10 && git push origin v1.0.10   # → GitHub Release with DMG
+git tag v2.0.0 && git push origin v2.0.0   # → GitHub Release with DMG
 ```
+
+The tag has to match `version` in [`cli/Cargo.toml`](cli/Cargo.toml), and CI refuses the release if it does not: the `.app` takes its `CFBundleShortVersionString` from that manifest, so a tag and a manifest that disagree publish a DMG whose application reports a different version from the release it is attached to.
 
 The corpus job is what keeps the two halves honest: it rebuilds the catalog from the archive and fails if it differs from what is committed.
 

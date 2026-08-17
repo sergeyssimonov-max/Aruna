@@ -54,6 +54,30 @@ jobs:
             echo "$tag is intact at $got"
           done
 
+      # `build_app.sh` reads `version` out of cli/Cargo.toml and writes it into
+      # the bundle's CFBundleShortVersionString, so a tag that disagrees with
+      # the manifest publishes a DMG whose application reports a different
+      # version from the release it is attached to — quietly, and only visible
+      # to someone who opens Get Info. cli/README.md has stated the rule from
+      # the start; nothing enforced it until now, and a major bump is exactly
+      # where a version is most likely to be left behind.
+      - name: The tag is the version the manifest declares
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          # The same expression build_app.sh reads it with, so the two cannot
+          # disagree about what the manifest says.
+          got="$(sed -n 's/^version = "\(.*\)"/\1/p' cli/Cargo.toml | head -1)"
+          if [ -z "$got" ]; then
+            echo "::error file=cli/Cargo.toml::Could not read a version from the manifest."
+            exit 1
+          fi
+          if [ "$want" != "$got" ]; then
+            echo "::error file=cli/Cargo.toml::Tag $GITHUB_REF_NAME does not match version $got in cli/Cargo.toml. The .app takes its version from the manifest, so publishing this would attach an application calling itself $got to a release called $GITHUB_REF_NAME."
+            exit 1
+          fi
+          echo "$GITHUB_REF_NAME matches version $got"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
