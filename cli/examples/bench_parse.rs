@@ -35,6 +35,7 @@ fn main() -> ExitCode {
 
     let mut read = Vec::with_capacity(runs);
     let mut parse = Vec::with_capacity(runs);
+    let mut sort = Vec::with_capacity(runs);
     let mut render = Vec::with_capacity(runs);
     let mut manuscripts = 0;
     let mut html_bytes = 0;
@@ -52,6 +53,7 @@ fn main() -> ExitCode {
         };
         read.push(times.inflate);
         parse.push(times.parse);
+        sort.push(times.sort);
 
         let start = Instant::now();
         let html = render_html(&records, "bench", "bench");
@@ -68,18 +70,26 @@ fn main() -> ExitCode {
     println!("html:        {} KiB", html_bytes / 1024);
     println!("runs:        {runs}");
     println!();
-    println!("{:<14} {:>10} {:>10} {:>10}", "stage", "min", "median", "max");
+    println!(
+        "{:<14} {:>10} {:>10} {:>10}",
+        "stage", "min", "median", "max"
+    );
     println!("{}", "-".repeat(48));
     report("read (zip)", &mut read);
-    report("parse + sort", &mut parse);
+    report("parse", &mut parse);
+    report("sort", &mut sort);
     report("render html", &mut render);
     println!("{}", "-".repeat(48));
 
-    let total: Duration = [&read, &parse, &render]
+    let total: Duration = [&read, &parse, &sort, &render]
         .into_iter()
         .filter_map(|stage| stage.iter().min())
         .sum();
-    println!("{:<14} {:>9.1}ms", "total (min)", total.as_secs_f64() * 1000.0);
+    println!(
+        "{:<14} {:>9.1}ms",
+        "total (min)",
+        total.as_secs_f64() * 1000.0
+    );
 
     ExitCode::SUCCESS
 }
