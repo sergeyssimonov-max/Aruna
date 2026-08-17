@@ -78,9 +78,13 @@ The corpus job is what keeps the two halves honest: it rebuilds the catalog from
 
 ## Releases
 
-[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) is current; work continues from it.
+Two releases are published, and both are references — states this project measures itself against and can fall back to. Everything between them has been withdrawn along with its tag and its DMG.
 
-[v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the reference: the first release of the numbering that survives, kept as a known-good state to fall back to. Its tag and commit are recorded in [`.github/reference-release.json`](.github/reference-release.json), and CI fails if that tag disappears or moves — GitHub's own tag protection needs a plan this repository is not on, so the guarantee is enforced where it can be.
+[v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
+
+[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) is current, and the second reference — so falling back does not mean giving up everything built since.
+
+Both are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if either tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to be.
 
 ## Performance and reliability
 

@@ -1,17 +1,35 @@
 {
   "$comment": [
-    "The release this project measures itself against, and the facts that identify it.",
+    "The releases this project measures itself against, and the facts that identify them.",
     "Read by the `Reference release is intact` step in release-dmg.yml, which fails the",
-    "build if the tag disappears or moves. GitHub-side tag protection is not available on",
-    "this repository's plan — rulesets need Pro or a public repository, and immutable",
-    "releases are not offered — so the guarantee lives here, where it is ours to enforce.",
-    "Changing any value below is a deliberate act and shows up in the diff as one."
+    "build if any of these tags disappears or moves to a different commit.",
+    "",
+    "GitHub-side tag protection became available when this repository was made public on",
+    "2026-08-17 — rulesets need Pro or a public repository, and it is now the latter. This",
+    "check is kept alongside rather than replaced by one: a ruleset can stop a tag being",
+    "deleted, but it does not record which commit the tag is supposed to point at, nor the",
+    "digest of the artifact that was published from it. Those are the facts a fallback point",
+    "is actually made of, and they live here.",
+    "",
+    "Two references, not one. v1.0.5 is the floor — the oldest state still known to be good.",
+    "v1.0.9 is the recent one, so falling back does not mean giving up everything built",
+    "since August. Adding or changing any value below is a deliberate act and shows up in",
+    "the diff as one."
   ],
-  "reference": {
-    "tag": "v1.0.5",
-    "commit": "343b55cd823deb0b39e6db7096df33eb5a68452f",
-    "published": "2026-08-16T15:37:48Z",
-    "dmg_sha256": "43574f10617a10dba49b32a8caa814035dee9bf141ff6324577d3bbdf2da3233",
-    "why": "First release of the numbering that survives; everything before it was withdrawn."
-  }
+  "references": [
+    {
+      "tag": "v1.0.5",
+      "commit": "343b55cd823deb0b39e6db7096df33eb5a68452f",
+      "published": "2026-08-16T15:37:48Z",
+      "dmg_sha256": "43574f10617a10dba49b32a8caa814035dee9bf141ff6324577d3bbdf2da3233",
+      "why": "First release of the numbering that survives; everything before it was withdrawn."
+    },
+    {
+      "tag": "v1.0.9",
+      "commit": "b24c258a478163a2d30ec8c3d4e09d2392585ed8",
+      "published": "2026-08-17T21:53:21Z",
+      "dmg_sha256": "0395b641dd94671166e44d4b3bc29b0ccf988a522119706bd1511825a5cd9b2e",
+      "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the state v1.0.7 and v1.0.8 were withdrawn in favour of."
+    }
+  ]
 }

@@ -23,24 +23,36 @@ jobs:
           # checkout does not fetch.
           fetch-depth: 0
 
-      # GitHub-side tag protection is not available here: rulesets need Pro or a
-      # public repository, and immutable releases are not offered on this plan.
-      # So the guarantee is enforced where it can be — a build that no longer
-      # finds the reference tag where it was recorded fails.
-      - name: Reference release is intact
+      # A build that no longer finds a reference tag where it was recorded
+      # fails. Rulesets became available when the repository went public and can
+      # stop a tag being deleted; they cannot say which commit it was supposed
+      # to point at, which is what this checks.
+      #
+      # There is more than one reference now, and an empty list would make this
+      # step pass by having nothing to check — so it refuses that too.
+      - name: Reference releases are intact
         run: |
-          tag="$(jq -r .reference.tag .github/reference-release.json)"
-          want="$(jq -r .reference.commit .github/reference-release.json)"
-          got="$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)"
-          if [ -z "$got" ]; then
-            echo "::error file=.github/reference-release.json::Reference tag $tag is gone. It is the release this project measures itself against; restore it, or record the decision to move on."
+          file=.github/reference-release.json
+          count="$(jq '.references | length' "$file")"
+          if [ "$count" -lt 1 ]; then
+            echo "::error file=$file::No reference releases are recorded. This project measures itself against at least one; restore it, or record the decision to move on."
             exit 1
           fi
-          if [ "$got" != "$want" ]; then
-            echo "::error file=.github/reference-release.json::Reference tag $tag points at $got, but $want is recorded. A tag that moves is not a reference."
-            exit 1
-          fi
-          echo "$tag is intact at $got"
+
+          for i in $(seq 0 $((count - 1))); do
+            tag="$(jq -r ".references[$i].tag" "$file")"
+            want="$(jq -r ".references[$i].commit" "$file")"
+            got="$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)"
+            if [ -z "$got" ]; then
+              echo "::error file=$file::Reference tag $tag is gone. It is a release this project measures itself against; restore it, or record the decision to move on."
+              exit 1
+            fi
+            if [ "$got" != "$want" ]; then
+              echo "::error file=$file::Reference tag $tag points at $got, but $want is recorded. A tag that moves is not a reference."
+              exit 1
+            fi
+            echo "$tag is intact at $got"
+          done
 
       - uses: dtolnay/rust-toolchain@stable
         with:
