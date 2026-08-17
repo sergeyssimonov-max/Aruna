@@ -33,6 +33,7 @@ The first run downloads 71 MiB from Zenodo and keeps it in the OS cache director
 Packaging, on macOS 13+ only:
 
 ```bash
+cd cli
 bash scripts/make_release.sh   # Aruna.app + releases/Aruna-macos-universal.dmg
 ./build_app.sh                 # .app only
 ```
