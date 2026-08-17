@@ -143,7 +143,10 @@ impl Md5 {
         }
 
         let [mut a, mut b, mut c, mut d] = self.state;
-        for i in 0..BLOCK {
+        // Walked rather than indexed: `SINE[i]` and `SHIFTS[i]` are a bounds
+        // check apiece on the hottest line in the program, and the pair moves
+        // in step with `i` anyway.
+        for (i, (&sine, &shift)) in SINE.iter().zip(SHIFTS.iter()).enumerate() {
             // (F, G, H, I) of the RFC, and its message-word schedule.
             let (mix, index) = match i / 16 {
                 0 => ((b & c) | (!b & d), i),
@@ -153,12 +156,12 @@ impl Md5 {
             };
             let mix = mix
                 .wrapping_add(a)
-                .wrapping_add(SINE[i])
+                .wrapping_add(sine)
                 .wrapping_add(m[index]);
             a = d;
             d = c;
             c = b;
-            b = b.wrapping_add(mix.rotate_left(SHIFTS[i]));
+            b = b.wrapping_add(mix.rotate_left(shift));
         }
 
         self.state[0] = self.state[0].wrapping_add(a);
