@@ -97,24 +97,53 @@ pub fn lookup(dir: &Path, url: &str, md5: &str) -> Option<PathBuf> {
     }
 }
 
-/// Delete every archive in `dir` except `keep`.
+/// Delete the editions of this archive that `keep` has superseded.
 ///
 /// Run after a download succeeds, so republishing the record does not leave
 /// 71 MiB of superseded archive behind for good. Failures are ignored: a cache
 /// that could not be tidied is not a reason to fail a run that has its data.
+///
+/// Only names this module produced are removed — the same file under a
+/// different digest. It used to take every `*.zip` in the directory, which is
+/// right for a cache of our own and destructive anywhere else: [`CACHE_DIR_ENV`]
+/// is a setting a user can point wherever they like, and pointed at a directory
+/// holding other archives it would have deleted them.
 pub fn prune(dir: &Path, keep: &Path) {
+    let Some(keep_name) = keep.file_name().and_then(|n| n.to_str()) else {
+        return;
+    };
+    // A name we cannot read as ours is a reason to remove nothing at all.
+    let Some(current) = archive_parts(keep_name) else {
+        return;
+    };
+
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path == keep {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if name == keep_name {
             continue;
         }
-        if path.extension().is_some_and(|ext| ext == "zip") {
+        if archive_parts(name) == Some(current) {
             let _ = std::fs::remove_file(&path);
         }
     }
+}
+
+/// The parts of a name [`archive_name`] built that identify the archive rather
+/// than the edition: what it is called at the source, and its extension.
+///
+/// `None` for anything not of that shape, which is how a file that is not ours
+/// is recognised.
+fn archive_parts(name: &str) -> Option<(&str, &str)> {
+    let (rest, ext) = name.rsplit_once('.')?;
+    let (stem, digest) = rest.rsplit_once('.')?;
+    let is_digest = digest.len() == 32 && digest.bytes().all(|b| b.is_ascii_hexdigit());
+    (is_digest && !stem.is_empty()).then_some((stem, ext))
 }
 
 /// How old an unfinished download must be before it counts as abandoned.
@@ -247,8 +276,9 @@ mod tests {
     #[test]
     fn pruning_keeps_the_current_archive_and_nothing_else() {
         let dir = tempdir().unwrap();
-        let keep = dir.path().join("corpus.new.zip");
-        let old = dir.path().join("corpus.old.zip");
+        let url = "https://zenodo.org/records/1/files/corpus.zip?download=1";
+        let keep = dir.path().join(archive_name(url, &md5_hex(b"new")));
+        let old = dir.path().join(archive_name(url, &md5_hex(b"old")));
         let unrelated = dir.path().join("notes.txt");
         for path in [&keep, &old, &unrelated] {
             std::fs::write(path, b"x").unwrap();
@@ -259,6 +289,56 @@ mod tests {
         assert!(keep.is_file(), "the archive this run uses stays");
         assert!(!old.is_file(), "a superseded archive is 71 MiB of nothing");
         assert!(unrelated.is_file(), "only archives are ours to remove");
+    }
+
+    /// The cache can be sent anywhere by [`CACHE_DIR_ENV`], so "ours" has to
+    /// mean the names this module builds — not every archive it happens to find
+    /// beside its own. Pointed at a directory of someone's downloads, the old
+    /// rule emptied it of zips.
+    #[test]
+    fn pruning_leaves_archives_that_are_not_ours() {
+        let dir = tempdir().unwrap();
+        let url = "https://zenodo.org/records/1/files/corpus.zip?download=1";
+        let keep = dir.path().join(archive_name(url, &md5_hex(b"new")));
+        let strangers = [
+            "holiday-photos.zip",                      // no digest at all
+            "corpus.zip",                              // the same name, undigested
+            "corpus.not-a-digest.zip",                 // a middle part that is not one
+            "other.d41d8cd98f00b204e9800998ecf8427e.zip", // digest-named, different archive
+            "corpus.d41d8cd98f00b204e9800998ecf8427e.tar", // same archive, another format
+        ];
+        std::fs::write(&keep, b"x").unwrap();
+        for name in strangers {
+            std::fs::write(dir.path().join(name), b"x").unwrap();
+        }
+
+        prune(dir.path(), &keep);
+
+        assert!(keep.is_file());
+        for name in strangers {
+            assert!(
+                dir.path().join(name).is_file(),
+                "{name} is not this cache's to delete"
+            );
+        }
+    }
+
+    /// A destination we cannot recognise as our own means removing nothing:
+    /// the alternative is deciding what to delete from a name we do not
+    /// understand.
+    #[test]
+    fn pruning_a_directory_we_did_not_name_removes_nothing() {
+        let dir = tempdir().unwrap();
+        let keep = dir.path().join("archive.zip");
+        let other = dir.path().join("corpus.d41d8cd98f00b204e9800998ecf8427e.zip");
+        for path in [&keep, &other] {
+            std::fs::write(path, b"x").unwrap();
+        }
+
+        prune(dir.path(), &keep);
+
+        assert!(keep.is_file());
+        assert!(other.is_file());
     }
 
     /// The override exists so a test — or a user short of disk — can send the
