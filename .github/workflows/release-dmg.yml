@@ -257,6 +257,10 @@ jobs:
         working-directory: cli
         run: bash scripts/make_release.sh
 
+      # Handed to the publish job below and wanted by nothing afterwards: what a
+      # release keeps is the DMG attached to it, not this. At the default
+      # retention the leftovers reached 73 copies and 525 MB, none of which
+      # anyone was ever going to download. A day is longer than the run.
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -266,6 +270,7 @@ jobs:
             cli/releases/Aruna-macos-universal.dmg
             cli/releases/SHA256SUMS
           if-no-files-found: error
+          retention-days: 1
 
   publish:
     name: GitHub Release
