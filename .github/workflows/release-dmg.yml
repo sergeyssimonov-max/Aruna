@@ -215,9 +215,18 @@ jobs:
       - name: Test
         run: npm test
 
+  # macOS minutes bill at 10× on a private repository, so this job was 20 of the
+  # ~26 minutes every push to main cost — to build an artifact that only a
+  # release consumes. It now runs when a release is actually being cut, or when
+  # asked for by hand.
+  #
+  # The trade is real: a break in make_release.sh surfaces at tag time instead
+  # of on the push that caused it. Cutting a release therefore means running
+  # this workflow by hand first, or being ready to move the tag.
   macos:
     name: Universal .app + DMG
     needs: [check, corpus]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v7
