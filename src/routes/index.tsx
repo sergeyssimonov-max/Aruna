@@ -139,7 +139,15 @@ function InventoryPage() {
           source={data.source}
           manuscripts={data.manuscripts}
           groups={data.groups.length}
-          matches={searching && !searchBroken ? { count: visibleCount, pending: waiting } : null}
+          matches={
+            searching && !searchBroken
+              ? // Collapsed, the table draws the group headings and none of the
+                // manuscripts under them, so nothing a query matched is on
+                // screen. The header says so rather than reporting a count the
+                // reader cannot see.
+                { count: visibleCount, shown: openAll ? visibleCount : 0, pending: waiting }
+              : null
+          }
           fallbackReason={searchBroken ? null : searchFallback}
           searchError={searchBroken ? workerError : null}
         />

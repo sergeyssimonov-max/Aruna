@@ -13,8 +13,14 @@ export function InventoryHeader({
   source: string;
   manuscripts: number;
   groups: number;
-  /** Shown only while a search is running; `pending` marks a stale count. */
-  matches: { count: number; pending: boolean } | null;
+  /**
+   * Shown only while a search is running; `pending` marks a stale count.
+   *
+   * `shown` is how many of those matches the table is actually drawing, which
+   * is not `count` while the fragments are collapsed — the groups are listed,
+   * their manuscripts are not.
+   */
+  matches: { count: number; shown: number; pending: boolean } | null;
   /** Set when search fell back to the slower engine — see `SearchEngineNote`. */
   fallbackReason: FallbackReason | null;
   /** Set when search is gone for this session; the table below still stands. */
@@ -33,6 +39,15 @@ export function InventoryHeader({
         <Count label="CTH groups" value={groups} />
         {matches && (
           <Count label="Match" value={matches.count}>
+            {/* Collapsing the fragments hides every row a query found, and the
+                count on its own then described a table nobody was looking at:
+                collapse, search, and it read "Match: 91" over a list of group
+                headings. */}
+            {matches.shown !== matches.count ? (
+              // The separator carries its own spaces rather than a margin, so
+              // the line reads the same copied out as it does on screen.
+              <span className="text-[#999]">{` · ${matches.shown.toLocaleString()} shown`}</span>
+            ) : null}
             {matches.pending ? <span className="ml-1 text-[#aaa]">…</span> : null}
           </Count>
         )}
