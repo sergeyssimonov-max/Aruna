@@ -8,6 +8,46 @@
   var tbody = table.tBodies[0];
   var rows = Array.prototype.slice.call(tbody.rows);
 
+  /** Which cell of a manuscript row names the editor. */
+  var EDITOR_CELL = 4;
+
+  // Spellings the corpus uses for one and the same editor, lowercased.
+  //
+  // TLHdig records who made an edition in whatever form the file's author
+  // typed: initials in most documents, a full name in the newer ones. A search
+  // for a surname would otherwise miss every row that carries only initials —
+  // `schwemer` found 84 manuscripts and not the 7 that say `DS`.
+  //
+  // The same table drives the site's search index, where the evidence for each
+  // group is set out in full; `editor-aliases-agreement.test.ts` fails if the
+  // two ever list different people. What an alias changes is which rows a query
+  // reaches — never what a row displays, which stays as the document wrote it.
+  var EDITOR_ALIASES = [["ds", "daniel schwemer"], ["ff", "francesco fuscagni"]];
+
+  /**
+   * The other spellings of whoever this row credits, ready to append to the
+   * text it is searched by.
+   *
+   * Matched against the Editor cell alone, and in full: `ds` as a substring of
+   * the whole row would catch every `CHDS` siglum in the corpus, which is 1 059
+   * manuscripts having nothing to do with the person.
+   */
+  function aliasesOf(tr) {
+    var cell = tr.cells[EDITOR_CELL];
+    var editor = cell ? (cell.textContent || "").trim().toLowerCase() : "";
+    if (!editor) return "";
+    for (var a = 0; a < EDITOR_ALIASES.length; a++) {
+      var group = EDITOR_ALIASES[a];
+      if (group.indexOf(editor) === -1) continue;
+      var others = [];
+      for (var s = 0; s < group.length; s++) {
+        if (group[s] !== editor) others.push(group[s]);
+      }
+      return " " + others.join(" ");
+    }
+    return "";
+  }
+
   // One entry per CTH group: its heading row, its manuscripts, the lowercased
   // text each of them is searched by, and whether the group is folded shut.
   //
@@ -24,7 +64,7 @@
       groups.push(current);
     } else if (current) {
       current.items.push(tr);
-      current.texts.push(text);
+      current.texts.push(text + aliasesOf(tr));
     }
   }
 
