@@ -81,6 +81,13 @@ h1 {
 .legend-list .d { color: #666; }
 
 /* toolbar / filter */
+
+/* Both controls do their work in `html_filter.js`, which adds this class as it
+   starts. Without the script the document is a plain, fully expanded table —
+   and it used to be a plain table with a search box above it that swallowed
+   whatever was typed into it and a button that folded nothing. */
+body:not(.filter-on) .toolbar { display: none; }
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

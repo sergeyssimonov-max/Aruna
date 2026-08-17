@@ -57,7 +57,7 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
     let records = archive::parse_zip(source.path())?;
     eprintln!("Indexed {} manuscripts.", records.len());
 
-    let generated_at = format_now_local();
+    let generated_at = format_now_utc();
     let html = html::render_html(&records, SOURCE_LABEL, &generated_at);
 
     // Atomic: a failure here must not destroy the inventory an earlier run left
@@ -184,9 +184,13 @@ fn work_dir_for_process() -> PathBuf {
     std::env::temp_dir().join(format!("aruna-work.{}", std::process::id()))
 }
 
-fn format_now_local() -> String {
-    // Avoid chrono dependency: format UTC unix-derived timestamp compactly.
-    // For inventory metadata, UTC is acceptable and deterministic.
+/// The moment the inventory was generated, as the document prints it.
+///
+/// UTC, and named so. It said `local` while it had never formatted anything
+/// but UTC — the one thing a reader comparing two inventories from different
+/// machines has to be sure of. No chrono: the civil-date arithmetic below is
+/// twenty lines and this is the only date the program handles.
+fn format_now_utc() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
