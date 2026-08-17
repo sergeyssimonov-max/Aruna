@@ -41,6 +41,8 @@ const MAX_POOL = 255;
 const MAX_SIGLUM_BYTES = 255;
 /** Directory entries address their pool with `u16`s. */
 const MAX_SMALL_POOL_BYTES = 0xffff;
+/** What the catalog writes where a document says nothing. */
+const MISSING = "—";
 
 const te = new TextEncoder();
 
@@ -66,6 +68,21 @@ export function buildSearchIndex(wire: Wire): ArrayBuffer | null {
   if (!sigs || !auths || !years) return null;
 
   return write(collected.groups, sigs, auths, years);
+}
+
+/**
+ * A field's searchable form: what it says, or nothing at all.
+ *
+ * Every item record names an author and a year, so a document that gives
+ * neither still needs an entry in each pool — and the entry it used to get was
+ * the dash the table displays. That made `—` a query matching the 14 349
+ * manuscripts with no editor, while the JavaScript engine, which drops the
+ * marker from its haystack outright, answered the same query with nothing. The
+ * marker stands for the absence of a value; it is not a value to search for, so
+ * the pool holds an empty string and no query reaches it.
+ */
+function pooled(value: string): string {
+  return value === MISSING ? "" : value;
 }
 
 /** A pooled string table: first-seen order, deduplicated, lowercase. */
@@ -128,8 +145,8 @@ function collect(wire: Wire): Collected | null {
       const row = rows[ri]!;
       // The editor is pooled with the person's other spellings appended, so a
       // surname reaches the rows that carry only initials — see editor-aliases.
-      const auth = auths.intern(searchableEditor(pool[row[1]!] ?? "—"));
-      const year = years.intern(pool[row[2]!] ?? "—");
+      const auth = auths.intern(pooled(searchableEditor(pool[row[1]!] ?? MISSING)));
+      const year = years.intern(pooled(pool[row[2]!] ?? MISSING));
       if (auth >= MAX_POOL || year >= MAX_POOL) return null;
       items[ri] = { sig: sigs.intern(searchableText(row, pool)), auth, year };
     }
@@ -151,8 +168,8 @@ function searchableText(row: Wire["g"][0][1][0], pool: string[]): string {
   let hay = row[0]!.toLowerCase();
   for (const id of [row[3], row[4], row[5]]) {
     if (id === undefined) continue;
-    const extra = (pool[id] ?? "—").toLowerCase();
-    if (!extra || extra === "—") continue;
+    const extra = (pool[id] ?? MISSING).toLowerCase();
+    if (!extra || extra === MISSING) continue;
     if (hay.length + 1 + extra.length <= MAX_SIGLUM_BYTES) hay += `\n${extra}`;
   }
   return hay;

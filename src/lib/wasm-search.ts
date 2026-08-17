@@ -11,12 +11,6 @@
  * failure — see `search.worker.ts`, which decides which engine answers.
  */
 import type { SearchMatch } from "./inventory";
-// Imported rather than written out as `/wasm/search.wasm`, so the build emits
-// the module under a name carrying a hash of its contents. The fetch below
-// asks for it with `force-cache`: on a stable name that meant a visitor kept
-// whichever module they first loaded, however often the search code changed
-// underneath them.
-import WASM_URL from "@/wasm/search.wasm?url";
 
 type Exports = {
   memory: WebAssembly.Memory;
@@ -49,12 +43,9 @@ const WHOLE_GROUP = 0;
  */
 const OUT_CAP = 1 << 20;
 
-/** Fetch and instantiate the module, checking it exports what we call. */
-async function instantiate(): Promise<Exports | null> {
-  const res = await fetch(WASM_URL, { credentials: "same-origin", cache: "force-cache" });
-  if (!res.ok) return null;
-
-  const { instance } = await WebAssembly.instantiate(await res.arrayBuffer(), {});
+/** Instantiate the module, checking it exports what we call. */
+async function instantiate(wasm: BufferSource): Promise<Exports | null> {
+  const { instance } = await WebAssembly.instantiate(wasm, {});
   const exports = instance.exports as unknown as Exports;
   const complete =
     typeof exports.alloc === "function" &&
@@ -114,21 +105,32 @@ function decodeMatches(view: DataView, count: number): SearchMatch[] {
 
 /** Thin glue around the Rust cdylib search module. */
 export class WasmSearch {
-  private constructor(
-    private readonly exports: Exports,
-    /** The result buffer, held for the module's lifetime. */
-    private readonly outPtr: number,
-  ) {}
+  private readonly exports: Exports;
+  /** The result buffer, held for the module's lifetime. */
+  private readonly outPtr: number;
+
+  // Written out rather than declared in the parameter list: constructor
+  // parameter properties are the one piece of TypeScript that is not merely
+  // annotation, and Node refuses them when it strips types — which is how
+  // `engine-parity.test.ts` gets to run this class outside a browser.
+  private constructor(exports: Exports, outPtr: number) {
+    this.exports = exports;
+    this.outPtr = outPtr;
+  }
 
   /**
-   * Load the module and hand it `index`, or return null if any step declines.
+   * Instantiate `wasm` and hand it `index`, or return null if any step declines.
    *
    * The index is copied in and freed straight away: `init` keeps its own copy,
    * so leaving ours would be a second 600 KB in the module's heap for good.
+   *
+   * The bytes are the caller's to fetch — see `wasm-module.ts`. Keeping the
+   * network out of here is what lets `engine-parity.test.ts` run this class,
+   * rather than a reimplementation of it, against the module that ships.
    */
-  static async create(index: ArrayBuffer): Promise<WasmSearch | null> {
+  static async fromBytes(wasm: BufferSource, index: ArrayBuffer): Promise<WasmSearch | null> {
     try {
-      const exports = await instantiate();
+      const exports = await instantiate(wasm);
       if (!exports) return null;
 
       const loaded = withBytes(exports, new Uint8Array(index), (ptr) =>
