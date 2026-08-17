@@ -19,7 +19,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CORPUS_AUTHORS } from "./corpus-authors.ts";
+import { CORPUS_AUTHORS, corpusAuthorsLine } from "./corpus-authors.ts";
 
 const LIB_RS = "../../cli/src/lib.rs";
 const source = readFileSync(new URL(LIB_RS, import.meta.url), "utf8");
@@ -44,6 +44,29 @@ test("both inventories credit the corpus to the same people", () => {
     rustAuthors(),
     CORPUS_AUTHORS.map(({ name, city }) => ({ name, city })),
     `${LIB_RS} and corpus-authors.ts credit the corpus differently`,
+  );
+});
+
+/**
+ * Matching lists are not a matching credit.
+ *
+ * Each side assembles the sentence itself — `corpus_authors_line` in Rust,
+ * `corpusAuthorsLine` here — from the same people. The test above compares the
+ * people and would stay green through a separator changed on one side only, or
+ * a bracket turned into a dash, which is a difference every reader holding both
+ * documents would see and no test would.
+ *
+ * The shape is written out here rather than imported from either side, so this
+ * checks the rule instead of asking one implementation to agree with itself.
+ */
+test("both inventories print the credit as the same sentence", () => {
+  const expected = rustAuthors()
+    .map(({ name, city }) => `${name} (${city})`)
+    .join(", ");
+  assert.equal(
+    corpusAuthorsLine(),
+    expected,
+    "the site and the standalone HTML word the credit differently",
   );
 });
 
