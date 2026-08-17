@@ -83,18 +83,8 @@ fn obtain_archive() -> Result<cache::Archive> {
     let url = download::ZENODO_ZIP_URL;
     let md5 = download::ZENODO_ZIP_MD5;
 
-    let Some(dir) = cache::cache_dir() else {
-        // No cache directory on this platform: download into a scratch
-        // directory this run owns, and delete it at the end as before.
-        let work_dir = work_dir_for_process();
-        fs::create_dir_all(&work_dir).map_err(|source| ArunaError::Io {
-            path: work_dir.clone(),
-            source,
-        })?;
-        let dest = work_dir.join(cache::archive_name(url, md5));
-        eprintln!("Downloading TLHdig archive from Zenodo…");
-        download::download_verified(url, &dest, Some(md5))?;
-        return Ok(cache::Archive::Temporary(dest));
+    let Some(dir) = cache_for_run() else {
+        return download_unkept(url, md5);
     };
 
     // Leftovers from runs that were killed mid-download; see `sweep_unfinished`.
@@ -105,25 +95,65 @@ fn obtain_archive() -> Result<cache::Archive> {
         return Ok(cache::Archive::Cached(hit));
     }
 
-    fs::create_dir_all(&dir).map_err(|source| ArunaError::Io {
-        path: dir.clone(),
-        source,
-    })?;
+    // The directory exists already: `cache::is_usable` created it to find out
+    // whether it could be written to.
     let dest = dir.join(cache::archive_name(url, md5));
-
-    // Asked here and nowhere else. The archive is about to be fetched, so the
-    // network is required anyway and one small request costs nothing against
-    // 71 MiB; a run served from the cache stays offline and stays fast, which
-    // is worth more than telling it about a new edition it is not fetching.
-    announce_release();
-
-    eprintln!("Downloading TLHdig archive from Zenodo…");
-    // The download lands through a scratch file and a rename, so an interrupted
-    // run cannot leave half an archive under a name that promises a whole one.
-    download::download_verified(url, &dest, Some(md5))?;
+    download_archive(url, md5, &dest)?;
     eprintln!("Kept for the next run: {}", dest.display());
     cache::prune(&dir, &dest);
     Ok(cache::Archive::Cached(dest))
+}
+
+/// The cache directory to use this run, or `None` to do without one.
+///
+/// Two ways to have no cache, and neither is a reason to fail: a platform that
+/// offers nowhere to keep files, and a directory that cannot be written to —
+/// a restricted account, a read-only volume, a permissions repair gone wrong.
+/// The second used to end the run with a permission error before a byte was
+/// fetched, though the archive was there for the taking and the run needed the
+/// cache for nothing but speed.
+fn cache_for_run() -> Option<PathBuf> {
+    let dir = cache::cache_dir()?;
+    if cache::is_usable(&dir) {
+        return Some(dir);
+    }
+    // Said out loud: the next run will pay the download again, and the reader
+    // is the only one who can do anything about the directory.
+    eprintln!(
+        "Cannot write to the cache directory ({}); downloading for this run only.",
+        dir.display()
+    );
+    None
+}
+
+/// Download into a scratch directory this run owns, and does not keep.
+///
+/// Costs the download on every run, which is the price of having nowhere to put
+/// the archive. [`run`] removes the directory when it is done with it.
+fn download_unkept(url: &str, md5: &str) -> Result<cache::Archive> {
+    let work_dir = work_dir_for_process();
+    fs::create_dir_all(&work_dir).map_err(|source| ArunaError::Io {
+        path: work_dir.clone(),
+        source,
+    })?;
+    let dest = work_dir.join(cache::archive_name(url, md5));
+    download_archive(url, md5, &dest)?;
+    Ok(cache::Archive::Temporary(dest))
+}
+
+/// Fetch the archive to `dest`, saying first what Zenodo publishes.
+///
+/// Both download paths come through here, so a run without a usable cache is
+/// told about a republished archive exactly as a run with one is. The release
+/// check is asked here and nowhere else: the network is required anyway at this
+/// point and one small request costs nothing against 71 MiB, while a run served
+/// from the cache stays offline and stays fast.
+fn download_archive(url: &str, md5: &str, dest: &Path) -> Result<()> {
+    announce_release();
+    eprintln!("Downloading TLHdig archive from Zenodo…");
+    // The download lands through a scratch file and a rename, so an interrupted
+    // run cannot leave half an archive under a name that promises a whole one.
+    download::download_verified(url, dest, Some(md5))
 }
 
 /// Say what Zenodo publishes, when it differs from what this build expects.

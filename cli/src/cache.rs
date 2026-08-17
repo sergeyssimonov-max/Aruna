@@ -268,6 +268,46 @@ mod tests {
         assert_eq!(CACHE_DIR_ENV, "ARUNA_CACHE_DIR");
     }
 
+    /// A cache that can be written to is one worth using, and asking creates it
+    /// — the caller relies on that and does not create it a second time.
+    #[test]
+    fn a_writable_cache_is_usable_and_is_created_by_the_asking() {
+        let dir = tempdir().unwrap();
+        let cache = dir.path().join("aruna");
+        assert!(!cache.exists());
+
+        assert!(is_usable(&cache));
+
+        assert!(cache.is_dir(), "asking must leave the directory ready to use");
+        let leftovers: Vec<_> = std::fs::read_dir(&cache)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name())
+            .collect();
+        assert!(leftovers.is_empty(), "the probe left {leftovers:?} behind");
+    }
+
+    /// The question this function exists to answer. A cache that cannot be
+    /// written is a reason to skip caching, and the answer has to be `false`
+    /// rather than an error — the run continues without it.
+    #[cfg(unix)]
+    #[test]
+    fn a_cache_that_cannot_be_written_is_not_usable() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let locked = dir.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o500)).unwrap();
+
+        // Cannot be created inside a directory that refuses writes…
+        assert!(!is_usable(&locked.join("aruna")));
+        // …and cannot be written to even where it already exists.
+        assert!(!is_usable(&locked));
+
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+
     /// A killed process leaves its `.part` behind — `Drop` does not run for a
     /// signal. In a directory that outlives the run, that is 10 MiB per
     /// interruption, kept for good.
