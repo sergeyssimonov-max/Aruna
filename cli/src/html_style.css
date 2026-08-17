@@ -91,7 +91,10 @@ body:not(.filter-on) .toolbar { display: none; }
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  /* Stretch, not centre: the two controls then take the same height whatever
+     each one's idea of its natural one is. Centring them let the taller of the
+     two hang over the other at both ends. */
+  align-items: stretch;
   gap: 0.75rem;
   margin: 0 0 1.15rem;
 }
@@ -103,6 +106,13 @@ body:not(.filter-on) .toolbar { display: none; }
   border-radius: 6px;
   font: inherit;
   font-size: 0.9rem;
+  /* Safari draws a search field natively, and a native search field ignores
+     `line-height` — so it came out about 5px shorter than the button beside it,
+     which is the misalignment this removes. Chrome sizes it like any other box
+     and never showed the difference. */
+  -webkit-appearance: none;
+  appearance: none;
+  line-height: 1.5;
   outline: none;
   background: #fff;
 }
@@ -118,6 +128,9 @@ body:not(.filter-on) .toolbar { display: none; }
   background: #fff;
   font: inherit;
   font-size: 0.9rem;
+  /* The same as the field beside it, stated rather than inherited, so the two
+     cannot drift apart when the page's own line-height changes. */
+  line-height: 1.5;
   color: #444;
   cursor: pointer;
 }
@@ -128,6 +141,9 @@ body:not(.filter-on) .toolbar { display: none; }
   box-shadow: 0 0 0 3px #eee;
 }
 .toolbar .hint {
+  /* The controls stretch; the note beside them reads better on their centre
+     line than pinned to the top of a box it does not fill. */
+  align-self: center;
   font-size: 0.8125rem;
   color: #888;
   font-variant-numeric: tabular-nums;
