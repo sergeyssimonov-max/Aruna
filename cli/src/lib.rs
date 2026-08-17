@@ -39,6 +39,43 @@ pub const ZENODO_RECORD: u64 = 20328284;
 /// archive is republished.
 pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 
+/// The people credited with the corpus, in the order the record names them,
+/// each with the city they worked in.
+///
+/// Read from `metadata.creators` of Zenodo record 20328284. The record gives an
+/// institution rather than a city — `University of Würzburg` for Müller and
+/// Schwemer, `Johannes Gutenberg University Mainz` for Prechel, `Philipps
+/// University of Marburg` for Rieken. The city is written out here instead of
+/// being cut from the institution's name at runtime: a rule that finds the
+/// place inside `Johannes Gutenberg University Mainz` is guesswork that happens
+/// to work on these four, and would quietly produce nonsense on a fifth.
+///
+/// Names are given as a reader writes them. The record stores them
+/// surname-first (`Müller, Gerfrid`), which is how a catalogue sorts people,
+/// not how a credit line reads.
+///
+/// Pinned rather than fetched. The site never talks to Zenodo, and a run served
+/// from the cache stays offline by design — a credit that arrived over the
+/// network would be missing in exactly the places it has to appear.
+pub const CORPUS_AUTHORS: [(&str, &str); 4] = [
+    ("Gerfrid Müller", "Würzburg"),
+    ("Doris Prechel", "Mainz"),
+    ("Elisabeth Rieken", "Marburg"),
+    ("Daniel Schwemer", "Würzburg"),
+];
+
+/// [`CORPUS_AUTHORS`] as the one line both inventories print.
+///
+/// Built in one place because both halves show it and this project keeps
+/// finding out what it costs when they each build their own.
+pub fn corpus_authors_line() -> String {
+    CORPUS_AUTHORS
+        .iter()
+        .map(|(name, city)| format!("{name} ({city})"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Full pipeline: download → parse → write HTML → return output path.
 ///
 /// When `local_zip` is `Some`, the download step is skipped (tests / offline).
@@ -283,6 +320,34 @@ mod tests {
             SOURCE_LABEL.contains(&format!("record {record}")),
             "SOURCE_LABEL credits a different record than {url} — it reads {SOURCE_LABEL:?}"
         );
+    }
+
+    /// The shape of the line, spelled out once so a change to it is a change
+    /// someone made on purpose: names as a reader writes them, the city alone
+    /// in the brackets, separated by commas.
+    #[test]
+    fn corpus_authors_line_names_each_author_with_their_city() {
+        assert_eq!(
+            corpus_authors_line(),
+            "Gerfrid Müller (Würzburg), Doris Prechel (Mainz), \
+             Elisabeth Rieken (Marburg), Daniel Schwemer (Würzburg)"
+        );
+    }
+
+    /// The brackets hold a place, not an employer. The Zenodo record gives an
+    /// affiliation — `Johannes Gutenberg University Mainz` — and copying one
+    /// across is the way this list would go wrong.
+    #[test]
+    fn no_author_is_credited_to_an_institution() {
+        for (name, city) in CORPUS_AUTHORS {
+            let lowered = city.to_lowercase();
+            assert!(
+                !["university", "universität", "institute", "academy"]
+                    .iter()
+                    .any(|word| lowered.contains(word)),
+                "{name} is credited to an institution rather than a city: {city}"
+            );
+        }
     }
 
     #[test]

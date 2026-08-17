@@ -153,7 +153,8 @@ fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord) {
     );
 }
 
-/// The line under the title: where the data came from and how much of it there is.
+/// The line under the title: where the data came from, who made it, and how
+/// much of it there is.
 ///
 /// The two counts share a line — they are one fact about the corpus, and each
 /// on its own row made a four-line block out of a header.
@@ -166,8 +167,13 @@ fn write_summary(
 ) {
     let source = escape_html(source);
     let generated = escape_html(generated_at);
+    // Not the `Editor` column, which says who edited one manuscript. These four
+    // are credited with the corpus itself, and the label has to keep the two
+    // apart on a page that shows both.
+    let authors = escape_html(&crate::corpus_authors_line());
     out.push_str("    <p class=\"meta\">\n");
     let _ = writeln!(out, "      <span>Source: {source}</span>");
+    let _ = writeln!(out, "      <span>Corpus authors: {authors}</span>");
     let _ = writeln!(out, "      <span>Generated: {generated}</span>");
     let _ = writeln!(
         out,
@@ -353,6 +359,20 @@ mod tests {
         assert!(html.contains("Manuscripts: 2"));
         assert!(html.contains("Zenodo 20328284"));
         assert!(html.contains("class=\"num\">1</td>"));
+    }
+
+    /// The credit belongs to the corpus, not to the rows, so it is there for an
+    /// inventory of nothing just as much as for a full one.
+    #[test]
+    fn the_corpus_authors_are_credited_under_the_title() {
+        let html = render_html(&[], "src", "now");
+        assert!(
+            html.contains(&format!(
+                "<span>Corpus authors: {}</span>",
+                crate::corpus_authors_line()
+            )),
+            "the summary block does not credit the corpus authors"
+        );
     }
 
     #[test]

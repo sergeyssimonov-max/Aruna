@@ -1,4 +1,5 @@
 import { COLUMNS } from "@/lib/columns";
+import { corpusAuthorsLine } from "@/lib/corpus-authors";
 import type { FallbackReason } from "@/lib/search-protocol";
 
 /** Title, provenance, and the counts — what this page is and how much is in it. */
@@ -33,6 +34,12 @@ export function InventoryHeader({
           Thesaurus Linguarum Hethaeorum Digitalis
         </h1>
         <p className="mt-1 text-[0.8125rem] leading-relaxed text-[#666]">{source}</p>
+        {/* Not the `Editor` column, which says who edited one manuscript.
+            These four are credited with the corpus itself, and the label has
+            to keep the two apart on a page that shows both. */}
+        <p className="mt-1 text-[0.8125rem] leading-relaxed text-[#666]">
+          Corpus authors: {corpusAuthorsLine()}
+        </p>
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8125rem] text-[#666]">
         <Count label="Manuscripts" value={manuscripts} />
