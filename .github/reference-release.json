@@ -29,7 +29,7 @@
       "commit": "b24c258a478163a2d30ec8c3d4e09d2392585ed8",
       "published": "2026-08-17T21:53:21Z",
       "dmg_sha256": "0395b641dd94671166e44d4b3bc29b0ccf988a522119706bd1511825a5cd9b2e",
-      "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the state v1.0.7 and v1.0.8 were withdrawn in favour of."
+      "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     }
   ]
 }
