@@ -32,6 +32,13 @@ pub enum ArunaError {
         got: u64,
     },
 
+    /// The body kept coming. `Truncated` catches a transfer that stopped early;
+    /// this is the other end of the same question, and it is the one that costs
+    /// something to find out late — bytes that are never going to be accepted
+    /// are still bytes written to the user's disk while they arrive.
+    #[error("oversized download of {url}: stopped after {got} bytes, limit is {limit}")]
+    Oversized { url: String, limit: u64, got: u64 },
+
     /// The bytes arrived intact by length but hash to something else. Zenodo
     /// publishes an MD5 per file, so a silently corrupted or republished archive
     /// is caught here instead of surfacing as an obscure parse failure.

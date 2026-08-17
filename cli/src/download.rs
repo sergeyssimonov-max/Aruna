@@ -5,7 +5,7 @@ use crate::md5::Md5;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Stable Zenodo URL for TLHdig Beta 0.3.
 pub const ZENODO_ZIP_URL: &str =
@@ -46,6 +46,14 @@ const ATTEMPT_DEADLINE: Duration = Duration::from_secs(15 * 60);
 /// Zenodo can answer a 429 with a delay measured in minutes. Sleeping that long
 /// inside a run the user is watching is worse than telling them to come back.
 const MAX_RETRY_AFTER: Duration = Duration::from_secs(30);
+
+/// The most this program will ever write for one download.
+///
+/// Only reached when the server announces no size at all; a server that states
+/// one is held to what it stated. Fourteen times the archive as it stands
+/// (71 MiB), so a corpus that keeps growing does not walk into it, and far
+/// short of any volume it would be reasonable to fill.
+const MAX_DOWNLOAD: u64 = 1024 * 1024 * 1024;
 
 /// Download `url` into `dest`, retrying transient failures and rejecting the
 /// result unless it hashes to `expected_md5`.
@@ -125,9 +133,16 @@ fn is_retryable(err: &ArunaError) -> bool {
 
 /// How long to wait before the next attempt.
 ///
-/// A server that sent `Retry-After` has told us what it wants; anything else
-/// gets exponential backoff, which now matters because an overloaded server is
-/// among the things we retry.
+/// A server that sent `Retry-After` has told us what it wants, and it is
+/// honoured as sent — spreading out a wait the server itself chose would be
+/// second-guessing the one party that knows.
+///
+/// Everything else gets exponential backoff plus a spread of up to a quarter of
+/// it. Aruna is run by hand rather than in a fleet, so the spread is not about
+/// this process: it is about all the copies of it that were reading from Zenodo
+/// when Zenodo started answering 503, and that would otherwise come back at the
+/// same two-second and four-second marks together. A quarter is enough to break
+/// the lockstep while leaving the wait roughly as long as it says it is.
 fn retry_delay(attempt: u32, err: &ArunaError) -> Duration {
     if let ArunaError::Http {
         retry_after: Some(secs),
@@ -136,7 +151,23 @@ fn retry_delay(attempt: u32, err: &ArunaError) -> Duration {
     {
         return Duration::from_secs(*secs).min(MAX_RETRY_AFTER);
     }
-    Duration::from_secs(2u64.saturating_pow(attempt))
+    let base = Duration::from_secs(2u64.saturating_pow(attempt));
+    base + base.mul_f64(0.25 * spread())
+}
+
+/// A number in `[0, 1)` to spread a backoff with.
+///
+/// The clock rather than a random number generator: this decides how long to
+/// pause before retrying a download, and a dependency — or a hand-rolled
+/// generator with state to keep — would be a great deal of machinery for that.
+/// Nanoseconds since the last second are as unrelated between two machines as
+/// this needs them to be, and nothing here is security-sensitive.
+fn spread() -> f64 {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|since| since.subsec_nanos())
+        .unwrap_or(0);
+    f64::from(nanos) / 1_000_000_000.0
 }
 
 /// One transfer, in the four steps it actually has.
@@ -161,13 +192,50 @@ fn attempt_download(url: &str, dest: &Path, expected_md5: Option<&str>) -> Resul
         .header("Content-Length")
         .and_then(|v| v.trim().parse().ok());
 
+    // A body this program will not accept is refused before a byte of it is
+    // written, rather than after the disk has taken all of it.
+    let limit = download_limit(url, announced)?;
+
     // Stream into a scratch file and rename only on success: an interrupted
     // download must never leave a truncated archive sitting at `dest` looking
     // like a complete one.
     let scratch = Scratch::beside(dest);
-    let transfer = stream_to_file(&mut response.into_reader(), scratch.path())?;
-    transfer.verify(url, announced, expected_md5)?;
+    let transfer = stream_bounded(response.into_reader(), limit, scratch.path())?;
+    transfer.verify(url, limit, announced, expected_md5)?;
     scratch.commit(dest)
+}
+
+/// Stream a body to `path`, refusing to write more than `limit` of it.
+///
+/// The bound lives here and nowhere else, so there is one line to get right and
+/// one place to test. One byte past the limit is read on purpose: it is what
+/// tells a body that runs over apart from one that ends exactly on it, and
+/// [`Transfer::verify`] is what turns that byte into a refusal.
+fn stream_bounded(reader: impl Read, limit: u64, path: &Path) -> Result<Transfer> {
+    stream_to_file(&mut reader.take(limit.saturating_add(1)), path)
+}
+
+/// The most this transfer may write, and a refusal if that is already too much.
+///
+/// Two things are bounded here, and they are not the same thing. A server that
+/// announces a size is held to it — anything past it is a body that disagrees
+/// with its own header, and there is no reason to keep writing it to disk. A
+/// server that announces nothing gets [`MAX_DOWNLOAD`], because a transfer with
+/// no stated end and no ceiling is a transfer that stops when the disk is full.
+///
+/// Without this the only limit was the digest check, which happens after the
+/// last byte has been written: an endless body filled the volume first and was
+/// rejected afterwards.
+fn download_limit(url: &str, announced: Option<u64>) -> Result<u64> {
+    match announced {
+        Some(size) if size > MAX_DOWNLOAD => Err(ArunaError::Oversized {
+            url: url.to_string(),
+            limit: MAX_DOWNLOAD,
+            got: size,
+        }),
+        Some(size) => Ok(size),
+        None => Ok(MAX_DOWNLOAD),
+    }
 }
 
 /// Create the directory `dest` will be written into.
@@ -253,7 +321,24 @@ impl Transfer {
     ///
     /// Both checks run before the rename in [`attempt_download`], so a damaged
     /// body never reaches `dest` under a name that says it is the archive.
-    fn verify(self, url: &str, announced: Option<u64>, expected_md5: Option<&str>) -> Result<()> {
+    fn verify(
+        self,
+        url: &str,
+        limit: u64,
+        announced: Option<u64>,
+        expected_md5: Option<&str>,
+    ) -> Result<()> {
+        // Asked first: past the limit the transfer was cut short deliberately,
+        // so every other check below would be reading a truncated body and
+        // reporting the wrong thing about it.
+        if self.bytes > limit {
+            return Err(ArunaError::Oversized {
+                url: url.to_string(),
+                limit,
+                got: self.bytes,
+            });
+        }
+
         if let Some(announced) = announced {
             if self.bytes != announced {
                 return Err(ArunaError::Truncated {
@@ -379,6 +464,10 @@ mod tests {
         /// Announce a body and then send it a byte at a time, for ever: the
         /// stall that no per-read timeout can catch.
         Dribble,
+        /// Send a body with no `Content-Length`, ended by closing the
+        /// connection. The transport cannot bound this one, so it is the shape
+        /// [`MAX_DOWNLOAD`] is the only limit on.
+        Unannounced(Vec<u8>),
     }
 
     /// A one-shot HTTP server that serves `replies[i]` to request `i`, counting
@@ -451,6 +540,13 @@ mod tests {
                                 let _ = stream.flush();
                                 std::thread::sleep(std::time::Duration::from_millis(20));
                             }
+                        }
+                        Some(Reply::Unannounced(bytes)) => {
+                            let _ =
+                                stream.write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n");
+                            let _ = stream.write_all(bytes);
+                            let _ = stream.flush();
+                            let _ = stream.shutdown(std::net::Shutdown::Write);
                         }
                         Some(Reply::Status(status, retry_after)) => {
                             let mut head = format!(
@@ -715,6 +811,155 @@ mod tests {
 
     /// A fast flood is capped by size, where the endless dribble below is
     /// capped by time. Both matter: only one of them is slow.
+    /// A body with no end writes a bounded amount and is then refused.
+    ///
+    /// This is the case the limit exists for. A response that states a
+    /// `Content-Length` is already held to it by the transport, so the gap was
+    /// the other kind — chunked, or closed by the server — where the read runs
+    /// until EOF and there is no EOF. Nothing stood between that and the volume
+    /// being written to except the digest check, which happens after the last
+    /// byte, and there is no last byte.
+    ///
+    /// Driven through the streaming path with a small limit rather than through
+    /// a server with the real one: the point is that the write stops, and
+    /// proving it with a gigabyte would be the same proof at ten thousand times
+    /// the cost.
+    #[test]
+    fn a_body_with_no_end_is_written_only_up_to_the_limit() {
+        let dir = tempdir().expect("tempdir");
+        let scratch = dir.path().join("endless.part");
+        let limit = 64 * 1024;
+
+        // `repeat` never returns 0, exactly like a connection that keeps
+        // delivering. Nothing bounds it here but the function under test.
+        let transfer = stream_bounded(std::io::repeat(b'x'), limit, &scratch)
+            .expect("the write itself succeeds");
+
+        assert_eq!(
+            transfer.bytes,
+            limit + 1,
+            "one byte past the limit, which is how the overrun is detected"
+        );
+        assert_eq!(
+            std::fs::metadata(&scratch).expect("scratch exists").len(),
+            limit + 1,
+            "the disk took a bounded amount and no more"
+        );
+
+        match transfer.verify("u", limit, None, None) {
+            Err(ArunaError::Oversized { limit: l, got, .. }) => {
+                assert_eq!(l, limit);
+                assert_eq!(got, limit + 1);
+            }
+            other => panic!("expected Oversized, got {other:?}"),
+        }
+    }
+
+    /// A response with no stated length still downloads, and still verifies.
+    ///
+    /// This is the shape the ceiling applies to, so it is also the shape the
+    /// ceiling could have broken: reading under a limit must not turn a body
+    /// that ends by closing the connection into a truncated one.
+    #[test]
+    fn a_response_with_no_stated_length_still_arrives_whole() {
+        let dir = tempdir().expect("tempdir");
+        let dest = dir.path().join("archive.zip");
+        let payload = b"not a zip, but all of it".to_vec();
+        let server = FakeServer::start(vec![Reply::Unannounced(payload.clone())]);
+
+        download_verified(&server.url(), &dest, Some(&crate::md5::md5_hex(&payload)))
+            .expect("an unannounced body is a complete body");
+
+        assert_eq!(std::fs::read(&dest).expect("dest"), payload);
+        assert!(leftover_parts(dir.path()).is_empty());
+    }
+
+    /// The failed attempt takes its scratch file with it, whatever went wrong.
+    #[test]
+    fn a_refused_download_leaves_nothing_behind() {
+        let dir = tempdir().expect("tempdir");
+        let dest = dir.path().join("archive.zip");
+        let server = FakeServer::start(vec![Reply::Truncated]);
+
+        assert!(download_file(&server.url(), &dest).is_err());
+        assert!(!dest.exists(), "nothing was committed to the destination");
+        assert!(
+            leftover_parts(dir.path()).is_empty(),
+            "a scratch file outlived the attempt"
+        );
+    }
+
+    /// A size the program will not accept is refused from the header alone,
+    /// without opening a file to write it into.
+    #[test]
+    fn an_announced_size_over_the_ceiling_is_refused_before_the_body() {
+        let url = "https://example.invalid/huge.zip";
+        match download_limit(url, Some(MAX_DOWNLOAD + 1)) {
+            Err(ArunaError::Oversized { limit, got, .. }) => {
+                assert_eq!(limit, MAX_DOWNLOAD);
+                assert_eq!(got, MAX_DOWNLOAD + 1);
+            }
+            other => panic!("expected Oversized, got {other:?}"),
+        }
+
+        // A server that says nothing gets the ceiling rather than no limit.
+        assert_eq!(download_limit(url, None).ok(), Some(MAX_DOWNLOAD));
+        // One that states a workable size is held to exactly that.
+        assert_eq!(download_limit(url, Some(71 << 20)).ok(), Some(71 << 20));
+    }
+
+    /// Scratch files matching `paths::scratch_sibling`, which are what an
+    /// abandoned attempt leaves behind.
+    fn leftover_parts(dir: &Path) -> Vec<PathBuf> {
+        std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "part"))
+            .collect()
+    }
+
+    /// The backoff spreads, and stays inside the window it advertises: long
+    /// enough to be the wait it says it is, never so long that three attempts
+    /// become a hang.
+    #[test]
+    fn the_backoff_is_spread_without_drifting_out_of_its_window() {
+        let err = ArunaError::EmptyArchive;
+        for attempt in 1..MAX_ATTEMPTS {
+            let base = Duration::from_secs(2u64.saturating_pow(attempt));
+            for _ in 0..64 {
+                let delay = retry_delay(attempt, &err);
+                assert!(
+                    delay >= base,
+                    "attempt {attempt}: {delay:?} is below {base:?}"
+                );
+                assert!(
+                    delay <= base.mul_f64(1.25),
+                    "attempt {attempt}: {delay:?} is more than a quarter over {base:?}"
+                );
+            }
+        }
+    }
+
+    /// `Retry-After` is honoured as sent rather than spread: the server named
+    /// the moment it wants to be asked again, and it is still capped.
+    #[test]
+    fn a_retry_after_is_taken_at_its_word_and_capped() {
+        let told = |secs| {
+            retry_delay(
+                1,
+                &ArunaError::Http {
+                    url: "u".into(),
+                    status: 503,
+                    retry_after: Some(secs),
+                },
+            )
+        };
+        assert_eq!(told(7), Duration::from_secs(7));
+        assert_eq!(told(9_999), MAX_RETRY_AFTER);
+    }
+
     #[test]
     fn a_flood_is_capped_by_size() {
         let flood = vec![b'x'; 8 * 1024 * 1024];

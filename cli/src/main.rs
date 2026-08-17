@@ -69,6 +69,15 @@ fn advice(err: &ArunaError) -> Option<String> {
              (обычно это браузер), и запустите ещё раз.",
             scratch.display()
         ),
+        // The message already says how much arrived and where the line is; what
+        // it cannot say is that a body which outruns its own header is almost
+        // never Zenodo, and that the one case where it is has a fix in the
+        // source rather than in the network.
+        ArunaError::Oversized { .. } => "Ответ оказался длиннее, чем сервер сам объявил.\n\
+             Обычно это значит, что до Zenodo дотянулось что-то по дороге —\n\
+             портал Wi-Fi, корпоративный прокси или подмена ответа.\n\
+             Если же архив просто вырос, поднимите MAX_DOWNLOAD в cli/src/download.rs."
+            .to_string(),
         ArunaError::Truncated { .. } | ArunaError::Io { .. } => return None,
     })
 }
@@ -111,6 +120,23 @@ mod tests {
         })
         .expect("a kept inventory has advice");
         assert!(advice.contains("/out/inventory.html.123.part"));
+    }
+
+    /// An overrun is worth explaining rather than reporting: the number in the
+    /// message is not what the reader needs to act on.
+    #[test]
+    fn an_oversized_body_points_at_what_is_usually_causing_it() {
+        let advice = advice(&ArunaError::Oversized {
+            url: "u".into(),
+            limit: 4096,
+            got: 4097,
+        })
+        .expect("an overrun has advice");
+        assert!(advice.contains("прокси"), "names the usual cause: {advice}");
+        assert!(
+            advice.contains("MAX_DOWNLOAD"),
+            "names the other one: {advice}"
+        );
     }
 
     /// Errors whose own message is the whole story get no second paragraph.
