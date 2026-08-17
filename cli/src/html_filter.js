@@ -8,8 +8,16 @@
   var tbody = table.tBodies[0];
   var rows = Array.prototype.slice.call(tbody.rows);
 
+  // The controls work from here on, so this is where they earn their place on
+  // the page. Without this script they did nothing at all: a search box that
+  // swallowed what you typed and a button that never folded anything.
+  document.body.classList.add("filter-on");
+
   /** Which cell of a manuscript row names the editor. */
   var EDITOR_CELL = 4;
+
+  /** Which cell carries the row's position in the table rather than its data. */
+  var ROW_NUMBER_CELL = 0;
 
   // Spellings the corpus uses for one and the same editor, lowercased.
   //
@@ -43,9 +51,44 @@
       for (var s = 0; s < group.length; s++) {
         if (group[s] !== editor) others.push(group[s]);
       }
-      return " " + others.join(" ");
+      return "\n" + others.join("\n");
     }
     return "";
+  }
+
+  /**
+   * The text a manuscript row is searched by: what it says, not where it sits.
+   *
+   * The row's own `textContent` was used here, and it begins with the ordinal
+   * in the first cell — so `12345` matched row 12 345, whose fields contain no
+   * such number, and any four-digit year also reached the rows numbered after
+   * it. The ordinal is typography: it renumbers itself whenever the corpus
+   * grows, and nothing in the archive answers to it.
+   *
+   * Cells are joined with a newline rather than a space, so a query cannot run
+   * from the end of one column into the start of the next. That is how the
+   * site's index is built too.
+   */
+  function rowText(tr) {
+    var parts = [];
+    for (var c = 0; c < tr.cells.length; c++) {
+      if (c === ROW_NUMBER_CELL) continue;
+      parts.push(tr.cells[c].textContent || "");
+    }
+    return parts.join("\n").toLowerCase();
+  }
+
+  /**
+   * The text a heading is searched by: the catalogue number it names.
+   *
+   * Its `textContent` also carries the tally beside the label, with nothing in
+   * between — the heading of `CTH 1` with six manuscripts reads `CTH 16`. A
+   * search for `CTH 16` therefore opened `CTH 1` and counted all six of its
+   * manuscripts as matches, and `CTH 316` did the same to `CTH 3`.
+   */
+  function groupText(tr) {
+    var label = tr.querySelector(".group-label");
+    return ((label ? label.textContent : tr.textContent) || "").toLowerCase();
   }
 
   // One entry per CTH group: its heading row, its manuscripts, the lowercased
@@ -58,13 +101,12 @@
   var current = null;
   for (var i = 0; i < rows.length; i++) {
     var tr = rows[i];
-    var text = (tr.textContent || "").toLowerCase();
     if (tr.classList.contains("group")) {
-      current = { tr: tr, text: text, items: [], texts: [], folded: false };
+      current = { tr: tr, text: groupText(tr), items: [], texts: [], folded: false };
       groups.push(current);
     } else if (current) {
       current.items.push(tr);
-      current.texts.push(text + aliasesOf(tr));
+      current.texts.push(rowText(tr) + aliasesOf(tr));
     }
   }
 
@@ -75,6 +117,7 @@
   function render() {
     var q = (input.value || "").trim().toLowerCase();
     var matches = 0;
+    var onScreen = 0;
 
     for (var g = 0; g < groups.length; g++) {
       var group = groups[g];
@@ -97,7 +140,10 @@
         // Folding hides the manuscripts, not the heading: a folded group still
         // shows that it matched, and its count says how much is inside.
         group.items[j].hidden = !show || group.folded;
-        if (show) matches++;
+        if (show) {
+          matches++;
+          if (!group.folded) onScreen++;
+        }
       }
 
       setFolded(group, group.folded);
@@ -105,8 +151,16 @@
 
     if (q === "") {
       hint.textContent = "";
+    } else if (!matches) {
+      hint.textContent = "No matches";
+    } else if (onScreen === matches) {
+      hint.textContent = "Match: " + matches.toLocaleString();
     } else {
-      hint.textContent = matches ? "Match: " + matches.toLocaleString() : "No matches";
+      // Folding can hide rows this query found, and the count alone then
+      // described a table the reader was not looking at: collapse everything,
+      // search, and it said "Match: 84" over an empty list.
+      hint.textContent =
+        "Match: " + matches.toLocaleString() + " · " + onScreen.toLocaleString() + " shown";
     }
     syncFoldAll();
   }
