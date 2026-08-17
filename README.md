@@ -70,7 +70,7 @@ The corpus job is what keeps the two halves honest: it rebuilds the catalog from
 
 ## Releases
 
-[v1.0.7](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.7) is current; work continues from it.
+[v1.0.8](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.8) is current; work continues from it.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the reference: the first release of the numbering that survives, kept as a known-good state to fall back to. Its tag and commit are recorded in [`.github/reference-release.json`](.github/reference-release.json), and CI fails if that tag disappears or moves — GitHub's own tag protection needs a plan this repository is not on, so the guarantee is enforced where it can be.
 
