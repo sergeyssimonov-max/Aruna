@@ -33,7 +33,10 @@ fn utf8(b: &[u8]) -> &str {
 pub(super) fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
     // `docID` and `TxtPubl` are looked for in the wider window as well: TLHdig
     // puts `<AO:TxtPubl>` in the body, beside the inventory number.
-    if let Some(text) = text_of(header, b"docID").or_else(|| text_of(xml, b"docID")) {
+    if let Some(text) = text_of(header, b"docID")
+        .or_else(|| text_of(xml, b"docID"))
+        .filter(|text| !is_join_mark(text))
+    {
         return text;
     }
     if let Some(text) = text_of(header, b"TxtPubl").or_else(|| text_of(xml, b"TxtPubl")) {
@@ -41,7 +44,7 @@ pub(super) fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
         // manuscript list, not to the siglum this row is filed under.
         let primary = text.split('{').next().unwrap_or(&text);
         let primary = normalize_ws(primary);
-        if !primary.is_empty() {
+        if !primary.is_empty() && !is_join_mark(&primary) {
             return primary;
         }
     }
@@ -49,6 +52,25 @@ pub(super) fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
         return text;
     }
     file_stem(path).unwrap_or_else(|| MISSING.to_string())
+}
+
+/// Whether a value is one of the corpus's join marks rather than a siglum.
+///
+/// TLHdig marks joined fragments with `{€1}`, `{€2}` … in the manuscript list.
+/// Three documents carry such a mark in `docID`, where the siglum belongs, with
+/// the opening brace lost somewhere upstream — and taking it at face value
+/// published `€1}` and `€7}` as the names of manuscripts. Each of those
+/// documents names itself properly elsewhere: `KBo 51.34` in `TxtPubl`, and
+/// `KUB 54.65+` in the file name, which the chain above reaches once the mark
+/// is refused.
+///
+/// `€` is what makes this recognisable, and it is safe to key on: no siglum in
+/// the corpus contains it, and nothing else this field ever holds does either.
+/// Named outright rather than matched by shape, like the artefacts
+/// [`normalise_lang`] drops, so an unfamiliar but genuine siglum cannot be
+/// swallowed by the same rule.
+fn is_join_mark(text: &str) -> bool {
+    text.contains('€')
 }
 
 /// Text of the first `<tag>`, whitespace collapsed, or `None` if it says nothing.
@@ -294,12 +316,19 @@ const LANG_WINDOW: usize = 12 * 1024;
 /// Separator between language codes, when a manuscript carries more than one.
 const LANG_SEPARATOR: &str = ", ";
 
-/// Every `lg="…"` code among the line elements, most-used first.
+/// Every `lg="…"` code in the sampled window, most-used first.
 ///
 /// A manuscript is not always in one language: 7% of this corpus mixes two or
 /// three, which is a fact about the text rather than noise — a Hittite ritual
 /// quoting Hurrian incantations is a different object from a Hittite one, and
 /// reporting only the dominant code hid that from anyone reading the table.
+///
+/// Every element carrying the attribute counts, not only the lines. Measured
+/// over 4 000 documents: `<lb>` 46 196 occurrences in 3 996 of them, `<w>` 973
+/// in 222, `<clb>` 305 in 190, `<gap>` 2 in 2. The word-level codes are the
+/// reason this says "in the window" rather than "among the line elements", as
+/// it used to: a Luwian word inside a Hittite line is named by its own `<w>`,
+/// and counting it is what lets the column say the text uses both.
 ///
 /// Ordered by how much of the sampled window each language holds, so the first
 /// code is the one that used to be reported alone. Ties break on the code
@@ -373,10 +402,14 @@ fn normalise_lang(code: &str) -> String {
         "Hat" | "Hattian" => "Hat".to_string(),
         // `ign` is the corpus saying "not identified". `5f_` is not a language
         // at all: it sits where one belongs on 100 lines whose cuneiform is
-        // empty or unreadable, an artefact of data entry. Named outright rather
-        // than matched by shape, so a real code that is new to us can never be
-        // swallowed by the same rule.
-        "ign" | "5f_" | "" => MISSING.to_string(),
+        // empty or unreadable, an artefact of data entry. `w` is a slip of the
+        // same kind — the element's own name typed into its attribute — and
+        // occurs exactly once in the corpus, on a `<w>` inside a Hittite line of
+        // `CTH 606_XML_HFR/KBo 38.5.xml`; it reached the table as a language and
+        // that row read `Hit, Hat, w`. Named outright rather than matched by
+        // shape, so a real code that is new to us can never be swallowed by the
+        // same rule.
+        "ign" | "5f_" | "w" | "" => MISSING.to_string(),
         other => other.to_string(),
     }
 }
@@ -470,6 +503,18 @@ mod tests {
     fn the_data_entry_artefact_is_not_a_language() {
         assert_eq!(extract_lang(r#"<l lg="5f_"/>"#), MISSING);
         assert_eq!(extract_lang(r#"<l lg="5f_"/><l lg="Hit"/>"#), "Hit");
+    }
+
+    /// `w` is the element's own name typed into its attribute. One document
+    /// does it, and that row read `Hit, Hat, w`.
+    #[test]
+    fn the_element_name_typed_into_its_attribute_is_not_a_language() {
+        assert_eq!(extract_lang(r#"<w lg="w"/>"#), MISSING);
+        assert_eq!(
+            extract_lang(r#"<lb lg="Hit"/><lb lg="Hat"/><w lg="w"/>"#),
+            "Hat, Hit",
+            "dropping the slip must not disturb the languages named beside it"
+        );
     }
 
     /// Codes we cannot resolve are shown as written rather than guessed at.

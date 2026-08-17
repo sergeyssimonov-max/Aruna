@@ -217,6 +217,43 @@ mod tests {
         assert_eq!(rec.inv, "VAT 7479");
     }
 
+    /// A `docID` holding one of the corpus's join marks is not a siglum, and
+    /// three documents hold exactly that. The document names itself properly
+    /// elsewhere; the chain has to get there.
+    #[test]
+    fn a_join_mark_where_the_siglum_belongs_is_refused() {
+        // `CTH 413_XML_BESRIT/KBo 51.34.xml`, which published `€1}`.
+        let with_txtpubl = r#"<AOxml><AOHeader><docID>€1}</docID></AOHeader>
+<AO:Manuscripts><AO:TxtPubl>KBo 51.34</AO:TxtPubl></AO:Manuscripts></AOxml>"#;
+        assert_eq!(
+            parse_manuscript("CTH 413_XML_BESRIT/KBo 51.34.xml", with_txtpubl).sigla,
+            "KBo 51.34"
+        );
+
+        // `CTH 757_XML_BESRIT/KUB 54.65+.xml`, which has no TxtPubl at all and
+        // published `€7}` — the file name was right there.
+        let bare = r#"<AOxml><AOHeader><docID>€7}</docID></AOHeader></AOxml>"#;
+        assert_eq!(
+            parse_manuscript("CTH 757_XML_BESRIT/KUB 54.65+.xml", bare).sigla,
+            "KUB 54.65+"
+        );
+    }
+
+    /// The refusal is for the mark alone. A siglum is taken as written, and the
+    /// join marks a manuscript list carries are trimmed as they always were.
+    #[test]
+    fn an_ordinary_siglum_is_untouched_by_the_join_mark_rule() {
+        let xml = r#"<AOxml><AOHeader><docID>KBo 17.86+</docID></AOHeader></AOxml>"#;
+        assert_eq!(parse_manuscript("CTH 786_XML_HFR/x.xml", xml).sigla, "KBo 17.86+");
+
+        let joined = r#"<AOxml><AOHeader><docID></docID></AOHeader>
+<AO:Manuscripts><AO:TxtPubl>KBo 17.86 {€1}+KBo 15.62 {€2}</AO:TxtPubl></AO:Manuscripts></AOxml>"#;
+        assert_eq!(
+            parse_manuscript("CTH 786_XML_HFR/x.xml", joined).sigla,
+            "KBo 17.86"
+        );
+    }
+
     /// The header still wins when it carries one, and a document without the
     /// tag anywhere reports the missing-value dash rather than empty text.
     #[test]
