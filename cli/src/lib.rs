@@ -5,13 +5,14 @@
 pub mod archive;
 pub mod cache;
 pub mod catalog;
-pub mod xml_scan;
 pub mod download;
 pub mod error;
 pub mod html;
 pub mod md5;
+pub mod order;
 pub mod parse;
 pub mod paths;
+pub mod xml_scan;
 pub mod zenodo;
 
 use error::{ArunaError, Result};

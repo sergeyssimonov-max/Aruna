@@ -136,7 +136,7 @@ pub fn group_label(rec: &ManuscriptRecord) -> &str {
 /// The CTH groups, as consecutive runs of records sharing a label.
 ///
 /// A group is a run rather than a bucket because the records arrive sorted
-/// from [`crate::archive::sort_records`], and both outputs — the HTML and the
+/// from [`crate::order::sort_records`], and both outputs — the HTML and the
 /// site's catalog — must list manuscripts in that one order. Collecting into a
 /// map would lose it.
 ///

@@ -100,7 +100,7 @@ pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &st
 /// Returns the rows and how many groups they fell into — the count is part of
 /// the summary line, and counting it here means walking the records once.
 ///
-/// The records arrive sorted (`archive::sort_records`), so a group is a run of
+/// The records arrive sorted (`order::sort_records`), so a group is a run of
 /// equal labels rather than something to collect into a map.
 fn render_rows(records: &[ManuscriptRecord]) -> (String, usize) {
     let mut rows = String::new();
