@@ -87,10 +87,7 @@ fn corrupted_and_empty_archives() {
 
     let noxml = dir.path().join("noxml.zip");
     make_zip(&noxml, &[("a.txt", "hi"), ("b.md", "#")]);
-    assert!(matches!(
-        parse_zip(&noxml),
-        Err(ArunaError::EmptyArchive)
-    ));
+    assert!(matches!(parse_zip(&noxml), Err(ArunaError::EmptyArchive)));
 }
 
 #[test]
@@ -261,9 +258,8 @@ fn real_fixture_zip_if_present() {
 fn report_coverage(records: &[ManuscriptRecord]) {
     let total = records.len();
     let share = |filled: usize| 100.0 * filled as f64 / total as f64;
-    let count = |f: fn(&ManuscriptRecord) -> &str| {
-        records.iter().filter(|r| f(r) != MISSING).count()
-    };
+    let count =
+        |f: fn(&ManuscriptRecord) -> &str| records.iter().filter(|r| f(r) != MISSING).count();
 
     let editor = count(|r| &r.authorship);
     let year = count(|r| &r.year);
