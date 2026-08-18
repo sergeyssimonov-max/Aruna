@@ -268,7 +268,10 @@ mod tests {
         let v = parse(r#"{"a": 1, "b": "x", "c": [1, 2], "d": {"e": true}, "f": null}"#).unwrap();
         assert_eq!(v.get("a").and_then(Json::as_u64), Some(1));
         assert_eq!(v.get("b").and_then(Json::as_str), Some("x"));
-        assert_eq!(v.get("c").and_then(|c| c.at(1)).and_then(Json::as_u64), Some(2));
+        assert_eq!(
+            v.get("c").and_then(|c| c.at(1)).and_then(Json::as_u64),
+            Some(2)
+        );
         assert_eq!(v.get("d").and_then(|d| d.get("e")), Some(&Json::Bool(true)));
         assert_eq!(v.get("f"), Some(&Json::Null));
         assert_eq!(v.get("missing"), None);
@@ -281,7 +284,10 @@ mod tests {
         let v = parse(r#"{"files": [{"key": "inner"}], "key": "outer"}"#).unwrap();
         assert_eq!(v.get("key").and_then(Json::as_str), Some("outer"));
         assert_eq!(
-            v.get("files").and_then(|f| f.at(0)).and_then(|f| f.get("key")).and_then(Json::as_str),
+            v.get("files")
+                .and_then(|f| f.at(0))
+                .and_then(|f| f.get("key"))
+                .and_then(Json::as_str),
             Some("inner")
         );
     }
@@ -289,7 +295,10 @@ mod tests {
     #[test]
     fn escapes_and_unicode_survive() {
         let v = parse(r#"{"s": "a\"b\\c\ndéሀ0"}"#);
-        assert_eq!(v.unwrap().get("s").and_then(Json::as_str), Some("a\"b\\c\ndéሀ0"));
+        assert_eq!(
+            v.unwrap().get("s").and_then(Json::as_str),
+            Some("a\"b\\c\ndéሀ0")
+        );
 
         // A surrogate pair spells cuneiform.
         let v = parse(r#"{"s": "𒀀"}"#).unwrap();
@@ -365,8 +374,9 @@ mod tests {
     fn corruption_at_any_position_is_survivable() {
         let bytes = REAL.as_bytes();
         for at in 0..bytes.len() {
-            for replacement in [b'"', b'{', b'}', b'[', b']', b'\\', b':', b',', b'0', 0x01, 0x7f]
-            {
+            for replacement in [
+                b'"', b'{', b'}', b'[', b']', b'\\', b':', b',', b'0', 0x01, 0x7f,
+            ] {
                 let mut broken = bytes.to_vec();
                 broken[at] = replacement;
                 // Only valid UTF-8 reaches the parser: the caller holds a String.
@@ -383,7 +393,9 @@ mod tests {
         let bytes = REAL.as_bytes();
         let mut seed = 0x2026_0816_u64;
         let mut next = move || {
-            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
             (seed >> 33) as usize
         };
         for _ in 0..2000 {
@@ -406,17 +418,17 @@ mod tests {
     #[test]
     fn hostile_documents_are_refused_rather_than_fatal() {
         let cases = vec![
-            "\u{feff}{}".to_string(),                 // byte-order mark
+            "\u{feff}{}".to_string(), // byte-order mark
             "{\"a\":".to_string() + &"[".repeat(500) + "1" + &"]".repeat(500) + "}",
             format!("{{\"a\":\"{}\"}}", "x".repeat(100_000)), // a very long string
-            format!("{{\"a\":{}}}", "9".repeat(400)),        // a number past f64
-            "{\"a\":1e999}".to_string(),                    // infinity
+            format!("{{\"a\":{}}}", "9".repeat(400)),         // a number past f64
+            "{\"a\":1e999}".to_string(),                      // infinity
             "{\"a\":-1e999}".to_string(),
             "{\"\":\"empty key\"}".to_string(),
-            "{\"a\":\"\\ud83d\\ude00\"}".to_string(),        // a valid surrogate pair
-            "{\"a\":\"\\udc00\\ud800\"}".to_string(),        // surrogates the wrong way round
-            "{\"a\":\"\\u0000\"}".to_string(),                // escaped NUL
-            "[".repeat(100_000),                              // deeper than the cap
+            "{\"a\":\"\\ud83d\\ude00\"}".to_string(), // a valid surrogate pair
+            "{\"a\":\"\\udc00\\ud800\"}".to_string(), // surrogates the wrong way round
+            "{\"a\":\"\\u0000\"}".to_string(),        // escaped NUL
+            "[".repeat(100_000),                      // deeper than the cap
             "{\"a\":{\"a\":{\"a\":1}}}".to_string(),
         ];
         for text in cases {

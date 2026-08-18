@@ -17,9 +17,7 @@ pub const OUTPUT_FILE_NAME: &str = "TLHdig_Beta_0.3.html";
 
 /// Resolve `~/Downloads/TLHdig_Beta_0.3.html`.
 pub fn output_html_path() -> Result<PathBuf> {
-    let downloads = dirs::download_dir().or_else(|| {
-        dirs::home_dir().map(|h| h.join("Downloads"))
-    });
+    let downloads = dirs::download_dir().or_else(|| dirs::home_dir().map(|h| h.join("Downloads")));
     let dir = downloads.ok_or(ArunaError::DownloadsDir)?;
     Ok(dir.join(OUTPUT_FILE_NAME))
 }
@@ -197,8 +195,14 @@ mod tests {
 
         check_output_writable(&out).expect("a fresh temp directory is writable");
 
-        assert!(out.parent().unwrap().is_dir(), "the parent is created, as the write needs");
-        assert!(!out.exists(), "the inventory itself is not created by a probe");
+        assert!(
+            out.parent().unwrap().is_dir(),
+            "the parent is created, as the write needs"
+        );
+        assert!(
+            !out.exists(),
+            "the inventory itself is not created by a probe"
+        );
         let leftovers: Vec<_> = std::fs::read_dir(out.parent().unwrap())
             .unwrap()
             .flatten()

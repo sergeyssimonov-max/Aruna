@@ -508,18 +508,15 @@ mod tests {
                     // Read the request line so the client is not writing into a
                     // closed socket while we answer.
                     let mut head = String::new();
-                    let mut reader = std::io::BufReader::new(
-                        stream.try_clone().expect("clone"),
-                    );
+                    let mut reader = std::io::BufReader::new(stream.try_clone().expect("clone"));
                     while reader.read_line(&mut head).unwrap_or(0) > 2 {
                         head.clear();
                     }
 
                     match reply {
                         None | Some(Reply::Truncated) => {
-                            let _ = stream.write_all(
-                                b"HTTP/1.1 200 OK\r\nContent-Length: 1024\r\n\r\nshort",
-                            );
+                            let _ = stream
+                                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1024\r\n\r\nshort");
                         }
                         Some(Reply::Body(bytes)) => {
                             let head = format!(
@@ -530,9 +527,8 @@ mod tests {
                             let _ = stream.write_all(bytes);
                         }
                         Some(Reply::Dribble) => {
-                            let _ = stream.write_all(
-                                b"HTTP/1.1 200 OK\r\nContent-Length: 1048576\r\n\r\n",
-                            );
+                            let _ = stream
+                                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1048576\r\n\r\n");
                             let _ = stream.flush();
                             // Slowly enough to outlast any sane deadline, and
                             // for ever: the client must be the one to give up.
@@ -549,9 +545,8 @@ mod tests {
                             let _ = stream.shutdown(std::net::Shutdown::Write);
                         }
                         Some(Reply::Status(status, retry_after)) => {
-                            let mut head = format!(
-                                "HTTP/1.1 {status} Something\r\nContent-Length: 0\r\n"
-                            );
+                            let mut head =
+                                format!("HTTP/1.1 {status} Something\r\nContent-Length: 0\r\n");
                             if let Some(secs) = retry_after {
                                 head.push_str(&format!("Retry-After: {secs}\r\n"));
                             }
@@ -619,8 +614,7 @@ mod tests {
         let dest = dir.path().join("out.zip");
         let server = FakeServer::with_bodies(vec![Some(b"corrupted".to_vec())]);
 
-        let err = download_verified(&server.url(), &dest, Some(&md5_hex(b"expected")))
-            .unwrap_err();
+        let err = download_verified(&server.url(), &dest, Some(&md5_hex(b"expected"))).unwrap_err();
         match err {
             ArunaError::ChecksumMismatch { expected, got, .. } => {
                 assert_eq!(expected, md5_hex(b"expected"));
@@ -628,7 +622,10 @@ mod tests {
             }
             other => panic!("unexpected: {other}"),
         }
-        assert!(!dest.exists(), "corrupt body must not reach the destination");
+        assert!(
+            !dest.exists(),
+            "corrupt body must not reach the destination"
+        );
         assert_eq!(
             server.hits(),
             1,
@@ -642,10 +639,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
         let good = b"complete archive bytes".to_vec();
-        let server = FakeServer::start(vec![
-            Reply::Status(503, None),
-            Reply::Body(good.clone()),
-        ]);
+        let server = FakeServer::start(vec![Reply::Status(503, None), Reply::Body(good.clone())]);
 
         download_verified(&server.url(), &dest, Some(&md5_hex(&good))).expect("second attempt");
         assert_eq!(std::fs::read(&dest).expect("read back"), good);
@@ -1009,7 +1003,10 @@ mod tests {
         let outcome = stream_to_file(&mut response.into_reader(), &dest);
         let waited = started.elapsed();
 
-        assert!(outcome.is_err(), "a transfer that never ends must not be waited out");
+        assert!(
+            outcome.is_err(),
+            "a transfer that never ends must not be waited out"
+        );
         assert!(
             waited < Duration::from_secs(5),
             "gave up after {waited:?}, which is not giving up"
@@ -1104,5 +1101,4 @@ mod tests {
             b"previous good archive"
         );
     }
-
 }

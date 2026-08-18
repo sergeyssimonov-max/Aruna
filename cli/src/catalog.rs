@@ -144,7 +144,9 @@ mod tests {
             title: sigla.to_string(),
             sigla: sigla.into(),
             cth: cth.map(|s| s.to_string()),
-            cth_num: cth.and_then(crate::parse::parse_cth_num).unwrap_or(u32::MAX),
+            cth_num: cth
+                .and_then(crate::parse::parse_cth_num)
+                .unwrap_or(u32::MAX),
             authorship: auth.into(),
             year: year.into(),
             lang: "Hit".into(),
@@ -207,6 +209,9 @@ mod tests {
     #[test]
     fn records_without_a_cth_group_under_the_dash() {
         let json = render(&[rec("Loose", None, "A", "2020")], "src").json;
-        assert!(json.contains(&format!(r#"["{MISSING}",[["Loose""#)), "{json}");
+        assert!(
+            json.contains(&format!(r#"["{MISSING}",[["Loose""#)),
+            "{json}"
+        );
     }
 }

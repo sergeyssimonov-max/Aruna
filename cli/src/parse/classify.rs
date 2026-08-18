@@ -105,7 +105,10 @@ mod tests {
             "CTH 1_XML/notes.txt",
             ".xml",
         ] {
-            assert!(!is_manuscript_xml(path), "should have been rejected: {path}");
+            assert!(
+                !is_manuscript_xml(path),
+                "should have been rejected: {path}"
+            );
         }
 
         for path in [
@@ -127,13 +130,22 @@ mod tests {
              signed:true:useLegacyFileKey:false:encoding:binary:HEND";
         assert!(!looks_like_manuscript(encrypted));
         assert!(!looks_like_manuscript(""));
-        assert!(!looks_like_manuscript("<html><body>not a manuscript</body></html>"));
+        assert!(!looks_like_manuscript(
+            "<html><body>not a manuscript</body></html>"
+        ));
         // AppleDouble entries start with a binary Mac OS X signature.
-        assert!(!looks_like_manuscript("\u{0}\u{5}\u{16}\u{7}\u{0}\u{2}\u{0}\u{0}Mac OS X"));
+        assert!(!looks_like_manuscript(
+            "\u{0}\u{5}\u{16}\u{7}\u{0}\u{2}\u{0}\u{0}Mac OS X"
+        ));
 
         assert!(looks_like_manuscript(SAMPLE_FULL));
-        assert!(looks_like_manuscript("<AOxml><AOHeader><docID>X</docID></AOHeader></AOxml>"));
-        assert!(looks_like_manuscript("<TEI><teiHeader/></TEI>"), "TEI is accepted too");
+        assert!(looks_like_manuscript(
+            "<AOxml><AOHeader><docID>X</docID></AOHeader></AOxml>"
+        ));
+        assert!(
+            looks_like_manuscript("<TEI><teiHeader/></TEI>"),
+            "TEI is accepted too"
+        );
     }
 
     /// The marker has to be found in the window the reader actually holds, not

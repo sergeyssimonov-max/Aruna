@@ -179,9 +179,9 @@ mod tests {
             "",
             "not json at all",
             "{}",
-            r#"{"id": 1}"#,                       // no files
-            r#"{"id": 1, "files": []}"#,          // no file in them
-            r#"{"files": [{"key": "a.zip"}]}"#,   // no id
+            r#"{"id": 1}"#,                     // no files
+            r#"{"id": 1, "files": []}"#,        // no file in them
+            r#"{"files": [{"key": "a.zip"}]}"#, // no id
             r#"{"status": 404, "message": "PID does not exist."}"#,
             // What `/versions/latest` answers when a client does not follow
             // redirects. It is JSON, and it is not a record.
@@ -227,7 +227,10 @@ mod tests {
     fn a_newer_edition_is_announced_without_switching_to_it() {
         let message = advice(7, "abc", &release(9, Some("zzz"))).expect("news");
         assert!(message.contains("record 9"), "{message}");
-        assert!(message.contains("2026-05-21"), "the edition is dated: {message}");
+        assert!(
+            message.contains("2026-05-21"),
+            "the edition is dated: {message}"
+        );
         assert!(message.contains("corpus.zip"), "{message}");
         assert!(
             message.contains("pinned to record 7") && message.contains("keep using it"),
@@ -249,7 +252,10 @@ mod tests {
     #[test]
     fn a_disagreeing_digest_warns_and_predicts_the_failure() {
         let message = advice(7, "abc", &release(7, Some("def"))).expect("warning");
-        assert!(message.contains("def") && message.contains("abc"), "both digests: {message}");
+        assert!(
+            message.contains("def") && message.contains("abc"),
+            "both digests: {message}"
+        );
         assert!(message.contains("will fail"), "{message}");
     }
 
@@ -258,7 +264,10 @@ mod tests {
     #[test]
     fn a_newer_edition_is_not_also_reported_as_a_digest_mismatch() {
         let message = advice(7, "abc", &release(9, Some("def"))).expect("news");
-        assert!(!message.contains("will fail"), "one story, not two: {message}");
+        assert!(
+            !message.contains("will fail"),
+            "one story, not two: {message}"
+        );
     }
 
     /// A record without a checksum is still usable — the digest is an extra,
