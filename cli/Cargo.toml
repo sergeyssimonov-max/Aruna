@@ -18,6 +18,16 @@ thiserror = "2"
 ureq = { version = "2.12", default-features = true, features = ["tls"] }
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
+[features]
+# Opens `parse::fields` for measurement. Off by default and never enabled by the
+# binary: the extractors are the parse's hot path, and timing them individually
+# is what makes replacing them individually checkable.
+bench = []
+
+[[example]]
+name = "bench_fields"
+required-features = ["bench"]
+
 [dev-dependencies]
 tempfile = "3"
 

@@ -28,9 +28,7 @@ fn is_ascii_alpha(b: u8) -> bool {
 /// `:` is included, so a scanned name still carries its prefix — use
 /// [`local_part`] to drop it.
 fn is_name_char(b: u8) -> bool {
-    is_ascii_alpha(b)
-        || b.is_ascii_digit()
-        || matches!(b, b':' | b'-' | b'_' | b'.')
+    is_ascii_alpha(b) || b.is_ascii_digit() || matches!(b, b':' | b'-' | b'_' | b'.')
 }
 
 /// Local part of a possibly prefixed XML Name (`AO:docID` → `docID`).
@@ -286,6 +284,39 @@ pub fn find_open_tag(hay: &[u8], local: &[u8]) -> Option<(usize, usize)> {
     })
 }
 
+/// The first opening tag for each of `names`, in one walk.
+///
+/// [`find_open_tag`] walks every tag in the haystack, so asking it for three
+/// names walks it three times — and the extractor that wanted three names was
+/// doing exactly that, over both windows, for every document in the corpus.
+/// This fills `found[i]` with the first tag whose local name matches
+/// `names[i]`, and stops as soon as every name has an answer.
+///
+/// Each name keeps its own first match rather than the earliest match of any
+/// name: a caller that prefers one spelling over another needs the first
+/// element of *that* spelling, not whichever came first in the document.
+pub fn find_open_tags(hay: &[u8], names: &[&[u8]], found: &mut [Option<(usize, usize)>]) {
+    debug_assert_eq!(names.len(), found.len());
+    let mut remaining = names.len();
+
+    for tag in tags(hay) {
+        let Tag::Start(start) = tag else { continue };
+        for (i, name) in names.iter().enumerate() {
+            if found[i].is_some() || !eq_ci(start.name, name) {
+                continue;
+            }
+            let Some((_, content)) = start.rest() else {
+                continue;
+            };
+            found[i] = Some((start.at, content));
+            remaining -= 1;
+        }
+        if remaining == 0 {
+            return;
+        }
+    }
+}
+
 /// Find the matching closing tag `</…local…>` starting search from `from`.
 pub fn find_close_tag(hay: &[u8], from: usize, local: &[u8]) -> Option<usize> {
     tags_from(hay, from).find_map(|tag| match tag {
@@ -410,7 +441,10 @@ impl<'a> Iterator for Attrs<'a> {
             }
 
             let quoted = &after_eq[1..];
-            let value_len = quoted.iter().position(|&b| b == quote).unwrap_or(quoted.len());
+            let value_len = quoted
+                .iter()
+                .position(|&b| b == quote)
+                .unwrap_or(quoted.len());
             self.rest = quoted.get(value_len + 1..).unwrap_or(&[]);
             return Some((name, &quoted[..value_len]));
         }
@@ -648,5 +682,50 @@ mod tests {
         assert!(eq_ci(b".xml", b".XML"));
         assert!(eq_ci(b"AbC", b"abc"));
         assert!(!eq_ci(b"a", b"ab"));
+    }
+
+    /// One walk, one first match per name — and each name keeps its own first
+    /// element rather than the earliest of any of them, which is what lets a
+    /// caller prefer a spelling over a position.
+    #[test]
+    fn one_walk_finds_the_first_tag_of_each_name() {
+        let xml = b"<root><b>second</b><a>first</a><a>again</a></root>";
+        let names: [&[u8]; 3] = [b"a", b"b", b"missing"];
+        let mut found = [None; 3];
+        find_open_tags(xml, &names, &mut found);
+
+        let text = |slot: Option<(usize, usize)>, name: &[u8]| {
+            let (_, content) = slot?;
+            let close = find_close_tag(xml, content, name)?;
+            Some(String::from_utf8_lossy(&xml[content..close]).into_owned())
+        };
+        assert_eq!(text(found[0], b"a").as_deref(), Some("first"));
+        assert_eq!(text(found[1], b"b").as_deref(), Some("second"));
+        assert_eq!(found[2], None, "a name that is not there stays unanswered");
+    }
+
+    /// The same answers `find_open_tag` gives one name at a time, which is the
+    /// only reason it is safe to ask for several at once.
+    #[test]
+    fn asking_for_several_names_agrees_with_asking_one_at_a_time() {
+        let xml = b"<AOxml><AOHeader><docID>X</docID></AOHeader>                    <body><inv>early</inv><InvNr>VAT 1</InvNr></body></AOxml>";
+        let names: [&[u8]; 3] = [b"InvNr", b"inv", b"docID"];
+        let mut found = [None; 3];
+        find_open_tags(xml, &names, &mut found);
+
+        for (name, slot) in names.iter().zip(found) {
+            assert_eq!(slot, find_open_tag(xml, name), "disagreed about {name:?}");
+        }
+    }
+
+    /// Case is not part of the question, which is why one spelling is enough.
+    #[test]
+    fn names_are_matched_without_regard_to_case() {
+        let xml = b"<root><InvNr>x</InvNr></root>";
+        let names: [&[u8]; 2] = [b"invnr", b"INVNR"];
+        let mut found = [None; 2];
+        find_open_tags(xml, &names, &mut found);
+        assert_eq!(found[0], found[1]);
+        assert!(found[0].is_some());
     }
 }

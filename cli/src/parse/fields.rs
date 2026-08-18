@@ -10,8 +10,8 @@
 
 use super::{truncate_on_char_boundary, MISSING};
 use crate::xml_scan::{
-    attr_value, eq_ci, find_ci, find_cth_number, find_year, for_each_start_tag, strip_tags_bytes,
-    tag_text,
+    attr_value, eq_ci, find_ci, find_close_tag, find_cth_number, find_open_tags, find_year,
+    for_each_start_tag, strip_tags_bytes, tag_text,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -30,7 +30,7 @@ fn utf8(b: &[u8]) -> &str {
 ///
 /// The filename is the last resort rather than the first: it is always present,
 /// so consulting it earlier would mask the documents that do carry a siglum.
-pub(super) fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
+pub fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
     // `docID` and `TxtPubl` are looked for in the wider window as well: TLHdig
     // puts `<AO:TxtPubl>` in the body, beside the inventory number.
     if let Some(text) = text_of(header, b"docID")
@@ -83,6 +83,16 @@ fn text_of(hay: &str, tag: &[u8]) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
+/// The same answer as [`text_of`], from an element already located.
+///
+/// Split out so a caller that found the element itself does not have to search
+/// for it again to read it.
+fn text_of_span(raw: &[u8]) -> Option<String> {
+    let stripped = strip_tags_bytes(raw);
+    let text = normalize_ws(String::from_utf8_lossy(&stripped).trim());
+    (!text.is_empty()).then_some(text)
+}
+
 /// The file's own name, without extension or surrounding space.
 fn file_stem(path: &str) -> Option<String> {
     let stem = Path::new(path).file_stem()?.to_str()?.trim();
@@ -94,7 +104,7 @@ fn file_stem(path: &str) -> Option<String> {
 /// The path wins because the archive is laid out by catalogue number
 /// (`CTH 786_XML_HFR/…`), so it is the one statement of the number that is
 /// there for every document.
-pub(super) fn extract_cth(header: &str, xml: &str, path: &str) -> Option<String> {
+pub fn extract_cth(header: &str, xml: &str, path: &str) -> Option<String> {
     if let Some(n) = find_cth_number(path.as_bytes()) {
         return Some(format!("CTH {}", utf8(n)));
     }
@@ -164,12 +174,15 @@ const EDITOR_ATTRS: &[&[u8]] = &[b"editor", b"author"];
 /// than the editor would credit one person's work to another's date. The year
 /// is optional here; [`extract_year_fallback`] takes over when the winning
 /// element carries no date.
-pub(super) fn extract_editor_and_year(header: &str) -> (Option<String>, Option<String>) {
+pub fn extract_editor_and_year(header: &str) -> (Option<String>, Option<String>) {
     // A TEI-like element naming a person wins outright: it spells out a full
     // name, where the AOxml roles below carry initials.
     for tag in [b"name".as_slice(), b"persName", b"author"] {
         if let Some(name) = text_of(header, tag).filter(|text| !is_auto_editor(text)) {
-            return (Some(name), find_year(header.as_bytes()).map(|y| utf8(&y).to_string()));
+            return (
+                Some(name),
+                find_year(header.as_bytes()).map(|y| utf8(&y).to_string()),
+            );
         }
     }
 
@@ -240,7 +253,7 @@ fn is_auto_editor(s: &str) -> bool {
 }
 
 /// Year when the editor's own element carried no usable date.
-pub(super) fn extract_year_fallback(header: &str, xml: &str) -> Option<String> {
+pub fn extract_year_fallback(header: &str, xml: &str) -> Option<String> {
     /// Elements whose `date=` says when this edition was made.
     const DATED_ELEMENTS: &[&[u8]] = &[
         b"creation-date",
@@ -251,9 +264,10 @@ pub(super) fn extract_year_fallback(header: &str, xml: &str) -> Option<String> {
     ];
 
     let dated = first_in_start_tags(header, |local, attrs| {
-        DATED_ELEMENTS.iter().any(|tag| eq_ci(local, tag)).then(|| {
-            attr_value(attrs, b"date").and_then(|date| year_from_date_value(utf8(date)))
-        })?
+        DATED_ELEMENTS
+            .iter()
+            .any(|tag| eq_ci(local, tag))
+            .then(|| attr_value(attrs, b"date").and_then(|date| year_from_date_value(utf8(date))))?
     });
     if dated.is_some() {
         return dated;
@@ -297,17 +311,34 @@ fn year_from_date_value(raw: &str) -> Option<String> {
 /// Looking only at the header therefore found it in no document at all, and
 /// every one of the 24 000 records carried the missing-value dash — while the
 /// numbers are what makes a manuscript findable by its museum id in search.
-pub(super) fn extract_inv(header: &str, window: &str) -> String {
-    // Lazily: the first place that answers wins, and the rest is not read.
-    [header, window]
-        .into_iter()
-        .flat_map(|hay| {
-            [b"InvNr".as_slice(), b"invNr", b"inv"]
-                .into_iter()
-                .map(move |tag| (hay, tag))
-        })
-        .find_map(|(hay, tag)| text_of(hay, tag))
-        .unwrap_or_else(|| MISSING.to_string())
+pub fn extract_inv(header: &str, window: &str) -> String {
+    /// The spellings this element is written with, in the order they are
+    /// preferred. `invNr` is not among them: the tag match is case-insensitive,
+    /// so it is the same question as `InvNr` asked a second time.
+    const NAMES: [&[u8]; 2] = [b"InvNr", b"inv"];
+
+    // One walk per window instead of one per spelling. Locating a tag means
+    // walking every tag in the haystack, and this extractor was doing that six
+    // times for a field only 11.6 % of the corpus carries — which made it 65 %
+    // of the parse, measured. The order of the answers is unchanged: the first
+    // element of the preferred spelling wins, and only if it says nothing does
+    // the next spelling get a turn.
+    for hay in [header, window] {
+        let bytes = hay.as_bytes();
+        let mut found = [None; NAMES.len()];
+        find_open_tags(bytes, &NAMES, &mut found);
+
+        for (name, open) in NAMES.iter().zip(found) {
+            let Some((_, content)) = open else { continue };
+            let Some(close) = find_close_tag(bytes, content, name) else {
+                continue;
+            };
+            if let Some(text) = text_of_span(&bytes[content..close]) {
+                return text;
+            }
+        }
+    }
+    MISSING.to_string()
 }
 
 /// How much of the body to sample when deciding which languages a text is in.
@@ -333,7 +364,7 @@ const LANG_SEPARATOR: &str = ", ";
 /// Ordered by how much of the sampled window each language holds, so the first
 /// code is the one that used to be reported alone. Ties break on the code
 /// itself, so the output never depends on hash order.
-pub(super) fn extract_lang(xml: &str) -> String {
+pub fn extract_lang(xml: &str) -> String {
     let window = truncate_on_char_boundary(xml, LANG_WINDOW);
     let mut counts: HashMap<String, u32> = HashMap::new();
 
@@ -415,7 +446,7 @@ fn normalise_lang(code: &str) -> String {
 }
 
 /// Series token from a path segment like `CTH 786_XML_HFR/…`.
-pub(super) fn extract_corpus(path: &str) -> String {
+pub fn extract_corpus(path: &str) -> String {
     let mut from = 0;
     while let Some(rel) = find_ci(&path.as_bytes()[from..], b"_XML_") {
         let start = from + rel + 5;
@@ -483,7 +514,10 @@ mod tests {
     /// 93% of this corpus.
     #[test]
     fn one_language_is_still_one_word() {
-        assert_eq!(extract_lang(r#"<body><l lg="Hit"/><l lg="Hit"/></body>"#), "Hit");
+        assert_eq!(
+            extract_lang(r#"<body><l lg="Hit"/><l lg="Hit"/></body>"#),
+            "Hit"
+        );
     }
 
     /// Spelling variants are one language, not two entries side by side.
@@ -493,8 +527,14 @@ mod tests {
     #[test]
     fn variants_fold_before_they_are_listed() {
         assert_eq!(extract_lang(r#"<l lg="Hit"/><l lg="Hitt"/>"#), "Hit");
-        assert_eq!(extract_lang(r#"<l lg="Akk"/><l lg="Akkd"/><l lg="Hit"/>"#), "Akk, Hit");
-        assert_eq!(extract_lang(r#"<l lg="Hat"/><l lg="Hattian"/><l lg="Hit"/>"#), "Hat, Hit");
+        assert_eq!(
+            extract_lang(r#"<l lg="Akk"/><l lg="Akkd"/><l lg="Hit"/>"#),
+            "Akk, Hit"
+        );
+        assert_eq!(
+            extract_lang(r#"<l lg="Hat"/><l lg="Hattian"/><l lg="Hit"/>"#),
+            "Hat, Hit"
+        );
     }
 
     /// `5f_` is not a language: it stands where one belongs on lines with no
@@ -548,7 +588,10 @@ mod tests {
     /// hide the languages that *are* named beside it.
     #[test]
     fn unidentified_lines_do_not_erase_the_identified_ones() {
-        assert_eq!(extract_lang(r#"<l lg="ign"/><l lg="ign"/><l lg="Hit"/>"#), "Hit");
+        assert_eq!(
+            extract_lang(r#"<l lg="ign"/><l lg="ign"/><l lg="Hit"/>"#),
+            "Hit"
+        );
     }
 
     /// `lg=` must be a whole attribute name, not the tail of another one.

@@ -13,7 +13,15 @@
 //!   consults before deciding to read an entry.
 
 mod classify;
+
+// The extractors are the parse's hot path, and measuring them one at a time is
+// the only way to replace them one at a time. They are reachable from outside
+// the crate only when `bench` is on, so the shipped library's surface is the
+// same as it was: a private module caps what `pub` inside it can mean.
+#[cfg(not(feature = "bench"))]
 mod fields;
+#[cfg(feature = "bench")]
+pub mod fields;
 #[cfg(test)]
 mod fixtures;
 
@@ -75,9 +83,51 @@ pub fn truncate_on_char_boundary(s: &str, max: usize) -> &str {
 /// inventory number, for one, is not in the header at all — so the choice lives
 /// with the extractor rather than here.
 pub fn parse_manuscript(path: &str, xml: &str) -> ManuscriptRecord {
-    // Restrict work to the header region; bodies can be hundreds of KiB of cuneiform.
-    let window = truncate_on_char_boundary(xml, HEADER_READ_LIMIT);
-    let header = extract_header_slice(window);
+    parse_windows(path, Windows::of(xml))
+}
+
+/// The two views of a document every field is read from.
+///
+/// Named because they are the one thing the whole parse shares: each extractor
+/// is handed this same pair and decides for itself which half answers its
+/// question. While they were two locals inside [`parse_manuscript`] that was
+/// true but invisible, and there was no way to measure cutting them apart from
+/// reading them — which is the difference between a parse stage that can be
+/// optimised locally and one that can only be timed as a whole.
+///
+/// Copy, and borrowed from the document: nothing here owns anything.
+#[derive(Clone, Copy, Debug)]
+pub struct Windows<'a> {
+    /// The `AOHeader` / `teiHeader` block, or the leading bytes of a document
+    /// that has neither.
+    pub header: &'a str,
+    /// The leading bytes of the document, up to [`HEADER_READ_LIMIT`].
+    pub window: &'a str,
+}
+
+impl<'a> Windows<'a> {
+    /// Cut the windows a document is read through.
+    ///
+    /// Bodies run to hundreds of KiB of cuneiform and hold nothing this parse
+    /// wants, so the work is restricted to the header region before any field
+    /// is looked for.
+    pub fn of(xml: &'a str) -> Self {
+        let window = truncate_on_char_boundary(xml, HEADER_READ_LIMIT);
+        Windows {
+            header: extract_header_slice(window),
+            window,
+        }
+    }
+}
+
+/// Parse a document whose windows have already been cut.
+///
+/// The half of [`parse_manuscript`] that reads. Separate so that a benchmark
+/// can hand it windows prepared once and time the reading alone, and so a
+/// future single-pass extractor can replace this body without any caller
+/// noticing.
+pub fn parse_windows(path: &str, windows: Windows<'_>) -> ManuscriptRecord {
+    let Windows { header, window } = windows;
 
     let sigla = extract_sigla(header, window, path);
     let cth = extract_cth(header, window, path);
@@ -244,7 +294,10 @@ mod tests {
     #[test]
     fn an_ordinary_siglum_is_untouched_by_the_join_mark_rule() {
         let xml = r#"<AOxml><AOHeader><docID>KBo 17.86+</docID></AOHeader></AOxml>"#;
-        assert_eq!(parse_manuscript("CTH 786_XML_HFR/x.xml", xml).sigla, "KBo 17.86+");
+        assert_eq!(
+            parse_manuscript("CTH 786_XML_HFR/x.xml", xml).sigla,
+            "KBo 17.86+"
+        );
 
         let joined = r#"<AOxml><AOHeader><docID></docID></AOHeader>
 <AO:Manuscripts><AO:TxtPubl>KBo 17.86 {€1}+KBo 15.62 {€2}</AO:TxtPubl></AO:Manuscripts></AOxml>"#;
@@ -260,7 +313,10 @@ mod tests {
     fn inventory_number_prefers_the_header_and_tolerates_absence() {
         let in_header = r#"<AOxml><AOHeader><docID>X</docID><InvNr>Bo 1234</InvNr></AOHeader>
 <AO:Manuscripts><AO:InvNr>VAT 9999</AO:InvNr></AO:Manuscripts></AOxml>"#;
-        assert_eq!(parse_manuscript("CTH 1_XML/X.xml", in_header).inv, "Bo 1234");
+        assert_eq!(
+            parse_manuscript("CTH 1_XML/X.xml", in_header).inv,
+            "Bo 1234"
+        );
 
         let absent = r#"<AOxml><AOHeader><docID>X</docID></AOHeader><body>t</body></AOxml>"#;
         assert_eq!(parse_manuscript("CTH 1_XML/X.xml", absent).inv, MISSING);
@@ -433,5 +489,87 @@ mod tests {
         let r = parse_manuscript("CTH 786_XML_HFR/KBo 17.86+.xml", &xml);
         assert_eq!(r.authorship, "FB");
         assert_eq!(r.year, "2017");
+    }
+
+    /// Cutting the windows and reading them are the same parse, whichever way
+    /// it is entered. The split exists to be measured through, not to be a
+    /// second behaviour.
+    #[test]
+    fn parsing_through_the_windows_gives_the_same_record() {
+        for (path, xml) in [
+            ("CTH 786_XML_HFR/KBo 17.86+.xml", SAMPLE_FULL),
+            (
+                "orphan/unknown.xml",
+                "<root><note>nothing useful</note></root>",
+            ),
+            ("x/y/z.xml", ""),
+        ] {
+            assert_eq!(
+                parse_manuscript(path, xml),
+                parse_windows(path, Windows::of(xml)),
+                "{path} parsed differently through the two entry points"
+            );
+        }
+    }
+
+    /// The windows are what the whole parse shares, so what they are is worth
+    /// stating: a header block when the document has one, and the leading bytes
+    /// either way.
+    #[test]
+    fn the_windows_are_the_header_block_and_the_leading_bytes() {
+        let xml = "<AOxml><AOHeader><docID>KBo 1.1</docID></AOHeader><body>rest</body></AOxml>";
+        let w = Windows::of(xml);
+        assert_eq!(w.header, "<docID>KBo 1.1</docID>");
+        assert_eq!(w.window, xml, "a short document is its own window");
+
+        // No header block: the fallback is the leading bytes, and the window is
+        // still the whole of a short document.
+        let bare = "<root><note>nothing</note></root>";
+        let w = Windows::of(bare);
+        assert_eq!(w.header, bare);
+        assert_eq!(w.window, bare);
+
+        // A body past the read limit is not in the window at all.
+        let long = format!(
+            "<AOxml><AOHeader><docID>X</docID></AOHeader>{}",
+            "y".repeat(HEADER_READ_LIMIT * 2)
+        );
+        let w = Windows::of(&long);
+        assert!(w.window.len() <= HEADER_READ_LIMIT);
+        assert_eq!(w.header, "<docID>X</docID>");
+    }
+
+    /// The inventory number is read in one walk now, and the order it prefers
+    /// spellings in is the part a single walk could quietly have changed.
+    ///
+    /// `InvNr` outranks `inv` by name, not by position: an `inv` earlier in the
+    /// document must still lose to an `InvNr` later in it. And a preferred
+    /// element that says nothing hands the turn on rather than ending the
+    /// search — which is why the two are tried in order rather than taken from
+    /// whichever tag appeared first.
+    #[test]
+    fn the_inventory_number_prefers_its_spelling_over_its_position() {
+        // `inv` comes first in the document; `InvNr` still wins.
+        let ordered = r#"<AOxml><AOHeader><docID>X</docID></AOHeader>
+<body><inv>early</inv><InvNr>VAT 7479</InvNr></body></AOxml>"#;
+        assert_eq!(parse_manuscript("CTH 1_XML/X.xml", ordered).inv, "VAT 7479");
+
+        // An empty preferred element passes the turn to the next spelling.
+        let empty_first = r#"<AOxml><AOHeader><docID>X</docID></AOHeader>
+<body><InvNr>   </InvNr><inv>Bo 1234</inv></body></AOxml>"#;
+        assert_eq!(
+            parse_manuscript("CTH 1_XML/X.xml", empty_first).inv,
+            "Bo 1234"
+        );
+
+        // Only the first element of a spelling is consulted, as before.
+        let repeated = r#"<AOxml><AOHeader><docID>X</docID></AOHeader>
+<body><InvNr>first</InvNr><InvNr>second</InvNr></body></AOxml>"#;
+        assert_eq!(parse_manuscript("CTH 1_XML/X.xml", repeated).inv, "first");
+
+        // The spelling is matched without regard to case, which is why `invNr`
+        // is no longer searched for separately.
+        let cased = r#"<AOxml><AOHeader><docID>X</docID><invNR>Bo 99</invNR></AOHeader></AOxml>"#;
+        assert_eq!(parse_manuscript("CTH 1_XML/X.xml", cased).inv, "Bo 99");
     }
 }
