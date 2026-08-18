@@ -96,11 +96,39 @@ jobs:
       - name: Clippy (wasm search)
         run: cargo clippy --manifest-path wasm/search/Cargo.toml --all-targets -- -D warnings
 
+      # nextest rather than `cargo test`, for one reason: it can stop a test
+      # that hangs. The CLI suite spawns the real binary as a child process and
+      # opens local sockets, and a test that waits on either of those forever
+      # takes the job with it — `cargo test` has no timeout and would sit there
+      # until the workflow's own limit killed it, with no output saying which
+      # test was stuck. `cli/.config/nextest.toml` sets the deadline; the `ci`
+      # profile says more on the way past.
+      #
+      # It also runs each test in its own process, which is a stricter check
+      # than `cargo test` gives: a test that depended on another one's leftover
+      # state fails here and passes there.
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Test (CLI)
-        run: cargo test --manifest-path cli/Cargo.toml
+        run: cargo nextest run --profile ci --manifest-path cli/Cargo.toml
+
+      # Doctests are the one thing nextest does not run. There are none today;
+      # the step is here so that adding one does not silently go unchecked.
+      - name: Doctests (CLI)
+        run: cargo test --manifest-path cli/Cargo.toml --doc
 
       - name: Test (wasm search)
-        run: cargo test --manifest-path wasm/search/Cargo.toml
+        run: cargo nextest run --manifest-path wasm/search/Cargo.toml
+
+      # The dependency tree is held to what it holds today: a new licence, a
+      # new source or a fresh advisory fails here rather than arriving unnoticed
+      # with a transitive dependency. Policy and reasoning in cli/deny.toml.
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
+      - name: Dependency policy
+        run: cargo deny --manifest-path cli/Cargo.toml check
 
       - name: Build wasm module for its real target
         run: cargo build --release --target wasm32-unknown-unknown --manifest-path wasm/search/Cargo.toml

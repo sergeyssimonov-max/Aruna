@@ -15,6 +15,13 @@ export default tseslint.config(
       ".nitro/**",
       "node_modules/**",
       "src/routeTree.gen.ts",
+      // Rust build output. Two toolchains share this tree and git fences off
+      // `**/target/` for both, but ESLint only knew about the JavaScript side:
+      // `cargo doc` writes a minified search index under `cli/target/doc/`, and
+      // linting it failed the whole check with an error in generated code
+      // nobody wrote. Whether `npm run lint` passed depended on what had been
+      // built locally.
+      "**/target/**",
     ],
   },
   js.configs.recommended,

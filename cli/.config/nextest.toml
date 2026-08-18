@@ -1,0 +1,26 @@
+# Test-runner settings. `cargo test` ignores this file; `cargo nextest run`
+# reads it, and the difference that matters is the one below.
+
+[profile.default]
+# A guard against hanging, not a performance target. The suite spawns the real
+# binary as a child process and opens local sockets, and a test that waits on
+# one of those forever takes CI with it — nothing else here can stop that. The
+# slowest test in the set takes about seven seconds (the download retries, which
+# wait out real backoff), so thirty seconds is a warning that something is
+# wrong and two minutes is the point at which it is killed and reported.
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+# A failure that is hard to reproduce is worth all of its output.
+failure-output = "immediate-final"
+status-level = "fail"
+
+# Retries are deliberately absent. A flaky test is a defect to find, and
+# retrying it here would hide exactly the intermittent failures this suite
+# exists to catch.
+
+[profile.ci]
+# Same guards, more said out loud: CI has no one watching it run.
+slow-timeout = { period = "30s", terminate-after = 4 }
+failure-output = "immediate-final"
+status-level = "all"
+final-status-level = "slow"
