@@ -71,7 +71,7 @@ gh workflow run release-dmg.yml --ref main
 A tag builds it and publishes the release:
 
 ```bash
-git tag v2.0.0 && git push origin v2.0.0   # → GitHub Release with DMG
+git tag v2.0.1 && git push origin v2.0.1   # → GitHub Release with DMG
 ```
 
 The tag has to match `version` in [`cli/Cargo.toml`](cli/Cargo.toml), and CI refuses the release if it does not: the `.app` takes its `CFBundleShortVersionString` from that manifest, so a tag and a manifest that disagree publish a DMG whose application reports a different version from the release it is attached to.
@@ -80,13 +80,15 @@ The corpus job is what keeps the two halves honest: it rebuilds the catalog from
 
 ## Releases
 
-Two releases are published, and both are references — states this project measures itself against and can fall back to. Everything between them has been withdrawn along with its tag and its DMG.
+[v2.0.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.0.0) is current; work continues from it.
+
+Two older releases are kept as references — states this project measures itself against and can fall back to. Everything else has been withdrawn along with its tag and its DMG.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
 
-[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) is current, and the second reference — so falling back does not mean giving up everything built since.
+[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) is the recent one, so falling back does not mean giving up everything built since August.
 
-Both are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if either tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to be.
+Both references are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if either tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to be.
 
 ## Performance and reliability
 
