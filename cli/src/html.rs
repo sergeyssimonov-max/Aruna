@@ -78,8 +78,47 @@ const COLUMNS: [Column; 6] = [
 ///
 /// `source` — human-readable source line (Zenodo record).
 /// `generated_at` — already-formatted local date/time string.
+/// Where an inventory's groups and manuscripts point, when it is part of a
+/// package that has them on disk beside it.
+///
+/// Two slices rather than a lookup: the rows are written in one pass over
+/// records that are already in display order, so the href for row *n* is the
+/// *n*-th entry and nothing has to be searched for. Both are indexed by
+/// position, which is why they are built from the same ordering the rows are.
+pub struct Links<'a> {
+    /// One href per group, in the order the groups appear.
+    pub groups: &'a [String],
+    /// One href per record, in record order.
+    pub fragments: &'a [String],
+}
+
+/// The inventory as the CLI writes it: a document that stands on its own.
 pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &str) -> String {
-    let (body_rows, groups) = render_rows(records);
+    render(records, source, generated_at, None)
+}
+
+/// The same inventory, with every group and every manuscript a link.
+///
+/// The same function on purpose. A package's inventory needs the search, the
+/// folding and the attribution this one already has, and a second renderer
+/// beside it would be a second description of the same table — which this
+/// project has paid for before, in two halves that quietly stopped agreeing.
+pub fn render_linked_html(
+    records: &[ManuscriptRecord],
+    source: &str,
+    generated_at: &str,
+    links: &Links<'_>,
+) -> String {
+    render(records, source, generated_at, Some(links))
+}
+
+fn render(
+    records: &[ManuscriptRecord],
+    source: &str,
+    generated_at: &str,
+    links: Option<&Links<'_>>,
+) -> String {
+    let (body_rows, groups) = render_rows(records, links);
 
     let mut html = String::with_capacity(4096 + body_rows.len());
     html.push_str(DOCUMENT_HEAD);
@@ -102,18 +141,22 @@ pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &st
 ///
 /// The records arrive sorted (`order::sort_records`), so a group is a run of
 /// equal labels rather than something to collect into a map.
-fn render_rows(records: &[ManuscriptRecord]) -> (String, usize) {
+fn render_rows(records: &[ManuscriptRecord], links: Option<&Links<'_>>) -> (String, usize) {
     let mut rows = String::new();
     let mut row_n = 0usize;
     let mut groups = 0usize;
 
     for run in group_runs(records) {
+        let group_href = links.and_then(|l| l.groups.get(groups)).map(String::as_str);
         groups += 1;
-        write_group_row(&mut rows, group_label(&run[0]), run.len());
+        write_group_row(&mut rows, group_label(&run[0]), run.len(), group_href);
 
         for rec in run {
+            let href = links
+                .and_then(|l| l.fragments.get(row_n))
+                .map(String::as_str);
             row_n += 1;
-            write_item_row(&mut rows, row_n, rec);
+            write_item_row(&mut rows, row_n, rec, href);
         }
     }
 
@@ -126,15 +169,29 @@ fn render_rows(records: &[ManuscriptRecord]) -> (String, usize) {
 /// the group can be folded from the keyboard and a screen reader is told what
 /// the control does and what state it is in. `aria-expanded` starts `true`
 /// because a document opened without JavaScript shows everything.
-fn write_group_row(out: &mut String, label: &str, count: usize) {
+fn write_group_row(out: &mut String, label: &str, count: usize, href: Option<&str>) {
     let label = escape_html(label);
+    let Some(href) = href else {
+        let _ = writeln!(
+            out,
+            "        <tr class=\"group\">\n          <td colspan=\"6\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></button></td>\n        </tr>"
+        );
+        return;
+    };
+
+    // The label leaves the button when it becomes a link: an anchor inside a
+    // button is invalid, and browsers disagree about which of the two a click
+    // belongs to. Apart, each does one thing — the chevron folds the group, the
+    // label opens its folder — and `.group-head` restores the spacing the
+    // button's own flex layout was providing.
+    let href = escape_html(href);
     let _ = writeln!(
         out,
-        "        <tr class=\"group\">\n          <td colspan=\"6\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></button></td>\n        </tr>"
+        "        <tr class=\"group\">\n          <td colspan=\"6\"><span class=\"group-head\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span></button><a class=\"group-label\" href=\"{href}\" target=\"_blank\" rel=\"noopener\">{label}</a><span class=\"group-count\">{count}</span></span></td>\n        </tr>"
     );
 }
 
-fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord) {
+fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord, href: Option<&str>) {
     // Within a CTH group show the siglum as the primary name: the group heading
     // already names the CTH, so the full title would repeat it on every row.
     let name = if rec.cth.is_some() && rec.sigla != MISSING {
@@ -147,6 +204,15 @@ fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord) {
     let auth = escape_html(&rec.authorship);
     let year = escape_html(&rec.year);
     let corpus = escape_html(&rec.corpus);
+    // A link where there is one, the bare name where there is not. The cell's
+    // text is the same either way, which is what the search reads.
+    let title = match href {
+        Some(href) => format!(
+            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\">{title}</a>",
+            escape_html(href)
+        ),
+        None => title,
+    };
     let _ = writeln!(
         out,
         "        <tr>\n          <td class=\"num\">{row_n}</td>\n          <td>{title}</td>\n          <td>{lang}</td>\n          <td>{corpus}</td>\n          <td>{auth}</td>\n          <td class=\"year\">{year}</td>\n        </tr>"
@@ -158,13 +224,7 @@ fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord) {
 ///
 /// The two counts share a line — they are one fact about the corpus, and each
 /// on its own row made a four-line block out of a header.
-fn write_summary(
-    out: &mut String,
-    source: &str,
-    generated_at: &str,
-    count: usize,
-    groups: usize,
-) {
+fn write_summary(out: &mut String, source: &str, generated_at: &str, count: usize, groups: usize) {
     let source = escape_html(source);
     let generated = escape_html(generated_at);
     // Not the `Editor` column, which says who edited one manuscript. These four
@@ -174,7 +234,12 @@ fn write_summary(
     out.push_str("    <p class=\"meta\">\n");
     let _ = writeln!(out, "      <span>Source: {source}</span>");
     let _ = writeln!(out, "      <span>Corpus authors: {authors}</span>");
-    let _ = writeln!(out, "      <span>Generated: {generated}</span>");
+    // Omitted when the caller has no timestamp to give. A package is rebuilt
+    // from the same archive and has to come out the same every time, and a
+    // clock reading in the document would be the one thing that never did.
+    if !generated.is_empty() {
+        let _ = writeln!(out, "      <span>Generated: {generated}</span>");
+    }
     let _ = writeln!(
         out,
         "      <span class=\"counts\"><span class=\"count\">Manuscripts: {count}</span><span class=\"count\">Groups (CTH): {groups}</span></span>"

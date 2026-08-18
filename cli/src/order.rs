@@ -27,9 +27,21 @@ use crate::parse::ManuscriptRecord;
 /// moved twice and both copies were live at once, for an inventory that is
 /// already in memory and already the right length.
 pub fn sort_records(records: &mut [ManuscriptRecord]) {
-    let keys = SortKeys::build(records);
+    sort_by_display_order(records, |record| record)
+}
 
-    let mut order: Vec<u32> = (0..records.len() as u32).collect();
+/// The same order, over anything that carries a record.
+///
+/// The export builds pairs of a record and the archive entry it came from, and
+/// has to list them in the order the inventory does. Sorting a second kind of
+/// item by copying the comparison would be two descriptions of one order, which
+/// is how the two halves of this project have drifted before — so there is one
+/// description and [`sort_records`] is a call to it.
+pub fn sort_by_display_order<T>(items: &mut [T], record: impl Fn(&T) -> &ManuscriptRecord) {
+    let records: Vec<&ManuscriptRecord> = items.iter().map(&record).collect();
+    let keys = SortKeys::build(&records);
+
+    let mut order: Vec<u32> = (0..items.len() as u32).collect();
     order.sort_unstable_by(|&a, &b| {
         let (a, b) = (a as usize, b as usize);
         keys.get(a)
@@ -38,7 +50,7 @@ pub fn sort_records(records: &mut [ManuscriptRecord]) {
             .then_with(|| records[a].year.cmp(&records[b].year))
     });
 
-    apply_order(records, &order);
+    apply_order(items, &order);
 }
 
 /// The primary sort keys of a whole inventory, in two allocations.
@@ -70,7 +82,7 @@ const TAG_NUM: u8 = 0x00;
 const TAG_TEXT: u8 = 0x01;
 
 impl SortKeys {
-    fn build(records: &[ManuscriptRecord]) -> Self {
+    fn build(records: &[&ManuscriptRecord]) -> Self {
         // Two bytes of tag and a handful of content per segment; the sigla in
         // this corpus encode to about 30 bytes. Sized to land near that without
         // pretending to know the archive.

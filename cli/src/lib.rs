@@ -7,6 +7,7 @@ pub mod cache;
 pub mod catalog;
 pub mod download;
 pub mod error;
+pub mod export;
 pub mod html;
 pub mod md5;
 pub mod order;
@@ -88,7 +89,7 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
 
     let source = match local_zip {
         Some(p) => cache::Archive::Cached(p.to_path_buf()),
-        None => obtain_archive()?,
+        None => obtain_archive(download::ZENODO_ZIP_URL, download::ZENODO_ZIP_MD5)?,
     };
 
     eprintln!("Parsing XML manuscripts…");
@@ -117,10 +118,15 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
 ///
 /// A hit costs the 267 ms of rereading 71 MiB to check the digest; a miss costs
 /// the download, which is about a minute. That is the whole reason this exists.
-fn obtain_archive() -> Result<cache::Archive> {
-    let url = download::ZENODO_ZIP_URL;
-    let md5 = download::ZENODO_ZIP_MD5;
-
+///
+/// Takes the url and digest rather than reading the pinned constants, so the
+/// orchestration can be pointed at a local server. It could not be before, and
+/// the cost of that showed up in coverage: every test reaches the parse through
+/// `ARUNA_ZIP`, which skips this function entirely, so the piece that decides
+/// between a cached archive and a downloaded one — the difference between a
+/// two-second run and a one-minute one — was the least tested code in the
+/// program. Its parts each had tests; nothing exercised the wiring.
+pub fn obtain_archive(url: &str, md5: &str) -> Result<cache::Archive> {
     let Some(dir) = cache_for_run() else {
         return download_unkept(url, md5);
     };

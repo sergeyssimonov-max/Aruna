@@ -78,6 +78,50 @@ pub enum ArunaError {
         source: std::io::Error,
     },
 
+    /// Two documents wanted the same place in the export, and neither may be
+    /// the one that survives. The message names both so the pair can be looked
+    /// at rather than guessed about.
+    #[error("export collision in {group}: {fragment} maps to {path:?}, wanted by both {first} and {second}")]
+    ExportCollision {
+        group: String,
+        fragment: String,
+        first: String,
+        second: String,
+        path: std::path::PathBuf,
+    },
+
+    /// One archive entry is larger than the export will hold in memory. The
+    /// archive is compressed, so a few hundred kilobytes on disk can be a few
+    /// hundred megabytes once inflated — measured at 834 MiB of peak memory
+    /// from a 398 KiB file before this limit existed.
+    #[error("{entry} is larger than the {limit} byte limit for one document")]
+    ExportDocumentTooLarge { entry: String, limit: u64 },
+
+    /// The export wrote a different number of documents than it placed. Not a
+    /// condition any input should produce — it means the writer and the
+    /// placement disagreed about what the archive holds — so it is reported
+    /// rather than absorbed.
+    #[error("export wrote {written} documents but placed {expected}")]
+    ExportIncomplete { expected: usize, written: usize },
+
+    /// A finished package does not match the model it was built from. The count
+    /// is the whole tally; the text is the first few, because a package with
+    /// four hundred broken links is one problem, not four hundred.
+    #[error("{root} failed validation with {count} problem(s): {first}")]
+    ExportInvalid {
+        root: std::path::PathBuf,
+        count: usize,
+        first: String,
+    },
+
+    /// The destination holds something this exporter did not write, and a
+    /// recursive delete aimed at the wrong directory cannot be taken back.
+    #[error("refusing to replace {path}: {reason}")]
+    ExportDestination {
+        path: std::path::PathBuf,
+        reason: String,
+    },
+
     #[error("could not resolve Downloads directory")]
     DownloadsDir,
 }

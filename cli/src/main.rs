@@ -78,6 +78,40 @@ fn advice(err: &ArunaError) -> Option<String> {
              портал Wi-Fi, корпоративный прокси или подмена ответа.\n\
              Если же архив просто вырос, поднимите MAX_DOWNLOAD в cli/src/download.rs."
             .to_string(),
+        // The export refuses to overwrite one document with another; the
+        // message already names both, and what to do about it is a question
+        // about the corpus rather than about this program.
+        ArunaError::ExportCollision { .. } => "Два документа претендуют на одно место в пакете.\n\
+             Это расхождение в исходных данных, а не сбой сборки —\n\
+             сверьте оба исходных пути, названных выше."
+            .to_string(),
+        // The export's own messages already carry the paths and the counts;
+        // what they cannot say is that none of these three is something the
+        // reader broke, and what to do about each differs.
+        // The number in the message is the limit, not the diagnosis: an entry
+        // this size is either a corrupted archive or one built to be expanded,
+        // and neither is answered by trying again.
+        ArunaError::ExportDocumentTooLarge { .. } => {
+            "Один документ в архиве больше допустимого предела и не был прочитан.\n\
+             Обычно это повреждённый архив или архив, собранный так, чтобы\n\
+             раздуться при распаковке. Пакет не собран, память не израсходована."
+                .to_string()
+        }
+        ArunaError::ExportDestination { .. } => {
+            "Каталог назначения занят чем-то, чего сборщик не создавал.\n\
+             Он ничего не удалил — перенесите папку в сторону и повторите."
+                .to_string()
+        }
+        ArunaError::ExportInvalid { .. } => {
+            "Пакет собран, но не сошёлся со своей же моделью, поэтому не опубликован.\n\
+             Это ошибка сборщика, а не ваших данных: сообщите, что именно перечислено выше."
+                .to_string()
+        }
+        ArunaError::ExportIncomplete { .. } => {
+            "Записано не столько документов, сколько размечено, — пакет не опубликован.\n\
+             Это ошибка сборщика, а не ваших данных."
+                .to_string()
+        }
         ArunaError::Truncated { .. } | ArunaError::Io { .. } => return None,
     })
 }

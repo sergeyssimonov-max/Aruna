@@ -263,3 +263,25 @@ tr.group.folded .chevron { transform: rotate(-45deg); }
   th:nth-child(5), td:nth-child(5) { display: none; }
   col.c-corp { width: 4.25rem; }
 }
+
+/* A group heading that is also a link: the chevron folds, the label opens the
+   folder. They cannot be one element — an anchor inside a button is invalid —
+   so the spacing the button's own flex layout gave them lives here instead. */
+.group-head {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+a.group-label {
+  /* Dark like the heading it replaced — 663 blue headings would drown the
+     table — but underlined, because a link nobody can tell is a link is a link
+     nobody clicks. The fragments below are ordinary links and look it. */
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 0, 0, 0.28);
+  text-underline-offset: 3px;
+}
+a.group-label:hover,
+a.group-label:focus-visible {
+  text-decoration-color: currentColor;
+}
