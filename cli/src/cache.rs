@@ -65,11 +65,21 @@ pub fn cache_dir() -> Option<PathBuf> {
 /// question "is this the archive I want?" can be answered by the name, and a
 /// republished archive lands beside the old one instead of over it.
 pub fn archive_name(url: &str, md5: &str) -> String {
+    // The last path segment, and nothing before it. This used to split on
+    // `/files/` — which the pinned Zenodo URL happens to contain — and a URL
+    // without that segment fell through to the whole URL: `rsplit` on a
+    // needle that is not there yields the haystack. The name then carried
+    // `http://host/…` separators and all, so joining it to the cache
+    // directory wrote the archive into a tree of directories named after the
+    // URL, and a `..` in one would have written outside the cache entirely.
     let file = url
-        .rsplit("/files/")
+        .split('?')
         .next()
-        .and_then(|rest| rest.split('?').next())
-        .filter(|name| !name.is_empty())
+        .unwrap_or(url)
+        .rsplit('/')
+        .next()
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .filter(|name| !name.contains(['/', '\\']))
         .unwrap_or("archive.zip");
     match file.rsplit_once('.') {
         Some((stem, ext)) => format!("{stem}.{md5}.{ext}"),
@@ -231,6 +241,51 @@ mod tests {
         assert_eq!(name, "TLHbasis_Beta_03.abc123.zip");
     }
 
+    /// A cache file name is one path component, whatever the URL looks like.
+    ///
+    /// It was not: the name was taken by splitting on `/files/`, and a URL
+    /// without that segment yielded the whole URL — scheme, host and all — so
+    /// `dir.join(name)` built a tree of directories named after the URL inside
+    /// the cache. A `..` among them would have written outside it. Found by
+    /// `tests/cache_lifecycle.rs`, which is the first thing to point the
+    /// download at a local server.
+    #[test]
+    fn the_name_is_always_a_single_path_component() {
+        for url in [
+            "https://zenodo.org/records/20328284/files/TLHbasis.zip?download=1",
+            "http://127.0.0.1:8080/TLHbasis.zip",
+            "http://example.invalid/a/b/c/corpus.zip",
+            "http://example.invalid/../../etc/passwd",
+            "http://example.invalid/",
+            "not even a url",
+            "",
+        ] {
+            let name = archive_name(url, "abc123");
+            assert!(
+                !name.contains('/') && !name.contains('\\'),
+                "{url:?} produced a name with a separator in it: {name}"
+            );
+            assert!(!name.starts_with(".."), "{url:?} produced {name}");
+            assert!(!name.is_empty());
+            // And joining it stays inside the directory it was joined to.
+            let joined = std::path::Path::new("/cache").join(&name);
+            assert_eq!(
+                joined.parent(),
+                Some(std::path::Path::new("/cache")),
+                "{url:?} escaped the cache directory as {name}"
+            );
+        }
+    }
+
+    /// The name a URL without `/files/` gets is the file it names, not the URL.
+    #[test]
+    fn a_plain_url_is_named_after_its_file() {
+        assert_eq!(
+            archive_name("http://127.0.0.1:8080/TLHbasis.zip", "abc123"),
+            "TLHbasis.abc123.zip"
+        );
+    }
+
     /// Two releases of the archive are two files, so a republished record can
     /// never be answered out of the cache by its predecessor.
     #[test]
@@ -270,7 +325,10 @@ mod tests {
     fn an_empty_cache_is_a_miss() {
         let dir = tempdir().unwrap();
         let url = "https://zenodo.org/records/1/files/corpus.zip?download=1";
-        assert_eq!(lookup(dir.path(), url, "d41d8cd98f00b204e9800998ecf8427e"), None);
+        assert_eq!(
+            lookup(dir.path(), url, "d41d8cd98f00b204e9800998ecf8427e"),
+            None
+        );
     }
 
     #[test]
@@ -301,10 +359,10 @@ mod tests {
         let url = "https://zenodo.org/records/1/files/corpus.zip?download=1";
         let keep = dir.path().join(archive_name(url, &md5_hex(b"new")));
         let strangers = [
-            "holiday-photos.zip",                      // no digest at all
-            "corpus.zip",                              // the same name, undigested
-            "corpus.not-a-digest.zip",                 // a middle part that is not one
-            "other.d41d8cd98f00b204e9800998ecf8427e.zip", // digest-named, different archive
+            "holiday-photos.zip",                          // no digest at all
+            "corpus.zip",                                  // the same name, undigested
+            "corpus.not-a-digest.zip",                     // a middle part that is not one
+            "other.d41d8cd98f00b204e9800998ecf8427e.zip",  // digest-named, different archive
             "corpus.d41d8cd98f00b204e9800998ecf8427e.tar", // same archive, another format
         ];
         std::fs::write(&keep, b"x").unwrap();
@@ -330,7 +388,9 @@ mod tests {
     fn pruning_a_directory_we_did_not_name_removes_nothing() {
         let dir = tempdir().unwrap();
         let keep = dir.path().join("archive.zip");
-        let other = dir.path().join("corpus.d41d8cd98f00b204e9800998ecf8427e.zip");
+        let other = dir
+            .path()
+            .join("corpus.d41d8cd98f00b204e9800998ecf8427e.zip");
         for path in [&keep, &other] {
             std::fs::write(path, b"x").unwrap();
         }
@@ -358,7 +418,10 @@ mod tests {
 
         assert!(is_usable(&cache));
 
-        assert!(cache.is_dir(), "asking must leave the directory ready to use");
+        assert!(
+            cache.is_dir(),
+            "asking must leave the directory ready to use"
+        );
         let leftovers: Vec<_> = std::fs::read_dir(&cache)
             .unwrap()
             .flatten()
@@ -411,8 +474,14 @@ mod tests {
 
         sweep_unfinished(dir.path());
 
-        assert!(!stale.is_file(), "an interrupted download from yesterday goes");
-        assert!(fresh.is_file(), "a download that may still be running stays");
+        assert!(
+            !stale.is_file(),
+            "an interrupted download from yesterday goes"
+        );
+        assert!(
+            fresh.is_file(),
+            "a download that may still be running stays"
+        );
         assert!(archive.is_file(), "the archive itself is not a leftover");
     }
 }
