@@ -80,15 +80,17 @@ The corpus job is what keeps the two halves honest: it rebuilds the catalog from
 
 ## Releases
 
-[v2.0.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.0.0) is current; work continues from it.
-
-Two older releases are kept as references — states this project measures itself against and can fall back to. Everything else has been withdrawn along with its tag and its DMG.
+[v2.0.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.0.0) is current, and is also the third of the releases this project keeps as references — states it measures itself against and can fall back to. Everything else has been withdrawn along with its tag and its DMG.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
 
-[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) is the recent one, so falling back does not mean giving up everything built since August.
+[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-Both references are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if either tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to be.
+[v2.0.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.0.0) opens the 2.x one — the corpus as a folder that can be opened, described for a program as well as a reader, with no document written until it is proven unchanged.
+
+Three, spread across the project rather than clustered at its end, which is what makes them useful: a fault introduced this week is bracketed by v2.0.0, and one that turns out to be much older still has a floor under it.
+
+All three are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if any tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to point at.
 
 ## Performance and reliability
 

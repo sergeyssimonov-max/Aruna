@@ -1,7 +1,7 @@
 {
   "$comment": [
     "The releases this project measures itself against, and the facts that identify them.",
-    "Read by the `Reference release is intact` step in release-dmg.yml, which fails the",
+    "Read by the `Reference releases are intact` step in release-dmg.yml, which fails the",
     "build if any of these tags disappears or moves to a different commit.",
     "",
     "GitHub-side tag protection became available when this repository was made public on",
@@ -11,10 +11,12 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Two references, not one. v1.0.5 is the floor — the oldest state still known to be good.",
-    "v1.0.9 is the recent one, so falling back does not mean giving up everything built",
-    "since August. Adding or changing any value below is a deliberate act and shows up in",
-    "the diff as one."
+    "Three references, spread across the project rather than clustered at its end. v1.0.5 is",
+    "the floor, v1.0.9 closes the 1.x line, v2.0.0 opens the 2.x one. A release cannot record",
+    "itself — the commit it names is the commit that carries it, and no file can contain its",
+    "own hash — so each entry here is added by the commit after the release it describes.",
+    "",
+    "Adding or changing any value below is a deliberate act and shows up in the diff as one."
   ],
   "references": [
     {
@@ -30,6 +32,13 @@
       "published": "2026-08-17T21:53:21Z",
       "dmg_sha256": "0395b641dd94671166e44d4b3bc29b0ccf988a522119706bd1511825a5cd9b2e",
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
+    },
+    {
+      "tag": "v2.0.0",
+      "commit": "925867fa89171b1528560754b0c80e380c044fed",
+      "published": "2026-08-19T19:40:29Z",
+      "dmg_sha256": "29c720a90f84d70ba4db3309a2204f705091450abdce53972dc85aeb545b8e72",
+      "why": "The third reference and the first of the 2.x line: the corpus as a folder that can be opened, described for a program as well as a reader, with no document written until it is proven unchanged."
     }
   ]
 }
