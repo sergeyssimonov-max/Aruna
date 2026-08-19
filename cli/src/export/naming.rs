@@ -51,6 +51,18 @@ pub fn path_component(raw: &str) -> String {
     }
 }
 
+/// Where this document's PDF will go, from the path its XML took.
+///
+/// The same name with a different extension, derived here rather than by the
+/// converter: two naming rules for one document is how a package and the thing
+/// built from it stop agreeing. It is also what lets a collision between two
+/// PDFs be found while the package is built — `Bo 2023%2F23.xml` and
+/// `Bo 2023%2F23.pdf` escape the slash identically, so a pair that collides in
+/// one collides in the other.
+pub fn pdf_path(xml: &Path) -> PathBuf {
+    xml.with_extension("pdf")
+}
+
 /// The relative URL for a path inside the package.
 ///
 /// Percent-encoded per component, and only the characters that need it: the
@@ -93,9 +105,13 @@ pub fn percent_decode(segment: &str) -> String {
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
+        // Read the two hex digits as bytes. Slicing the `&str` here would panic
+        // the moment a `%` is followed by a multi-byte character — `%aé` cuts
+        // through the middle of the `é` — and this function exists to survive
+        // input nobody vouched for.
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(byte) = u8::from_str_radix(&segment[i + 1..i + 3], 16) {
-                out.push(byte);
+            if let (Some(hi), Some(lo)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
+                out.push(hi * 16 + lo);
                 i += 3;
                 continue;
             }
@@ -104,6 +120,16 @@ pub fn percent_decode(segment: &str) -> String {
         i += 1;
     }
     String::from_utf8_lossy(&out).into_owned()
+}
+
+/// One hex digit, or `None` if it is not one.
+fn hex(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 /// The path a relative href points at, or `None` if it points outside.

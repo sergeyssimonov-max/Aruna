@@ -97,6 +97,13 @@ pub enum ArunaError {
     #[error("{entry} is larger than the {limit} byte limit for one document")]
     ExportDocumentTooLarge { entry: String, limit: u64 },
 
+    /// A document came out of normalisation differing from its source in a way
+    /// the permit list does not cover. The highest-priority guarantee of the
+    /// export is that this cannot happen silently, so it stops the build rather
+    /// than publishing the document or the package around it.
+    #[error("{entry} was distorted by normalisation: {reason}")]
+    ExportDistorted { entry: String, reason: String },
+
     /// The export wrote a different number of documents than it placed. Not a
     /// condition any input should produce — it means the writer and the
     /// placement disagreed about what the archive holds — so it is reported

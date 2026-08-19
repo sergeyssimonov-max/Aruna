@@ -17,12 +17,17 @@
 //! of four documents exercise the same code the 24 000-manuscript corpus does.
 
 pub mod inventory;
+pub mod manifest;
 pub mod naming;
 pub mod normalize;
 pub mod validate;
+pub mod verify;
 
 pub use inventory::{hrefs, render_inventory};
-pub use naming::{dir_component, href, output_path, path_component, percent_decode, resolve};
+pub use manifest::{render_manifest, FontContract};
+pub use naming::{
+    dir_component, href, output_path, path_component, pdf_path, percent_decode, resolve,
+};
 pub use normalize::{normalize_document, normalize_into};
 pub use validate::{validate, Validation};
 
@@ -38,6 +43,12 @@ use zip::ZipArchive;
 
 /// What the package is called, in the folder and in the inventory's file name.
 pub const PACKAGE: &str = "TLHdig_Beta_0.3";
+
+/// The page each CTH folder opens with. See [`inventory::render_group_index`].
+pub const GROUP_INDEX: &str = "index.html";
+
+/// The machine-readable model of the package.
+pub const MANIFEST: &str = "manifest.json";
 
 /// The most one document may be, inflated.
 ///
@@ -85,6 +96,7 @@ pub struct Placed {
 /// overwritten.
 pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
     let mut taken: HashMap<PathBuf, String> = HashMap::with_capacity(fragments.len());
+    let mut pdfs: HashMap<PathBuf, String> = HashMap::with_capacity(fragments.len());
     let mut placed = Vec::with_capacity(fragments.len());
 
     for fragment in fragments {
@@ -99,6 +111,20 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
             relative = output_path(group, &format!("{base} ({suffix})"));
         }
 
+        // The same check for the name this document's PDF will take. Two XML
+        // files that differ only in extension would become one PDF, and the
+        // clash would surface in whatever builds them rather than here.
+        let as_pdf = pdf_path(&relative);
+        if let Some(first) = pdfs.get(&as_pdf) {
+            return Err(ArunaError::ExportCollision {
+                group: group.to_string(),
+                fragment: base.to_string(),
+                first: first.clone(),
+                second: fragment.source.clone(),
+                path: as_pdf,
+            });
+        }
+
         if let Some(first) = taken.get(&relative) {
             return Err(ArunaError::ExportCollision {
                 group: group.to_string(),
@@ -108,6 +134,7 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
                 path: relative,
             });
         }
+        pdfs.insert(pdf_path(&relative), fragment.source.clone());
         taken.insert(relative.clone(), fragment.source.clone());
         placed.push(Placed {
             relative,
@@ -176,7 +203,19 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
     let staging = Staging::fresh(staging)?;
 
     eprintln!("Writing {} documents…", placed.len());
-    let stylesheet_dropped = write_documents(zip, &fragments, &placed, staging.path())?;
+    // The archive this package was built from, named in the manifest so a
+    // reader can tell which edition of the corpus they are looking at.
+    let archive_digest = digest_of(zip)?;
+    let mut applied: std::collections::BTreeMap<String, usize> = Default::default();
+    let mut fonts = manifest::FontContract::default();
+    let stylesheet_dropped = write_documents(
+        zip,
+        &fragments,
+        &placed,
+        staging.path(),
+        &mut applied,
+        &mut fonts,
+    )?;
 
     let records: Vec<ManuscriptRecord> = fragments.iter().map(|f| f.record.clone()).collect();
     let html = render_inventory(&records, &placed, source_label);
@@ -186,14 +225,81 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
         source,
     })?;
 
+    // One page per group. Safari shows nothing for a `file://` directory, so a
+    // package that is opened by double-clicking cannot link to bare folders.
+    // All groups or none — a package where some links work and some do not is
+    // worse than either.
+    let mut from = 0usize;
+    for run in crate::parse::group_runs(&records) {
+        let slice = &placed[from..from + run.len()];
+        from += run.len();
+        let label = group_label(&run[0]);
+        let index = staging.path().join(dir_component(label)).join(GROUP_INDEX);
+        fs::write(&index, inventory::render_group_index(label, run, slice)).map_err(|source| {
+            ArunaError::Io {
+                path: index,
+                source,
+            }
+        })?;
+    }
+
+    let manifest_json = manifest::render_manifest(
+        &records,
+        &placed,
+        source_label,
+        &archive_digest,
+        &applied,
+        &fonts,
+    );
+    let manifest_path = staging.path().join(MANIFEST);
+    fs::write(&manifest_path, &manifest_json).map_err(|source| ArunaError::Io {
+        path: manifest_path,
+        source,
+    })?;
+
     eprintln!("Checking the package…");
     let staged = validate(staging.path(), &records, &placed)?;
 
-    // Only now does it get the name.
-    if final_root.exists() {
-        remove_dir(&final_root)?;
+    // Only now does it get the name — and the package already there is moved
+    // aside rather than deleted first.
+    //
+    // Deleting it first meant that between the delete and the rename there was
+    // no package at all, and for a 389 MB tree that gap is seconds long, not
+    // instants. A run interrupted inside it left the reader with neither the
+    // old package nor the new one. A rename is atomic and takes no time, so the
+    // gap is now one syscall wide, and if the publish fails the old package
+    // goes back where it was.
+    let previous = fs::symlink_metadata(&final_root)
+        .is_ok()
+        .then(|| destination.join(format!(".{PACKAGE}.previous")));
+    if let Some(aside) = &previous {
+        if aside.exists() {
+            remove_dir(aside)?;
+        }
+        fs::rename(&final_root, aside).map_err(|source| ArunaError::Io {
+            path: final_root.clone(),
+            source,
+        })?;
     }
-    staging.publish(&final_root)?;
+    if let Err(err) = staging.publish(&final_root) {
+        if let Some(aside) = &previous {
+            // Best effort, and the only thing left worth doing: the run has
+            // already failed, and putting the reader's package back matters
+            // more than reporting why the restore failed too.
+            let _ = fs::rename(aside, &final_root);
+        }
+        return Err(err);
+    }
+    if let Some(aside) = previous {
+        // The new package is published; the old copy is only occupying space.
+        // Failing to remove it is not a reason to fail a build that worked.
+        if remove_dir(&aside).is_err() {
+            eprintln!(
+                "  note: the previous package is left at {}",
+                aside.display()
+            );
+        }
+    }
 
     eprintln!("Checking the published copy…");
     let published = validate(&final_root, &records, &placed)?;
@@ -313,6 +419,8 @@ fn write_documents(
     fragments: &[Fragment],
     placed: &[Placed],
     staging: &Path,
+    applied: &mut std::collections::BTreeMap<String, usize>,
+    fonts: &mut manifest::FontContract,
 ) -> Result<usize> {
     let wanted: HashMap<&str, &Path> = fragments
         .iter()
@@ -359,6 +467,34 @@ fn write_documents(
         normalised.clear();
         normalize::normalize_into(&bytes, &mut normalised);
 
+        // Before it is written, not after. A document whose non-distortion is
+        // not proven does not reach the package, and the build stops rather
+        // than publishing the rest around it.
+        match verify::compare(&bytes, &normalised) {
+            Ok(report) => {
+                for rule in report.dropped {
+                    *applied.entry(format!("DROP_PI {rule}")).or_default() += 1;
+                }
+                if report.added_declaration {
+                    *applied.entry("ADD declaration".to_string()).or_default() += 1;
+                }
+                if report.reflowed {
+                    *applied
+                        .entry("REFLOW prologue whitespace".to_string())
+                        .or_default() += 1;
+                }
+            }
+            Err(reason) => {
+                return Err(ArunaError::ExportDistorted {
+                    entry: name.clone(),
+                    reason,
+                })
+            }
+        }
+
+        // The font contract is counted from what is actually shipped.
+        fonts.observe(&String::from_utf8_lossy(&normalised));
+
         let out = staging.join(relative);
         if let Some(parent) = out.parent() {
             create_dir(parent)?;
@@ -387,6 +523,27 @@ fn write_documents(
         });
     }
     Ok(dropped)
+}
+
+/// The archive's own digest, for the manifest to record.
+fn digest_of(path: &Path) -> Result<String> {
+    let mut file = File::open(path).map_err(|source| ArunaError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut digest = crate::md5::Md5::new();
+    let mut buf = vec![0u8; 1 << 16];
+    loop {
+        let read = file.read(&mut buf).map_err(|source| ArunaError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buf[..read]);
+    }
+    Ok(digest.finish_hex())
 }
 
 fn open(zip: &Path) -> Result<ZipArchive<BufReader<File>>> {

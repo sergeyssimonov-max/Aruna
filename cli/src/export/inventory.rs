@@ -12,8 +12,9 @@
 
 use super::naming::{dir_component, href};
 use super::Placed;
-use crate::html::{render_linked_html, Links};
+use crate::html::{escape_html, render_linked_html, Links};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
+use std::fmt::Write as _;
 use std::path::PathBuf;
 
 /// The package's inventory: the CLI's own, with the links a folder makes possible.
@@ -24,8 +25,16 @@ use std::path::PathBuf;
 pub fn render_inventory(records: &[ManuscriptRecord], placed: &[Placed], source: &str) -> String {
     // One href per group, in the order the groups appear, and one per record,
     // in record order — which is the order `placed` is already in.
+    // At the group's page, not at the folder: Safari renders nothing for a
+    // `file://` directory, so a link to a bare folder is a blank page for
+    // anyone who opens the package in it.
     let groups: Vec<String> = group_runs(records)
-        .map(|run| href(&PathBuf::from(dir_component(group_label(&run[0])))))
+        .map(|run| {
+            href(
+                &PathBuf::from(dir_component(group_label(&run[0])))
+                    .join(crate::export::GROUP_INDEX),
+            )
+        })
         .collect();
     let fragments: Vec<String> = placed.iter().map(|p| href(&p.relative)).collect();
 
@@ -57,6 +66,70 @@ pub fn hrefs(html: &str) -> Vec<&str> {
     out
 }
 
+/// The listing a CTH folder opens with.
+///
+/// Safari does not render `file://` directory listings — observed, not assumed:
+/// opening a folder URL yields a document with no title, no URL and no source,
+/// which is a blank page for the reader. Chrome does render one. A package that
+/// is meant to be opened by double-clicking cannot depend on which browser that
+/// is, so every group gets a page of its own and the group link points at it.
+///
+/// Written from the same model as the inventory, with the same link rules, so
+/// the two cannot disagree about where a document is.
+pub fn render_group_index(group: &str, run: &[ManuscriptRecord], placed: &[Placed]) -> String {
+    let mut html = String::with_capacity(1024 + run.len() * 160);
+    html.push_str(
+        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n",
+    );
+    let _ = writeln!(
+        html,
+        "<title>{} — TLHdig Beta 0.3</title>",
+        escape_html(group)
+    );
+    html.push_str(
+        "<style>\n:root{color-scheme:light dark}\n\
+         body{font:15px/1.6 system-ui,-apple-system,sans-serif;margin:0;padding:2rem;\
+         background:#fafafa;color:#1a1a1a}\n\
+         @media (prefers-color-scheme:dark){body{background:#141414;color:#e8e8e8}}\n\
+         h1{font-size:1.15rem;margin:0 0 .2rem}\n\
+         p.meta{color:#888;font-size:.82rem;margin:0 0 1.4rem}\n\
+         ul{list-style:none;margin:0;padding:0}\nli{padding:.15rem 0}\n\
+         a{color:inherit}\n.dim{color:#888;font-size:.85em;margin-left:.5rem}\n\
+         </style>\n</head>\n<body>\n",
+    );
+    let _ = writeln!(html, "<h1>{}</h1>", escape_html(group));
+    let _ = writeln!(
+        html,
+        "<p class=\"meta\">{} manuscript{} · <a href=\"../{}.html\">back to the inventory</a></p>\n<ul>",
+        run.len(),
+        if run.len() == 1 { "" } else { "s" },
+        crate::export::PACKAGE
+    );
+
+    for (record, place) in run.iter().zip(placed) {
+        // Relative to this folder, so the page works wherever the package is
+        // moved and whatever it is opened from.
+        let file = place
+            .relative
+            .file_name()
+            .map(|name| PathBuf::from(name.to_os_string()))
+            .unwrap_or_else(|| place.relative.clone());
+        let _ = writeln!(
+            html,
+            "  <li><a href=\"{}\" target=\"_blank\" rel=\"noopener\">{}</a>\
+             <span class=\"dim\">{} · {} · {}</span></li>",
+            href(&file),
+            escape_html(&place.label),
+            escape_html(&record.lang),
+            escape_html(&record.authorship),
+            escape_html(&record.year)
+        );
+    }
+    html.push_str("</ul>\n</body>\n</html>\n");
+    html
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,7 +156,10 @@ mod tests {
             "group and fragment"
         );
         assert_eq!(html.matches("rel=\"noopener\"").count(), 2);
-        assert!(html.contains("href=\"./CTH%20786\""), "group link");
+        assert!(
+            html.contains("href=\"./CTH%20786/index.html\""),
+            "the group link points at its page, not the bare folder"
+        );
         assert!(html.contains("href=\"./CTH%20786/KBo%2017.86%2B.xml\""));
         // No absolute path may reach the document.
         assert!(!html.contains("file://"));

@@ -81,7 +81,10 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
         .map(|e| e.file_name().to_string_lossy().to_string())
         .collect();
     top.sort();
-    assert_eq!(top, vec!["CTH 5", "CTH 9", "TLHdig_Beta_0.3.html"]);
+    assert_eq!(
+        top,
+        vec!["CTH 5", "CTH 9", "TLHdig_Beta_0.3.html", "manifest.json"]
+    );
 
     let mut group5: Vec<String> = fs::read_dir(root.join("CTH 5"))
         .expect("read")
@@ -91,8 +94,13 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
     group5.sort();
     assert_eq!(
         group5,
-        vec!["544%2Ff.xml", "KBo 1.1 (CTH 5_XML_TLH).xml", "KBo 1.1.xml",],
-        "the slash is escaped and the repeat has a place of its own"
+        vec![
+            "544%2Ff.xml",
+            "KBo 1.1 (CTH 5_XML_TLH).xml",
+            "KBo 1.1.xml",
+            "index.html",
+        ],
+        "the slash is escaped, the repeat has a place of its own, and the group has a page"
     );
 }
 
@@ -111,11 +119,10 @@ fn every_link_resolves_and_opens_in_a_new_context() {
         let relative = export::resolve(href).unwrap_or_else(|| panic!("{href} is not relative"));
         let target = root.join(&relative);
         assert!(target.exists(), "{href} points at nothing");
-        assert_eq!(
-            target.is_dir(),
-            !href.ends_with(".xml"),
-            "{href} is the wrong kind of thing"
-        );
+        // Every link now names a file: a document, or the group's own page.
+        // Safari shows nothing for a `file://` directory, so the package links
+        // to pages rather than folders.
+        assert!(target.is_file(), "{href} is not a file");
     }
 
     // Every anchor carries both attributes, and none of them is absolute.
@@ -164,8 +171,8 @@ fn none_of_the_archive_debris_reaches_the_package() {
     collect(&root, &mut files);
     assert_eq!(
         files.len(),
-        5,
-        "four documents and one inventory: {files:?}"
+        8,
+        "four documents, one inventory, one manifest, two group pages: {files:?}"
     );
     for path in &files {
         let name = path
@@ -174,7 +181,10 @@ fn none_of_the_archive_debris_reaches_the_package() {
             .to_string_lossy()
             .to_string();
         assert!(
-            name.ends_with(".xml") || name == format!("{PACKAGE}.html"),
+            name.ends_with(".xml")
+                || name == format!("{PACKAGE}.html")
+                || name == "manifest.json"
+                || name == "index.html",
             "{name} is not something the package should hold"
         );
         assert!(!name.starts_with('.'), "{name} is hidden debris");

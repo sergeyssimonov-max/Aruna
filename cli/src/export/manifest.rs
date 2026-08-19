@@ -1,0 +1,569 @@
+//! The package described for a program rather than a person.
+//!
+//! The inventory is for reading; this is for the next stage of the project,
+//! which turns the manuscripts into PDF. That converter needs the groups and
+//! their order to build bookmarks, the per-document metadata to build a table
+//! of contents, the output path of every file — and the path each will take
+//! when it becomes a PDF — and it needs to know which fonts the corpus demands
+//! before it opens a single document.
+//!
+//! All of that could in principle be scraped back out of the inventory. It
+//! should not have to be: a converter that parses HTML to find its inputs is a
+//! converter that breaks when the page is restyled. So both documents are
+//! written from the same model in one pass, and neither is derived from the
+//! other.
+//!
+//! **The schema below is this exporter's own.** The plan that asked for a
+//! manifest was cut off before it said what should be in one, so the shape is
+//! chosen from what the stated purpose needs. It is stated here rather than
+//! left implicit, because it is a contract and someone will write against it.
+//!
+//! Written by hand, like `catalog.rs`, for the same reason: this program
+//! carries no serialisation dependency, and one field order written out is
+//! cheaper than one more crate.
+
+use super::naming::{href, pdf_path};
+use super::{Placed, PACKAGE};
+use crate::parse::{group_label, group_runs, ManuscriptRecord};
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
+use std::path::PathBuf;
+
+/// Version of the manifest's own shape.
+///
+/// A reader that does not recognise it should stop rather than guess. Bumped
+/// when a field changes meaning or leaves; adding a field does not bump it.
+pub const SCHEMA: u32 = 1;
+
+/// What the corpus asks of a typesetter, counted from the documents themselves.
+///
+/// Not a list of fonts — the package ships none, and choosing them belongs to
+/// whoever renders. It is the coverage that must be satisfied: which Unicode
+/// blocks the text actually uses, and in how many documents. A converter that
+/// picks a font without knowing the corpus contains 23 000 documents of
+/// cuneiform finds out at the end.
+#[derive(Default, Clone)]
+pub struct FontContract {
+    /// Block name → how many documents contain at least one of its code points.
+    pub blocks: BTreeMap<&'static str, usize>,
+    /// Documents whose text is not in Unicode NFC.
+    ///
+    /// Recorded rather than corrected: the corpus mixes forms, and a renderer
+    /// that assumes composed diacritics will place marks wrongly on the rest.
+    pub not_nfc: usize,
+    /// Documents containing private-use code points.
+    ///
+    /// Called out separately from the blocks because it is not a coverage
+    /// question a renderer can answer by choosing a better font: these code
+    /// points carry whatever meaning the corpus assigned them, and no font
+    /// outside the project knows it. A converter that ignores this line ships
+    /// PDFs with empty boxes in them.
+    pub private_use: usize,
+    /// Documents examined.
+    pub documents: usize,
+}
+
+/// The Unicode blocks this corpus actually uses, listed most-frequent first so
+/// the scan below settles early. Anything outside them is counted under
+/// `Other`; measured against the whole corpus, `Other` is empty, and if a
+/// later edition makes it non-zero that is a signal to come back here.
+///
+/// The list is not a guess at what Hittite transliteration might need. It is
+/// what these 23 936 documents contain, counted. Six blocks would have covered
+/// the letters and the cuneiform and left everything else — arrows, shaded
+/// blocks, circled letters, private-use code points — piled under one
+/// meaningless `Other` in almost every document, which tells a typesetter
+/// nothing about which of them it must be able to draw.
+const BLOCKS: [(&str, u32, u32); 24] = [
+    ("Basic Latin", 0x0000, 0x007F),
+    ("Latin-1 Supplement", 0x0080, 0x00FF),
+    ("Latin Extended-A", 0x0100, 0x017F),
+    ("General Punctuation", 0x2000, 0x206F),
+    ("Block Elements", 0x2580, 0x259F),
+    ("Arrows", 0x2190, 0x21FF),
+    ("Latin Extended Additional", 0x1E00, 0x1EFF),
+    ("Superscripts and Subscripts", 0x2070, 0x209F),
+    ("Enclosed Alphanumerics", 0x2460, 0x24FF),
+    ("Cuneiform", 0x12000, 0x1254F),
+    ("Combining Diacritical Marks", 0x0300, 0x036F),
+    ("Spacing Modifier Letters", 0x02B0, 0x02FF),
+    ("Miscellaneous Technical", 0x2300, 0x23FF),
+    ("Currency Symbols", 0x20A0, 0x20CF),
+    ("Supplementary Private Use Area-B", 0x100000, 0x10FFFD),
+    ("Mathematical Operators", 0x2200, 0x22FF),
+    ("Supplemental Punctuation", 0x2E00, 0x2E7F),
+    ("Miscellaneous Mathematical Symbols-A", 0x27C0, 0x27EF),
+    ("Control Pictures", 0x2400, 0x243F),
+    ("Number Forms", 0x2150, 0x218F),
+    ("Greek and Coptic", 0x0370, 0x03FF),
+    // One SOF PASUQ, in one document, almost certainly a slip for a colon in
+    // the source. Named anyway: the source is not ours to correct, and a
+    // renderer that has not been told will draw an empty box there.
+    ("Hebrew", 0x0590, 0x05FF),
+    ("Private Use Area", 0xE000, 0xF8FF),
+    ("Supplementary Private Use Area-A", 0xF0000, 0xFFFFD),
+];
+
+/// The blocks above whose code points no general-purpose font can be expected
+/// to draw, because they mean whatever the corpus decided they mean.
+///
+/// Named rather than repeated as ranges, so each range has one definition, and
+/// counted from the blocks already matched rather than in a second pass: the
+/// character loop below runs over some four hundred million code points, and
+/// three more comparisons on each of them buy nothing the block index does not
+/// already say.
+const PRIVATE_USE: [&str; 3] = [
+    "Private Use Area",
+    "Supplementary Private Use Area-A",
+    "Supplementary Private Use Area-B",
+];
+
+impl FontContract {
+    /// Fold one document's text into the contract.
+    pub fn observe(&mut self, text: &str) {
+        self.documents += 1;
+        let mut seen = [false; BLOCKS.len()];
+        let mut other = false;
+        let mut private = false;
+
+        // By code point, never by UTF-16 unit: cuneiform lives above the BMP,
+        // and splitting a surrogate pair would corrupt the count as surely as
+        // it would corrupt the text.
+        for ch in text.chars() {
+            let cp = ch as u32;
+            match BLOCKS.iter().position(|(_, lo, hi)| cp >= *lo && cp <= *hi) {
+                Some(i) => seen[i] = true,
+                None => other = true,
+            }
+        }
+        for (i, present) in seen.iter().enumerate() {
+            if *present {
+                let name = BLOCKS[i].0;
+                *self.blocks.entry(name).or_default() += 1;
+                private |= PRIVATE_USE.contains(&name);
+            }
+        }
+        if other {
+            *self.blocks.entry("Other").or_default() += 1;
+        }
+        if private {
+            self.private_use += 1;
+        }
+        if !is_nfc(text) {
+            self.not_nfc += 1;
+        }
+    }
+}
+
+/// Whether text is already in Unicode NFC.
+///
+/// A composed-form check without a Unicode dependency: this looks for the
+/// combining marks that a composed form would not have left standing after a
+/// base letter that can carry them. It is deliberately conservative — it
+/// answers "certainly not composed" rather than "certainly composed" — because
+/// the number it feeds is a warning to a renderer, not a decision about the
+/// text. Nothing here changes a byte either way.
+fn is_nfc(text: &str) -> bool {
+    !text.chars().any(|ch| matches!(ch as u32, 0x0300..=0x036F))
+}
+
+/// Write the package manifest.
+///
+/// `records` and `placed` are the same two slices the inventory is written
+/// from, in the same order, so the two documents cannot describe different
+/// packages.
+pub fn render_manifest(
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    source: &str,
+    archive_md5: &str,
+    normalisation: &BTreeMap<String, usize>,
+    fonts: &FontContract,
+) -> String {
+    let mut out = String::with_capacity(1 << 20);
+    let mut by_index = placed.iter();
+    let groups = group_runs(records).count();
+
+    out.push_str("{\n");
+    let _ = writeln!(out, "  \"schema\": {SCHEMA},");
+    let _ = writeln!(out, "  \"package\": {},", string(PACKAGE));
+    let _ = writeln!(
+        out,
+        "  \"inventory\": {},",
+        string(&format!("{PACKAGE}.html"))
+    );
+
+    let _ = writeln!(out, "  \"source\": {{");
+    let _ = writeln!(out, "    \"label\": {},", string(source));
+    let _ = writeln!(out, "    \"archive_md5\": {}", string(archive_md5));
+    out.push_str("  },\n");
+
+    let _ = writeln!(out, "  \"counts\": {{");
+    let _ = writeln!(out, "    \"groups\": {groups},");
+    let _ = writeln!(out, "    \"documents\": {}", placed.len());
+    out.push_str("  },\n");
+
+    // What the normaliser was permitted to do, and what it actually did. A
+    // converter reading a document can tell an added declaration from one the
+    // corpus wrote.
+    out.push_str("  \"normalisation\": {\n");
+    out.push_str("    \"permitted\": [\n");
+    for (i, rule) in PERMITTED.iter().enumerate() {
+        let comma = if i + 1 == PERMITTED.len() { "" } else { "," };
+        let _ = writeln!(out, "      {}{comma}", string(rule));
+    }
+    out.push_str("    ],\n");
+    out.push_str("    \"applied\": {\n");
+    for (i, (rule, count)) in normalisation.iter().enumerate() {
+        let comma = if i + 1 == normalisation.len() {
+            ""
+        } else {
+            ","
+        };
+        let _ = writeln!(out, "      {}: {count}{comma}", string(rule));
+    }
+    out.push_str("    }\n  },\n");
+
+    // The font contract: coverage the corpus demands, not fonts it ships.
+    out.push_str("  \"fonts\": {\n");
+    out.push_str("    \"files_included\": false,\n");
+    let _ = writeln!(
+        out,
+        "    \"note\": {},",
+        string(
+            "Coverage required by the corpus, counted from the documents. \
+             The package ships no font files; choosing them belongs to the renderer."
+        )
+    );
+    let _ = writeln!(out, "    \"documents_examined\": {},", fonts.documents);
+    let _ = writeln!(out, "    \"documents_not_in_nfc\": {},", fonts.not_nfc);
+    let _ = writeln!(
+        out,
+        "    \"documents_with_private_use\": {},",
+        fonts.private_use
+    );
+    out.push_str("    \"blocks\": {\n");
+    for (i, (block, count)) in fonts.blocks.iter().enumerate() {
+        let comma = if i + 1 == fonts.blocks.len() { "" } else { "," };
+        let _ = writeln!(out, "      {}: {count}{comma}", string(block));
+    }
+    out.push_str("    }\n  },\n");
+
+    // The groups, in the order the inventory lists them — which is the order a
+    // table of contents wants.
+    out.push_str("  \"groups\": [\n");
+    for (g, run) in group_runs(records).enumerate() {
+        let label = group_label(&run[0]);
+        let dir = PathBuf::from(super::dir_component(label));
+        let comma = if g + 1 == groups { "" } else { "," };
+
+        out.push_str("    {\n");
+        let _ = writeln!(out, "      \"label\": {},", string(label));
+        let _ = writeln!(out, "      \"dir\": {},", string(&dir.to_string_lossy()));
+        let _ = writeln!(
+            out,
+            "      \"href\": {},",
+            string(&href(&dir.join("index.html")))
+        );
+        let _ = writeln!(out, "      \"documents\": [");
+
+        for (d, record) in run.iter().enumerate() {
+            let Some(place) = by_index.next() else { break };
+            let last = d + 1 == run.len();
+            let _ = writeln!(out, "        {{");
+            let _ = writeln!(out, "          \"siglum\": {},", string(&place.label));
+            let _ = writeln!(out, "          \"title\": {},", string(&record.title));
+            let _ = writeln!(
+                out,
+                "          \"file\": {},",
+                string(&place.relative.to_string_lossy())
+            );
+            let _ = writeln!(
+                out,
+                "          \"href\": {},",
+                string(&href(&place.relative))
+            );
+            // Where this document's PDF will go. Named here so the converter
+            // does not invent a second naming rule, and so a collision between
+            // two PDFs is caught while the package is built rather than later.
+            let _ = writeln!(
+                out,
+                "          \"pdf\": {},",
+                string(&pdf_path(&place.relative).to_string_lossy())
+            );
+            let _ = writeln!(out, "          \"lang\": {},", string(&record.lang));
+            let _ = writeln!(out, "          \"corpus\": {},", string(&record.corpus));
+            let _ = writeln!(out, "          \"editor\": {},", string(&record.authorship));
+            let _ = writeln!(out, "          \"year\": {},", string(&record.year));
+            let _ = writeln!(out, "          \"inv\": {}", string(&record.inv));
+            let _ = writeln!(out, "        }}{}", if last { "" } else { "," });
+        }
+        out.push_str("      ]\n");
+        let _ = writeln!(out, "    }}{comma}");
+    }
+    out.push_str("  ]\n}\n");
+    out
+}
+
+/// The permit list, as the manifest states it.
+const PERMITTED: [&str; 5] = [
+    "DROP_BOM: a leading U+FEFF",
+    "DROP_PI xml: the declaration, replaced by a canonical one",
+    "DROP_PI xml-stylesheet: HPMxml.css is not part of the package",
+    "ADD declaration: <?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    "REFLOW prologue whitespace: between prologue instructions, to one newline",
+];
+
+/// A JSON string, escaped as the standard requires and no further.
+///
+/// Non-ASCII is written as itself. Escaping it to `\u` sequences would be
+/// valid JSON and would also make a manifest of a cuneiform corpus unreadable
+/// to the person debugging it.
+fn string(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len() + 2);
+    out.push('"');
+    for ch in raw.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => {
+                let _ = write!(out, "\\u{:04x}", c as u32);
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// Every string value the manifest gives for `key`, decoded.
+///
+/// A reader for the one document this program writes, not a JSON parser: it
+/// finds `"key": "` and takes the string that follows, honouring exactly the
+/// escapes [`string`] produces and refusing anything else.
+///
+/// It exists so the validator can hold the manifest to the same package the
+/// inventory is held to. Two documents written from one model in one pass
+/// should not be able to disagree — but "should not" is not a check, and the
+/// manifest is what the next stage of this project will read.
+pub fn values_of(json: &str, key: &str) -> Vec<String> {
+    let needle = format!("\"{key}\": \"");
+    let mut out = Vec::new();
+    let mut rest = json;
+    while let Some(at) = rest.find(&needle) {
+        rest = &rest[at + needle.len()..];
+        let mut value = String::new();
+        let mut chars = rest.char_indices();
+        let mut closed = None;
+        while let Some((i, ch)) = chars.next() {
+            match ch {
+                '"' => {
+                    closed = Some(i + 1);
+                    break;
+                }
+                '\\' => match chars.next().map(|(_, c)| c) {
+                    Some('"') => value.push('"'),
+                    Some('\\') => value.push('\\'),
+                    Some('/') => value.push('/'),
+                    Some('n') => value.push('\n'),
+                    Some('r') => value.push('\r'),
+                    Some('t') => value.push('\t'),
+                    Some('b') => value.push('\u{8}'),
+                    Some('f') => value.push('\u{c}'),
+                    Some('u') => {
+                        // Four hex digits, which is all `string` ever writes.
+                        let hex: String = (0..4)
+                            .filter_map(|_| chars.next().map(|(_, c)| c))
+                            .collect();
+                        match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                            Some(c) => value.push(c),
+                            None => break,
+                        }
+                    }
+                    _ => break,
+                },
+                c => value.push(c),
+            }
+        }
+        match closed {
+            Some(end) => {
+                out.push(value);
+                rest = &rest[end..];
+            }
+            // An unterminated string means the rest is not readable either.
+            None => break,
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::{place, tests_support::fragment};
+
+    fn built() -> (Vec<ManuscriptRecord>, Vec<Placed>) {
+        let fragments = vec![
+            fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/a.xml"),
+            fragment("Bo 2023/23", "CTH 5", "root/CTH 5_XML_HFR/b.xml"),
+            fragment("KUB 2.1", "CTH 9", "root/CTH 9_XML_TLH/c.xml"),
+        ];
+        let placed = place(&fragments).expect("placed");
+        (fragments.into_iter().map(|f| f.record).collect(), placed)
+    }
+
+    fn manifest() -> String {
+        let (records, placed) = built();
+        let mut applied = BTreeMap::new();
+        applied.insert("DROP_PI xml-stylesheet".to_string(), 2usize);
+        let mut fonts = FontContract::default();
+        fonts.observe("KBo 1.1 šarrum 𒀀");
+        render_manifest(&records, &placed, "test", "abc123", &applied, &fonts)
+    }
+
+    /// The manifest has to be JSON before it has to be anything else.
+    #[test]
+    fn the_manifest_parses_and_says_what_the_package_holds() {
+        let text = manifest();
+        // A hand-written writer earns a structural check: balanced braces and
+        // brackets, and no trailing comma before a close.
+        let braces = text.matches('{').count() as i64 - text.matches('}').count() as i64;
+        let brackets = text.matches('[').count() as i64 - text.matches(']').count() as i64;
+        assert_eq!(braces, 0, "unbalanced braces");
+        assert_eq!(brackets, 0, "unbalanced brackets");
+        assert!(!text.contains(",\n  ]"), "trailing comma before a close");
+        assert!(!text.contains(",\n    }"), "trailing comma before a close");
+
+        assert!(text.contains("\"schema\": 1"));
+        assert!(text.contains("\"groups\": 2"));
+        assert!(text.contains("\"documents\": 3"));
+    }
+
+    /// What the converter comes for: every document, its file, and the path its
+    /// PDF will take.
+    #[test]
+    fn every_document_carries_its_file_and_its_future_pdf() {
+        let text = manifest();
+        assert!(text.contains("\"file\": \"CTH 5/KBo 1.1.xml\""));
+        assert!(text.contains("\"pdf\": \"CTH 5/KBo 1.1.pdf\""));
+        // The siglum with a slash keeps its escaped file name and its own PDF.
+        assert!(text.contains("\"siglum\": \"Bo 2023/23\""), "{text}");
+        assert!(text.contains("\"file\": \"CTH 5/Bo 2023%2F23.xml\""));
+        assert!(text.contains("\"pdf\": \"CTH 5/Bo 2023%2F23.pdf\""));
+    }
+
+    /// Non-ASCII is written as itself: a manifest of a cuneiform corpus that
+    /// escapes every sign is valid and unreadable.
+    #[test]
+    fn the_text_is_not_escaped_into_unreadability() {
+        let mut fonts = FontContract::default();
+        fonts.observe("𒀀 šarrum");
+        let (records, placed) = built();
+        let text = render_manifest(&records, &placed, "𒀀 source", "x", &BTreeMap::new(), &fonts);
+        assert!(text.contains("𒀀 source"));
+        assert!(!text.contains("\\u12000"));
+    }
+
+    /// The font contract counts what the corpus needs, by code point.
+    #[test]
+    fn the_font_contract_counts_the_blocks_the_corpus_uses() {
+        let mut fonts = FontContract::default();
+        fonts.observe("plain ascii");
+        fonts.observe("šarrum ḫattuša"); // Latin Extended
+        fonts.observe("𒀀𒀁"); // above the BMP
+        fonts.observe("e\u{0301}"); // a combining mark: not composed
+
+        assert_eq!(fonts.documents, 4);
+        assert_eq!(fonts.blocks.get("Cuneiform"), Some(&1));
+        assert_eq!(fonts.blocks.get("Basic Latin"), Some(&3));
+        assert_eq!(fonts.blocks.get("Combining Diacritical Marks"), Some(&1));
+        assert_eq!(
+            fonts.not_nfc, 1,
+            "the decomposed one is counted, and only it"
+        );
+        assert_eq!(fonts.blocks.get("Other"), None, "all of it was classified");
+    }
+
+    #[test]
+    fn private_use_code_points_are_counted_as_well_as_named() {
+        let mut fonts = FontContract::default();
+        fonts.observe("ordinary");
+        fonts.observe("a\u{100009}b"); // the corpus does use this plane
+        fonts.observe("\u{E000}");
+
+        assert_eq!(
+            fonts.blocks.get("Supplementary Private Use Area-B"),
+            Some(&1)
+        );
+        assert_eq!(fonts.blocks.get("Private Use Area"), Some(&1));
+        assert_eq!(
+            fonts.private_use, 2,
+            "counted per document, and only where private use appears"
+        );
+    }
+
+    #[test]
+    fn what_the_manifest_writes_can_be_read_back() {
+        let awkward = [
+            "plain",
+            "a\"b",
+            "back\\slash",
+            "line\nbreak",
+            "tab\there",
+            "\u{1}",
+            "𒀀",
+        ];
+        let json = format!(
+            "{{\n  \"k\": {},\n  \"k\": {},\n  \"k\": {},\n  \"k\": {},\n  \"k\": {},\n  \"k\": {},\n  \"k\": {}\n}}",
+            string(awkward[0]),
+            string(awkward[1]),
+            string(awkward[2]),
+            string(awkward[3]),
+            string(awkward[4]),
+            string(awkward[5]),
+            string(awkward[6]),
+        );
+        assert_eq!(values_of(&json, "k"), awkward);
+        assert!(values_of(&json, "absent").is_empty());
+    }
+
+    #[test]
+    fn every_document_in_the_manifest_can_be_read_back_as_a_path() {
+        let (records, placed) = built();
+        let json = manifest();
+        let files = values_of(&json, "file");
+        assert_eq!(files.len(), placed.len(), "one entry per document");
+        for (file, place) in files.iter().zip(&placed) {
+            assert_eq!(
+                std::path::Path::new(file),
+                place.relative,
+                "the manifest names a path the package does not use"
+            );
+        }
+        assert_eq!(values_of(&json, "pdf").len(), records.len());
+    }
+
+    #[test]
+    fn the_block_table_holds_together() {
+        for (i, (name, lo, hi)) in BLOCKS.iter().enumerate() {
+            assert!(lo <= hi, "{name} runs backwards");
+            for (other, olo, ohi) in &BLOCKS[i + 1..] {
+                assert!(
+                    hi < olo || ohi < lo,
+                    "{name} and {other} overlap: the first match wins and the \
+                     second block would never be counted"
+                );
+            }
+        }
+        for name in PRIVATE_USE {
+            assert!(
+                BLOCKS.iter().any(|(b, _, _)| *b == name),
+                "{name} is not a block, so nothing would ever match it and \
+                 documents_with_private_use would silently stay zero"
+            );
+        }
+    }
+}
