@@ -119,6 +119,12 @@ fn is_retryable_io(err: &std::io::Error) -> bool {
 /// Whether another attempt has any chance of succeeding.
 fn is_retryable(err: &ArunaError) -> bool {
     match err {
+        // A redirect loop is settled, not transient. Measured before this
+        // arm existed: a server redirecting to itself was walked five times
+        // by the client, then the whole thing was retried twice more — 15
+        // requests and eight seconds, six of them spent asleep, to reach the
+        // identical error. The same reasoning as the digest mismatch below.
+        ArunaError::Network { source, .. } if is_redirect_loop(source.as_ref()) => false,
         ArunaError::Network { .. } | ArunaError::Truncated { .. } => true,
         ArunaError::Io { source, .. } => is_retryable_io(source),
         ArunaError::Http { status, .. } => is_retryable_status(*status),
@@ -129,6 +135,19 @@ fn is_retryable(err: &ArunaError) -> bool {
         // the useful outcome, and it should arrive at once.
         _ => false,
     }
+}
+
+/// Whether a transport failure is the client giving up on a redirect chain.
+///
+/// Asked of the boxed source by type rather than by message: the wording
+/// belongs to the HTTP client and would change without warning, and matching a
+/// string is how a check quietly stops matching anything.
+fn is_redirect_loop(source: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+    matches!(
+        source.downcast_ref::<ureq::Error>(),
+        Some(ureq::Error::Transport(transport))
+            if transport.kind() == ureq::ErrorKind::TooManyRedirects
+    )
 }
 
 /// How long to wait before the next attempt.

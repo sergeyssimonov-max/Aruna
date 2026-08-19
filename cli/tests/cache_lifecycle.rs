@@ -18,7 +18,7 @@ use aruna::md5::md5_hex;
 use aruna::obtain_archive;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::{tempdir, TempDir};
@@ -32,33 +32,81 @@ use tempfile::{tempdir, TempDir};
 struct Origin {
     port: u16,
     hits: Arc<AtomicUsize>,
+    /// Set when the test is done with the server; the accept loop reads it and
+    /// stops. Without it the thread blocks on `accept` for ever and outlives
+    /// the test, which nextest reports as a leak — correctly: a test that
+    /// leaves a listening socket behind is a test that leaves a resource
+    /// behind.
+    stop: Arc<AtomicBool>,
+}
+
+/// What the server answers with.
+enum Answer {
+    /// A body, with a matching `Content-Length`.
+    Body(Vec<u8>),
+    /// `302` pointing somewhere else. `None` means "back to myself", which is
+    /// the loop a client has to be able to give up on.
+    Redirect(Option<String>),
 }
 
 impl Origin {
     fn start(body: Vec<u8>) -> Self {
+        Self::answering(Answer::Body(body))
+    }
+
+    /// A server that sends everyone somewhere else.
+    fn redirecting(to: Option<String>) -> Self {
+        Self::answering(Answer::Redirect(to))
+    }
+
+    fn answering(answer: Answer) -> Self {
+        let body = match answer {
+            Answer::Body(body) => body,
+            Answer::Redirect(target) => {
+                return Self::start_with(move |stream, port| {
+                    let location = target
+                        .clone()
+                        .unwrap_or_else(|| format!("http://127.0.0.1:{port}/loop"));
+                    let head = format!(
+                        "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    );
+                    let _ = stream.write_all(head.as_bytes());
+                    let _ = stream.flush();
+                });
+            }
+        };
+        Self::start_with(move |stream, _| Self::answer(stream, &body))
+    }
+
+    fn start_with(reply: impl Fn(&mut TcpStream, u16) + Send + 'static) -> Self {
         // Port 0: the operating system picks a free one, so concurrent tests
         // cannot collide over a hard-coded number.
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().expect("addr").port();
         let hits = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&hits);
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopping = Arc::clone(&stop);
 
         std::thread::spawn(move || {
             for stream in listener.incoming() {
+                if stopping.load(Ordering::SeqCst) {
+                    return;
+                }
                 let Ok(mut stream) = stream else { break };
                 counter.fetch_add(1, Ordering::SeqCst);
-                Self::answer(&mut stream, &body);
+                // Read the request line so the client is not writing into a
+                // socket nobody is reading.
+                let mut scratch = [0u8; 1024];
+                let _ = stream.read(&mut scratch);
+                reply(&mut stream, port);
             }
         });
 
-        Origin { port, hits }
+        Origin { port, hits, stop }
     }
 
     fn answer(stream: &mut TcpStream, body: &[u8]) {
-        // Read the request line so the client is not writing into a socket
-        // nobody is reading.
-        let mut scratch = [0u8; 1024];
-        let _ = stream.read(&mut scratch);
         let head = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             body.len()
@@ -74,6 +122,15 @@ impl Origin {
 
     fn requests(&self) -> usize {
         self.hits.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for Origin {
+    fn drop(&mut self) {
+        // Raise the flag, then knock on the door: `accept` is blocking, so it
+        // has to be woken before it can notice.
+        self.stop.store(true, Ordering::SeqCst);
+        let _ = std::net::TcpStream::connect(("127.0.0.1", self.port));
     }
 }
 
@@ -291,5 +348,116 @@ fn an_unreachable_source_fails_without_leaving_anything_behind() {
         cache.files().is_empty(),
         "a failed download left {:?} in the cache",
         cache.files()
+    );
+}
+
+/// A redirect is followed, and what arrives is still held to its digest.
+///
+/// Zenodo answers the archive URL with a redirect in practice, and the client
+/// follows it — but nothing here had ever checked that, nor that the digest is
+/// still the authority afterwards. A redirect that quietly delivered something
+/// else would otherwise be indistinguishable from a successful download.
+#[test]
+fn a_redirect_is_followed_and_the_result_still_has_to_hash_right() {
+    let payload = body();
+    let real = Origin::start(payload.clone());
+    let front = Origin::redirecting(Some(real.url()));
+    let cache = CacheDir::new();
+
+    let archive = with_cache_dir(&cache.path(), || {
+        obtain_archive(&front.url(), &md5_hex(&payload))
+    })
+    .expect("a redirect leads to the archive");
+
+    assert_eq!(std::fs::read(archive.path()).expect("read"), payload);
+    assert_eq!(front.requests(), 1, "the redirect was asked for once");
+    assert_eq!(real.requests(), 1, "and followed once");
+
+    // And the digest still decides: the same redirect with the wrong digest is
+    // refused rather than trusted because a server sent us there.
+    let cache = CacheDir::new();
+    let refused = with_cache_dir(&cache.path(), || {
+        obtain_archive(&front.url(), "00000000000000000000000000000000")
+    });
+    assert!(
+        matches!(refused, Err(ArunaError::ChecksumMismatch { .. })),
+        "a redirected body escaped the digest check"
+    );
+}
+
+/// A redirect that points at itself must end, and end quickly.
+///
+/// Following redirects without a limit is a hang: the client goes round for
+/// ever, the run looks frozen and the only way out is killing it. The bound is
+/// the HTTP client's, but a bound nobody checks is a bound that can be
+/// configured away.
+#[test]
+fn a_redirect_loop_gives_up_instead_of_going_round_for_ever() {
+    let looping = Origin::redirecting(None);
+    let cache = CacheDir::new();
+
+    // Timed inside the lock, not around it. `with_cache_dir` serialises the
+    // tests that set the cache environment, and a neighbour waiting out its
+    // retries would otherwise be counted here — which it was: ten seconds of
+    // someone else's backoff, attributed to a redirect chain that takes
+    // milliseconds.
+    let (outcome, elapsed) = with_cache_dir(&cache.path(), || {
+        let started = std::time::Instant::now();
+        let outcome = obtain_archive(&looping.url(), &md5_hex(&body()));
+        (outcome, started.elapsed())
+    });
+
+    assert!(outcome.is_err(), "a redirect loop was followed to a result");
+    assert!(
+        elapsed < Duration::from_secs(60),
+        "gave up only after {elapsed:?}"
+    );
+    // Walked once, not once per attempt. The client bounds the chain at five;
+    // retrying a loop only walks the identical loop again, so it is not
+    // retried. Before that arm existed this was 15 requests and eight seconds,
+    // six of them asleep between attempts.
+    assert!(
+        looping.requests() <= 6,
+        "the loop was walked {} times, so it is being retried",
+        looping.requests()
+    );
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "took {elapsed:?}, which is long enough to have slept between retries"
+    );
+    assert!(
+        cache.files().is_empty(),
+        "a loop left something in the cache"
+    );
+}
+
+/// The cache directory path is a regular file.
+///
+/// Section 9's "file where a directory is expected": creating the directory
+/// fails, and that is a reason to do without a cache rather than to fail a run
+/// that would otherwise succeed.
+#[test]
+fn a_file_where_the_cache_directory_belongs_does_not_fail_the_run() {
+    let payload = body();
+    let origin = Origin::start(payload.clone());
+    let dir = tempdir().expect("tempdir");
+    let occupied = dir.path().join("cache");
+    std::fs::write(&occupied, b"not a directory").expect("write");
+
+    let archive = with_cache_dir(&occupied, || {
+        obtain_archive(&origin.url(), &md5_hex(&payload))
+    })
+    .expect("a file in the way must not fail the run");
+
+    assert!(
+        matches!(archive, Archive::Temporary(_)),
+        "the archive was reported as cached into a file"
+    );
+    assert_eq!(std::fs::read(archive.path()).expect("read"), payload);
+    // And the file that was in the way is untouched.
+    assert_eq!(
+        std::fs::read(&occupied).expect("read"),
+        b"not a directory",
+        "the file standing where the cache belongs was overwritten"
     );
 }
