@@ -1,0 +1,1 @@
+<AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0" xmlns:future="http://example.invalid/ns/future/2.0"><AOHeader><docID>KBo 3.4</docID></AOHeader><body><text><l lg="Hit"/><future:annotation kind="unheard-of">payload</future:annotation><neverSeenBefore attr="x">y</neverSeenBefore></text></body></AOxml>

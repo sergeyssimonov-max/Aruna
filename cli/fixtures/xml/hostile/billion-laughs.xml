@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!DOCTYPE AOxml [
+ <!ENTITY a "aaaaaaaaaa">
+ <!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">
+ <!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
+ <!ENTITY d "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
+ <!ENTITY e "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
+ <!ENTITY f "&e;&e;&e;&e;&e;&e;&e;&e;&e;&e;">
+ <!ENTITY g "&f;&f;&f;&f;&f;&f;&f;&f;&f;&f;">
+ <!ENTITY h "&g;&g;&g;&g;&g;&g;&g;&g;&g;&g;">
+ <!ENTITY i "&h;&h;&h;&h;&h;&h;&h;&h;&h;&h;">
+]>
+<AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0"><AOHeader><docID>&i;</docID></AOHeader><body><text><l lg="Hit"/>&i;</text></body></AOxml>

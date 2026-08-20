@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE AOxml [ <!ENTITY siglum "KBo 2.7"> ]>
+<AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0"><AOHeader><docID>&siglum;</docID></AOHeader><body><text><l lg="Hit"/>&siglum; and &amp; and &#x1200;</text></body></AOxml>

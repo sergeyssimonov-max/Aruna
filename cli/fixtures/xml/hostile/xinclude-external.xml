@@ -1,0 +1,1 @@
+<AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0" xmlns:xi="http://www.w3.org/2001/XInclude"><AOHeader><docID>KBo 6.2</docID></AOHeader><body><text><l lg="Hit"/><xi:include href="file:///etc/passwd" parse="text"/><xi:include href="../../../../etc/hosts"/></text></body></AOxml>

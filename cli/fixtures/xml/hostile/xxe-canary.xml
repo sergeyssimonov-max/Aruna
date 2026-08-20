@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE AOxml [ <!ENTITY canary SYSTEM "ARUNA_CANARY_PATH"> ]>
+<AOxml xmlns:AO="http://hethiter.net/ns/AO/1.0"><AOHeader><docID>&canary;</docID></AOHeader><body><text><l lg="Hit"/>&canary;</text></body></AOxml>
