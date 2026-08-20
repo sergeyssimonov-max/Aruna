@@ -15,7 +15,7 @@ use super::Placed;
 use crate::html::{escape_html, render_linked_html, Links};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
 use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The package's inventory: the CLI's own, with the links a folder makes possible.
 ///
@@ -113,13 +113,12 @@ pub fn render_group_index(group: &str, run: &[ManuscriptRecord], placed: &[Place
         let file = place
             .relative
             .file_name()
-            .map(|name| PathBuf::from(name.to_os_string()))
-            .unwrap_or_else(|| place.relative.clone());
+            .map_or(place.relative.as_path(), Path::new);
         let _ = writeln!(
             html,
             "  <li><a href=\"{}\" target=\"_blank\" rel=\"noopener\">{}</a>\
              <span class=\"dim\">{} · {} · {}</span></li>",
-            href(&file),
+            href(file),
             escape_html(&place.label),
             escape_html(&record.lang),
             escape_html(&record.authorship),

@@ -40,8 +40,12 @@ fn archive(dir: &Path, entries: &[(&str, Vec<u8>)]) -> PathBuf {
     path
 }
 
-fn text(name: &str, siglum: &str) -> (String, Vec<u8>) {
-    (name.to_string(), manuscript(siglum).into_bytes())
+/// One archive entry: the name it goes in under, and a manuscript body.
+///
+/// The name is passed through rather than copied, so a slice of these is
+/// already what [`archive`] takes.
+fn text<'a>(name: &'a str, siglum: &str) -> (&'a str, Vec<u8>) {
+    (name, manuscript(siglum).into_bytes())
 }
 
 /// Every regular file under `root`, relative to it.
@@ -73,13 +77,7 @@ fn an_entry_that_walks_out_of_the_archive_cannot_walk_out_of_the_package() {
         text("/absolute/CTH 5_XML_HFR/rooted.xml", "KBo 1.2"),
         text("root/CTH 5_XML_HFR/ok.xml", "KBo 1.3"),
     ];
-    let zip = archive(
-        dir.path(),
-        &owned
-            .iter()
-            .map(|(n, b)| (n.as_str(), b.clone()))
-            .collect::<Vec<_>>(),
-    );
+    let zip = archive(dir.path(), &owned);
 
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
@@ -110,13 +108,7 @@ fn a_siglum_that_is_a_path_stays_one_file_inside_one_group() {
         text("root/CTH 5_XML_HFR/d.xml", "."),
         text("root/CTH 5_XML_HFR/e.xml", "   "),
     ];
-    let zip = archive(
-        dir.path(),
-        &entries
-            .iter()
-            .map(|(n, b)| (n.as_str(), b.clone()))
-            .collect::<Vec<_>>(),
-    );
+    let zip = archive(dir.path(), &entries);
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
     export::build(&zip, &destination, "hostile").expect("builds");
@@ -153,13 +145,7 @@ fn two_documents_that_want_one_path_stop_the_build_rather_than_overwrite() {
         text("root/CTH 5_XML_HFR/two.xml", "KBo 1.1"),
         text("root/CTH 5_XML_HFR/three.xml", "KBo 1.1"),
     ];
-    let zip = archive(
-        dir.path(),
-        &entries
-            .iter()
-            .map(|(n, b)| (n.as_str(), b.clone()))
-            .collect::<Vec<_>>(),
-    );
+    let zip = archive(dir.path(), &entries);
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
 
@@ -318,13 +304,7 @@ fn two_archive_entries_with_one_name_do_not_produce_one_document_twice() {
         text("root/CTH 5_XML_HFR/one.xml", "KBo 1.1"),
         text("root/CTH 5_XML_HFR/two.xml", "KBo 2.2"),
     ];
-    let honest = archive(
-        dir.path(),
-        &entries
-            .iter()
-            .map(|(n, b)| (n.as_str(), b.clone()))
-            .collect::<Vec<_>>(),
-    );
+    let honest = archive(dir.path(), &entries);
     let mut raw = fs::read(&honest).expect("read");
     let (from, to) = (b"two.xml", b"one.xml");
     let mut renamed = 0usize;
@@ -418,13 +398,7 @@ fn building_twice_replaces_the_package_and_leaves_nothing_beside_it() {
         text("root/CTH 9_XML_HFR/b.xml", "KUB 2.2"),
         text("root/CTH 9_XML_HFR/c.xml", "KUB 2.3"),
     ];
-    let second = archive(
-        &dir.path().join("second"),
-        &entries
-            .iter()
-            .map(|(n, b)| (n.as_str(), b.clone()))
-            .collect::<Vec<_>>(),
-    );
+    let second = archive(&dir.path().join("second"), &entries);
     let built = export::build(&second, &destination, "second").expect("second build");
 
     assert_eq!(built.documents, 2);

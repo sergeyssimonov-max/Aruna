@@ -4,6 +4,9 @@
 //! what lets the transform be checked against a handful of literals instead of
 //! against a 71 MiB corpus.
 
+use super::verify::{self, DECLARATION};
+use crate::xml_scan::find_exact;
+
 /// Normalise one document for the package.
 ///
 /// Two changes, and deliberately no others. The corpus is scholarly text with
@@ -34,8 +37,6 @@ pub fn normalize_document(bytes: &[u8]) -> Vec<u8> {
 /// is 24 000 allocations for a buffer that is the same size every time. `out`
 /// is appended to, so the caller clears it rather than this deciding for them.
 pub fn normalize_into(bytes: &[u8], out: &mut Vec<u8>) {
-    const DECLARATION: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-
     let mut body = bytes;
     // A leading BOM would sit in front of the declaration and make it invalid.
     if let Some(rest) = body.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
@@ -70,7 +71,7 @@ pub fn normalize_into(bytes: &[u8], out: &mut Vec<u8>) {
 /// Counted by the export so the number it reports is what was actually removed
 /// rather than an estimate.
 pub fn carries_stylesheet(bytes: &[u8]) -> bool {
-    find(bytes, b"<?xml-stylesheet").is_some()
+    find_exact(bytes, b"<?xml-stylesheet").is_some()
 }
 
 /// How many leading bytes are XML whitespace.
@@ -86,7 +87,7 @@ fn processing_instruction_end(bytes: &[u8]) -> Option<usize> {
     if !bytes.starts_with(b"<?") {
         return None;
     }
-    let close = find(bytes, b"?>")?;
+    let close = find_exact(bytes, b"?>")?;
     Some(close + 2)
 }
 
@@ -96,6 +97,10 @@ fn processing_instruction_end(bytes: &[u8]) -> Option<usize> {
 /// the stylesheet is not here. Anything else a document carries is its own and
 /// is kept: dropping instructions by shape rather than by name is how a
 /// normaliser starts deleting things nobody looked at.
+///
+/// Which names those are is [`verify::DROPPED`]'s to say. This module does the
+/// dropping; the permit list is the specification it is held to, and a
+/// specification each side keeps its own copy of is one that drifts.
 fn is_dropped_instruction(pi: &[u8]) -> bool {
     let target = pi
         .get(2..)
@@ -107,11 +112,7 @@ fn is_dropped_instruction(pi: &[u8]) -> bool {
             &rest[..end]
         })
         .unwrap_or(b"");
-    target.eq_ignore_ascii_case(b"xml") || target.eq_ignore_ascii_case(b"xml-stylesheet")
-}
-
-fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
-    hay.windows(needle.len()).position(|w| w == needle)
+    verify::is_dropped(target)
 }
 
 #[cfg(test)]

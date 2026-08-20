@@ -14,8 +14,6 @@
 //! something to take on trust.
 
 use crate::error::{ArunaError, Result};
-use crate::md5::Md5;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// Where the archive came from, and whether it is ours to delete.
@@ -206,23 +204,12 @@ pub fn is_usable(dir: &Path) -> bool {
     ok
 }
 
-/// Stream a file through MD5.
+/// Stream a file through MD5, as an [`ArunaError`] rather than an `io::Error`.
 fn digest_of(path: &Path) -> Result<String> {
-    let io = |source| ArunaError::Io {
+    crate::md5::md5_file(path).map_err(|source| ArunaError::Io {
         path: path.to_path_buf(),
         source,
-    };
-    let mut file = std::fs::File::open(path).map_err(io)?;
-    let mut digest = Md5::new();
-    let mut buf = [0u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buf).map_err(io)?;
-        if read == 0 {
-            break;
-        }
-        digest.update(&buf[..read]);
-    }
-    Ok(digest.finish_hex())
+    })
 }
 
 #[cfg(test)]

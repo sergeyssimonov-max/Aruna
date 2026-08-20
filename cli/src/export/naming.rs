@@ -34,11 +34,11 @@ pub fn dir_component(group: &str) -> String {
 /// a hidden directory is not what a group of manuscripts should be, and `..` is
 /// how a path escapes the folder it belongs in.
 pub fn path_component(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
+    let mut out = String::with_capacity(raw.len() + 8);
     for ch in raw.chars() {
         match ch {
-            '/' | '\\' | ':' => out.push_str(&format!("%{:02X}", ch as u32)),
-            c if (c as u32) < 0x20 || c == '\u{7f}' => out.push_str(&format!("%{:02X}", c as u32)),
+            '/' | '\\' | ':' => push_percent(&mut out, ch as u8),
+            c if (c as u32) < 0x20 || c == '\u{7f}' => push_percent(&mut out, c as u8),
             c => out.push(c),
         }
     }
@@ -83,16 +83,31 @@ pub fn href(path: &Path) -> String {
 
 /// Percent-encode one path segment for a URL.
 fn encode_uri_component(segment: &str) -> String {
-    let mut out = String::with_capacity(segment.len());
+    // Escaping only grows a segment, and the corpus's spaces and brackets mean
+    // most of them do grow.
+    let mut out = String::with_capacity(segment.len() + 8);
     for byte in segment.as_bytes() {
         match byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 out.push(*byte as char)
             }
-            other => out.push_str(&format!("%{other:02X}")),
+            other => push_percent(&mut out, *other),
         }
     }
     out
+}
+
+/// One percent-escape, written straight into the buffer.
+///
+/// `format!("%{byte:02X}")` allocates a `String` and goes through `core::fmt`
+/// for three characters. That is charged per escaped byte, and the package
+/// builds some seventy thousand of these URLs — one per document in the
+/// inventory, again in each group page, and again in the manifest.
+fn push_percent(out: &mut String, byte: u8) {
+    const HEX: [u8; 16] = *b"0123456789ABCDEF";
+    out.push('%');
+    out.push(HEX[(byte >> 4) as usize] as char);
+    out.push(HEX[(byte & 0xF) as usize] as char);
 }
 
 /// Turn one URL segment back into the name it stands for.

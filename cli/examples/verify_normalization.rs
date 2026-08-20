@@ -37,7 +37,7 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    let before = match digest_of(&zip) {
+    let before = match aruna::md5::md5_file(&zip) {
         Ok(digest) => digest,
         Err(err) => {
             eprintln!("cannot read {}: {err}", zip.display());
@@ -110,7 +110,7 @@ fn main() -> ExitCode {
         }
     }
 
-    let after = match digest_of(&zip) {
+    let after = match aruna::md5::md5_file(&zip) {
         Ok(digest) => digest,
         Err(err) => {
             eprintln!("cannot re-read {}: {err}", zip.display());
@@ -153,19 +153,4 @@ fn main() -> ExitCode {
         }
         ExitCode::FAILURE
     }
-}
-
-/// The archive's own digest, to prove it was only read.
-fn digest_of(path: &std::path::Path) -> std::io::Result<String> {
-    let mut file = std::fs::File::open(path)?;
-    let mut digest = aruna::md5::Md5::new();
-    let mut buf = vec![0u8; 1 << 16];
-    loop {
-        let read = file.read(&mut buf)?;
-        if read == 0 {
-            break;
-        }
-        digest.update(&buf[..read]);
-    }
-    Ok(digest.finish_hex())
 }

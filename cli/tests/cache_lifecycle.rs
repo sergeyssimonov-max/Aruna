@@ -40,42 +40,27 @@ struct Origin {
     stop: Arc<AtomicBool>,
 }
 
-/// What the server answers with.
-enum Answer {
-    /// A body, with a matching `Content-Length`.
-    Body(Vec<u8>),
-    /// `302` pointing somewhere else. `None` means "back to myself", which is
-    /// the loop a client has to be able to give up on.
-    Redirect(Option<String>),
-}
-
 impl Origin {
+    /// A server that hands out one body, with a matching `Content-Length`.
     fn start(body: Vec<u8>) -> Self {
-        Self::answering(Answer::Body(body))
+        Self::start_with(move |stream, _| Self::answer(stream, &body))
     }
 
     /// A server that sends everyone somewhere else.
+    ///
+    /// `None` means "back to myself", which is the loop a client has to be able
+    /// to give up on.
     fn redirecting(to: Option<String>) -> Self {
-        Self::answering(Answer::Redirect(to))
-    }
-
-    fn answering(answer: Answer) -> Self {
-        let body = match answer {
-            Answer::Body(body) => body,
-            Answer::Redirect(target) => {
-                return Self::start_with(move |stream, port| {
-                    let location = target
-                        .clone()
-                        .unwrap_or_else(|| format!("http://127.0.0.1:{port}/loop"));
-                    let head = format!(
-                        "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                    );
-                    let _ = stream.write_all(head.as_bytes());
-                    let _ = stream.flush();
-                });
-            }
-        };
-        Self::start_with(move |stream, _| Self::answer(stream, &body))
+        Self::start_with(move |stream, port| {
+            let location = to
+                .clone()
+                .unwrap_or_else(|| format!("http://127.0.0.1:{port}/loop"));
+            let head = format!(
+                "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.flush();
+        })
     }
 
     fn start_with(reply: impl Fn(&mut TcpStream, u16) + Send + 'static) -> Self {

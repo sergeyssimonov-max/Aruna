@@ -23,8 +23,9 @@
 //! cheaper than one more crate.
 
 use super::naming::{href, pdf_path};
-use super::{Placed, PACKAGE};
-use crate::parse::{group_label, group_runs, ManuscriptRecord};
+use super::verify::{self, ADD_DECLARATION, DROP_BOM, REFLOW_PROLOGUE};
+use super::{Placed, GROUP_INDEX, PACKAGE};
+use crate::parse::{group_runs, ManuscriptRecord};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -85,7 +86,7 @@ const BLOCKS: [(&str, u32, u32); 24] = [
     ("Superscripts and Subscripts", 0x2070, 0x209F),
     ("Enclosed Alphanumerics", 0x2460, 0x24FF),
     ("Cuneiform", 0x12000, 0x1254F),
-    ("Combining Diacritical Marks", 0x0300, 0x036F),
+    ("Combining Diacritical Marks", 0x0300, 0x036F), // COMBINING
     ("Spacing Modifier Letters", 0x02B0, 0x02FF),
     ("Miscellaneous Technical", 0x2300, 0x23FF),
     ("Currency Symbols", 0x20A0, 0x20CF),
@@ -103,6 +104,12 @@ const BLOCKS: [(&str, u32, u32); 24] = [
     ("Private Use Area", 0xE000, 0xF8FF),
     ("Supplementary Private Use Area-A", 0xF0000, 0xFFFFD),
 ];
+
+/// Where [`BLOCKS`] holds the combining marks.
+///
+/// Pinned by name in the block-table test rather than trusted: the NFC count
+/// rides on this index, and a block inserted above it would move it silently.
+const COMBINING: usize = 10;
 
 /// The blocks above whose code points no general-purpose font can be expected
 /// to draw, because they mean whatever the corpus decided they mean.
@@ -149,22 +156,18 @@ impl FontContract {
         if private {
             self.private_use += 1;
         }
-        if !is_nfc(text) {
+        // Not a second pass. "Is this text composed?" asks whether it contains
+        // a combining mark, and the loop above has just answered exactly that
+        // for the whole document — the block table has no overlaps, so a code
+        // point in that range matches this block and nothing else.
+        //
+        // Asking again cost a full character-by-character walk of every
+        // document. Measured on the corpus with `bench_fonts`: 561 ms before,
+        // 307 ms after, for the identical counts.
+        if seen[COMBINING] {
             self.not_nfc += 1;
         }
     }
-}
-
-/// Whether text is already in Unicode NFC.
-///
-/// A composed-form check without a Unicode dependency: this looks for the
-/// combining marks that a composed form would not have left standing after a
-/// base letter that can carry them. It is deliberately conservative — it
-/// answers "certainly not composed" rather than "certainly composed" — because
-/// the number it feeds is a warning to a renderer, not a decision about the
-/// text. Nothing here changes a byte either way.
-fn is_nfc(text: &str) -> bool {
-    !text.chars().any(|ch| matches!(ch as u32, 0x0300..=0x036F))
 }
 
 /// Write the package manifest.
@@ -180,8 +183,9 @@ pub fn render_manifest(
     normalisation: &BTreeMap<String, usize>,
     fonts: &FontContract,
 ) -> String {
-    let mut out = String::with_capacity(1 << 20);
-    let mut by_index = placed.iter();
+    // The real manifest averages about 350 bytes per document; 1 MiB for an
+    // 8.3 MB result meant four reallocations and settling at 16 MiB.
+    let mut out = String::with_capacity(placed.len() * 384 + 8192);
     let groups = group_runs(records).count();
 
     out.push_str("{\n");
@@ -208,19 +212,19 @@ pub fn render_manifest(
     // corpus wrote.
     out.push_str("  \"normalisation\": {\n");
     out.push_str("    \"permitted\": [\n");
-    for (i, rule) in PERMITTED.iter().enumerate() {
-        let comma = if i + 1 == PERMITTED.len() { "" } else { "," };
-        let _ = writeln!(out, "      {}{comma}", string(rule));
+    let permitted = permitted();
+    for (i, rule) in permitted.iter().enumerate() {
+        let _ = writeln!(out, "      {}{}", string(rule), comma(i, permitted.len()));
     }
     out.push_str("    ],\n");
     out.push_str("    \"applied\": {\n");
     for (i, (rule, count)) in normalisation.iter().enumerate() {
-        let comma = if i + 1 == normalisation.len() {
-            ""
-        } else {
-            ","
-        };
-        let _ = writeln!(out, "      {}: {count}{comma}", string(rule));
+        let _ = writeln!(
+            out,
+            "      {}: {count}{}",
+            string(rule),
+            comma(i, normalisation.len())
+        );
     }
     out.push_str("    }\n  },\n");
 
@@ -244,18 +248,20 @@ pub fn render_manifest(
     );
     out.push_str("    \"blocks\": {\n");
     for (i, (block, count)) in fonts.blocks.iter().enumerate() {
-        let comma = if i + 1 == fonts.blocks.len() { "" } else { "," };
-        let _ = writeln!(out, "      {}: {count}{comma}", string(block));
+        let _ = writeln!(
+            out,
+            "      {}: {count}{}",
+            string(block),
+            comma(i, fonts.blocks.len())
+        );
     }
     out.push_str("    }\n  },\n");
 
     // The groups, in the order the inventory lists them — which is the order a
     // table of contents wants.
     out.push_str("  \"groups\": [\n");
-    for (g, run) in group_runs(records).enumerate() {
-        let label = group_label(&run[0]);
+    for (g, (label, run, slice)) in super::group_slices(records, placed).enumerate() {
         let dir = PathBuf::from(super::dir_component(label));
-        let comma = if g + 1 == groups { "" } else { "," };
 
         out.push_str("    {\n");
         let _ = writeln!(out, "      \"label\": {},", string(label));
@@ -263,13 +269,11 @@ pub fn render_manifest(
         let _ = writeln!(
             out,
             "      \"href\": {},",
-            string(&href(&dir.join("index.html")))
+            string(&href(&dir.join(GROUP_INDEX)))
         );
         let _ = writeln!(out, "      \"documents\": [");
 
-        for (d, record) in run.iter().enumerate() {
-            let Some(place) = by_index.next() else { break };
-            let last = d + 1 == run.len();
+        for (d, (record, place)) in run.iter().zip(slice).enumerate() {
             let _ = writeln!(out, "        {{");
             let _ = writeln!(out, "          \"siglum\": {},", string(&place.label));
             let _ = writeln!(out, "          \"title\": {},", string(&record.title));
@@ -284,8 +288,7 @@ pub fn render_manifest(
                 string(&href(&place.relative))
             );
             // Where this document's PDF will go. Named here so the converter
-            // does not invent a second naming rule, and so a collision between
-            // two PDFs is caught while the package is built rather than later.
+            // does not invent a second naming rule for the same document.
             let _ = writeln!(
                 out,
                 "          \"pdf\": {},",
@@ -296,54 +299,69 @@ pub fn render_manifest(
             let _ = writeln!(out, "          \"editor\": {},", string(&record.authorship));
             let _ = writeln!(out, "          \"year\": {},", string(&record.year));
             let _ = writeln!(out, "          \"inv\": {}", string(&record.inv));
-            let _ = writeln!(out, "        }}{}", if last { "" } else { "," });
+            let _ = writeln!(out, "        }}{}", comma(d, run.len()));
         }
         out.push_str("      ]\n");
-        let _ = writeln!(out, "    }}{comma}");
+        let _ = writeln!(out, "    }}{}", comma(g, groups));
     }
     out.push_str("  ]\n}\n");
     out
 }
 
 /// The permit list, as the manifest states it.
-const PERMITTED: [&str; 5] = [
-    "DROP_BOM: a leading U+FEFF",
-    "DROP_PI xml: the declaration, replaced by a canonical one",
-    "DROP_PI xml-stylesheet: HPMxml.css is not part of the package",
-    "ADD declaration: <?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-    "REFLOW prologue whitespace: between prologue instructions, to one newline",
-];
-
-/// A JSON string, escaped as the standard requires and no further.
 ///
-/// Non-ASCII is written as itself. Escaping it to `\u` sequences would be
-/// valid JSON and would also make a manifest of a cuneiform corpus unreadable
-/// to the person debugging it.
+/// Built from [`verify`]'s own table rather than restated here. The two used to
+/// be separate lists joined by a shared prefix — `applied` counted a change
+/// under `DROP_PI xml-stylesheet` and `permitted` advertised the same string,
+/// with nothing relating them — so adding a rule to one left the other quietly
+/// describing the old package.
+fn permitted() -> Vec<String> {
+    let mut out = vec![format!("{DROP_BOM}: a leading U+FEFF")];
+    out.extend(
+        verify::DROPPED
+            .iter()
+            .map(|(target, why)| format!("{}: {why}", verify::drop_pi(target))),
+    );
+    out.push(format!(
+        "{ADD_DECLARATION}: {}",
+        String::from_utf8_lossy(verify::DECLARATION).trim_end()
+    ));
+    out.push(format!(
+        "{REFLOW_PROLOGUE}: between prologue instructions, to one newline"
+    ));
+    out
+}
+
+/// The separator after item `i` of `len`: a comma, unless it is the last.
+///
+/// Written out four times in three different shapes before this existed.
+fn comma(i: usize, len: usize) -> &'static str {
+    if i + 1 == len {
+        ""
+    } else {
+        ","
+    }
+}
+
+/// A JSON string value, escaped, as a fresh `String`.
+///
+/// The escaping itself is [`crate::catalog::json_str`] — the crate's one answer
+/// to "what does a JSON string look like here", shared with the catalogue the
+/// site reads. This wrapper exists because most of the manifest is assembled
+/// with `writeln!` and wants a value it can interpolate.
 fn string(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len() + 2);
-    out.push('"');
-    for ch in raw.chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => {
-                let _ = write!(out, "\\u{:04x}", c as u32);
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
+    crate::catalog::json_str(raw, &mut out);
     out
 }
 
 /// Every string value the manifest gives for `key`, decoded.
 ///
 /// A reader for the one document this program writes, not a JSON parser: it
-/// finds `"key": "` and takes the string that follows, honouring exactly the
-/// escapes [`string`] produces and refusing anything else.
+/// finds `"key": "` and takes the string that follows. It understands every
+/// escape JSON defines, which is a superset of the five [`string`] emits —
+/// decoding more than the writer produces costs nothing and means the reader
+/// does not have to be revisited if the writer ever escapes more.
 ///
 /// It exists so the validator can hold the manifest to the same package the
 /// inventory is held to. Two documents written from one model in one pass
@@ -355,6 +373,21 @@ pub fn values_of(json: &str, key: &str) -> Vec<String> {
     let mut rest = json;
     while let Some(at) = rest.find(&needle) {
         rest = &rest[at + needle.len()..];
+        // Almost every value is a path with nothing to unescape. Copying the
+        // slice whole beats pushing it one character at a time, and the manifest
+        // holds some fifty thousand of them.
+        let plain = rest
+            .as_bytes()
+            .iter()
+            .position(|b| matches!(b, b'"' | b'\\'));
+        if let Some(end) = plain {
+            if rest.as_bytes()[end] == b'"' {
+                out.push(rest[..end].to_string());
+                rest = &rest[end + 1..];
+                continue;
+            }
+        }
+
         let mut value = String::new();
         let mut chars = rest.char_indices();
         let mut closed = None;
@@ -374,7 +407,6 @@ pub fn values_of(json: &str, key: &str) -> Vec<String> {
                     Some('b') => value.push('\u{8}'),
                     Some('f') => value.push('\u{c}'),
                     Some('u') => {
-                        // Four hex digits, which is all `string` ever writes.
                         let hex: String = (0..4)
                             .filter_map(|_| chars.next().map(|(_, c)| c))
                             .collect();
@@ -558,6 +590,11 @@ mod tests {
                 );
             }
         }
+        assert_eq!(
+            BLOCKS[COMBINING].0, "Combining Diacritical Marks",
+            "COMBINING no longer points at the combining marks, and the NFC \
+             count rides on it"
+        );
         for name in PRIVATE_USE {
             assert!(
                 BLOCKS.iter().any(|(b, _, _)| *b == name),

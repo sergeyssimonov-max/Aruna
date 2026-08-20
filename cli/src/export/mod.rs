@@ -50,6 +50,15 @@ pub const GROUP_INDEX: &str = "index.html";
 /// The machine-readable model of the package.
 pub const MANIFEST: &str = "manifest.json";
 
+/// Whether `name` is one of the two files the package carries at its root.
+///
+/// The validator's walk and its refusal to overwrite a stranger's folder each
+/// listed these independently, and this very pair had to be extended by hand in
+/// both places when the manifest arrived. One list, asked twice.
+pub fn is_root_file(name: &str) -> bool {
+    name == MANIFEST || name.strip_prefix(PACKAGE) == Some(".html")
+}
+
 /// The most one document may be, inflated.
 ///
 /// A ZIP entry states its uncompressed size and the reader believes it, so a
@@ -94,9 +103,17 @@ pub struct Placed {
 ///
 /// A collision that survives that is a build error rather than a file quietly
 /// overwritten.
+///
+/// Only the XML path is checked. There was a second map for the PDF name each
+/// document will take, but [`naming::output_path`] always ends a name with
+/// `.xml` and [`naming::pdf_path`] only replaces that fixed suffix, so two
+/// distinct XML paths cannot become one PDF path: the check could never fire on
+/// its own. Because it ran first it did fire — naming the `.pdf` path in every
+/// collision error for a clash that was between two `.xml` files. The manifest
+/// is still held to distinct PDF names by [`validate`], which reads them back
+/// from the published file rather than trusting the rule.
 pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
     let mut taken: HashMap<PathBuf, String> = HashMap::with_capacity(fragments.len());
-    let mut pdfs: HashMap<PathBuf, String> = HashMap::with_capacity(fragments.len());
     let mut placed = Vec::with_capacity(fragments.len());
 
     for fragment in fragments {
@@ -111,20 +128,6 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
             relative = output_path(group, &format!("{base} ({suffix})"));
         }
 
-        // The same check for the name this document's PDF will take. Two XML
-        // files that differ only in extension would become one PDF, and the
-        // clash would surface in whatever builds them rather than here.
-        let as_pdf = pdf_path(&relative);
-        if let Some(first) = pdfs.get(&as_pdf) {
-            return Err(ArunaError::ExportCollision {
-                group: group.to_string(),
-                fragment: base.to_string(),
-                first: first.clone(),
-                second: fragment.source.clone(),
-                path: as_pdf,
-            });
-        }
-
         if let Some(first) = taken.get(&relative) {
             return Err(ArunaError::ExportCollision {
                 group: group.to_string(),
@@ -134,7 +137,6 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
                 path: relative,
             });
         }
-        pdfs.insert(pdf_path(&relative), fragment.source.clone());
         taken.insert(relative.clone(), fragment.source.clone());
         placed.push(Placed {
             relative,
@@ -157,6 +159,30 @@ fn disambiguator(source: &str) -> String {
         .and_then(|head| head.rsplit('/').next())
         .unwrap_or(source);
     path_component(parent)
+}
+
+/// Each CTH group: its label, the records in it, and where they were placed.
+///
+/// `placed` is built from `records` in order, so a group's run of records lines
+/// up with a run of the same length in `placed`. That invariant was re-derived
+/// three times — by index arithmetic in the builder, by a shared iterator in the
+/// manifest that silently truncated the file if it ran dry, and by a copy of the
+/// first in the validator's fixture — which is three ways to get one thing
+/// wrong. It is derived here once instead.
+///
+/// Slicing panics if the two ever stop being parallel. That is the right
+/// outcome: it cannot happen from any input, only from a change to this module,
+/// and a manifest that quietly describes half a package is worse than a crash.
+pub fn group_slices<'a>(
+    records: &'a [ManuscriptRecord],
+    placed: &'a [Placed],
+) -> impl Iterator<Item = (&'a str, &'a [ManuscriptRecord], &'a [Placed])> {
+    let mut from = 0usize;
+    crate::parse::group_runs(records).map(move |run| {
+        let slice = &placed[from..from + run.len()];
+        from += run.len();
+        (group_label(&run[0]), run, slice)
+    })
 }
 
 /// What a build did, for the caller to print and for a test to assert on.
@@ -229,11 +255,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
     // package that is opened by double-clicking cannot link to bare folders.
     // All groups or none — a package where some links work and some do not is
     // worse than either.
-    let mut from = 0usize;
-    for run in crate::parse::group_runs(&records) {
-        let slice = &placed[from..from + run.len()];
-        from += run.len();
-        let label = group_label(&run[0]);
+    for (label, run, slice) in group_slices(&records, &placed) {
         let index = staging.path().join(dir_component(label)).join(GROUP_INDEX);
         fs::write(&index, inventory::render_group_index(label, run, slice)).map_err(|source| {
             ArunaError::Io {
@@ -260,46 +282,11 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
     eprintln!("Checking the package…");
     let staged = validate(staging.path(), &records, &placed)?;
 
-    // Only now does it get the name — and the package already there is moved
-    // aside rather than deleted first.
-    //
-    // Deleting it first meant that between the delete and the rename there was
-    // no package at all, and for a 389 MB tree that gap is seconds long, not
-    // instants. A run interrupted inside it left the reader with neither the
-    // old package nor the new one. A rename is atomic and takes no time, so the
-    // gap is now one syscall wide, and if the publish fails the old package
-    // goes back where it was.
-    let previous = fs::symlink_metadata(&final_root)
-        .is_ok()
-        .then(|| destination.join(format!(".{PACKAGE}.previous")));
-    if let Some(aside) = &previous {
-        if aside.exists() {
-            remove_dir(aside)?;
-        }
-        fs::rename(&final_root, aside).map_err(|source| ArunaError::Io {
-            path: final_root.clone(),
-            source,
-        })?;
-    }
-    if let Err(err) = staging.publish(&final_root) {
-        if let Some(aside) = &previous {
-            // Best effort, and the only thing left worth doing: the run has
-            // already failed, and putting the reader's package back matters
-            // more than reporting why the restore failed too.
-            let _ = fs::rename(aside, &final_root);
-        }
-        return Err(err);
-    }
-    if let Some(aside) = previous {
-        // The new package is published; the old copy is only occupying space.
-        // Failing to remove it is not a reason to fail a build that worked.
-        if remove_dir(&aside).is_err() {
-            eprintln!(
-                "  note: the previous package is left at {}",
-                aside.display()
-            );
-        }
-    }
+    // Only now does it get the name. The package already there is moved aside
+    // first, and put back if the publish fails.
+    let previous = Replaced::aside(&final_root, destination)?;
+    staging.publish(&final_root)?;
+    previous.committed();
 
     eprintln!("Checking the published copy…");
     let published = validate(&final_root, &records, &placed)?;
@@ -313,6 +300,83 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
         disambiguated,
         stylesheet_dropped,
     })
+}
+
+/// The package that was already there, held aside until its replacement is in
+/// place.
+///
+/// Deleting it first meant that between the delete and the rename there was no
+/// package at all, and for a 389 MB tree that gap is seconds long rather than
+/// instants — a run interrupted inside it left the reader with neither the old
+/// package nor the new one. A rename is atomic, so the gap is now one syscall
+/// wide.
+///
+/// A guard rather than a sequence of statements in [`build`], for the reason
+/// [`Staging`] and [`crate::paths::write_atomic`] are: cleanup that runs only
+/// on the paths the author remembered is cleanup that stops running the moment
+/// someone adds a `?`. Dropping without [`committed`](Self::committed) puts the
+/// old package back.
+struct Replaced {
+    target: PathBuf,
+    aside: Option<PathBuf>,
+    committed: bool,
+}
+
+impl Replaced {
+    /// Move whatever is at `target` out of the way, if anything is.
+    ///
+    /// `symlink_metadata`, not `exists`: `exists` follows links, and a link is
+    /// what would be renamed here.
+    fn aside(target: &Path, destination: &Path) -> Result<Self> {
+        let mut held = Self {
+            target: target.to_path_buf(),
+            aside: None,
+            committed: false,
+        };
+        if fs::symlink_metadata(target).is_err() {
+            return Ok(held);
+        }
+        let aside = destination.join(format!(".{PACKAGE}.previous"));
+        if aside.exists() {
+            remove_dir(&aside)?;
+        }
+        fs::rename(target, &aside).map_err(|source| ArunaError::Io {
+            path: target.to_path_buf(),
+            source,
+        })?;
+        held.aside = Some(aside);
+        Ok(held)
+    }
+
+    /// The replacement is in place; the old copy is now only occupying space.
+    ///
+    /// Failing to remove it is not a reason to fail a build that worked, so it
+    /// is reported and left.
+    fn committed(mut self) {
+        self.committed = true;
+        if let Some(aside) = &self.aside {
+            if remove_dir(aside).is_err() {
+                eprintln!(
+                    "  note: the previous package is left at {}",
+                    aside.display()
+                );
+            }
+        }
+    }
+}
+
+impl Drop for Replaced {
+    fn drop(&mut self) {
+        if self.committed {
+            return;
+        }
+        if let Some(aside) = &self.aside {
+            // Best effort, and the only thing left worth doing: the run has
+            // already failed, and putting the reader's package back matters
+            // more than reporting why the restore failed too.
+            let _ = fs::rename(aside, &self.target);
+        }
+    }
 }
 
 /// The half-built package: a directory that removes itself unless it is
@@ -472,15 +536,20 @@ fn write_documents(
         // than publishing the rest around it.
         match verify::compare(&bytes, &normalised) {
             Ok(report) => {
+                // Named by `verify`, which also renders the manifest's list of
+                // what is permitted. One list, so a change cannot be counted
+                // under a name the manifest never advertises.
                 for rule in report.dropped {
-                    *applied.entry(format!("DROP_PI {rule}")).or_default() += 1;
+                    *applied.entry(verify::drop_pi(&rule)).or_default() += 1;
                 }
                 if report.added_declaration {
-                    *applied.entry("ADD declaration".to_string()).or_default() += 1;
+                    *applied
+                        .entry(verify::ADD_DECLARATION.to_string())
+                        .or_default() += 1;
                 }
                 if report.reflowed {
                     *applied
-                        .entry("REFLOW prologue whitespace".to_string())
+                        .entry(verify::REFLOW_PROLOGUE.to_string())
                         .or_default() += 1;
                 }
             }
@@ -527,23 +596,10 @@ fn write_documents(
 
 /// The archive's own digest, for the manifest to record.
 fn digest_of(path: &Path) -> Result<String> {
-    let mut file = File::open(path).map_err(|source| ArunaError::Io {
+    crate::md5::md5_file(path).map_err(|source| ArunaError::Io {
         path: path.to_path_buf(),
         source,
-    })?;
-    let mut digest = crate::md5::Md5::new();
-    let mut buf = vec![0u8; 1 << 16];
-    loop {
-        let read = file.read(&mut buf).map_err(|source| ArunaError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
-        if read == 0 {
-            break;
-        }
-        digest.update(&buf[..read]);
-    }
-    Ok(digest.finish_hex())
+    })
 }
 
 fn open(zip: &Path) -> Result<ZipArchive<BufReader<File>>> {

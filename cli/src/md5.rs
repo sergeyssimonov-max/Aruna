@@ -175,6 +175,29 @@ fn nibble(v: u8) -> char {
     char::from(if v < 10 { b'0' + v } else { b'a' + (v - 10) })
 }
 
+/// Stream a file through MD5, without holding it in memory.
+///
+/// The archive is 71 MiB and [`md5_hex`] takes a slice, so every caller that
+/// wanted the digest of a file wrote this loop instead. There were three: the
+/// cache checking what it holds, the export naming the archive in its manifest,
+/// and the example that proves nothing was distorted. Three loops is three
+/// chances to pick a different buffer size and wonder why the numbers differ.
+pub fn md5_file(path: &std::path::Path) -> std::io::Result<String> {
+    use std::io::Read as _;
+
+    let mut file = std::fs::File::open(path)?;
+    let mut digest = Md5::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buf)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buf[..read]);
+    }
+    Ok(digest.finish_hex())
+}
+
 /// Digest a whole slice at once.
 pub fn md5_hex(data: &[u8]) -> String {
     let mut h = Md5::new();

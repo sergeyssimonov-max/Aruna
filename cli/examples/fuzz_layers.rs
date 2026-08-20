@@ -72,7 +72,9 @@ fn blob(rng: &mut Rng, max: usize) -> String {
 }
 
 fn main() {
-    let mut rng = Rng(0xDEADBEEFCAFEBABE);
+    const SEED: u64 = 0xDEADBEEFCAFEBABE;
+    println!("seed: {SEED:#018x}  (fixed, so a failure here reproduces)");
+    let mut rng = Rng(SEED);
     let mut records = Vec::new();
 
     for round in 0..300_000 {

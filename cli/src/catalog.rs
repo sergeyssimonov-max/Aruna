@@ -118,7 +118,17 @@ impl Pool {
 
 /// Minimal JSON string escaping — enough for this document, which holds only
 /// catalogue text.
-fn json_str(s: &str, out: &mut String) {
+/// A JSON string, escaped as the standard requires and no further.
+///
+/// Non-ASCII is written as itself. Escaping it to `\u` sequences would be valid
+/// JSON and would also make a catalogue of a cuneiform corpus unreadable to the
+/// person debugging it.
+///
+/// `pub(crate)` because this crate writes two JSON documents — this catalogue,
+/// which the site reads, and the export's manifest, which the PDF converter
+/// will. They had an escaper each, character-for-character identical, which is
+/// one escape away from the two documents disagreeing about what a quote is.
+pub(crate) fn json_str(s: &str, out: &mut String) {
     out.push('"');
     for c in s.chars() {
         match c {

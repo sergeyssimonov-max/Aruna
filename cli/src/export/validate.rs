@@ -11,7 +11,7 @@
 //! the second call in [`super::build`] does, after the rename.
 
 use super::manifest;
-use super::naming::{dir_component, resolve};
+use super::naming::{dir_component, pdf_path, resolve};
 use super::{inventory, Placed, GROUP_INDEX, MANIFEST, PACKAGE};
 use crate::error::{ArunaError, Result};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
@@ -144,7 +144,7 @@ pub fn validate(
     // The manifest describes the same package, and is checked against the same
     // model rather than against the inventory: two documents agreeing with each
     // other prove nothing if both were written from a model that was wrong.
-    check_manifest(root, placed, &mut errors);
+    check_manifest(root, placed, &expected, &mut errors);
 
     // Groups: one directory each, all linked, none invented.
     let groups: HashSet<PathBuf> = group_runs(records)
@@ -175,7 +175,12 @@ pub fn validate(
 ///
 /// Read back from the file rather than from the string that was written, for
 /// the same reason the inventory is: what a converter opens is the file.
-fn check_manifest(root: &Path, placed: &[Placed], errors: &mut Vec<String>) {
+fn check_manifest(
+    root: &Path,
+    placed: &[Placed],
+    expected: &HashSet<PathBuf>,
+    errors: &mut Vec<String>,
+) {
     let path = root.join(MANIFEST);
     let json = match read_bounded(&path, MAX_MANIFEST) {
         Ok(json) => json,
@@ -185,41 +190,40 @@ fn check_manifest(root: &Path, placed: &[Placed], errors: &mut Vec<String>) {
         }
     };
 
-    let named: HashSet<PathBuf> = manifest::values_of(&json, "file")
-        .into_iter()
-        .map(PathBuf::from)
-        .collect();
-    let expected: HashSet<PathBuf> = placed.iter().map(|p| p.relative.clone()).collect();
-    for missing in expected.difference(&named) {
-        errors.push(format!(
-            "the manifest does not name {}, which the package holds",
-            missing.display()
-        ));
-    }
-    for extra in named.difference(&expected) {
-        errors.push(format!(
-            "the manifest names {}, which the package does not hold",
-            extra.display()
-        ));
-    }
-
-    // One future PDF per document, and no two documents sharing one: the
-    // collision `place` refuses at build time has to still be absent here.
-    let pdfs = manifest::values_of(&json, "pdf");
-    let unique: HashSet<&String> = pdfs.iter().collect();
-    if pdfs.len() != placed.len() {
-        errors.push(format!(
-            "the manifest lists {} PDF names for {} documents",
-            pdfs.len(),
-            placed.len()
-        ));
-    }
-    if unique.len() != pdfs.len() {
-        errors.push(format!(
-            "the manifest gives {} PDF names to {} documents",
-            unique.len(),
-            pdfs.len()
-        ));
+    // Both directions for both names. Counting them and checking they are
+    // distinct is not the same question: a manifest whose PDF names are all
+    // wrong but all different passed that, which is the manifest agreeing with
+    // itself rather than with the package.
+    for (key, expected) in [
+        ("file", expected.clone()),
+        (
+            "pdf",
+            placed.iter().map(|p| pdf_path(&p.relative)).collect(),
+        ),
+    ] {
+        let named: HashSet<PathBuf> = manifest::values_of(&json, key)
+            .into_iter()
+            .map(PathBuf::from)
+            .collect();
+        for missing in expected.difference(&named) {
+            errors.push(format!(
+                "the manifest has no {key} entry for {}",
+                missing.display()
+            ));
+        }
+        for extra in named.difference(&expected) {
+            errors.push(format!(
+                "the manifest has a {key} entry for {}, which is not in the package",
+                extra.display()
+            ));
+        }
+        if named.len() != placed.len() {
+            errors.push(format!(
+                "the manifest lists {} distinct {key} names for {} documents",
+                named.len(),
+                placed.len()
+            ));
+        }
     }
 }
 
@@ -260,7 +264,7 @@ fn walk(
         // or a second manifest inside a group is not part of any contract, and
         // was left by something other than this exporter.
         let belongs = if at_root {
-            name == format!("{PACKAGE}.html") || name == MANIFEST
+            super::is_root_file(&name)
         } else {
             name == GROUP_INDEX
         };
@@ -320,8 +324,10 @@ pub fn check_destination(root: &Path) -> Result<()> {
     })?;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        let ours = name == format!("{PACKAGE}.html")
-            || name == MANIFEST
+        // Wider than the walk's rule on purpose: a group folder is ours, and a
+        // `.DS_Store` is the Finder's business rather than a reason to refuse
+        // to replace our own package.
+        let ours = super::is_root_file(&name)
             || (entry.path().is_dir() && name.starts_with("CTH"))
             || name == ".DS_Store";
         if !ours {
@@ -484,16 +490,17 @@ mod tests {
 
         let path = dir.path().join(MANIFEST);
         let json = fs::read_to_string(&path).expect("read");
-        let second = super::super::naming::pdf_path(&placed[1].relative)
-            .to_string_lossy()
-            .to_string();
-        let first = super::super::naming::pdf_path(&placed[0].relative)
-            .to_string_lossy()
-            .to_string();
+        let second = pdf_path(&placed[1].relative).to_string_lossy().to_string();
+        let first = pdf_path(&placed[0].relative).to_string_lossy().to_string();
         fs::write(&path, json.replace(&second, &first)).expect("write");
 
         let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
-        assert!(format!("{err}").contains("PDF"), "{err}");
+        let text = format!("{err}");
+        assert!(text.contains("pdf"), "{text}");
+        assert!(
+            text.contains(&second),
+            "the name that went missing is the one to say: {text}"
+        );
     }
 
     #[test]

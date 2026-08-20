@@ -1,6 +1,5 @@
 //! Scratch: hammer the pure naming functions with hostile input.
 use aruna::export::naming::{href, output_path, path_component, pdf_path, percent_decode, resolve};
-use std::path::PathBuf;
 
 fn main() {
     let seeds: Vec<String> = vec![
@@ -42,6 +41,7 @@ fn main() {
         "~".into(),
         "_".into(),
     ];
+    println!("inputs: every seed above, and every pair of them — fixed, not random");
     let mut inputs = seeds.clone();
     for a in &seeds {
         for b in &seeds {
@@ -49,7 +49,6 @@ fn main() {
         }
     }
 
-    let mut checked = 0usize;
     for s in &inputs {
         let c = path_component(s);
         assert!(!c.is_empty(), "path_component({s:?}) is empty");
@@ -76,7 +75,6 @@ fn main() {
         let _ = percent_decode(s);
         let _ = resolve(s);
         let _ = resolve(&format!("./{s}"));
-        checked += 1;
     }
     // Deliberately hostile hrefs.
     for bad in [
@@ -97,6 +95,5 @@ fn main() {
             assert!(p.is_relative(), "resolve({bad:?}) is absolute: {p:?}");
         }
     }
-    let _ = PathBuf::new();
-    println!("--- ok, {checked} inputs ---");
+    println!("--- ok, {} inputs ---", inputs.len());
 }

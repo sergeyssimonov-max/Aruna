@@ -110,22 +110,42 @@ fn document(rng: &mut Rng) -> Vec<u8> {
 }
 
 fn main() {
-    let mut rng = Rng(0x9E3779B97F4A7C15);
+    const SEED: u64 = 0x9E3779B97F4A7C15;
+    println!("seed: {SEED:#018x}  (fixed, so a failure here reproduces)");
+    let mut rng = Rng(SEED);
     let mut normalised = Vec::new();
     let (mut distorted, mut json_bad, mut html_bad) = (0usize, 0usize, 0usize);
+    let mut refused = 0usize;
 
     // 1. Normalising never distorts, whatever the prologue looks like.
     for _ in 0..200_000 {
         let source = document(&mut rng);
         normalised.clear();
         normalize_into(&source, &mut normalised);
-        if let Err(why) = verify::compare(&source, &normalised) {
-            distorted += 1;
-            if distorted <= 3 {
-                eprintln!(
-                    "DISTORTED: {why}\n  source: {:?}",
-                    String::from_utf8_lossy(&source)
-                );
+        // A document that declares an encoding other than UTF-8 must be
+        // refused: keeping its bytes under a UTF-8 declaration would change
+        // what they mean, and the byte comparison would not see it. That is the
+        // correct outcome, so the oracle has to know the rule rather than count
+        // the refusal as a fault.
+        let text = String::from_utf8_lossy(&source);
+        let declares_other = text
+            .split("?>")
+            .take_while(|piece| piece.contains("<?"))
+            .any(|pi| pi.contains("encoding=") && !pi.contains("UTF-8"));
+        match (verify::compare(&source, &normalised), declares_other) {
+            (Ok(_), false) => {}
+            (Err(_), true) => refused += 1,
+            (Ok(_), true) => {
+                distorted += 1;
+                if distorted <= 3 {
+                    eprintln!("ALLOWED THROUGH: {text:?}");
+                }
+            }
+            (Err(why), false) => {
+                distorted += 1;
+                if distorted <= 3 {
+                    eprintln!("DISTORTED: {why}\n  source: {text:?}");
+                }
             }
         }
     }
@@ -175,7 +195,7 @@ fn main() {
         }
     }
 
-    println!("distorted: {distorted} | bad json: {json_bad} | bad html: {html_bad}");
+    println!("distorted: {distorted} | correctly refused: {refused} | bad json: {json_bad} | bad html: {html_bad}");
     if distorted + json_bad + html_bad > 0 {
         std::process::exit(1);
     }
@@ -186,9 +206,8 @@ fn main() {
 /// and that no control character rode in raw.
 fn check_json(s: &str) -> Result<(), String> {
     let b = s.as_bytes();
-    let (mut i, mut depth, mut in_str, mut esc) = (0usize, 0i32, false, false);
-    while i < b.len() {
-        let c = b[i];
+    let (mut depth, mut in_str, mut esc) = (0i32, false, false);
+    for (i, &c) in b.iter().enumerate() {
         if in_str {
             if esc {
                 if !matches!(
@@ -218,7 +237,6 @@ fn check_json(s: &str) -> Result<(), String> {
                 _ => {}
             }
         }
-        i += 1;
     }
     if in_str {
         return Err("unterminated string".into());
