@@ -1,0 +1,65 @@
+:root {
+  color-scheme: light;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Cuneiform", UllikummiA,
+    "STIX Two Math", Arial, sans-serif;
+  --font-size: 15px;
+  --line-height: 1.55;
+  --h1-size: 1.35rem;
+  --meta-size: .875rem;
+  --meta-line-height: 1.65;
+  --fg: #1a1a1a;
+  --fg-muted: #666;
+  --bg: #fafafa;
+  --surface: #fff;
+  --border: #e8e8e8;
+  --content-width: 1080px;
+  --page-padding: 2.5rem 1.25rem 3.5rem;
+  --surface-padding: 2rem 1.75rem 2rem;
+  --radius: 6px;
+  --print-margin: 18mm 16mm 20mm;
+  --print-font-size: 10.5pt;
+  --print-line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  padding: var(--page-padding);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+main {
+  max-width: var(--content-width);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--surface-padding);
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: var(--h1-size);
+  letter-spacing: -.01em;
+  margin: 0 0 .45rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.meta {
+  color: var(--fg-muted);
+  font-size: var(--meta-size);
+  line-height: var(--meta-line-height);
+  margin: 0 0 1.25rem;
+}
+
+.meta span {
+  display: block;
+}

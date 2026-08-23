@@ -12,7 +12,7 @@
 
 use super::manifest;
 use super::naming::{dir_component, pdf_path, resolve};
-use super::{inventory, Placed, GROUP_INDEX, MANIFEST, PACKAGE};
+use super::{inventory, Placed, MANIFEST, PACKAGE};
 use crate::error::{ArunaError, Result};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
 use std::collections::HashSet;
@@ -63,7 +63,6 @@ fn read_bounded(path: &Path, limit: u64) -> Result<String> {
 /// What a clean package contains, counted while checking it.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Validation {
-    pub group_links: usize,
     pub fragment_links: usize,
 }
 
@@ -83,7 +82,6 @@ pub fn validate(
     let mut errors: Vec<String> = Vec::new();
     let mut counts = Validation::default();
     let mut linked_files: HashSet<PathBuf> = HashSet::new();
-    let mut linked_dirs: HashSet<PathBuf> = HashSet::new();
 
     for href in inventory::hrefs(&html) {
         let Some(relative) = resolve(href) else {
@@ -94,18 +92,11 @@ pub fn validate(
         };
         let target = root.join(&relative);
 
-        if href.ends_with(GROUP_INDEX) {
-            counts.group_links += 1;
-            if target.is_file() {
-                // The group is named by its folder, which is what the model
-                // knows; the page inside it is where the link points.
-                if let Some(dir) = relative.parent() {
-                    linked_dirs.insert(dir.to_path_buf());
-                }
-            } else {
-                errors.push(format!("group link points at no page: {href}"));
-            }
-        } else if href.ends_with(".xml") {
+        // Every link in this document names an XML file. Group headings carried
+        // links to a page inside each CTH folder until 2026-08-23; that page is
+        // no longer written and nothing may link to one, so anything that is not
+        // a fragment is a fault rather than a second kind of link.
+        if href.ends_with(".xml") {
             counts.fragment_links += 1;
             if target.is_file() {
                 linked_files.insert(relative);
@@ -113,12 +104,9 @@ pub fn validate(
                 errors.push(format!("fragment link points at nothing: {href}"));
             }
         } else {
-            counts.group_links += 1;
-            if target.is_dir() {
-                linked_dirs.insert(relative);
-            } else {
-                errors.push(format!("group link is not a directory: {href}"));
-            }
+            errors.push(format!(
+                "the inventory links something that is not a fragment: {href}"
+            ));
         }
     }
 
@@ -146,18 +134,17 @@ pub fn validate(
     // other prove nothing if both were written from a model that was wrong.
     check_manifest(root, placed, &expected, &mut errors);
 
-    // Groups: one directory each, all linked, none invented.
+    // Groups: one directory each, and each one there. Nothing links a folder any
+    // more, so this is checked against the filesystem rather than against the
+    // links — a group whose folder never appeared would otherwise be reported
+    // only as its documents going missing one by one.
     let groups: HashSet<PathBuf> = group_runs(records)
         .map(|run| PathBuf::from(dir_component(group_label(&run[0]))))
         .collect();
-    for group in groups.difference(&linked_dirs) {
-        errors.push(format!("group without a working link: {}", group.display()));
-    }
-    for extra in linked_dirs.difference(&groups) {
-        errors.push(format!(
-            "link to a group that is not in the inventory: {}",
-            extra.display()
-        ));
+    for group in &groups {
+        if !root.join(group).is_dir() {
+            errors.push(format!("group without a folder: {}", group.display()));
+        }
     }
 
     if errors.is_empty() {
@@ -259,15 +246,12 @@ fn walk(
     for entry in entries.flatten() {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
-        // The inventory, the manifest and a group's own page are part of the
-        // package by contract — each in its own place. A group page at the root
-        // or a second manifest inside a group is not part of any contract, and
-        // was left by something other than this exporter.
-        let belongs = if at_root {
-            super::is_root_file(&name)
-        } else {
-            name == GROUP_INDEX
-        };
+        // The inventory and the manifest are part of the package by contract, at
+        // the root and nowhere else. Inside a CTH folder there is nothing but
+        // XML: the `index.html` that used to open each folder is no longer
+        // written, so one appearing here is either a leftover from an older
+        // export or a regression, and both are worth failing on.
+        let belongs = at_root && super::is_root_file(&name);
         if path.is_dir() {
             walk(root, &path, depth - 1, files, errors);
         } else if belongs {
@@ -359,19 +343,6 @@ mod tests {
             )
             .expect("write");
         }
-        // Each group's own page, as the build writes them: the group links
-        // point at these, so a fixture without them is not a package.
-        let mut from = 0usize;
-        for run in crate::parse::group_runs(&records) {
-            let slice = &placed[from..from + run.len()];
-            from += run.len();
-            let label = crate::parse::group_label(&run[0]);
-            fs::write(
-                dir.join(super::dir_component(label)).join(GROUP_INDEX),
-                crate::export::inventory::render_group_index(label, run, slice),
-            )
-            .expect("group index");
-        }
         fs::write(
             dir.join(format!("{PACKAGE}.html")),
             render_inventory(&records, &placed, "test"),
@@ -412,7 +383,6 @@ mod tests {
         let placed = package(dir.path(), &fragments);
 
         let counts = validate(dir.path(), &records(&fragments), &placed).expect("valid");
-        assert_eq!(counts.group_links, 2);
         assert_eq!(counts.fragment_links, 3);
     }
 
@@ -503,17 +473,27 @@ mod tests {
         );
     }
 
+    /// `index.html` is refused wherever it appears — this is the guard on the
+    /// decision, not a tidiness check.
+    ///
+    /// The exporter wrote one into every CTH folder until 2026-08-23. Re-adding
+    /// that would be a silent return of a feature that was deliberately given
+    /// up, so a package carrying one is not a package this program built.
     #[test]
-    fn a_group_page_where_no_group_is_does_not_pass_as_part_of_the_package() {
-        let dir = tempdir().expect("tempdir");
+    fn an_index_page_is_no_longer_part_of_a_package_anywhere() {
         let fragments = sample();
-        let placed = package(dir.path(), &fragments);
-        // Named like something the exporter writes, in a place it never writes
-        // one: skipping it by name alone would let anything through.
-        fs::write(dir.path().join(GROUP_INDEX), b"<html/>").expect("write");
+        for at in ["", "CTH 5"] {
+            let dir = tempdir().expect("tempdir");
+            let placed = package(dir.path(), &fragments);
+            let path = dir.path().join(at).join("index.html");
+            fs::write(&path, b"<html/>").expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
-        assert!(format!("{err}").contains(GROUP_INDEX), "{err}");
+            let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+            assert!(
+                format!("{err}").contains("index.html"),
+                "an index.html in {at:?} was accepted: {err}"
+            );
+        }
     }
 
     #[test]

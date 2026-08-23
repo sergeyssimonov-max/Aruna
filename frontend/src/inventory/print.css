@@ -1,0 +1,90 @@
+/* Print / PDF.
+ *
+ * Not the screen page photographed. The screen puts the content on a card
+ * floating on a tinted ground, which on paper is a grey rectangle and a border
+ * around every page for no reason; print flattens that and gives the margin box
+ * the job the card was doing.
+ *
+ * What is removed is what cannot be used on paper — the search field and the
+ * fold control act through a script that is not running. What is kept is
+ * everything a reader reads: the heading, the attribution, the counts, the
+ * legend, the table, the listing.
+ */
+@page {
+  margin: var(--print-margin);
+}
+
+@media print {
+  body {
+    padding: 0;
+    background: #fff;
+    color: #000;
+    font-size: var(--print-font-size);
+    line-height: var(--print-line-height);
+    -webkit-font-smoothing: auto;
+  }
+
+  main {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* Screen-only affordances: both are controls, and a control on paper is an
+   * instruction the reader cannot follow. */
+  .toolbar,
+  .group-toggle {
+    display: none !important;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Deliberately no `a[href]::after { content: " (" attr(href) ")" }`. The
+   * hrefs here are relative file names — printing `KBo 1.1.xml` after the words
+   * `KBo 1.1` adds noise and no information, and on the inventory it would put
+   * a path beside all 23 936 rows. */
+
+  /* Page breaking, stated case by case rather than as one blanket rule.
+   * `break-inside: avoid` applied to everything makes a renderer push large
+   * blocks whole onto empty pages; these are the elements small enough that
+   * keeping them together costs nothing. */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    break-inside: avoid;
+  }
+  tr,
+  li,
+  dt,
+  dd {
+    break-inside: avoid;
+  }
+  /* The column headings repeat at the top of every page the table runs onto —
+   * without this a 24 000-row table is unreadable from page two. */
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Transliteration runs long and has few break opportunities; the alternative
+   * to breaking a word is a cell that runs off the page and is clipped. */
+  body {
+    overflow-wrap: break-word;
+  }
+
+  /* An orphaned heading or a single line stranded on its own page. */
+  p,
+  li {
+    orphans: 2;
+    widows: 2;
+  }
+}

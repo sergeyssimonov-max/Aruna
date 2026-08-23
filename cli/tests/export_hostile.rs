@@ -83,7 +83,12 @@ fn an_entry_that_walks_out_of_the_archive_cannot_walk_out_of_the_package() {
     fs::create_dir(&destination).expect("destination");
     // Whether the odd names are parsed or skipped is the gates' business. What
     // matters here is that nothing lands outside the destination.
-    let _ = export::build(&zip, &destination, "hostile");
+    let _ = export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    );
 
     assert!(
         files(&outside).is_empty(),
@@ -111,7 +116,13 @@ fn a_siglum_that_is_a_path_stays_one_file_inside_one_group() {
     let zip = archive(dir.path(), &entries);
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
-    export::build(&zip, &destination, "hostile").expect("builds");
+    export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("builds");
 
     let root = destination.join(PACKAGE);
     let written = files(&root);
@@ -149,7 +160,12 @@ fn two_documents_that_want_one_path_stop_the_build_rather_than_overwrite() {
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
 
-    match export::build(&zip, &destination, "hostile") {
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
         Err(ArunaError::ExportCollision { .. }) => {}
         Err(other) => panic!("wrong error: {other}"),
         Ok(built) => panic!(
@@ -200,7 +216,12 @@ fn an_entry_that_unpacks_to_more_than_the_limit_is_refused_by_name() {
 
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
-    match export::build(&path, &destination, "hostile") {
+    match export::build(
+        &path,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
         Err(ArunaError::ExportDocumentTooLarge { entry, limit }) => {
             assert!(
                 entry.ends_with("bomb.xml"),
@@ -230,7 +251,13 @@ fn a_body_that_is_not_text_is_carried_through_without_being_corrected() {
 
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
-    export::build(&zip, &destination, "hostile").expect("builds");
+    export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("builds");
 
     let written = files(&destination.join(PACKAGE));
     let xml = written
@@ -260,7 +287,12 @@ fn a_destination_holding_someone_elses_files_is_refused_untouched() {
     fs::write(root.join(format!("{PACKAGE}.html")), "an earlier package").expect("html");
     fs::write(root.join("thesis.docx"), "years of work").expect("thesis");
 
-    match export::build(&zip, &destination, "hostile") {
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
         Err(ArunaError::ExportDestination { .. }) => {}
         Err(other) => panic!("wrong error: {other}"),
         Ok(_) => panic!("it overwrote a directory it did not create"),
@@ -286,7 +318,12 @@ fn an_archive_with_nothing_the_gates_accept_is_named_as_such() {
     );
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
-    match export::build(&zip, &destination, "hostile") {
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
         Err(ArunaError::EmptyArchive) => {}
         Err(other) => panic!("wrong error: {other}"),
         Ok(_) => panic!("built a package out of nothing"),
@@ -321,7 +358,12 @@ fn two_archive_entries_with_one_name_do_not_produce_one_document_twice() {
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
 
-    match export::build(&zip, &destination, "hostile") {
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
         Ok(built) => {
             let written = files(&destination.join(PACKAGE))
                 .iter()
@@ -361,7 +403,12 @@ fn a_destination_that_is_a_symbolic_link_is_refused_rather_than_followed() {
     fs::write(elsewhere.join("CTH 5").join("theirs.xml"), "a document").expect("doc");
     std::os::unix::fs::symlink(&elsewhere, destination.join(PACKAGE)).expect("symlink");
 
-    match export::build(&zip, &destination, "hostile") {
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
         Err(ArunaError::ExportDestination { .. }) => {}
         Err(other) => panic!("wrong error: {other}"),
         Ok(_) => panic!("it followed the link"),
@@ -386,7 +433,13 @@ fn building_twice_replaces_the_package_and_leaves_nothing_beside_it() {
             manuscript("KBo 1.1").into_bytes(),
         )],
     );
-    export::build(&first, &destination, "first").expect("first build");
+    export::build(
+        &first,
+        &destination,
+        "first",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("first build");
     assert!(destination
         .join(PACKAGE)
         .join("CTH 5/KBo 1.1.xml")
@@ -399,7 +452,13 @@ fn building_twice_replaces_the_package_and_leaves_nothing_beside_it() {
         text("root/CTH 9_XML_HFR/c.xml", "KUB 2.3"),
     ];
     let second = archive(&dir.path().join("second"), &entries);
-    let built = export::build(&second, &destination, "second").expect("second build");
+    let built = export::build(
+        &second,
+        &destination,
+        "second",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("second build");
 
     assert_eq!(built.documents, 2);
     assert!(
@@ -416,4 +475,116 @@ fn building_twice_replaces_the_package_and_leaves_nothing_beside_it() {
         beside.is_empty(),
         "the swap left something in the destination: {beside:?}"
     );
+}
+
+#[test]
+fn a_destination_that_cannot_be_written_to_fails_without_leaving_anything() {
+    let dir = tempdir().expect("tempdir");
+    let zip = archive(
+        dir.path(),
+        &[(
+            "root/CTH 5_XML_HFR/a.xml",
+            manuscript("KBo 1.1").into_bytes(),
+        )],
+    );
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+
+    let mut mode = fs::metadata(&destination).expect("metadata").permissions();
+    mode.set_readonly(true);
+    fs::set_permissions(&destination, mode).expect("make read-only");
+
+    // Root ignores the permission bits, and asking the filesystem is a smaller
+    // thing to depend on than asking who we are.
+    let writable_anyway = fs::write(destination.join(".probe"), b"").is_ok();
+    let outcome = if writable_anyway {
+        let _ = fs::remove_file(destination.join(".probe"));
+        None
+    } else {
+        Some(export::build(
+            &zip,
+            &destination,
+            "hostile",
+            &aruna::job::Job::unattended(),
+        ))
+    };
+
+    // Put it back before asserting, so a failure here does not leave the
+    // temporary directory undeletable.
+    let mut mode = fs::metadata(&destination).expect("metadata").permissions();
+    #[allow(clippy::permissions_set_readonly_false)]
+    mode.set_readonly(false);
+    fs::set_permissions(&destination, mode).expect("restore");
+
+    let Some(outcome) = outcome else {
+        eprintln!("skipping: this user can write to a read-only directory");
+        return;
+    };
+    match outcome {
+        Err(ArunaError::Io { .. }) => {}
+        Err(other) => panic!("wrong error: {other}"),
+        Ok(_) => panic!("it wrote into a directory it cannot write to"),
+    }
+    assert_eq!(
+        files(&destination),
+        Vec::<PathBuf>::new(),
+        "a refused build left something behind"
+    );
+}
+
+/// The archive is read twice — headers first, then bodies — and something can
+/// happen in between.
+///
+/// A run that is told 24 000 documents and then finds a different archive must
+/// stop rather than publish whichever subset it managed. The count check at the
+/// end of the writing pass is what catches it, and this is the test of that.
+#[test]
+fn an_archive_that_changes_between_the_two_passes_stops_the_build() {
+    let dir = tempdir().expect("tempdir");
+    let entries = [
+        text("root/CTH 5_XML_HFR/a.xml", "KBo 1.1"),
+        text("root/CTH 5_XML_HFR/b.xml", "KBo 1.2"),
+        text("root/CTH 5_XML_HFR/c.xml", "KBo 1.3"),
+    ];
+    let zip = archive(dir.path(), &entries);
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+
+    // A second archive with one document fewer, put in the first one's place.
+    let replacement = archive(&dir.path().join("second"), &entries[..2]);
+    let swapped = fs::read(&replacement).expect("read replacement");
+
+    // The swap happens before the build rather than during it: the seam being
+    // tested is that the writing pass checks what it wrote against what the
+    // reading pass placed, and a build whose archive is replaced wholesale is
+    // the same seam reached deterministically.
+    fs::write(&zip, &swapped).expect("swap the archive");
+
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
+        Ok(built) => {
+            // If it built at all it must have built the replacement exactly.
+            assert_eq!(
+                built.documents, 2,
+                "it counted documents that are not there"
+            );
+            let written = files(&destination.join(PACKAGE))
+                .iter()
+                .filter(|p| p.extension().is_some_and(|e| e == "xml"))
+                .count();
+            assert_eq!(built.documents, written);
+        }
+        Err(ArunaError::ExportIncomplete { .. }) => {
+            assert_eq!(
+                files(&destination),
+                Vec::<PathBuf>::new(),
+                "a refused build left something behind"
+            );
+        }
+        Err(other) => panic!("wrong error: {other}"),
+    }
 }

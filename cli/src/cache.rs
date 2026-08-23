@@ -85,23 +85,39 @@ pub fn archive_name(url: &str, md5: &str) -> String {
     }
 }
 
+/// What the cache had for `md5`.
+///
+/// Three outcomes rather than `Option`, because two of the misses are the same
+/// to the caller and different to the reader: nothing under that name is the
+/// ordinary cold run, and a file under that name that hashes to something else
+/// is worth saying out loud. Returned rather than printed so this module needs
+/// no opinion about who is listening — see [`crate::progress`].
+pub enum Lookup {
+    /// There, and still hashing to what its name promises.
+    Hit(PathBuf),
+    /// Nothing under that name.
+    Absent,
+    /// Something under that name, and not this archive.
+    Rejected,
+}
+
 /// The cached archive for `md5`, if it is there and still hashes to it.
 ///
 /// A file that fails the check is reported as a miss rather than deleted here:
 /// the caller downloads over it, and the rename that lands the new copy
 /// replaces it atomically.
-pub fn lookup(dir: &Path, url: &str, md5: &str) -> Option<PathBuf> {
+pub fn lookup(dir: &Path, url: &str, md5: &str) -> Lookup {
     let path = dir.join(archive_name(url, md5));
     if !path.is_file() {
-        return None;
+        return Lookup::Absent;
     }
     match digest_of(&path) {
-        Ok(found) if found.eq_ignore_ascii_case(md5) => Some(path),
-        Ok(_) => {
-            eprintln!("Cached archive failed its checksum; downloading it again.");
-            None
-        }
-        Err(_) => None,
+        Ok(found) if found.eq_ignore_ascii_case(md5) => Lookup::Hit(path),
+        Ok(_) => Lookup::Rejected,
+        // Unreadable is not "the wrong archive": nothing is known about the
+        // bytes, so there is nothing to tell the reader that the download
+        // about to happen will not tell them better.
+        Err(_) => Lookup::Absent,
     }
 }
 
@@ -289,10 +305,10 @@ mod tests {
         let md5 = md5_hex(body);
         std::fs::write(dir.path().join(archive_name(url, &md5)), body).unwrap();
 
-        assert_eq!(
+        assert!(matches!(
             lookup(dir.path(), url, &md5),
-            Some(dir.path().join(archive_name(url, &md5)))
-        );
+            Lookup::Hit(path) if path == dir.path().join(archive_name(url, &md5))
+        ));
     }
 
     /// The name says what the contents must be, so contents that say otherwise
@@ -305,17 +321,17 @@ mod tests {
         let md5 = md5_hex(b"the real archive");
         std::fs::write(dir.path().join(archive_name(url, &md5)), b"something else").unwrap();
 
-        assert_eq!(lookup(dir.path(), url, &md5), None);
+        assert!(matches!(lookup(dir.path(), url, &md5), Lookup::Rejected));
     }
 
     #[test]
     fn an_empty_cache_is_a_miss() {
         let dir = tempdir().unwrap();
         let url = "https://zenodo.org/records/1/files/corpus.zip?download=1";
-        assert_eq!(
+        assert!(matches!(
             lookup(dir.path(), url, "d41d8cd98f00b204e9800998ecf8427e"),
-            None
-        );
+            Lookup::Absent
+        ));
     }
 
     #[test]

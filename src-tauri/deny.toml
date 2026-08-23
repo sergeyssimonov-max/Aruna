@@ -1,0 +1,99 @@
+# What this dependency tree is allowed to contain.
+#
+# The companion of `cli/deny.toml`, and the same principle: the list below is
+# not a policy someone chose in the abstract, it is what the tree holds today,
+# read out of `cargo deny list` and written down. A *new* licence then becomes a
+# decision someone makes on purpose, with a failing check to prompt it, rather
+# than something that arrives with a transitive dependency and is noticed by
+# nobody.
+#
+#   cargo deny check            — everything below
+#   cargo deny check licenses   — this section alone
+#
+# The specification (§4, §9.7.5) asked for this file and for the platform
+# filter below in particular.
+
+[graph]
+# **The filter that makes this check mean anything here.** Tauri's dependency
+# tree carries every platform it supports, and on a Mac most of it is code that
+# never compiles: gtk-rs, glib, the X11 and Wayland bindings, the Windows and
+# Android halves. Left in, they decide the licence policy of a program that
+# will never contain them — `r-efi`, which is `LGPL-2.1-or-later` and the only
+# copyleft-strong licence anywhere in the graph, arrives through the UEFI
+# branch and disappears the moment these two targets are named.
+#
+# The same two targets the release is built for, and no third: `pnpm build` at
+# the root produces a universal binary out of exactly these.
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+
+[licenses]
+# Every entry below is present because a crate that reaches a macOS build needs
+# it. Most of the tree offers `MIT OR Apache-2.0` and is settled by the first
+# two; what follows them is the tail that has no permissive alternative in its
+# own expression.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    # `alloc-no-stdlib` and `alloc-stdlib`, under `brotli`, which reaches here
+    # through `reqwest`.
+    "BSD-3-Clause",
+    # `foldhash`, the default hasher of `hashbrown`.
+    "Zlib",
+    # The ICU stack, reached through URL parsing. `unicode-ident` is
+    # `(MIT OR Apache-2.0) AND Unicode-3.0`, so this is required rather than
+    # merely offered.
+    "Unicode-3.0",
+    # `cssparser`, `cssparser-macros`, `dtoa-short` and `selectors` — the CSS
+    # selector engine `dom_query` is built on — and `option-ext`, a transitive
+    # of `dirs`. MPL-2.0 is file-level weak copyleft: these crates are used
+    # unmodified, so it asks nothing of Aruna's own source. Named here so that
+    # stays a conscious fact rather than a discovery.
+    "MPL-2.0",
+]
+
+# A licence expression this cannot read with 80 % confidence is worth a human
+# reading it, not a guess.
+confidence-threshold = 0.8
+
+[bans]
+# Duplicate versions of one crate are ordinary in a tree this size — Tauri
+# alone brings three generations of `windows-sys` and two of `syn` — and are
+# not a defect here.
+multiple-versions = "allow"
+# Nothing is banned outright. The list exists so that banning something is
+# possible without inventing this file first.
+deny = []
+
+[advisories]
+# **Unmaintained, scoped to what we actually choose.** Five crates in the
+# `unic-*` family carry an unmaintained advisory; every one of them arrives
+# through Tauri's URL-pattern handling, several levels down, and nothing in
+# this repository asked for them. cargo-deny 0.20 treats the whole class as an
+# error by default, which turns the check into a report about somebody else's
+# dependency choices that no edit here can answer.
+#
+# `workspace` keeps the class an error for anything **we** depend on directly —
+# where the finding is actionable — and leaves the deep transitives to be
+# reported rather than to fail the run. This is a scope, not an exception list:
+# no advisory is named, none is silenced, and `vulnerability` is untouched at
+# its default, so an actual security advisory anywhere in the tree still fails.
+unmaintained = "workspace"
+
+# **No ignores, and that is deliberate.** The specification (§4) keeps the
+# `unmaintained` and `unsound` warnings visible on purpose: they are the
+# indicator that would otherwise be the first thing silenced when a real
+# vulnerability appears behind one of them. An advisory silenced in a config
+# file is an advisory nobody reads again.
+#
+# What reduces them here is the platform filter above, not an exception list —
+# most of them were reported against crates that only exist in the Linux and
+# Windows branches of this tree.
+ignore = []
+
+[sources]
+# Everything comes from crates.io. A dependency pulled from a git remote or a
+# private registry would be a change worth noticing.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -4,10 +4,7 @@
 //! hand: normalising never distorts, the manifest is always valid JSON, and the
 //! inventory never lets a field escape into markup.
 use aruna::export::manifest::{render_manifest, FontContract};
-use aruna::export::{
-    inventory::{render_group_index, render_inventory},
-    normalize_into, place, verify, Fragment, Placed,
-};
+use aruna::export::{inventory::render_inventory, normalize_into, place, verify, Fragment, Placed};
 use aruna::parse::ManuscriptRecord;
 use std::collections::BTreeMap;
 
@@ -182,10 +179,12 @@ fn main() {
             }
         }
 
-        for html in [
-            render_inventory(&recs, &placed, &text(&mut rng)),
-            render_group_index("CTH 0", &recs[..1], &placed[..1]),
-        ] {
+        // Through the exporter's own entry point, which is how the package is
+        // built — a harness that assembled the document another way would be
+        // fuzzing a pipeline the program does not run. There was a second
+        // document here until 2026-08-23, one page per CTH folder; those are no
+        // longer written.
+        for html in [render_inventory(&recs, &placed, &text(&mut rng))] {
             if let Err(why) = check_html(&html) {
                 html_bad += 1;
                 if html_bad <= 3 {

@@ -8,7 +8,8 @@
 //! [`COLUMNS`], the one description of the table's columns; and the rows, which
 //! are the only part that depends on the records.
 
-use crate::parse::{group_label, group_runs, ManuscriptRecord, MISSING};
+use crate::parse::ManuscriptRecord;
+use crate::presentation::{CorpusPresentation, FragmentPresentation};
 use std::fmt::Write as _;
 
 /// Escape text for safe HTML text/attribute embedding.
@@ -78,58 +79,54 @@ const COLUMNS: [Column; 6] = [
 ///
 /// `source` — human-readable source line (Zenodo record).
 /// `generated_at` — already-formatted local date/time string.
-/// Where an inventory's groups and manuscripts point, when it is part of a
-/// package that has them on disk beside it.
-///
-/// Two slices rather than a lookup: the rows are written in one pass over
-/// records that are already in display order, so the href for row *n* is the
-/// *n*-th entry and nothing has to be searched for. Both are indexed by
-/// position, which is why they are built from the same ordering the rows are.
-pub struct Links<'a> {
-    /// One href per group, in the order the groups appear.
-    pub groups: &'a [String],
-    /// One href per record, in record order.
-    pub fragments: &'a [String],
-}
-
 /// The inventory as the CLI writes it: a document that stands on its own.
+///
+/// Nothing is linked, because there is nothing beside it to link to — the file
+/// lands in `~/Downloads` on its own.
 pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &str) -> String {
-    render(records, source, generated_at, None)
+    render(&CorpusPresentation::plain(records, source), generated_at)
 }
 
-/// The same inventory, with every group and every manuscript a link.
+/// The same inventory, with every manuscript a link to its own XML file.
 ///
 /// The same function on purpose. A package's inventory needs the search, the
 /// folding and the attribution this one already has, and a second renderer
 /// beside it would be a second description of the same table — which this
 /// project has paid for before, in two halves that quietly stopped agreeing.
-pub fn render_linked_html(
-    records: &[ManuscriptRecord],
-    source: &str,
-    generated_at: &str,
-    links: &Links<'_>,
-) -> String {
-    render(records, source, generated_at, Some(links))
+///
+/// The difference between the two is entirely in the presentation it is handed:
+/// one has hrefs and the other does not, and this renderer never asks why.
+pub fn render_linked_html(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
+    render(corpus, generated_at)
 }
 
-fn render(
-    records: &[ManuscriptRecord],
-    source: &str,
-    generated_at: &str,
-    links: Option<&Links<'_>>,
-) -> String {
-    let (body_rows, groups) = render_rows(records, links);
+fn render(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
+    let (body_rows, groups) = render_rows(corpus);
 
     let mut html = String::with_capacity(4096 + body_rows.len());
     html.push_str(DOCUMENT_HEAD);
-    html.push_str(include_str!("html_style.css"));
+    // The stylesheet is assembled in [`crate::style`] rather than held here.
+    // It was shared with the CTH group pages until those were given up on
+    // 2026-08-23; the seam stays because the print and screen rules are still
+    // built from one source.
+    html.push_str(&crate::style::inventory_css());
     html.push_str(HEAD_TO_BODY);
-    write_summary(&mut html, source, generated_at, records.len(), groups);
+    write_summary(
+        &mut html,
+        corpus.source,
+        generated_at,
+        corpus.manuscripts(),
+        groups,
+    );
     write_legend(&mut html);
     html.push_str(TOOLBAR);
     write_table(&mut html, &body_rows);
     html.push_str(BODY_TO_SCRIPT);
-    html.push_str(include_str!("html_filter.js"));
+    // Built from `frontend/src/inventory/`, not written here: the search and
+    // the folding are the frontend's to author, and `pnpm build:inventory`
+    // bundles them into the file below. Compiled in like the stylesheets, so
+    // exporting still needs nothing but this binary.
+    html.push_str(INVENTORY_SCRIPT);
     html.push_str(DOCUMENT_TAIL);
     html
 }
@@ -141,26 +138,20 @@ fn render(
 ///
 /// The records arrive sorted (`order::sort_records`), so a group is a run of
 /// equal labels rather than something to collect into a map.
-fn render_rows(records: &[ManuscriptRecord], links: Option<&Links<'_>>) -> (String, usize) {
+fn render_rows(corpus: &CorpusPresentation<'_>) -> (String, usize) {
     let mut rows = String::new();
     let mut row_n = 0usize;
-    let mut groups = 0usize;
 
-    for run in group_runs(records) {
-        let group_href = links.and_then(|l| l.groups.get(groups)).map(String::as_str);
-        groups += 1;
-        write_group_row(&mut rows, group_label(&run[0]), run.len(), group_href);
+    for group in &corpus.groups {
+        write_group_row(&mut rows, group.label, group.fragments.len());
 
-        for rec in run {
-            let href = links
-                .and_then(|l| l.fragments.get(row_n))
-                .map(String::as_str);
+        for fragment in &group.fragments {
             row_n += 1;
-            write_item_row(&mut rows, row_n, rec, href);
+            write_item_row(&mut rows, row_n, fragment, fragment.href.as_deref());
         }
     }
 
-    (rows, groups)
+    (rows, corpus.groups.len())
 }
 
 /// A section heading, and the control that folds the manuscripts under it.
@@ -169,37 +160,28 @@ fn render_rows(records: &[ManuscriptRecord], links: Option<&Links<'_>>) -> (Stri
 /// the group can be folded from the keyboard and a screen reader is told what
 /// the control does and what state it is in. `aria-expanded` starts `true`
 /// because a document opened without JavaScript shows everything.
-fn write_group_row(out: &mut String, label: &str, count: usize, href: Option<&str>) {
+/// A CTH label is text, never a link. Grouping is a way of reading the table,
+/// not a destination: the folders hold XML files and the rows under this
+/// heading link straight at them. Group pages existed until 2026-08-23 and were
+/// given up deliberately — see `docs/FRONTEND-CONTRACT.md`.
+fn write_group_row(out: &mut String, label: &str, count: usize) {
     let label = escape_html(label);
-    let Some(href) = href else {
-        let _ = writeln!(
-            out,
-            "        <tr class=\"group\">\n          <td colspan=\"6\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></button></td>\n        </tr>"
-        );
-        return;
-    };
-
-    // The label leaves the button when it becomes a link: an anchor inside a
-    // button is invalid, and browsers disagree about which of the two a click
-    // belongs to. Apart, each does one thing — the chevron folds the group, the
-    // label opens its folder — and `.group-head` restores the spacing the
-    // button's own flex layout was providing.
-    let href = escape_html(href);
     let _ = writeln!(
         out,
-        "        <tr class=\"group\">\n          <td colspan=\"6\"><span class=\"group-head\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span></button><a class=\"group-label\" href=\"{href}\" target=\"_blank\" rel=\"noopener\">{label}</a><span class=\"group-count\">{count}</span></span></td>\n        </tr>"
+        "        <tr class=\"group\">\n          <td colspan=\"6\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></button></td>\n        </tr>"
     );
 }
 
-fn write_item_row(out: &mut String, row_n: usize, rec: &ManuscriptRecord, href: Option<&str>) {
-    // Within a CTH group show the siglum as the primary name: the group heading
-    // already names the CTH, so the full title would repeat it on every row.
-    let name = if rec.cth.is_some() && rec.sigla != MISSING {
-        rec.sigla.as_str()
-    } else {
-        rec.title.as_str()
-    };
-    let title = escape_html(name);
+fn write_item_row(
+    out: &mut String,
+    row_n: usize,
+    fragment: &FragmentPresentation<'_>,
+    href: Option<&str>,
+) {
+    // Which name a manuscript is listed under is [`crate::presentation`]'s
+    // decision, made once for every document rather than here.
+    let rec = fragment.record;
+    let title = escape_html(fragment.display_name);
     let lang = escape_html(&rec.lang);
     let auth = escape_html(&rec.authorship);
     let year = escape_html(&rec.year);
@@ -289,6 +271,16 @@ fn write_table(out: &mut String, body_rows: &str) {
     out.push_str("    </table>\n");
 }
 
+/// The client script the inventory carries: the search box and the folding.
+///
+/// A build product, and the only one in the crate. Vite bundles
+/// `frontend/src/inventory/main.ts` into it — see `docs/FRONTEND-CONTRACT.md`,
+/// *The target state*. It is committed rather than built by `build.rs` so that
+/// `cargo build` never needs Node, which is the premise of the `.app` and the
+/// DMG; `frontend/tests/inventory-artifact.test.ts` fails if what is committed
+/// is not what the sources now produce.
+const INVENTORY_SCRIPT: &str = include_str!("generated/inventory_filter.js");
+
 /// Everything before the stylesheet.
 const DOCUMENT_HEAD: &str = r#"<!DOCTYPE html>
 <html lang="en">
@@ -308,7 +300,8 @@ const HEAD_TO_BODY: &str = r#"  </style>
 "#;
 
 /// The search box and the fold-everything control. Both act through
-/// `html_filter.js`; without it the document is a plain, fully expanded table.
+/// [`INVENTORY_SCRIPT`]; without it the document is a plain, fully expanded
+/// table.
 const TOOLBAR: &str = r#"    <div class="toolbar">
       <input type="search" id="q" placeholder="Search CTH, siglum, lang, corpus, editor, year…" autocomplete="off" spellcheck="false" />
       <button type="button" id="fold-all" class="fold-all" aria-expanded="true">Collapse fragments</button>

@@ -51,7 +51,7 @@ fn end_to_end_zip_to_html() {
         ],
     );
 
-    let records = parse_zip(&zip_path).expect("parse");
+    let records = parse_zip(&zip_path, &aruna::job::Job::unattended()).expect("parse");
     assert_eq!(records.len(), 3);
 
     let html = render_html(&records, "test source", "2026-01-01 00:00:00 UTC");
@@ -78,16 +78,22 @@ fn corrupted_and_empty_archives() {
 
     let bad = dir.path().join("bad.zip");
     fs::write(&bad, b"PK\x03\x04garbage").unwrap();
-    assert!(matches!(parse_zip(&bad), Err(ArunaError::Zip(_))));
+    assert!(matches!(
+        parse_zip(&bad, &aruna::job::Job::unattended()),
+        Err(ArunaError::Zip(_))
+    ));
 
     let empty = dir.path().join("empty.zip");
     make_zip(&empty, &[]);
     // Empty central directory may be EmptyArchive or Zip depending on crate
-    assert!(parse_zip(&empty).is_err());
+    assert!(parse_zip(&empty, &aruna::job::Job::unattended()).is_err());
 
     let noxml = dir.path().join("noxml.zip");
     make_zip(&noxml, &[("a.txt", "hi"), ("b.md", "#")]);
-    assert!(matches!(parse_zip(&noxml), Err(ArunaError::EmptyArchive)));
+    assert!(matches!(
+        parse_zip(&noxml, &aruna::job::Job::unattended()),
+        Err(ArunaError::EmptyArchive)
+    ));
 }
 
 #[test]
@@ -156,7 +162,7 @@ fn run_with_local_zip_writes_downloads() {
         )],
     );
 
-    let out = aruna::run(Some(&zip_path)).expect("run");
+    let out = aruna::run(Some(&zip_path), &aruna::job::Job::unattended()).expect("run");
     assert!(out.ends_with(OUTPUT_FILE_NAME));
     assert!(out.exists());
     let body = fs::read_to_string(&out).unwrap();
@@ -207,7 +213,7 @@ fn real_fixture_zip_if_present() {
         return;
     }
 
-    let records = parse_zip(&fixture).expect("fixture parse");
+    let records = parse_zip(&fixture, &aruna::job::Job::unattended()).expect("fixture parse");
     assert!(
         records.len() > 20_000,
         "expected the full corpus, got {}",

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "e2e",
+  "description": "WebDriver access for end-to-end tests, debug builds only",
+  "windows": ["main"],
+  "permissions": ["wdio-webdriver:default", "wdio:default"]
+}

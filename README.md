@@ -2,21 +2,18 @@
 
 Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (Hittite cuneiform transliterations).
 
-Two programs share one parser. The CLI downloads the corpus from Zenodo and writes a standalone HTML inventory; the web app serves the same catalog as a searchable page. The parser in [`cli/`](cli/) is the source of truth for both, and CI fails if the two ever describe different manuscripts.
+Two programs share one parser. The CLI downloads the corpus from Zenodo and writes a standalone HTML inventory; the desktop application opens the same corpus in a window. The parser in [`cli/`](cli/) is the source of truth for both.
 
 ## Layout
 
 | Path | Description |
 |------|-------------|
 | [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → HTML inventory. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
-| [`src/`](src/) | Web inventory UI (TanStack Start, virtual list, search in a Web Worker) |
-| [`wasm/search/`](wasm/search/) | Rust → WASM search engine: plain substring matching over a compact index |
-| [`src/data/`](src/data/) | ARUN v3 catalog (`inventory.bin` / `.gz`) and the `inventory.json` it is built from |
-| [`src/wasm/search.wasm`](src/wasm/) | The compiled search module the site loads |
-| [`scripts/build-inventory-bin.mjs`](scripts/build-inventory-bin.mjs) | Rebuild ARUN from `inventory.json` |
-| [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Rebuild `inventory.json` from the archive — the parser is the source of truth for both the site and the CLI |
+| [`frontend/`](frontend/) | Desktop UI — Svelte 5, Vite, TypeScript, no SvelteKit |
+| [`src-tauri/`](src-tauri/) | The Tauri 2 shell the UI runs in, and the Rust side it talks to |
+| [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
 
-Data and the WASM module live under `src/` rather than `public/` so the build can give each a name containing a hash of its contents: new data is a new URL, and a visitor never keeps a stale catalog. See [`src/data/README.txt`](src/data/README.txt).
+There was a React web application here until 2026-08-23, served from `src/` with a WASM search module under `wasm/search/`. It has been removed along with the ARUN container built for it; the desktop application replaces it. [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what went and why.
 
 ## CLI (Aruna)
 
@@ -40,27 +37,32 @@ bash scripts/make_release.sh   # Aruna.app + releases/Aruna-macos-universal.dmg
 
 Prebuilt DMG: [Releases](https://github.com/sergeyssimonov-max/Aruna/releases) (Universal Binary).
 
-## Web app
+## Desktop application
+
+pnpm only — the version is pinned by `packageManager` in [`package.json`](package.json), so `corepack` hands every machine the same one.
 
 ```bash
-npm ci
-npm run dev          # 0.0.0.0:8080
-npm run build:data   # ARUN binary + gzip, from src/data/inventory.json
-npm run build:wasm   # rebuild src/wasm/search.wasm (needs the pinned toolchain)
-npm run typecheck
-npm test
-npm run build
+pnpm --dir frontend install
+pnpm dev             # Tauri window, frontend on Vite's dev server
+pnpm build           # → Universal .app + DMG (macOS, both architectures)
+pnpm build:host      # → .app + DMG for this machine's architecture only
+pnpm check           # svelte-check + tsc over both tsconfigs
+pnpm test            # vitest — including the font-stack agreement check
 ```
 
-Table columns: **№ · Siglum · Lang · Corpus · Editor · Year**
+`pnpm build` targets `universal-apple-darwin`, so the bundle it produces runs on
+Intel and Apple Silicon alike — the same guarantee the CLI's DMG has always
+carried. It needs both Rust targets installed (`rustup target add
+x86_64-apple-darwin aarch64-apple-darwin`) and, being a macOS target, it is
+macOS-only; `build:host` is the escape hatch anywhere else.
 
-Search runs in a Web Worker against the ARUN catalog, through the WASM module when it loads and a JavaScript scan when it does not. Both answer identically; the page says which one is running whenever it is the slower one.
+`pnpm dev` and `pnpm build` drive the frontend themselves: `beforeDevCommand` and `beforeBuildCommand` in [`src-tauri/tauri.conf.json`](src-tauri/tauri.conf.json) run it, and `frontendDist` points at what `vite build` leaves in `frontend/dist`.
 
 ## CI
 
 [`.github/workflows/release-dmg.yml`](.github/workflows/release-dmg.yml) · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
-Three jobs on every push, all on Ubuntu: tests and clippy for both Rust crates, typecheck, lint and tests for the web side, and a full parse of all 23 936 manuscripts against the real archive.
+Three jobs on every push, all on Ubuntu: tests and clippy for the CLI; `svelte-check`, vitest and a production build for the frontend; and a full parse of all 23 936 manuscripts against the real archive.
 
 The Universal `.app` and DMG are built on macOS, but only when a release is being cut or when the workflow is run by hand — macOS minutes bill at ten times the rate, and nothing but a release consumes that artifact. Run it by hand before tagging, since a break in the packaging script no longer surfaces on the push that caused it:
 
@@ -76,7 +78,7 @@ git tag v2.0.1 && git push origin v2.0.1   # → GitHub Release with DMG
 
 The tag has to match `version` in [`cli/Cargo.toml`](cli/Cargo.toml), and CI refuses the release if it does not: the `.app` takes its `CFBundleShortVersionString` from that manifest, so a tag and a manifest that disagree publish a DMG whose application reports a different version from the release it is attached to.
 
-The corpus job is what keeps the two halves honest: it rebuilds the catalog from the archive and fails if it differs from what is committed.
+The corpus job is the one that runs the parser against the real 71 MiB archive rather than fixtures, which is where the character-boundary panic on actual cuneiform was caught. It gates the release.
 
 ## Releases
 
@@ -99,7 +101,8 @@ All three are recorded in [`.github/reference-release.json`](.github/reference-r
 | [`docs/TESTING.md`](docs/TESTING.md) | the test profiles — fast, standard, full corpus, stress, soak — and the exact command for each |
 | [`docs/XML-CONTRACT.md`](docs/XML-CONTRACT.md) | what may be done to the corpus, what must be preserved, what the corpus measurably contains, and where every kind of XML data has to end up in a PDF |
 | [`docs/PDF-ACCEPTANCE.md`](docs/PDF-ACCEPTANCE.md) | the criteria a future converter will be held to, written before it exists |
-| [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) | the agreed desktop stack, what the Rust core still owes it, and the obstacle of already having a different frontend |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | the shape of the Rust side: the layers, which way they depend, and where a Tauri adapter and a PDF renderer attach |
+| [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) | the agreed desktop stack, what the Rust core still owes it, and what the removal of the React application took with it |
 | [`PERFORMANCE.md`](PERFORMANCE.md) | measured numbers, baselines, and the rules for changing them |
 | [`cli/fixtures/xml/MANIFEST.md`](cli/fixtures/xml/MANIFEST.md) | every XML fixture, with a SHA-256 and what it is for |
 
@@ -109,4 +112,4 @@ Measured numbers, and the rules for changing them, are in [`PERFORMANCE.md`](PER
 
 ## License
 
-MIT — declared in [`cli/Cargo.toml`](cli/Cargo.toml).
+MIT — [`LICENSE`](LICENSE), and declared in [`cli/Cargo.toml`](cli/Cargo.toml) and [`src-tauri/Cargo.toml`](src-tauri/Cargo.toml).

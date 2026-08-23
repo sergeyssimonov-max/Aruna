@@ -109,7 +109,7 @@ fn main() -> ExitCode {
     let scratch = std::env::temp_dir().join(format!("aruna-bench-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&scratch);
     let start = Instant::now();
-    let built = export::build(&zip, &scratch, "bench");
+    let built = export::build(&zip, &scratch, "bench", &aruna::job::Job::unattended());
     let whole = start.elapsed();
     let documents_written = match &built {
         Ok(built) => built.documents,

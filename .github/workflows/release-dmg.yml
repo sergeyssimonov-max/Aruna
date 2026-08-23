@@ -81,20 +81,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-          targets: wasm32-unknown-unknown
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            cli → target
-            wasm/search → target
+          workspaces: cli → target
 
       - name: Clippy (CLI)
         run: cargo clippy --manifest-path cli/Cargo.toml --all-targets -- -D warnings
-
-      - name: Clippy (wasm search)
-        run: cargo clippy --manifest-path wasm/search/Cargo.toml --all-targets -- -D warnings
 
       # nextest rather than `cargo test`, for one reason: it can stop a test
       # that hangs. The CLI suite spawns the real binary as a child process and
@@ -118,9 +112,6 @@ jobs:
       - name: Doctests (CLI)
         run: cargo test --manifest-path cli/Cargo.toml --doc
 
-      - name: Test (wasm search)
-        run: cargo nextest run --manifest-path wasm/search/Cargo.toml
-
       # The dependency tree is held to what it holds today: a new licence, a
       # new source or a fresh advisory fails here rather than arriving unnoticed
       # with a transitive dependency. Policy and reasoning in cli/deny.toml.
@@ -129,30 +120,6 @@ jobs:
 
       - name: Dependency policy
         run: cargo deny --manifest-path cli/Cargo.toml check
-
-      - name: Build wasm module for its real target
-        run: cargo build --release --target wasm32-unknown-unknown --manifest-path wasm/search/Cargo.toml
-
-      # src/wasm/search.wasm is served to every visitor, so it must be the
-      # module this commit actually contains.
-      #
-      # Two conditions make the comparison meaningful. The compiler is pinned by
-      # wasm/search/rust-toolchain.toml (rustup reads it because this step runs
-      # from inside the crate) — otherwise CI would rebuild with whatever
-      # `stable` is that week. And the build goes to a fresh CARGO_TARGET_DIR:
-      # rebuilding over a populated target directory — which the cache restores —
-      # yields different bytes from the same sources, so the check would fail for
-      # reasons unrelated to the change.
-      - name: Committed wasm artifact matches its source
-        working-directory: wasm/search
-        run: |
-          export CARGO_TARGET_DIR="$(mktemp -d)"
-          cargo build --release --target wasm32-unknown-unknown
-          built="$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/tlhdig_search.wasm"
-          if ! cmp -s "$built" ../../src/wasm/search.wasm; then
-            echo "::error file=src/wasm/search.wasm::Stale artifact — run 'npm run build:wasm' and commit the result"
-            exit 1
-          fi
 
   # The full 24 000-manuscript parse. It lives in its own job because it needs
   # the 71 MiB Zenodo archive, which is not in the repository — so until now the
@@ -216,68 +183,61 @@ jobs:
           export ARUNA_FIXTURE_ZIP="$HOME/aruna-fixtures/corpus.zip"
           cargo test --manifest-path cli/Cargo.toml --test integration -- --nocapture
 
-      # The site serves a committed catalog while the CLI parses the archive on
-      # every run — two descriptions of one corpus. They had drifted apart
-      # unnoticed for lack of anything comparing them: the committed catalog
-      # carried 643 manuscripts that were really macOS resource-fork files, and
-      # editor and year had moved on in 400 more. Rebuilding it here and
-      # comparing is what keeps the site and the CLI saying the same thing.
-      - name: The committed catalog matches a fresh parse
-        run: |
-          out="$(mktemp -d)/inventory.json"
-          cargo run --release --manifest-path cli/Cargo.toml \
-            --example emit_inventory_json -- "$HOME/aruna-fixtures/corpus.zip" "$out"
-          if ! cmp -s "$out" src/data/inventory.json; then
-            echo "::error file=src/data/inventory.json::Catalog is stale — regenerate it (see src/data/README.txt) and commit the result"
-            diff <(head -c 2000 "$out") <(head -c 2000 src/data/inventory.json) | head -20 || true
-            exit 1
-          fi
-
-      # …and that the binary the browser downloads was built from that catalog.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-      - name: The ARUN binary matches the catalog
-        run: |
-          before="$(shasum -a 256 < src/data/inventory.bin)"
-          node scripts/build-inventory-bin.mjs
-          after="$(shasum -a 256 < src/data/inventory.bin)"
-          if [ "$before" != "$after" ]; then
-            echo "::error file=src/data/inventory.bin::Stale binary — run 'npm run build:data' and commit the result"
-            exit 1
-          fi
-
-  web:
-    name: Typecheck + lint (web)
+  # The desktop frontend. It replaced a React site that had its own job here,
+  # and the shape of the check changed with it: there is no lint step, because
+  # the new environment ships no linter, and no separate typecheck, because
+  # `check` is svelte-check plus tsc over both tsconfigs.
+  #
+  # The build runs too. `svelte-check` reads the sources; only `vite build`
+  # proves they compile into the `frontend/dist` that tauri.conf.json points
+  # `frontendDist` at — and a Tauri bundle with no frontend fails at packaging
+  # time, which is far too late.
+  frontend:
+    name: Check + build (frontend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
+      # The version comes from `packageManager` in the root package.json, so it
+      # is stated once and cannot drift from what runs locally.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
-          cache: npm
-
-      # The runner ships the npm bundled with Node 22 (10.x), but the lockfile is
-      # written by npm 12 locally, and the two disagree about which transitive
-      # packages belong in it — `npm ci` then refuses to install at all. Pin the
-      # same major here so the check tests the lockfile, not the npm skew.
-      - name: Pin npm to the version the lockfile is written with
-        run: npm install -g npm@12
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm ci
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Check
+        working-directory: frontend
+        run: pnpm check
 
-      - name: Lint
-        run: npm run lint
-
-      # Runs src/**/*.test.ts directly: Node 22 strips the types, so the web
-      # side needs no build step or test runner of its own.
+      # Two of these tests read across the language boundary, and both exist
+      # because nothing else would notice.
+      #
+      # The cuneiform font stack is declared twice — here and in
+      # `src/inventory/canonical.css`. On 2026-08-23 the copy vanished with the
+      # directory it lived in and no check noticed, because none read it.
+      # `tests/font-stack.test.ts` reads both files, so a change to the Rust
+      # side that is not mirrored fails here rather than shipping a window that
+      # draws cuneiform as boxes.
+      #
+      # `tests/inventory-artifact.test.ts` rebuilds the client script the
+      # exported inventory carries and compares it with the copy committed at
+      # `cli/src/generated/inventory_filter.js`, which the Rust crate compiles
+      # in. That file is committed so `cargo build` never needs Node; this is
+      # what keeps it from going stale.
       - name: Test
-        run: npm test
+        working-directory: frontend
+        run: pnpm test:unit
+
+      - name: Build
+        working-directory: frontend
+        run: pnpm build
 
   # macOS minutes bill at 10× on a private repository, so this job was 20 of the
   # ~26 minutes every push to main cost — to build an artifact that only a

@@ -1,8 +1,14 @@
-//! The site's catalog: the same records the HTML shows, as the JSON wire form.
+//! The catalog: the same records the HTML shows, as the JSON wire form.
 //!
-//! `src/data/inventory.json` is what `scripts/build-inventory-bin.mjs` reads
-//! to build the binary the browser downloads, so this module and that script
-//! are the two halves of one format:
+//! This used to be one half of a pair — `src/data/inventory.json` was read by
+//! `scripts/build-inventory-bin.mjs`, which packed the ARUN container the
+//! browser downloaded. **Both were deleted with the React site on 2026-08-23**,
+//! and the packing never lived here: this module emits JSON and nothing else,
+//! so there was no container code to remove.
+//!
+//! It is kept because a machine-readable catalog of the corpus is worth having
+//! independently of anything that consumed it — `emit_inventory_json` still
+//! writes it on demand. The format:
 //!
 //! ```json
 //! { "s": source, "m": count, "p": [pooled strings],
@@ -12,8 +18,8 @@
 //!
 //! Metadata fields are indices into the pool `p` — the corpus has 24 000
 //! manuscripts and a few dozen distinct editors, years and languages between
-//! them. Grouping and order follow the HTML exactly, so the site lists
-//! manuscripts in the order the CLI does.
+//! them. Grouping and order follow the HTML exactly, so a reader of this
+//! document lists manuscripts in the order the CLI does.
 //!
 //! It lives in the library rather than in the example that writes the file
 //! because a format with no producer is how the catalog drifted from the parser
@@ -22,7 +28,19 @@
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
 use std::collections::HashMap;
 
-/// Wire schema version, carried as `v` and checked by the reader.
+/// Wire schema version, carried as `v` and refused by the reader when it is not
+/// the one it knows.
+///
+/// The check lived in `scripts/build-inventory-bin.mjs` as `CATALOG_VERSION`,
+/// that script being the only reader this document ever had. Both were deleted
+/// with the React site on 2026-08-23, and with them the second half of the
+/// agreement: `catalog_contract.rs` is now the only thing holding this number
+/// honest.
+///
+/// The field was not there at first. It was written every run and read by
+/// nobody, so the one mechanism that could have caught a reshaped catalog was
+/// inert — while the failure it guards against, indices read against the wrong
+/// shape, is silent wherever the document is consumed.
 const WIRE_VERSION: u32 = 2;
 
 /// A rendered catalog: the document, and what went into it.
@@ -116,18 +134,16 @@ impl Pool {
     }
 }
 
-/// Minimal JSON string escaping — enough for this document, which holds only
-/// catalogue text.
 /// A JSON string, escaped as the standard requires and no further.
 ///
 /// Non-ASCII is written as itself. Escaping it to `\u` sequences would be valid
 /// JSON and would also make a catalogue of a cuneiform corpus unreadable to the
 /// person debugging it.
 ///
-/// `pub(crate)` because this crate writes two JSON documents — this catalogue,
-/// which the site reads, and the export's manifest, which the PDF converter
-/// will. They had an escaper each, character-for-character identical, which is
-/// one escape away from the two documents disagreeing about what a quote is.
+/// `pub(crate)` because this crate writes two JSON documents — this catalogue
+/// and the export's manifest, which the PDF converter will read. They had an
+/// escaper each, character-for-character identical, which is one escape away
+/// from the two documents disagreeing about what a quote is.
 pub(crate) fn json_str(s: &str, out: &mut String) {
     out.push('"');
     for c in s.chars() {

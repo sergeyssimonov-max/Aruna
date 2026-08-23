@@ -11,16 +11,24 @@
 //! directory for the cache, and an archive invented here. Nothing reaches
 //! Zenodo, and the server counts its requests so "it used the cache" can be
 //! asserted rather than assumed.
+//!
+//! That first claim was false until 2026-08-23 and nothing here showed it: the
+//! download path asks Zenodo which edition of the corpus is current, so every
+//! test below made a live request the local server never saw. `obtain_archive`
+//! here is `support::obtain_archive`, which hands that lookup an answer instead
+//! of a network.
+
+mod support;
 
 use aruna::cache::{self, Archive};
 use aruna::error::ArunaError;
 use aruna::md5::md5_hex;
-use aruna::obtain_archive;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use support::obtain_archive;
 use tempfile::{tempdir, TempDir};
 
 /// A server that serves one body and counts who asked.
@@ -183,8 +191,10 @@ fn a_cold_run_downloads_and_a_warm_one_does_not() {
     let cache = CacheDir::new();
 
     let (first, second) = with_cache_dir(&cache.path(), || {
-        let first = obtain_archive(&origin.url(), &digest).expect("cold run downloads");
-        let second = obtain_archive(&origin.url(), &digest).expect("warm run is served");
+        let first = obtain_archive(&origin.url(), &digest, &aruna::job::Job::unattended())
+            .expect("cold run downloads");
+        let second = obtain_archive(&origin.url(), &digest, &aruna::job::Job::unattended())
+            .expect("warm run is served");
         (first, second)
     });
 
@@ -221,7 +231,11 @@ fn an_archive_that_hashes_wrong_is_refused_and_not_cached() {
     let cache = CacheDir::new();
 
     let outcome = with_cache_dir(&cache.path(), || {
-        obtain_archive(&origin.url(), "00000000000000000000000000000000")
+        obtain_archive(
+            &origin.url(),
+            "00000000000000000000000000000000",
+            &aruna::job::Job::unattended(),
+        )
     });
 
     match outcome {
@@ -257,13 +271,23 @@ fn a_republished_archive_replaces_the_edition_it_supersedes() {
     let later = Origin::start(second_payload.clone());
 
     let files = with_cache_dir(&cache.path(), || {
-        obtain_archive(&origin.url(), &md5_hex(&first_payload)).expect("first edition");
+        obtain_archive(
+            &origin.url(),
+            &md5_hex(&first_payload),
+            &aruna::job::Job::unattended(),
+        )
+        .expect("first edition");
         let before = std::fs::read_dir(cache.path()).expect("read").count();
 
         // The same file name at the source, a different digest: what a
         // republished record looks like.
         let url = format!("http://127.0.0.1:{}/TLHbasis.zip", later.port);
-        obtain_archive(&url, &md5_hex(&second_payload)).expect("second edition");
+        obtain_archive(
+            &url,
+            &md5_hex(&second_payload),
+            &aruna::job::Job::unattended(),
+        )
+        .expect("second edition");
         (before, cache.files())
     });
 
@@ -290,7 +314,11 @@ fn an_unwritable_cache_directory_falls_back_to_a_run_of_its_own() {
     std::fs::set_permissions(cache.path(), std::fs::Permissions::from_mode(0o500)).expect("chmod");
 
     let outcome = with_cache_dir(&cache.path(), || {
-        obtain_archive(&origin.url(), &md5_hex(&payload))
+        obtain_archive(
+            &origin.url(),
+            &md5_hex(&payload),
+            &aruna::job::Job::unattended(),
+        )
     });
 
     std::fs::set_permissions(cache.path(), std::fs::Permissions::from_mode(0o755)).expect("chmod");
@@ -320,7 +348,11 @@ fn an_unreachable_source_fails_without_leaving_anything_behind() {
 
     let started = std::time::Instant::now();
     let outcome = with_cache_dir(&cache.path(), || {
-        obtain_archive(&format!("http://127.0.0.1:{port}/x.zip"), &md5_hex(&body()))
+        obtain_archive(
+            &format!("http://127.0.0.1:{port}/x.zip"),
+            &md5_hex(&body()),
+            &aruna::job::Job::unattended(),
+        )
     });
 
     assert!(outcome.is_err(), "an unreachable source reported success");
@@ -350,7 +382,11 @@ fn a_redirect_is_followed_and_the_result_still_has_to_hash_right() {
     let cache = CacheDir::new();
 
     let archive = with_cache_dir(&cache.path(), || {
-        obtain_archive(&front.url(), &md5_hex(&payload))
+        obtain_archive(
+            &front.url(),
+            &md5_hex(&payload),
+            &aruna::job::Job::unattended(),
+        )
     })
     .expect("a redirect leads to the archive");
 
@@ -362,7 +398,11 @@ fn a_redirect_is_followed_and_the_result_still_has_to_hash_right() {
     // refused rather than trusted because a server sent us there.
     let cache = CacheDir::new();
     let refused = with_cache_dir(&cache.path(), || {
-        obtain_archive(&front.url(), "00000000000000000000000000000000")
+        obtain_archive(
+            &front.url(),
+            "00000000000000000000000000000000",
+            &aruna::job::Job::unattended(),
+        )
     });
     assert!(
         matches!(refused, Err(ArunaError::ChecksumMismatch { .. })),
@@ -388,7 +428,11 @@ fn a_redirect_loop_gives_up_instead_of_going_round_for_ever() {
     // milliseconds.
     let (outcome, elapsed) = with_cache_dir(&cache.path(), || {
         let started = std::time::Instant::now();
-        let outcome = obtain_archive(&looping.url(), &md5_hex(&body()));
+        let outcome = obtain_archive(
+            &looping.url(),
+            &md5_hex(&body()),
+            &aruna::job::Job::unattended(),
+        );
         (outcome, started.elapsed())
     });
 
@@ -416,6 +460,68 @@ fn a_redirect_loop_gives_up_instead_of_going_round_for_ever() {
     );
 }
 
+/// A sink that keeps the Zenodo advisories and lets the rest go by.
+#[derive(Default)]
+struct Notices(std::sync::Mutex<Vec<String>>);
+
+impl aruna::progress::Progress for Notices {
+    fn report(&self, event: aruna::progress::Event<'_>) {
+        if let aruna::progress::Event::ZenodoNotice { message } = event {
+            self.0
+                .lock()
+                .expect("not poisoned")
+                .push(message.to_string());
+        }
+    }
+}
+
+/// A newer edition of the corpus is announced, and the run goes ahead anyway.
+///
+/// The other tests here fill the release lookup with silence, which is what a
+/// hermetic suite needs and is also the way to end up with a seam that only
+/// ever says nothing: deleting the announcement from the download path would
+/// break none of them. This one drives the same seam the other way — the
+/// lookup reports that the corpus has moved on — and holds both halves of
+/// `zenodo::advice`'s promise: the reader is told, and the pinned archive is
+/// still what arrives.
+#[test]
+fn a_newer_edition_is_announced_and_the_pinned_archive_still_arrives() {
+    fn superseded(_record_id: u64) -> aruna::error::Result<aruna::zenodo::Release> {
+        Ok(aruna::zenodo::Release {
+            record_id: aruna::ZENODO_RECORD + 1,
+            file: "TLHbasisONLINE25_2_ZENODO_Beta_04.zip".to_string(),
+            md5: None,
+            published: Some("2026-09-01".to_string()),
+        })
+    }
+
+    let payload = body();
+    let origin = Origin::start(payload.clone());
+    let cache = CacheDir::new();
+    let notices = Notices::default();
+    let cancel = aruna::job::Cancel::new();
+    let job = aruna::job::Job::new(&notices, &cancel);
+
+    let archive = with_cache_dir(&cache.path(), || {
+        aruna::obtain_archive_advised_by(&origin.url(), &md5_hex(&payload), &job, superseded)
+    })
+    .expect("a corpus that has moved on is not a reason to refuse the pinned one");
+
+    assert_eq!(
+        std::fs::read(archive.path()).expect("read"),
+        payload,
+        "the advice was taken as an instruction"
+    );
+
+    let said = notices.0.lock().expect("not poisoned").clone();
+    assert_eq!(said.len(), 1, "said {} times, not once", said.len());
+    assert!(
+        said[0].contains(&(aruna::ZENODO_RECORD + 1).to_string()),
+        "the notice does not name the newer record: {}",
+        said[0]
+    );
+}
+
 /// The cache directory path is a regular file.
 ///
 /// Section 9's "file where a directory is expected": creating the directory
@@ -430,7 +536,11 @@ fn a_file_where_the_cache_directory_belongs_does_not_fail_the_run() {
     std::fs::write(&occupied, b"not a directory").expect("write");
 
     let archive = with_cache_dir(&occupied, || {
-        obtain_archive(&origin.url(), &md5_hex(&payload))
+        obtain_archive(
+            &origin.url(),
+            &md5_hex(&payload),
+            &aruna::job::Job::unattended(),
+        )
     })
     .expect("a file in the way must not fail the run");
 

@@ -47,7 +47,7 @@ fn main() -> ExitCode {
 
     // Setup, and not part of any measurement below.
     eprintln!("reading {} …", zip.display());
-    let sorted = match parse_zip(&zip) {
+    let sorted = match parse_zip(&zip, &aruna::job::Job::unattended()) {
         Ok(records) => records,
         Err(err) => {
             eprintln!("failed to read {}: {err}", zip.display());

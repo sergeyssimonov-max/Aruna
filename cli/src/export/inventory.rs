@@ -2,20 +2,24 @@
 //!
 //! Not a second renderer: the package gets the same document the CLI writes —
 //! the same table, the same search, the same folding, the same attribution —
-//! with every group and every manuscript turned into a link. The rendering
+//! with every manuscript turned into a link to its own XML file. The rendering
 //! itself belongs to [`crate::html`], and this module only says where the links
 //! point.
+//!
+//! Until 2026-08-23 it also wrote a page for every CTH folder and linked the
+//! group headings at those. That was given up: a CTH label is a way of reading
+//! the table, not a document, and a reader who wants a manuscript wants the
+//! manuscript. Nothing here writes a `index.html` any more, and
+//! `package_pages.rs` fails if one appears.
 //!
 //! Pure: records and their placements in, one HTML document out. It reads
 //! nothing and writes nothing, so what it produces can be checked against a
 //! string rather than against a folder on disk.
 
-use super::naming::{dir_component, href};
 use super::Placed;
-use crate::html::{escape_html, render_linked_html, Links};
-use crate::parse::{group_label, group_runs, ManuscriptRecord};
-use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use crate::html::render_linked_html;
+use crate::parse::ManuscriptRecord;
+use crate::presentation::CorpusPresentation;
 
 /// The package's inventory: the CLI's own, with the links a folder makes possible.
 ///
@@ -23,30 +27,12 @@ use std::path::{Path, PathBuf};
 /// to come out identical every time, and a clock reading is the one thing that
 /// would not.
 pub fn render_inventory(records: &[ManuscriptRecord], placed: &[Placed], source: &str) -> String {
-    // One href per group, in the order the groups appear, and one per record,
-    // in record order — which is the order `placed` is already in.
-    // At the group's page, not at the folder: Safari renders nothing for a
-    // `file://` directory, so a link to a bare folder is a blank page for
-    // anyone who opens the package in it.
-    let groups: Vec<String> = group_runs(records)
-        .map(|run| {
-            href(
-                &PathBuf::from(dir_component(group_label(&run[0])))
-                    .join(crate::export::GROUP_INDEX),
-            )
-        })
-        .collect();
-    let fragments: Vec<String> = placed.iter().map(|p| href(&p.relative)).collect();
-
-    render_linked_html(
-        records,
-        source,
-        "",
-        &Links {
-            groups: &groups,
-            fragments: &fragments,
-        },
-    )
+    // Where every link points is [`crate::presentation`]'s decision, made once
+    // for the package rather than once per document. At the XML file itself —
+    // never at a folder, which Safari renders as a blank page for a `file://`
+    // URL, and never at a page about the folder, which is the thing this
+    // stopped producing.
+    render_linked_html(&CorpusPresentation::linked(records, placed, source), "")
 }
 
 /// The `href="…"` values of an inventory, in the order it lists them.
@@ -64,69 +50,6 @@ pub fn hrefs(html: &str) -> Vec<&str> {
         rest = &rest[end..];
     }
     out
-}
-
-/// The listing a CTH folder opens with.
-///
-/// Safari does not render `file://` directory listings — observed, not assumed:
-/// opening a folder URL yields a document with no title, no URL and no source,
-/// which is a blank page for the reader. Chrome does render one. A package that
-/// is meant to be opened by double-clicking cannot depend on which browser that
-/// is, so every group gets a page of its own and the group link points at it.
-///
-/// Written from the same model as the inventory, with the same link rules, so
-/// the two cannot disagree about where a document is.
-pub fn render_group_index(group: &str, run: &[ManuscriptRecord], placed: &[Placed]) -> String {
-    let mut html = String::with_capacity(1024 + run.len() * 160);
-    html.push_str(
-        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n",
-    );
-    let _ = writeln!(
-        html,
-        "<title>{} — TLHdig Beta 0.3</title>",
-        escape_html(group)
-    );
-    html.push_str(
-        "<style>\n:root{color-scheme:light dark}\n\
-         body{font:15px/1.6 system-ui,-apple-system,sans-serif;margin:0;padding:2rem;\
-         background:#fafafa;color:#1a1a1a}\n\
-         @media (prefers-color-scheme:dark){body{background:#141414;color:#e8e8e8}}\n\
-         h1{font-size:1.15rem;margin:0 0 .2rem}\n\
-         p.meta{color:#888;font-size:.82rem;margin:0 0 1.4rem}\n\
-         ul{list-style:none;margin:0;padding:0}\nli{padding:.15rem 0}\n\
-         a{color:inherit}\n.dim{color:#888;font-size:.85em;margin-left:.5rem}\n\
-         </style>\n</head>\n<body>\n",
-    );
-    let _ = writeln!(html, "<h1>{}</h1>", escape_html(group));
-    let _ = writeln!(
-        html,
-        "<p class=\"meta\">{} manuscript{} · <a href=\"../{}.html\">back to the inventory</a></p>\n<ul>",
-        run.len(),
-        if run.len() == 1 { "" } else { "s" },
-        crate::export::PACKAGE
-    );
-
-    for (record, place) in run.iter().zip(placed) {
-        // Relative to this folder, so the page works wherever the package is
-        // moved and whatever it is opened from.
-        let file = place
-            .relative
-            .file_name()
-            .map_or(place.relative.as_path(), Path::new);
-        let _ = writeln!(
-            html,
-            "  <li><a href=\"{}\" target=\"_blank\" rel=\"noopener\">{}</a>\
-             <span class=\"dim\">{} · {} · {}</span></li>",
-            href(file),
-            escape_html(&place.label),
-            escape_html(&record.lang),
-            escape_html(&record.authorship),
-            escape_html(&record.year)
-        );
-    }
-    html.push_str("</ul>\n</body>\n</html>\n");
-    html
 }
 
 #[cfg(test)]
@@ -151,15 +74,15 @@ mod tests {
 
         assert_eq!(
             html.matches("target=\"_blank\"").count(),
-            2,
-            "group and fragment"
+            1,
+            "the fragment, and nothing else"
         );
-        assert_eq!(html.matches("rel=\"noopener\"").count(), 2);
-        assert!(
-            html.contains("href=\"./CTH%20786/index.html\""),
-            "the group link points at its page, not the bare folder"
-        );
+        assert_eq!(html.matches("rel=\"noopener\"").count(), 1);
         assert!(html.contains("href=\"./CTH%20786/KBo%2017.86%2B.xml\""));
+        assert!(
+            !html.contains("index.html"),
+            "a CTH folder has no page, and nothing may link to one"
+        );
         // No absolute path may reach the document.
         assert!(!html.contains("file://"));
         assert!(!html.contains("/Users/"));
@@ -183,21 +106,27 @@ mod tests {
         );
     }
 
-    /// The label is a link and the chevron is a button, and they are siblings:
-    /// an anchor inside a button is invalid, and the script folds on the button
-    /// alone, so a click on the label opens the folder instead of folding.
+    /// A CTH heading is text inside its fold button, and carries no link.
+    ///
+    /// It was an anchor beside the button while the folders had pages. Now that
+    /// they do not, the whole heading folds again — which is what the client
+    /// script was written against, and what it still does now that
+    /// `frontend/` builds it.
     #[test]
-    fn folding_and_following_a_link_are_separate_controls() {
+    fn a_group_heading_folds_and_does_not_link() {
         let (html, _) = built(&[fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/a.xml")]);
 
-        assert!(html.contains("<span class=\"group-head\">"));
         assert!(
-            html.contains("</button><a class=\"group-label\""),
-            "the label sits after the button, not inside it"
+            html.contains("<span class=\"group-label\">CTH 5</span>"),
+            "the label is text"
         );
         assert!(
-            !html.contains("<a class=\"group-label\" href=\"./CTH%205\" target=\"_blank\" rel=\"noopener\">CTH 5</a></button>"),
-            "the anchor must not be inside the button"
+            !html.contains("<a class=\"group-label\""),
+            "a CTH label must never be a link"
+        );
+        assert!(
+            !html.contains("group-head"),
+            "the wrapper existed only to sit an anchor beside the button"
         );
     }
 
@@ -221,9 +150,9 @@ mod tests {
         ]);
 
         let found = hrefs(&html);
-        assert_eq!(found.len(), 3, "one group and two fragments: {found:?}");
+        assert_eq!(found.len(), 2, "two fragments and no group: {found:?}");
         for place in &placed {
-            let want = href(&place.relative);
+            let want = super::super::naming::href(&place.relative);
             assert!(found.contains(&want.as_str()), "{want} was not linked");
         }
     }

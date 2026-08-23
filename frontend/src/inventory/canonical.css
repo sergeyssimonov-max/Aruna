@@ -1,0 +1,146 @@
+/* The style both generated documents share.
+ *
+ * The inventory and the CTH pages used to carry independent stylesheets: 287
+ * lines here and ten hand-written lines inside the group renderer. They agreed
+ * about nothing they were not forced to agree about — the group page set its own
+ * padding, its own heading size, its own link colour, and a dark-mode rule the
+ * inventory did not have, so in dark mode one page turned and the other stayed
+ * light. This file is what the two now hold in common; each adds only the rules
+ * for what it actually contains.
+ *
+ * Emitted before the page's own section, so a page can still override — but
+ * nothing here is written expecting that.
+ *
+ * Values are tokens rather than literals because they are read in two documents
+ * now and a third (the future PDF) later. The numbers are the ones the inventory
+ * already used: this file was cut out of the screen section, not written over it,
+ * and every declaration below computes to what it computed to before.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* type
+   *
+   * The stack names what the corpus needs rather than what a user interface
+   * usually needs, and the difference is most of the corpus.
+   *
+   * Measured with `cargo run --release --example font_coverage`: of the 648
+   * distinct code points these documents use, the plain UI stack —
+   * `system-ui, -apple-system, …` — covers 259. The other 389 rendered only
+   * because macOS silently substitutes a font it finds. That is not a
+   * guarantee: fallback is a property of one operating system, it differs
+   * between machines, and a PDF engine may not do it at all. 19 021 of these
+   * documents are cuneiform, and "it looks right here" was the whole basis for
+   * believing they would print.
+   *
+   * So the two faces that close the gap are named, in the order a browser
+   * consults them per character:
+   *
+   *   Noto Sans Cuneiform  376 signs, every one of the corpus's standard
+   *                        cuneiform. A system font on macOS 13, under OFL,
+   *                        `fsType` 0 — embeddable in a PDF without condition.
+   *   UllikummiA           1 sign, U+100000, in 927 places. A cuneiform sign
+   *                        with no Unicode code point, which S. Vanséveren
+   *                        allocated in the private use area and documented in
+   *                        the Hittite Sign List. Nothing else draws it.
+   *                        Not a system font: `docs/FONTS.md` says where it
+   *                        comes from and how to check the copy you have.
+   *   STIX Two Math          6 signs: U+24F5–24F8, the double-circled digits
+   *                        the corpus uses as editorial marks, and U+27E8/27E9,
+   *                        the angle brackets. A system font, `fsType` 0.
+   *   Arial                  1 sign, U+05C3, Hebrew punctuation, in at most 26
+   *                        documents. Named rather than left to the generic
+   *                        because `fsType` 0x0008 says the font permits
+   *                        embedding, so there is no reason to leave it to
+   *                        chance.
+   *
+   * Noto comes before Ullikummi on purpose. Both draw standard cuneiform and
+   * both may be embedded, but Noto is what the documents render with today;
+   * putting the Hittitological face first would change the appearance of
+   * 19 021 documents, which is a decision about how the corpus looks and not
+   * one to make while fixing coverage.
+   *
+   * That takes the declared coverage to 642 of 648. The six left over are the
+   * subject of `docs/FONTS.md` — one is a stray character in editorial prose
+   * and five are cuneiform signs the corpus encodes privately and nobody has
+   * published a font for.
+   *
+   * `Hiragino Sans GB` is deliberately absent. It "covers" U+E83A, in the sense
+   * that its private-use area happens to hold a Chinese glyph at that number.
+   * Naming it would make an unrelated sign the official rendering of a TLHdig
+   * character, which is worse than the empty box it would replace.
+   *
+   * The generic families stay at the end: on a machine without these faces the
+   * document degrades to fallback, which is where it was before — better than
+   * refusing to render.
+   */
+  --font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Cuneiform', UllikummiA,
+    'STIX Two Math', Arial, sans-serif;
+  --font-size: 15px;
+  --line-height: 1.55;
+  --h1-size: 1.35rem;
+  --meta-size: 0.875rem;
+  --meta-line-height: 1.65;
+
+  /* colour */
+  --fg: #1a1a1a;
+  --fg-muted: #666;
+  --bg: #fafafa;
+  --surface: #fff;
+  --border: #e8e8e8;
+
+  /* measure and rhythm */
+  --content-width: 1080px;
+  --page-padding: 2.5rem 1.25rem 3.5rem;
+  --surface-padding: 2rem 1.75rem 2rem;
+  --radius: 6px;
+
+  /* print */
+  --print-margin: 18mm 16mm 20mm;
+  --print-font-size: 10.5pt;
+  --print-line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: var(--page-padding);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--surface-padding);
+}
+
+h1 {
+  margin: 0 0 0.45rem;
+  font-size: var(--h1-size);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.meta {
+  margin: 0 0 1.25rem;
+  color: var(--fg-muted);
+  font-size: var(--meta-size);
+  line-height: var(--meta-line-height);
+}
+.meta span {
+  display: block;
+}

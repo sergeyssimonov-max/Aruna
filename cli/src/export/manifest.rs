@@ -24,9 +24,9 @@
 
 use super::naming::{href, pdf_path};
 use super::verify::{self, ADD_DECLARATION, DROP_BOM, REFLOW_PROLOGUE};
-use super::{Placed, GROUP_INDEX, PACKAGE};
+use super::{Placed, PACKAGE};
 use crate::parse::{group_runs, ManuscriptRecord};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
@@ -62,6 +62,88 @@ pub struct FontContract {
     pub private_use: usize,
     /// Documents examined.
     pub documents: usize,
+    /// Every private-use code point the corpus actually uses.
+    ///
+    /// The count above says how many documents carry one; this says *which*,
+    /// and that is the difference between knowing there is a problem and being
+    /// able to act on it. No font outside the project knows what these mean, so
+    /// a renderer needs the list to find out whether it can draw them — and on
+    /// the machine this was written on, five of the six are drawn by nothing
+    /// installed, including the Hittitology fonts.
+    ///
+    /// A set rather than a count because it is small by nature: six in this
+    /// corpus. If a later edition made it large, that is itself the finding.
+    pub private_use_points: BTreeSet<u32>,
+    /// Characters that are not text and are easy to introduce by accident.
+    pub anomalies: Anomalies,
+}
+
+/// Code points whose presence is a question rather than a fact.
+///
+/// None of these is removed — [`crate::export::verify`] permits nothing of the
+/// kind, and a transliteration may use a non-breaking space or a zero-width
+/// joiner on purpose. They are *counted*, so that a corpus which suddenly grew
+/// a thousand replacement characters says so instead of shipping them.
+///
+/// Counted by document, like everything else here: one document with four
+/// hundred soft hyphens is one document with a soft-hyphen habit, not four
+/// hundred findings.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Anomalies {
+    /// U+00A0 and the other spaces that are not U+0020.
+    pub unusual_space: usize,
+    /// U+200B–U+200D and U+FEFF away from the start of a document.
+    pub zero_width: usize,
+    /// U+00AD, which is invisible until a renderer decides to break a line.
+    pub soft_hyphen: usize,
+    /// C0 other than tab, newline and carriage return, and the whole of C1.
+    pub control: usize,
+    /// The marks that reorder text: a PDF that ignores them lays it out wrongly.
+    pub bidi_control: usize,
+    /// U+FFFD — decoding went wrong somewhere upstream, or the source is broken.
+    pub replacement: usize,
+}
+
+impl Anomalies {
+    /// Whether anything at all was found.
+    pub fn any(&self) -> bool {
+        self.unusual_space
+            + self.zero_width
+            + self.soft_hyphen
+            + self.control
+            + self.bidi_control
+            + self.replacement
+            > 0
+    }
+
+    /// Each class with its document count, in a fixed order.
+    pub fn counts(&self) -> [(&'static str, usize); 6] {
+        [
+            ("unusual_space", self.unusual_space),
+            ("zero_width", self.zero_width),
+            ("soft_hyphen", self.soft_hyphen),
+            ("control", self.control),
+            ("bidi_control", self.bidi_control),
+            ("replacement", self.replacement),
+        ]
+    }
+}
+
+/// Which anomaly class `cp` belongs to, if any.
+///
+/// Asked only of characters outside plain ASCII text, so the corpus's four
+/// hundred million Basic Latin characters never reach the comparisons below.
+fn anomaly_of(cp: u32) -> Option<usize> {
+    Some(match cp {
+        // C0 without the three that are ordinary whitespace, and C1 whole.
+        0x00..=0x08 | 0x0B | 0x0C | 0x0E..=0x1F | 0x7F..=0x9F => 3,
+        0x00A0 | 0x1680 | 0x2000..=0x200A | 0x202F | 0x205F | 0x3000 => 0,
+        0x00AD => 2,
+        0x200B..=0x200D | 0xFEFF => 1,
+        0x200E | 0x200F | 0x202A..=0x202E | 0x2066..=0x2069 => 4,
+        0xFFFD => 5,
+        _ => return None,
+    })
 }
 
 /// The Unicode blocks this corpus actually uses, listed most-frequent first so
@@ -125,6 +207,19 @@ const PRIVATE_USE: [&str; 3] = [
     "Supplementary Private Use Area-B",
 ];
 
+/// The same three areas as code-point ranges, for collecting which of them the
+/// corpus actually uses.
+///
+/// The block index above answers "does this document use one?"; a renderer
+/// needs "which ones does the corpus use?", and that is a question about code
+/// points rather than about blocks. Cheap to ask because it is only asked of
+/// characters outside printable ASCII.
+const PRIVATE_USE_RANGES: [(u32, u32); 3] = [
+    (0xE000, 0xF8FF),
+    (0xF_0000, 0xF_FFFD),
+    (0x10_0000, 0x10_FFFD),
+];
+
 impl FontContract {
     /// Fold one document's text into the contract.
     pub fn observe(&mut self, text: &str) {
@@ -132,15 +227,43 @@ impl FontContract {
         let mut seen = [false; BLOCKS.len()];
         let mut other = false;
         let mut private = false;
+        let mut odd = [false; 6];
 
         // By code point, never by UTF-16 unit: cuneiform lives above the BMP,
         // and splitting a surrogate pair would corrupt the count as surely as
         // it would corrupt the text.
         for ch in text.chars() {
             let cp = ch as u32;
+            // The corpus is four hundred million characters and most of them
+            // are ordinary printable ASCII; those cannot be an anomaly and are
+            // let past before anything else is asked.
+            if !(0x20..0x7F).contains(&cp) {
+                if let Some(class) = anomaly_of(cp) {
+                    odd[class] = true;
+                }
+                if PRIVATE_USE_RANGES
+                    .iter()
+                    .any(|(lo, hi)| cp >= *lo && cp <= *hi)
+                {
+                    self.private_use_points.insert(cp);
+                }
+            }
             match BLOCKS.iter().position(|(_, lo, hi)| cp >= *lo && cp <= *hi) {
                 Some(i) => seen[i] = true,
                 None => other = true,
+            }
+        }
+        let counters = [
+            &mut self.anomalies.unusual_space,
+            &mut self.anomalies.zero_width,
+            &mut self.anomalies.soft_hyphen,
+            &mut self.anomalies.control,
+            &mut self.anomalies.bidi_control,
+            &mut self.anomalies.replacement,
+        ];
+        for (present, counter) in odd.iter().zip(counters) {
+            if *present {
+                *counter += 1;
             }
         }
         for (i, present) in seen.iter().enumerate() {
@@ -246,6 +369,27 @@ pub fn render_manifest(
         "    \"documents_with_private_use\": {},",
         fonts.private_use
     );
+    // Which private-use code points, not just how many documents have one. A
+    // renderer cannot look for a font that draws "some private-use character".
+    out.push_str("    \"private_use_points\": [");
+    for (i, cp) in fonts.private_use_points.iter().enumerate() {
+        let _ = write!(out, "{}\"U+{cp:04X}\"", if i == 0 { "" } else { ", " });
+    }
+    out.push_str("],\n");
+    // Characters that are not text. Reported rather than removed: a
+    // transliteration may use a non-breaking space on purpose, and this
+    // package changes nothing about what a document says.
+    out.push_str("    \"anomalies\": {\n");
+    let anomalies = fonts.anomalies.counts();
+    for (i, (name, count)) in anomalies.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "      {}: {count}{}",
+            string(name),
+            comma(i, anomalies.len())
+        );
+    }
+    out.push_str("    },\n");
     out.push_str("    \"blocks\": {\n");
     for (i, (block, count)) in fonts.blocks.iter().enumerate() {
         let _ = writeln!(
@@ -266,11 +410,6 @@ pub fn render_manifest(
         out.push_str("    {\n");
         let _ = writeln!(out, "      \"label\": {},", string(label));
         let _ = writeln!(out, "      \"dir\": {},", string(&dir.to_string_lossy()));
-        let _ = writeln!(
-            out,
-            "      \"href\": {},",
-            string(&href(&dir.join(GROUP_INDEX)))
-        );
         let _ = writeln!(out, "      \"documents\": [");
 
         for (d, (record, place)) in run.iter().zip(slice).enumerate() {
@@ -602,5 +741,95 @@ mod tests {
                  documents_with_private_use would silently stay zero"
             );
         }
+    }
+
+    /// The anomaly classes are recognised by what they are, not by a list of
+    /// the ones this corpus happens to contain.
+    #[test]
+    fn every_anomaly_class_is_recognised() {
+        let cases = [
+            ('\u{00A0}', "unusual_space"),
+            ('\u{2009}', "unusual_space"),
+            ('\u{3000}', "unusual_space"),
+            ('\u{200B}', "zero_width"),
+            ('\u{FEFF}', "zero_width"),
+            ('\u{00AD}', "soft_hyphen"),
+            ('\u{0001}', "control"),
+            ('\u{007F}', "control"),
+            ('\u{0085}', "control"),
+            ('\u{202E}', "bidi_control"),
+            ('\u{2069}', "bidi_control"),
+            ('\u{FFFD}', "replacement"),
+        ];
+        for (ch, class) in cases {
+            let mut fonts = FontContract::default();
+            fonts.observe(&format!("KBo 1.1{ch}text"));
+            let found: Vec<&str> = fonts
+                .anomalies
+                .counts()
+                .iter()
+                .filter(|(_, n)| *n > 0)
+                .map(|(name, _)| *name)
+                .collect();
+            assert_eq!(
+                found,
+                vec![class],
+                "U+{:04X} was classified as {found:?}",
+                ch as u32
+            );
+        }
+    }
+
+    /// Ordinary text is not an anomaly, and the three whitespace characters a
+    /// document really uses are ordinary.
+    #[test]
+    fn ordinary_text_raises_nothing() {
+        let mut fonts = FontContract::default();
+        fonts.observe("KBo 1.1\tCTH 5\nš ḫ ā 𒀀 ①\r\n");
+        assert!(
+            !fonts.anomalies.any(),
+            "ordinary text was reported as anomalous: {:?}",
+            fonts.anomalies
+        );
+    }
+
+    /// Counted once per document, however many times the character occurs.
+    #[test]
+    fn an_anomaly_is_counted_by_document_and_not_by_character() {
+        let mut fonts = FontContract::default();
+        fonts.observe(&"\u{00A0}".repeat(400));
+        fonts.observe("clean");
+        assert_eq!(fonts.anomalies.unusual_space, 1);
+        assert_eq!(fonts.documents, 2);
+    }
+
+    /// The private-use code points are collected as themselves.
+    ///
+    /// The count of documents was never enough to act on: a renderer has to
+    /// know *which* code points to find a face for, and on the machine this was
+    /// written on five of the six this corpus uses are drawn by nothing
+    /// installed — including the Hittitology fonts.
+    #[test]
+    fn the_private_use_code_points_are_collected_and_not_merely_counted() {
+        let mut fonts = FontContract::default();
+        fonts.observe("a\u{100009}b");
+        fonts.observe("c\u{100009}d\u{E000}e");
+        assert_eq!(
+            fonts.private_use_points.iter().copied().collect::<Vec<_>>(),
+            vec![0xE000, 0x10_0009]
+        );
+        assert_eq!(fonts.private_use, 2, "both documents carry one");
+    }
+
+    /// A cuneiform sign is not private use, and a private-use code point is not
+    /// a cuneiform sign — the two are next to each other in every discussion of
+    /// this corpus and are different problems.
+    #[test]
+    fn cuneiform_is_not_counted_as_private_use() {
+        let mut fonts = FontContract::default();
+        fonts.observe("\u{12000}\u{1230B}");
+        assert!(fonts.private_use_points.is_empty());
+        assert_eq!(fonts.private_use, 0);
+        assert_eq!(fonts.blocks.get("Cuneiform"), Some(&1));
     }
 }

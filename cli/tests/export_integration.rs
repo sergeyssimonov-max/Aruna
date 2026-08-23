@@ -58,7 +58,8 @@ fn write_archive(path: &Path) {
 fn built(dir: &Path) -> (export::Built, PathBuf) {
     let archive = dir.join("corpus.zip");
     write_archive(&archive);
-    let built = export::build(&archive, dir, "test source").expect("the package builds");
+    let built = export::build(&archive, dir, "test source", &aruna::job::Job::unattended())
+        .expect("the package builds");
     (built, dir.join(PACKAGE))
 }
 
@@ -69,7 +70,6 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
 
     assert_eq!(built.groups, 2, "CTH 5 and CTH 9");
     assert_eq!(built.documents, 4, "the debris is not a document");
-    assert_eq!(built.group_links, 2);
     assert_eq!(built.fragment_links, 4);
     assert_eq!(built.disambiguated, 1, "the repeated KBo 1.1");
     assert_eq!(built.stylesheet_dropped, 4);
@@ -94,13 +94,9 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
     group5.sort();
     assert_eq!(
         group5,
-        vec![
-            "544%2Ff.xml",
-            "KBo 1.1 (CTH 5_XML_TLH).xml",
-            "KBo 1.1.xml",
-            "index.html",
-        ],
-        "the slash is escaped, the repeat has a place of its own, and the group has a page"
+        vec!["544%2Ff.xml", "KBo 1.1 (CTH 5_XML_TLH).xml", "KBo 1.1.xml",],
+        "the slash is escaped, the repeat has a place of its own, and the \
+         folder holds documents and nothing else"
     );
 }
 
@@ -113,16 +109,20 @@ fn every_link_resolves_and_opens_in_a_new_context() {
     let html = fs::read_to_string(root.join(format!("{PACKAGE}.html"))).expect("inventory");
 
     let links = export::hrefs(&html);
-    assert_eq!(links.len(), 6, "two groups and four fragments");
+    assert_eq!(links.len(), 4, "four fragments, and nothing else");
 
     for href in &links {
         let relative = export::resolve(href).unwrap_or_else(|| panic!("{href} is not relative"));
         let target = root.join(&relative);
         assert!(target.exists(), "{href} points at nothing");
-        // Every link now names a file: a document, or the group's own page.
-        // Safari shows nothing for a `file://` directory, so the package links
-        // to pages rather than folders.
+        // Every link names a manuscript. Never a folder — Safari shows nothing
+        // for a `file://` directory — and never a page about a folder, which is
+        // what the CTH index pages were until they were given up.
         assert!(target.is_file(), "{href} is not a file");
+        assert!(
+            href.ends_with(".xml"),
+            "{href} is not a manuscript, so the inventory links something it should not"
+        );
     }
 
     // Every anchor carries both attributes, and none of them is absolute.
@@ -171,8 +171,8 @@ fn none_of_the_archive_debris_reaches_the_package() {
     collect(&root, &mut files);
     assert_eq!(
         files.len(),
-        8,
-        "four documents, one inventory, one manifest, two group pages: {files:?}"
+        6,
+        "four documents, one inventory, one manifest: {files:?}"
     );
     for path in &files {
         let name = path
@@ -181,10 +181,7 @@ fn none_of_the_archive_debris_reaches_the_package() {
             .to_string_lossy()
             .to_string();
         assert!(
-            name.ends_with(".xml")
-                || name == format!("{PACKAGE}.html")
-                || name == "manifest.json"
-                || name == "index.html",
+            name.ends_with(".xml") || name == format!("{PACKAGE}.html") || name == "manifest.json",
             "{name} is not something the package should hold"
         );
         assert!(!name.starts_with('.'), "{name} is hidden debris");
@@ -204,8 +201,13 @@ fn building_twice_gives_the_same_package() {
     before.sort();
     let inventory_before = fs::read(root.join(format!("{PACKAGE}.html"))).expect("read");
 
-    let second = export::build(&dir.path().join("corpus.zip"), dir.path(), "test source")
-        .expect("rebuilds over itself");
+    let second = export::build(
+        &dir.path().join("corpus.zip"),
+        dir.path(),
+        "test source",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("rebuilds over itself");
 
     let mut after = Vec::new();
     collect(&root, &mut after);
@@ -234,7 +236,13 @@ fn a_destination_that_is_not_ours_stops_the_build() {
     fs::create_dir_all(&occupied).expect("mkdir");
     fs::write(occupied.join("thesis.docx"), b"years of work").expect("write");
 
-    let err = export::build(&archive, dir.path(), "test source").expect_err("must refuse");
+    let err = export::build(
+        &archive,
+        dir.path(),
+        "test source",
+        &aruna::job::Job::unattended(),
+    )
+    .expect_err("must refuse");
     assert!(format!("{err}").contains("refusing to replace"), "{err}");
     assert!(
         occupied.join("thesis.docx").is_file(),
@@ -292,7 +300,13 @@ fn one_enormous_document_does_not_take_the_memory_with_it() {
     }
     zip.finish().expect("finish");
 
-    let err = export::build(&archive, dir.path(), "test source").expect_err("must refuse");
+    let err = export::build(
+        &archive,
+        dir.path(),
+        "test source",
+        &aruna::job::Job::unattended(),
+    )
+    .expect_err("must refuse");
     match err {
         aruna::error::ArunaError::ExportDocumentTooLarge { entry, limit } => {
             assert!(entry.ends_with("big.xml"), "names the entry: {entry}");
@@ -336,7 +350,13 @@ fn a_failed_build_takes_its_half_written_package_with_it() {
     }
     zip.finish().expect("finish");
 
-    assert!(export::build(&archive, dir.path(), "test source").is_err());
+    assert!(export::build(
+        &archive,
+        dir.path(),
+        "test source",
+        &aruna::job::Job::unattended()
+    )
+    .is_err());
 
     let leftovers: Vec<String> = fs::read_dir(dir.path())
         .expect("read")

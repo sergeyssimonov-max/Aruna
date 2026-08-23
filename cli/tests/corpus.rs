@@ -36,6 +36,14 @@ const DOCUMENTS: usize = 23_936;
 /// attribute error before it. Every one of them is inside the 210 it rejects.
 const TAGS_DO_NOT_BALANCE: usize = 121;
 
+/// Documents whose text is not in Unicode NFC.
+///
+/// Recorded rather than corrected — the corpus mixes forms and this program
+/// does not touch a source document — so the number is an anchor like the two
+/// above: it says a renderer will meet decomposed diacritics in this many
+/// documents and had better place marks itself.
+const NOT_NFC: usize = 78;
+
 fn archive() -> Option<PathBuf> {
     if let Some(named) = std::env::var_os("ARUNA_ZIP") {
         return Some(PathBuf::from(named));
@@ -245,4 +253,72 @@ fn local(qname: &[u8]) -> &[u8] {
         Some(at) => &qname[at + 1..],
         None => qname,
     }
+}
+
+/// **Nothing the pipeline reads comes out damaged.**
+///
+/// The one property that cannot be checked on a fixture, because the fixture
+/// is written by whoever writes the test: a corpus of 23 936 documents from
+/// four editorial series, decoded and folded into the model that every
+/// renderer reads. What this asserts is that not one of them arrives with a
+/// replacement character, a stray control code, an unusual space, a zero-width
+/// mark, a soft hyphen or a bidi override in it.
+///
+/// **The replacement character is the sharp one.** U+FFFD is what decoding
+/// produces when the bytes were not what they were taken for, and it is
+/// invisible in an inventory — a manuscript listed under a name with a black
+/// diamond in it looks like a corpus problem rather than a program one. The
+/// count is zero and this test is what keeps it there.
+///
+/// The archive does contain 643 files that are not UTF-8: `__MACOSX/._*.xml`,
+/// the AppleDouble resource-fork stubs a Mac put in the zip. They are binary,
+/// they are not manuscripts, and the gates refuse every one of them — which is
+/// why this walks the corpus through `is_manuscript_xml` and
+/// `looks_like_manuscript` rather than over every entry ending in `.xml`.
+/// Counting them as corpus damage was the first answer this test gave, and it
+/// was wrong.
+#[test]
+fn every_document_the_gates_admit_survives_decoding_intact() {
+    let Some(path) = required() else { return };
+
+    let file = std::fs::File::open(&path).expect("open the archive");
+    let mut archive =
+        zip::ZipArchive::new(std::io::BufReader::new(file)).expect("read the archive");
+
+    let mut contract = aruna::export::manifest::FontContract::default();
+    let mut admitted = 0usize;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).expect("entry");
+        if !is_manuscript_xml(entry.name()) {
+            continue;
+        }
+        let mut bytes = Vec::new();
+        entry.read_to_end(&mut bytes).expect("read the document");
+        let head = String::from_utf8_lossy(&bytes[..bytes.len().min(HEADER_READ_LIMIT)]);
+        if !looks_like_manuscript(&head) {
+            continue;
+        }
+        admitted += 1;
+        contract.observe(&String::from_utf8_lossy(&bytes));
+    }
+
+    assert_eq!(
+        admitted, DOCUMENTS,
+        "the gates admitted a different number of documents than the export reports"
+    );
+
+    for (name, count) in contract.anomalies.counts() {
+        assert_eq!(
+            count, 0,
+            "{count} documents carry {name}; the pipeline is damaging text or the corpus changed"
+        );
+    }
+
+    // Not an anomaly, and not corrected: an anchor, so that a change in the
+    // corpus or in how it is read is noticed rather than assumed.
+    assert_eq!(
+        contract.not_nfc, NOT_NFC,
+        "the number of documents outside NFC moved"
+    );
 }

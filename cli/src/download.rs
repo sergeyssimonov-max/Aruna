@@ -1,7 +1,9 @@
 //! Download the TLHdig ZIP from Zenodo.
 
 use crate::error::{ArunaError, Result};
+use crate::job::{Job, Phase};
 use crate::md5::Md5;
+use crate::progress::Event;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -24,8 +26,8 @@ const MAX_ATTEMPTS: u32 = 3;
 /// Download `url` into `dest`, retrying transient failures.
 ///
 /// No integrity check — see [`download_verified`] for that.
-pub fn download_file(url: &str, dest: &Path) -> Result<()> {
-    download_verified(url, dest, None)
+pub fn download_file(url: &str, dest: &Path, job: &Job<'_>) -> Result<()> {
+    download_verified(url, dest, None, job)
 }
 
 /// Longest one attempt may take, headers and body together.
@@ -62,18 +64,36 @@ const MAX_DOWNLOAD: u64 = 1024 * 1024 * 1024;
 /// connection, a short body, a local write error, and the HTTP statuses that
 /// mean "busy, not wrong". See [`is_retryable`] for what is deliberately left
 /// out.
-pub fn download_verified(url: &str, dest: &Path, expected_md5: Option<&str>) -> Result<()> {
+pub fn download_verified(
+    url: &str,
+    dest: &Path,
+    expected_md5: Option<&str>,
+    job: &Job<'_>,
+) -> Result<()> {
     let mut attempt = 1;
     loop {
-        match attempt_download(url, dest, expected_md5) {
+        // Before an attempt, and again inside the body loop below. A run
+        // cancelled between attempts must not start the next one — the whole
+        // point of stopping a download is not to fetch the 71 MiB.
+        job.check(Phase::Obtaining)?;
+        match attempt_download(url, dest, expected_md5, job) {
             Ok(()) => return Ok(()),
             Err(err) if attempt < MAX_ATTEMPTS && is_retryable(&err) => {
                 let delay = retry_delay(attempt, &err);
-                eprintln!(
-                    "Attempt {attempt} failed ({err}); retrying in {}s…",
-                    delay.as_secs()
-                );
-                std::thread::sleep(delay);
+                job.report(Event::DownloadRetrying {
+                    attempt,
+                    delay,
+                    error: &err,
+                });
+                // Slept in slices so a cancelled run does not sit out a
+                // backoff nobody is waiting for any more. Sixteen seconds is
+                // the longest this waits, and a person who clicked Cancel
+                // should not watch it out.
+                if sleep_unless_cancelled(delay, job).is_err() {
+                    return Err(ArunaError::Cancelled {
+                        phase: Phase::Obtaining,
+                    });
+                }
                 attempt += 1;
             }
             Err(err) => return Err(err),
@@ -201,7 +221,12 @@ fn spread() -> f64 {
 /// when it goes out of scope uncommitted, which covers every `?` above — the
 /// previous version repeated the removal at four returns and had to be read in
 /// full to be sure it covered all of them.
-fn attempt_download(url: &str, dest: &Path, expected_md5: Option<&str>) -> Result<()> {
+fn attempt_download(
+    url: &str,
+    dest: &Path,
+    expected_md5: Option<&str>,
+    job: &Job<'_>,
+) -> Result<()> {
     create_parent(dest)?;
     let response = request(url)?;
 
@@ -219,7 +244,7 @@ fn attempt_download(url: &str, dest: &Path, expected_md5: Option<&str>) -> Resul
     // download must never leave a truncated archive sitting at `dest` looking
     // like a complete one.
     let scratch = Scratch::beside(dest);
-    let transfer = stream_bounded(response.into_reader(), limit, scratch.path())?;
+    let transfer = stream_bounded(response.into_reader(), limit, scratch.path(), job)?;
     transfer.verify(url, limit, announced, expected_md5)?;
     scratch.commit(dest)
 }
@@ -230,8 +255,31 @@ fn attempt_download(url: &str, dest: &Path, expected_md5: Option<&str>) -> Resul
 /// one place to test. One byte past the limit is read on purpose: it is what
 /// tells a body that runs over apart from one that ends exactly on it, and
 /// [`Transfer::verify`] is what turns that byte into a refusal.
-fn stream_bounded(reader: impl Read, limit: u64, path: &Path) -> Result<Transfer> {
-    stream_to_file(&mut reader.take(limit.saturating_add(1)), path)
+fn stream_bounded(reader: impl Read, limit: u64, path: &Path, job: &Job<'_>) -> Result<Transfer> {
+    stream_to_file(&mut reader.take(limit.saturating_add(1)), path, job)
+}
+
+/// Wait out `delay`, unless the run is cancelled while waiting.
+///
+/// Polled rather than parked on a condition variable: the flag is an atomic and
+/// nothing signals it, so there is nothing to wait on. A tenth of a second is
+/// far below what a person notices and far above what costs anything — sixteen
+/// seconds of backoff is 160 loads.
+fn sleep_unless_cancelled(delay: Duration, job: &Job<'_>) -> std::result::Result<(), ()> {
+    const SLICE: Duration = Duration::from_millis(100);
+    let deadline = std::time::Instant::now() + delay;
+    while std::time::Instant::now() < deadline {
+        if job.is_cancelled() {
+            return Err(());
+        }
+        std::thread::sleep(
+            SLICE.min(deadline.saturating_duration_since(std::time::Instant::now())),
+        );
+    }
+    if job.is_cancelled() {
+        return Err(());
+    }
+    Ok(())
 }
 
 /// The most this transfer may write, and a refusal if that is already too much.
@@ -386,7 +434,7 @@ impl Transfer {
 ///
 /// Hashed in the same pass: a second read over 71 MiB just to digest the file
 /// would cost more than the check it feeds.
-fn stream_to_file(reader: &mut impl Read, path: &Path) -> Result<Transfer> {
+fn stream_to_file(reader: &mut impl Read, path: &Path, job: &Job<'_>) -> Result<Transfer> {
     let io = |source| ArunaError::Io {
         path: path.to_path_buf(),
         source,
@@ -398,6 +446,14 @@ fn stream_to_file(reader: &mut impl Read, path: &Path) -> Result<Transfer> {
     let mut buf = [0u8; 64 * 1024];
 
     let outcome = loop {
+        // Between chunks of 64 KiB. The scratch file is dropped on the way out
+        // — `Scratch` removes an uncommitted one — so a cancelled download
+        // leaves nothing behind, which is exactly what a failed one does.
+        if job.is_cancelled() {
+            return Err(ArunaError::Cancelled {
+                phase: Phase::Obtaining,
+            });
+        }
         let n = match reader.read(&mut buf) {
             Ok(0) => break Ok(()),
             Ok(n) => n,
@@ -601,7 +657,7 @@ mod tests {
         let dest = dir.path().join("out.zip");
         let server = FakeServer::with_bodies(vec![None]);
 
-        let err = download_file(&server.url(), &dest).unwrap_err();
+        let err = download_file(&server.url(), &dest, &Job::unattended()).unwrap_err();
         assert!(
             matches!(err, ArunaError::Truncated { .. } | ArunaError::Io { .. }),
             "unexpected: {err}"
@@ -618,7 +674,13 @@ mod tests {
         let good = b"complete archive bytes".to_vec();
         let server = FakeServer::with_bodies(vec![None, Some(good.clone())]);
 
-        download_verified(&server.url(), &dest, Some(&md5_hex(&good))).expect("second attempt");
+        download_verified(
+            &server.url(),
+            &dest,
+            Some(&md5_hex(&good)),
+            &Job::unattended(),
+        )
+        .expect("second attempt");
         assert_eq!(std::fs::read(&dest).expect("read back"), good);
         assert_eq!(server.hits(), 2, "should have taken exactly two attempts");
     }
@@ -633,7 +695,13 @@ mod tests {
         let dest = dir.path().join("out.zip");
         let server = FakeServer::with_bodies(vec![Some(b"corrupted".to_vec())]);
 
-        let err = download_verified(&server.url(), &dest, Some(&md5_hex(b"expected"))).unwrap_err();
+        let err = download_verified(
+            &server.url(),
+            &dest,
+            Some(&md5_hex(b"expected")),
+            &Job::unattended(),
+        )
+        .unwrap_err();
         match err {
             ArunaError::ChecksumMismatch { expected, got, .. } => {
                 assert_eq!(expected, md5_hex(b"expected"));
@@ -660,7 +728,13 @@ mod tests {
         let good = b"complete archive bytes".to_vec();
         let server = FakeServer::start(vec![Reply::Status(503, None), Reply::Body(good.clone())]);
 
-        download_verified(&server.url(), &dest, Some(&md5_hex(&good))).expect("second attempt");
+        download_verified(
+            &server.url(),
+            &dest,
+            Some(&md5_hex(&good)),
+            &Job::unattended(),
+        )
+        .expect("second attempt");
         assert_eq!(std::fs::read(&dest).expect("read back"), good);
         assert_eq!(server.hits(), 2);
     }
@@ -674,7 +748,7 @@ mod tests {
         let dest = dir.path().join("out.zip");
         let server = FakeServer::start(vec![Reply::Status(404, None)]);
 
-        let err = download_file(&server.url(), &dest).unwrap_err();
+        let err = download_file(&server.url(), &dest, &Job::unattended()).unwrap_err();
         match err {
             ArunaError::Http { status, .. } => assert_eq!(status, 404),
             other => panic!("expected an HTTP status, got: {other}"),
@@ -714,7 +788,13 @@ mod tests {
         let body = b"the real archive".to_vec();
         let server = FakeServer::with_bodies(vec![Some(body.clone())]);
 
-        download_verified(&server.url(), &dest, Some(&md5_hex(&body))).expect("accepted");
+        download_verified(
+            &server.url(),
+            &dest,
+            Some(&md5_hex(&body)),
+            &Job::unattended(),
+        )
+        .expect("accepted");
         assert_eq!(std::fs::read(&dest).expect("read back"), body);
         assert_eq!(server.hits(), 1, "no retry needed on success");
     }
@@ -845,7 +925,7 @@ mod tests {
 
         // `repeat` never returns 0, exactly like a connection that keeps
         // delivering. Nothing bounds it here but the function under test.
-        let transfer = stream_bounded(std::io::repeat(b'x'), limit, &scratch)
+        let transfer = stream_bounded(std::io::repeat(b'x'), limit, &scratch, &Job::unattended())
             .expect("the write itself succeeds");
 
         assert_eq!(
@@ -880,8 +960,13 @@ mod tests {
         let payload = b"not a zip, but all of it".to_vec();
         let server = FakeServer::start(vec![Reply::Unannounced(payload.clone())]);
 
-        download_verified(&server.url(), &dest, Some(&crate::md5::md5_hex(&payload)))
-            .expect("an unannounced body is a complete body");
+        download_verified(
+            &server.url(),
+            &dest,
+            Some(&crate::md5::md5_hex(&payload)),
+            &Job::unattended(),
+        )
+        .expect("an unannounced body is a complete body");
 
         assert_eq!(std::fs::read(&dest).expect("dest"), payload);
         assert!(leftover_parts(dir.path()).is_empty());
@@ -894,7 +979,7 @@ mod tests {
         let dest = dir.path().join("archive.zip");
         let server = FakeServer::start(vec![Reply::Truncated]);
 
-        assert!(download_file(&server.url(), &dest).is_err());
+        assert!(download_file(&server.url(), &dest, &Job::unattended()).is_err());
         assert!(!dest.exists(), "nothing was committed to the destination");
         assert!(
             leftover_parts(dir.path()).is_empty(),
@@ -1008,6 +1093,18 @@ mod tests {
     /// single read ever times out. Without an overall deadline the download sat
     /// there for as long as the server cared to dribble — for ever, in this
     /// test — and the only way out was killing the process.
+    ///
+    /// The deadline is asked for as a whole and asserted on as a whole. It used
+    /// to be split: the request was `expect`ed to succeed and only the body was
+    /// allowed to fail, which reads as two steps but is one budget —
+    /// `request_within` sets ureq's overall timeout, and that covers the
+    /// headers and the body together. So a machine that did not schedule the
+    /// server's accept loop inside 400 ms failed the test on `expect`, and
+    /// under this suite's own parallelism that happened about one run in seven.
+    ///
+    /// Which step the deadline bites at is a fact about the machine. That it
+    /// bites, and that the program is back in well under five seconds, is the
+    /// fact about the program — so that is what is asserted.
     #[test]
     fn a_server_that_dribbles_for_ever_is_given_up_on() {
         let server = FakeServer::start(vec![Reply::Dribble]);
@@ -1015,11 +1112,10 @@ mod tests {
         let dest = dir.path().join("archive.zip");
 
         let started = std::time::Instant::now();
-        // The two steps `attempt_download` takes, with a deadline a test can
-        // wait for: the headers arrive at once, and the body never ends.
-        let response = request_within(&server.url(), Duration::from_millis(400))
-            .expect("headers are sent immediately");
-        let outcome = stream_to_file(&mut response.into_reader(), &dest);
+        let outcome =
+            request_within(&server.url(), Duration::from_millis(400)).and_then(|response| {
+                stream_to_file(&mut response.into_reader(), &dest, &Job::unattended())
+            });
         let waited = started.elapsed();
 
         assert!(
@@ -1048,7 +1144,8 @@ mod tests {
     fn network_error_on_unreachable_host() {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
-        let err = download_file("http://127.0.0.1:1/nope.zip", &dest).unwrap_err();
+        let err =
+            download_file("http://127.0.0.1:1/nope.zip", &dest, &Job::unattended()).unwrap_err();
         match err {
             ArunaError::Network { .. } | ArunaError::Http { .. } => {}
             other => panic!("unexpected error variant: {other}"),
@@ -1062,7 +1159,7 @@ mod tests {
     fn failed_download_leaves_no_files_behind() {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
-        assert!(download_file("http://127.0.0.1:1/nope.zip", &dest).is_err());
+        assert!(download_file("http://127.0.0.1:1/nope.zip", &dest, &Job::unattended()).is_err());
         assert!(!dest.exists(), "destination must not be created on failure");
         let leftovers: Vec<_> = std::fs::read_dir(dir.path())
             .expect("read_dir")
@@ -1114,7 +1211,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let dest = dir.path().join("out.zip");
         std::fs::write(&dest, b"previous good archive").expect("seed");
-        assert!(download_file("http://127.0.0.1:1/nope.zip", &dest).is_err());
+        assert!(download_file("http://127.0.0.1:1/nope.zip", &dest, &Job::unattended()).is_err());
         assert_eq!(
             std::fs::read(&dest).expect("read back"),
             b"previous good archive"

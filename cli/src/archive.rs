@@ -6,10 +6,12 @@
 //! [`crate::order`] — neither needs an archive to be exercised or measured.
 
 use crate::error::{ArunaError, Result};
+use crate::job::{Job, Phase};
 use crate::order::sort_records;
 use crate::parse::{
     is_manuscript_xml, looks_like_manuscript, parse_manuscript, ManuscriptRecord, HEADER_READ_LIMIT,
 };
+use crate::progress::Event;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -101,14 +103,17 @@ impl Probe for Timed {
 }
 
 /// Open `zip_path`, parse every manuscript XML, return records ordered for display.
-pub fn parse_zip(zip_path: &Path) -> Result<Vec<ManuscriptRecord>> {
-    read_archive(zip_path, &mut Untimed)
+pub fn parse_zip(zip_path: &Path, job: &Job<'_>) -> Result<Vec<ManuscriptRecord>> {
+    read_archive(zip_path, &mut Untimed, job)
 }
 
 /// As [`parse_zip`], and how long each stage took.
-pub fn parse_zip_timed(zip_path: &Path) -> Result<(Vec<ManuscriptRecord>, StageTimes)> {
+pub fn parse_zip_timed(
+    zip_path: &Path,
+    job: &Job<'_>,
+) -> Result<(Vec<ManuscriptRecord>, StageTimes)> {
     let mut probe = Timed::default();
-    let records = read_archive(zip_path, &mut probe)?;
+    let records = read_archive(zip_path, &mut probe, job)?;
     Ok((records, probe.times))
 }
 
@@ -129,7 +134,11 @@ struct Scratch {
 }
 
 /// The pipeline, once, with whatever probe the caller brought.
-fn read_archive<P: Probe>(zip_path: &Path, probe: &mut P) -> Result<Vec<ManuscriptRecord>> {
+fn read_archive<P: Probe>(
+    zip_path: &Path,
+    probe: &mut P,
+    job: &Job<'_>,
+) -> Result<Vec<ManuscriptRecord>> {
     let mut archive = open_archive(zip_path)?;
 
     let mut records = Vec::new();
@@ -140,6 +149,13 @@ fn read_archive<P: Probe>(zip_path: &Path, probe: &mut P) -> Result<Vec<Manuscri
     };
 
     for i in 0..archive.len() {
+        // Between entries, which is where stopping leaves something coherent:
+        // nothing has been written, and the records built so far are simply
+        // dropped. One relaxed atomic load against inflating a ZIP entry is not
+        // a cost worth measuring, and it is what makes a 24 500-entry archive
+        // interruptible at all.
+        job.check(Phase::Parsing)?;
+
         let started = probe.start();
         let entry = archive.by_index(i)?;
 
@@ -190,7 +206,7 @@ fn read_archive<P: Probe>(zip_path: &Path, probe: &mut P) -> Result<Vec<Manuscri
         records.push(parse_manuscript(&scratch.path, xml));
         probe.record(Stage::Parse, started);
     }
-    skipped.report();
+    skipped.report(job);
 
     if records.is_empty() {
         return Err(ArunaError::EmptyArchive);
@@ -294,13 +310,12 @@ impl Skipped {
     /// time, and its debris changes with it. A run that suddenly discards
     /// thousands of entries should say so while there is still someone reading
     /// the output.
-    fn report(&self) {
-        let total = self.by_path + self.by_content;
-        if total > 0 {
-            eprintln!(
-                "Skipped {total} non-manuscript entries ({} by path, {} by content).",
-                self.by_path, self.by_content
-            );
+    fn report(&self, job: &Job<'_>) {
+        if self.by_path + self.by_content > 0 {
+            job.report(Event::EntriesSkipped {
+                by_path: self.by_path,
+                by_content: self.by_content,
+            });
         }
     }
 }
@@ -392,7 +407,7 @@ mod tests {
                 ("readme.txt", "ignore me"),
             ],
         );
-        let recs = parse_zip(&zip_path).unwrap();
+        let recs = parse_zip(&zip_path, &Job::unattended()).unwrap();
         assert_eq!(recs.len(), 2);
         assert!(recs[0].title.contains("A") || recs[1].title.contains("A"));
     }
@@ -402,7 +417,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let zip_path = dir.path().join("empty.zip");
         write_zip(&zip_path, &[]);
-        let err = parse_zip(&zip_path).unwrap_err();
+        let err = parse_zip(&zip_path, &Job::unattended()).unwrap_err();
         assert!(matches!(err, ArunaError::EmptyArchive | ArunaError::Zip(_)));
     }
 
@@ -412,7 +427,7 @@ mod tests {
         let zip_path = dir.path().join("noxml.zip");
         write_zip(&zip_path, &[("notes.txt", "hi")]);
         assert!(matches!(
-            parse_zip(&zip_path).unwrap_err(),
+            parse_zip(&zip_path, &Job::unattended()).unwrap_err(),
             ArunaError::EmptyArchive
         ));
     }
@@ -423,7 +438,7 @@ mod tests {
         let zip_path = dir.path().join("bad.zip");
         std::fs::write(&zip_path, b"not a zip at all").unwrap();
         assert!(matches!(
-            parse_zip(&zip_path).unwrap_err(),
+            parse_zip(&zip_path, &Job::unattended()).unwrap_err(),
             ArunaError::Zip(_)
         ));
     }
@@ -439,7 +454,7 @@ mod tests {
                 r#"<AOHeader><docID>İK 174-66</docID><creation-date date="2023-07-26"/></AOHeader>"#,
             )],
         );
-        let recs = parse_zip(&zip_path).unwrap();
+        let recs = parse_zip(&zip_path, &Job::unattended()).unwrap();
         assert_eq!(recs.len(), 1);
         assert!(recs[0].title.contains("İK 174-66"));
     }
@@ -463,7 +478,7 @@ mod tests {
                 ("CTH 2_XML/big.xml", &large),
             ],
         );
-        let recs = parse_zip(&zip_path).unwrap();
+        let recs = parse_zip(&zip_path, &Job::unattended()).unwrap();
         assert_eq!(recs.len(), 2);
     }
 }

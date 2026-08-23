@@ -55,6 +55,20 @@ pub enum ArunaError {
     #[error("ZIP archive is empty or contains no XML documents")]
     EmptyArchive,
 
+    /// The caller asked the run to stop, and it did.
+    ///
+    /// An outcome, not a fault: nothing went wrong, somebody changed their
+    /// mind. It travels as an error because that is how a stop propagates out
+    /// of a loop nested five calls deep without every function in between
+    /// growing a third return case — and because the cleanup a `?` triggers on
+    /// the way out is exactly the cleanup a cancelled run needs. A `Drop` that
+    /// removes a staging directory does not care why it is being dropped.
+    ///
+    /// Callers that show this to a person must not word it as a failure; see
+    /// `ArunaError::is_cancellation`.
+    #[error("cancelled during {phase}")]
+    Cancelled { phase: crate::job::Phase },
+
     /// Every I/O failure carries the path it happened at — there is deliberately
     /// no bare `#[from] io::Error` variant, so a path can never be dropped.
     #[error("I/O error at {path}: {source}")]
@@ -134,3 +148,141 @@ pub enum ArunaError {
 }
 
 pub type Result<T> = std::result::Result<T, ArunaError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    /// Every error must name what it is about.
+    ///
+    /// Across 23 936 documents an error that says only what went wrong and not
+    /// what it went wrong on is not actionable, and the next stage — a batch of
+    /// the same size producing PDFs — will make that worse rather than better.
+    /// Listed one by one rather than derived, so adding a variant means coming
+    /// here and saying what identifies it.
+    #[test]
+    fn no_error_is_anonymous() {
+        let io = || std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+        let cases: Vec<(ArunaError, &str)> = vec![
+            (
+                ArunaError::Http {
+                    status: 503,
+                    url: "https://example.invalid/a.zip".into(),
+                    retry_after: None,
+                },
+                "a.zip",
+            ),
+            (
+                ArunaError::Truncated {
+                    url: "https://example.invalid/b.zip".into(),
+                    expected: 10,
+                    got: 3,
+                },
+                "b.zip",
+            ),
+            (
+                ArunaError::Oversized {
+                    url: "https://example.invalid/c.zip".into(),
+                    limit: 10,
+                    got: 11,
+                },
+                "c.zip",
+            ),
+            (
+                ArunaError::ChecksumMismatch {
+                    url: "https://example.invalid/d.zip".into(),
+                    expected: "aa".into(),
+                    got: "bb".into(),
+                },
+                "d.zip",
+            ),
+            (
+                ArunaError::Io {
+                    path: PathBuf::from("/tmp/e.xml"),
+                    source: io(),
+                },
+                "e.xml",
+            ),
+            (
+                ArunaError::Replace {
+                    path: PathBuf::from("/tmp/f.html"),
+                    scratch: PathBuf::from("/tmp/f.tmp"),
+                    source: io(),
+                },
+                "f.html",
+            ),
+            (
+                ArunaError::ExportCollision {
+                    group: "CTH 5".into(),
+                    fragment: "KBo 1.1".into(),
+                    first: "a.xml".into(),
+                    second: "b.xml".into(),
+                    path: PathBuf::from("CTH 5/KBo 1.1.xml"),
+                },
+                "KBo 1.1",
+            ),
+            (
+                ArunaError::ExportDocumentTooLarge {
+                    entry: "g.xml".into(),
+                    limit: 1,
+                },
+                "g.xml",
+            ),
+            (
+                ArunaError::ExportDistorted {
+                    entry: "h.xml".into(),
+                    reason: "why".into(),
+                },
+                "h.xml",
+            ),
+            (
+                ArunaError::ExportInvalid {
+                    root: PathBuf::from("/tmp/pkg"),
+                    count: 2,
+                    first: "a link points at nothing".into(),
+                },
+                "/tmp/pkg",
+            ),
+            (
+                ArunaError::ExportDestination {
+                    path: PathBuf::from("/tmp/theirs"),
+                    reason: "it is not ours".into(),
+                },
+                "/tmp/theirs",
+            ),
+        ];
+
+        for (error, subject) in cases {
+            let text = error.to_string();
+            assert!(
+                text.contains(subject),
+                "{text:?} does not say which {subject} it is about"
+            );
+        }
+    }
+
+    /// The three that identify no subject, and why that is right.
+    ///
+    /// `EmptyArchive` and `DownloadsDir` are about the one archive and the one
+    /// folder the run already named; `ExportIncomplete` is a disagreement
+    /// between two counts and the counts are the subject. Pinned so that a new
+    /// variant cannot join them by accident.
+    #[test]
+    fn the_errors_without_a_subject_are_only_the_ones_that_cannot_have_one() {
+        assert_eq!(
+            ArunaError::EmptyArchive.to_string(),
+            "ZIP archive is empty or contains no XML documents"
+        );
+        assert_eq!(
+            ArunaError::DownloadsDir.to_string(),
+            "could not resolve Downloads directory"
+        );
+        let counts = ArunaError::ExportIncomplete {
+            expected: 5,
+            written: 4,
+        }
+        .to_string();
+        assert!(counts.contains('5') && counts.contains('4'), "{counts}");
+    }
+}

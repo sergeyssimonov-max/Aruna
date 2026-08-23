@@ -22,10 +22,29 @@ pub fn output_html_path() -> Result<PathBuf> {
     Ok(dir.join(OUTPUT_FILE_NAME))
 }
 
-/// Sibling scratch path: `<name>.<pid>.part`, beside `path`.
+/// Sibling scratch path: `<name>.<pid>.<n>.part`, beside `path`.
 ///
-/// The process id keeps two concurrent runs from writing the same scratch file,
-/// and keeping it next to the destination keeps the later rename on a single
+/// Two things have to be unique here and the process id only covered one of
+/// them. Between processes it is what keeps two runs from writing the same
+/// scratch file, and that was always true. Within one process it is not: every
+/// caller got the same name back, so two downloads of one archive on two
+/// threads shared a scratch file — the one that renamed second found nothing
+/// left to rename and failed with `NotFound` on a path it had just written.
+///
+/// The quieter half is worse. The digest is checked on the scratch file and the
+/// rename happens after, so with a shared name the bytes that were verified and
+/// the bytes that were moved into place need not be the same ones. Nothing
+/// downstream would say so; only [`crate::cache::lookup`] rehashing the file on
+/// the next run would catch it, a run later and as a mysterious miss.
+///
+/// The CLI is one download per process and never met this. The crate is a
+/// library, `download_verified` and `obtain_archive` are public, and the
+/// desktop application this is written towards is expected to convert on
+/// background threads — so the guarantee has to hold per call, not per process.
+/// A counter costs one atomic increment and makes the name unique for the life
+/// of the process, which is as long as any scratch file lives.
+///
+/// Keeping it next to the destination keeps the later rename on a single
 /// filesystem — across devices `rename` fails instead of being atomic.
 ///
 /// Both things this program writes are written this way — the inventory here
@@ -33,8 +52,18 @@ pub fn output_html_path() -> Result<PathBuf> {
 /// and they cannot end up with different ideas of what a half-written file
 /// looks like.
 pub fn scratch_sibling(path: &Path) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    /// Distinct for every scratch file this process asks for. `Relaxed` is
+    /// enough: `fetch_add` is atomic whatever the ordering, and nothing here
+    /// depends on the counter ordering against other memory.
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+
     let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(format!(".{}.part", std::process::id()));
+    name.push(format!(
+        ".{}.{}.part",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
     path.with_file_name(name)
 }
 
@@ -261,6 +290,43 @@ mod tests {
             .map(|e| e.file_name())
             .collect();
         assert_eq!(names.len(), 1, "unexpected leftovers: {names:?}");
+    }
+
+    /// Two callers wanting a scratch file for one destination are given two
+    /// files.
+    ///
+    /// The name used to carry the process id and nothing else, which is unique
+    /// between processes and identical within one. Two downloads of the same
+    /// archive on two threads then shared a scratch path: the second rename
+    /// found nothing to move, and — quieter — the bytes that passed the digest
+    /// check need not have been the bytes that reached the destination.
+    ///
+    /// `tests/cache_concurrency.rs` reproduces that through six real downloads
+    /// and takes eleven seconds to do it. This states the same invariant in a
+    /// millisecond, so the fix has a test that runs on every change rather than
+    /// only in the slow set.
+    #[test]
+    fn every_scratch_file_has_a_name_of_its_own() {
+        let path = std::path::Path::new("/tmp/aruna/out.html");
+
+        let sequential: std::collections::HashSet<_> =
+            (0..64).map(|_| scratch_sibling(path)).collect();
+        assert_eq!(sequential.len(), 64, "one process reused a scratch name");
+
+        let concurrent: std::collections::HashSet<_> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8)
+                .map(|_| scope.spawn(|| (0..32).map(|_| scratch_sibling(path)).collect::<Vec<_>>()))
+                .collect();
+            handles
+                .into_iter()
+                .flat_map(|h| h.join().expect("no thread panicked"))
+                .collect()
+        });
+        assert_eq!(
+            concurrent.len(),
+            8 * 32,
+            "two threads were handed the same scratch path"
+        );
     }
 
     /// The scratch path stays in the destination directory: a rename across

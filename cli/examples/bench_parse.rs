@@ -44,7 +44,7 @@ fn main() -> ExitCode {
         // The pipeline reads, parses and sorts in one pass — an entry is
         // finished with before the next is read — so the stages are timed
         // inside it rather than around it.
-        let (records, times) = match parse_zip_timed(&zip) {
+        let (records, times) = match parse_zip_timed(&zip, &aruna::job::Job::unattended()) {
             Ok(parsed) => parsed,
             Err(err) => {
                 eprintln!("failed to read {}: {err}", zip.display());

@@ -1,0 +1,268 @@
+.meta .count {
+  margin-right: 1.5rem;
+  display: inline-block;
+}
+
+.meta .count:last-child {
+  margin-right: 0;
+}
+
+.legend {
+  background: #fafafa;
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  margin: 0 0 1rem;
+  padding: .7rem .9rem;
+}
+
+.legend-title {
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #999;
+  margin: 0 0 .4rem;
+  font-size: .68rem;
+  font-weight: 500;
+}
+
+.legend-list {
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.legend-list li {
+  color: #555;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 999px;
+  align-items: baseline;
+  gap: .35rem;
+  padding: .18rem .5rem .18rem .38rem;
+  font-size: .75rem;
+  display: inline-flex;
+}
+
+.legend-list .k {
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+.legend-list .d {
+  color: #666;
+}
+
+body:not(.filter-on) .toolbar {
+  display: none;
+}
+
+.toolbar {
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: .75rem;
+  margin: 0 0 1.15rem;
+  display: flex;
+}
+
+.toolbar input[type="search"] {
+  min-width: 12rem;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  outline: none;
+  flex: 16rem;
+  padding: .65rem .85rem;
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+.toolbar input[type="search"]:focus {
+  border-color: #ccc;
+  box-shadow: 0 0 0 3px #eee;
+}
+
+.toolbar .fold-all {
+  font: inherit;
+  color: #444;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  flex: none;
+  padding: .65rem .85rem;
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+.toolbar .fold-all:hover {
+  background: #fafafa;
+}
+
+.toolbar .fold-all:focus-visible {
+  border-color: #ccc;
+  outline: none;
+  box-shadow: 0 0 0 3px #eee;
+}
+
+.toolbar .hint {
+  color: #888;
+  font-variant-numeric: tabular-nums;
+  align-self: center;
+  font-size: .8125rem;
+}
+
+table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+}
+
+col.c-num {
+  width: 4.75rem;
+}
+
+col.c-sig {
+  width: auto;
+}
+
+col.c-lang {
+  width: 7rem;
+}
+
+col.c-corp {
+  width: 5rem;
+}
+
+col.c-ed {
+  width: 28%;
+}
+
+col.c-year {
+  width: 4rem;
+}
+
+thead th {
+  text-align: left;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #888;
+  white-space: nowrap;
+  border-bottom: 1px solid #e5e5e5;
+  padding: .55rem .5rem .65rem 0;
+  font-size: .7rem;
+  font-weight: 500;
+}
+
+thead th:last-child {
+  text-align: right;
+  padding-right: 0;
+}
+
+tbody td {
+  vertical-align: top;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid #f0f0f0;
+  padding: .7rem .5rem .7rem 0;
+  overflow: hidden;
+}
+
+tbody td:last-child {
+  padding-right: 0;
+}
+
+td.num {
+  color: #999;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  padding-right: .75rem;
+}
+
+td.year {
+  font-variant-numeric: tabular-nums;
+  color: #444;
+  text-align: right;
+  white-space: nowrap;
+}
+
+tr.group td {
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 1.15rem 0 .5rem;
+}
+
+tr.group:first-child td {
+  padding-top: .2rem;
+}
+
+.group-toggle {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: 0;
+  align-items: baseline;
+  gap: .55rem;
+  padding: 0;
+  display: inline-flex;
+}
+
+.group-toggle:focus-visible {
+  outline-offset: 3px;
+  border-radius: 3px;
+  outline: 2px solid #ccc;
+}
+
+.chevron {
+  transform-origin: 55% 55%;
+  border-bottom: 1.5px solid #bbb;
+  border-right: 1.5px solid #bbb;
+  align-self: center;
+  width: .42rem;
+  height: .42rem;
+  transition: transform .12s;
+  transform: rotate(45deg);
+}
+
+tr.group.folded .chevron {
+  transform: rotate(-45deg);
+}
+
+.group-label {
+  letter-spacing: -.01em;
+  font-size: .95rem;
+  font-weight: 600;
+}
+
+.group-count {
+  font-variant-numeric: tabular-nums;
+  color: #999;
+  font-size: .75rem;
+}
+
+.group-count:before {
+  content: "· ";
+  color: #ccc;
+}
+
+@media (max-width: 720px) {
+  col.c-ed {
+    width: 0;
+  }
+
+  th:nth-child(5), td:nth-child(5) {
+    display: none;
+  }
+
+  col.c-corp {
+    width: 4.25rem;
+  }
+}

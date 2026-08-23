@@ -83,7 +83,16 @@ impl Sandbox {
 
     /// Run the binary against `archive`, with the sandbox's home and cache.
     fn run(&self, archive: &Path) -> Output {
+        self.run_with(archive, &[])
+    }
+
+    /// The same run, with arguments on the command line.
+    ///
+    /// Only one test passes any: this program takes none, and that is the
+    /// property being pinned rather than a feature being exercised.
+    fn run_with(&self, archive: &Path, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_aruna"))
+            .args(args)
             .env("HOME", self.path())
             .env("ARUNA_ZIP", archive)
             .env("ARUNA_CACHE_DIR", self.path().join("cache"))
@@ -160,6 +169,56 @@ fn an_ordinary_run_writes_the_inventory_and_says_where() {
 
     // Nothing half-written beside it.
     assert!(leftovers(&sandbox.downloads()).is_empty());
+}
+
+/// **A zero-argument program, and this is what that means today.**
+///
+/// `aruna` parses no command line at all: there is no argument parser in the
+/// binary, so `--help` is not a request it can refuse — it is a word the
+/// program never looks at, and the run proceeds exactly as if nothing had been
+/// typed. The one input it does take arrives through the environment
+/// (`ARUNA_ZIP`), which is what the rest of this file uses.
+///
+/// This is characterization, not endorsement. A person typing `--help` and
+/// getting a full corpus run instead of a usage line is a reasonable thing to
+/// change; the point of pinning it is that changing it then reads as a
+/// decision — this test failing — rather than as a silent difference between
+/// two versions. Until then, an argument parser bolted on without touching
+/// this test would be an unnoticed change of contract.
+#[test]
+fn the_command_line_is_not_read_and_arguments_change_nothing() {
+    let sandbox = Sandbox::new();
+    let corpus = sandbox.corpus();
+
+    let plain = sandbox.run(&corpus);
+    let inventory = fs::read_to_string(sandbox.output()).expect("read");
+    fs::remove_file(sandbox.output()).expect("clear");
+
+    for args in [
+        vec!["--help"],
+        vec!["--version"],
+        vec!["nonsense"],
+        vec!["-x", "--", "/etc/passwd"],
+    ] {
+        let out = sandbox.run_with(&corpus, &args);
+        assert_no_panic(&out);
+        assert_eq!(
+            out.status.code(),
+            plain.status.code(),
+            "{args:?} changed the exit code"
+        );
+        assert_eq!(
+            stdout(&out),
+            stdout(&plain),
+            "{args:?} changed what the program says"
+        );
+        assert_eq!(
+            fs::read_to_string(sandbox.output()).expect("read"),
+            inventory,
+            "{args:?} changed what the program wrote"
+        );
+        fs::remove_file(sandbox.output()).expect("clear");
+    }
 }
 
 #[test]

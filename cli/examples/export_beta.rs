@@ -31,13 +31,17 @@ fn main() -> ExitCode {
         .unwrap_or_else(|| PathBuf::from("."));
 
     eprintln!("Building {PACKAGE} from {}…", zip.display());
-    match export::build(&zip, &destination, aruna::SOURCE_LABEL) {
+    match export::build(
+        &zip,
+        &destination,
+        aruna::SOURCE_LABEL,
+        &aruna::job::Job::unattended(),
+    ) {
         Ok(built) => {
             println!();
             println!("package:          {}", destination.join(PACKAGE).display());
             println!("CTH groups:       {}", built.groups);
             println!("documents:        {}", built.documents);
-            println!("group links:      {}", built.group_links);
             println!("fragment links:   {}", built.fragment_links);
             println!("disambiguated:    {}", built.disambiguated);
             println!("stylesheet PIs dropped: {}", built.stylesheet_dropped);

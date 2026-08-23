@@ -2,6 +2,18 @@
 //!
 //! Library surface used by the CLI binary and integration tests.
 
+// The compiler holds this, not a reviewer and not a tool: `cargo-geiger` was
+// excluded from this project because it will not install here, and this is what
+// replaced it for our own code. It says nothing about the dependency tree,
+// which is `cargo-deny`'s subject.
+//
+// It binds this crate alone. `tests/cli_process.rs` calls `libc::kill` to stop
+// the binary mid-run, and an integration test is a crate of its own, so the
+// attribute neither covers it nor could: sending a signal to a child process
+// has no safe equivalent in `std`.
+#![forbid(unsafe_code)]
+
+pub mod app;
 pub mod archive;
 pub mod cache;
 pub mod catalog;
@@ -9,14 +21,20 @@ pub mod download;
 pub mod error;
 pub mod export;
 pub mod html;
+pub mod job;
 pub mod md5;
 pub mod order;
 pub mod parse;
 pub mod paths;
+pub mod presentation;
+pub mod progress;
+pub mod style;
 pub mod xml_scan;
 pub mod zenodo;
 
 use error::{ArunaError, Result};
+use job::Job;
+use progress::Event;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -81,7 +99,14 @@ pub fn corpus_authors_line() -> String {
 /// Full pipeline: download → parse → write HTML → return output path.
 ///
 /// When `local_zip` is `Some`, the download step is skipped (tests / offline).
-pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
+///
+/// `job` is what the run owes its caller: where to say what it is doing, and
+/// whether to keep going. The binary passes a job over [`progress::Stderr`]
+/// that is never cancelled; a test passes [`job::Job::unattended`]; a window
+/// passes one it holds the cancellation handle for. Nothing below this line
+/// prints on its own authority, and nothing below it runs to completion when
+/// the caller has asked it to stop.
+pub fn run(local_zip: Option<&Path>, job: &Job<'_>) -> Result<PathBuf> {
     // Asked before anything expensive: the inventory is written last, and a
     // destination that will refuse it refuses it just as well now.
     let out = paths::output_html_path()?;
@@ -89,12 +114,14 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
 
     let source = match local_zip {
         Some(p) => cache::Archive::Cached(p.to_path_buf()),
-        None => obtain_archive(download::ZENODO_ZIP_URL, download::ZENODO_ZIP_MD5)?,
+        None => obtain_archive(download::ZENODO_ZIP_URL, download::ZENODO_ZIP_MD5, job)?,
     };
 
-    eprintln!("Parsing XML manuscripts…");
-    let records = archive::parse_zip(source.path())?;
-    eprintln!("Indexed {} manuscripts.", records.len());
+    job.report(Event::ParsingArchive);
+    let records = archive::parse_zip(source.path(), job)?;
+    job.report(Event::Indexed {
+        manuscripts: records.len(),
+    });
 
     let generated_at = format_now_utc();
     let html = html::render_html(&records, SOURCE_LABEL, &generated_at);
@@ -126,24 +153,57 @@ pub fn run(local_zip: Option<&Path>) -> Result<PathBuf> {
 /// between a cached archive and a downloaded one — the difference between a
 /// two-second run and a one-minute one — was the least tested code in the
 /// program. Its parts each had tests; nothing exercised the wiring.
-pub fn obtain_archive(url: &str, md5: &str) -> Result<cache::Archive> {
-    let Some(dir) = cache_for_run() else {
-        return download_unkept(url, md5);
+pub fn obtain_archive(url: &str, md5: &str, job: &Job<'_>) -> Result<cache::Archive> {
+    obtain_archive_advised_by(url, md5, job, zenodo::latest_release)
+}
+
+/// Where a run learns what Zenodo publishes.
+///
+/// A parameter rather than a call written into [`download_archive`], because as
+/// a call it reached the network from tests that say they do not. Every test
+/// that points [`obtain_archive`] at a local server was also asking zenodo.org
+/// about the pinned record — invisibly, since the local server counts no
+/// request for it. On a day the API answered in eight seconds that cost ten
+/// seconds a test, and one of them asserts it finishes in under two, which is
+/// how this was found rather than read.
+pub type ReleaseLookup = fn(u64) -> Result<zenodo::Release>;
+
+/// As [`obtain_archive`], with the release lookup given — the tests need one
+/// that does not reach Zenodo.
+///
+/// The lookup answers for the *pinned* record, not for `url`: what it is asked
+/// is which edition of the corpus is current, and that question has one answer
+/// wherever this run happens to be fetching bytes from.
+pub fn obtain_archive_advised_by(
+    url: &str,
+    md5: &str,
+    job: &Job<'_>,
+    releases: ReleaseLookup,
+) -> Result<cache::Archive> {
+    let Some(dir) = cache_for_run(job) else {
+        return download_unkept(url, md5, job, releases);
     };
 
     // Leftovers from runs that were killed mid-download; see `sweep_unfinished`.
     cache::sweep_unfinished(&dir);
 
-    if let Some(hit) = cache::lookup(&dir, url, md5) {
-        eprintln!("Using the archive already downloaded: {}", hit.display());
-        return Ok(cache::Archive::Cached(hit));
+    // The cache reports why it missed rather than printing about it: a rejected
+    // file and an empty directory are the same outcome — download — and only
+    // one of them is worth telling the reader about.
+    match cache::lookup(&dir, url, md5) {
+        cache::Lookup::Hit(hit) => {
+            job.report(Event::ArchiveFromCache { path: &hit });
+            return Ok(cache::Archive::Cached(hit));
+        }
+        cache::Lookup::Rejected => job.report(Event::CachedArchiveRejected),
+        cache::Lookup::Absent => {}
     }
 
     // The directory exists already: `cache::is_usable` created it to find out
     // whether it could be written to.
     let dest = dir.join(cache::archive_name(url, md5));
-    download_archive(url, md5, &dest)?;
-    eprintln!("Kept for the next run: {}", dest.display());
+    download_archive(url, md5, &dest, job, releases)?;
+    job.report(Event::ArchiveKept { path: &dest });
     cache::prune(&dir, &dest);
     Ok(cache::Archive::Cached(dest))
 }
@@ -156,17 +216,14 @@ pub fn obtain_archive(url: &str, md5: &str) -> Result<cache::Archive> {
 /// The second used to end the run with a permission error before a byte was
 /// fetched, though the archive was there for the taking and the run needed the
 /// cache for nothing but speed.
-fn cache_for_run() -> Option<PathBuf> {
+fn cache_for_run(job: &Job<'_>) -> Option<PathBuf> {
     let dir = cache::cache_dir()?;
     if cache::is_usable(&dir) {
         return Some(dir);
     }
     // Said out loud: the next run will pay the download again, and the reader
     // is the only one who can do anything about the directory.
-    eprintln!(
-        "Cannot write to the cache directory ({}); downloading for this run only.",
-        dir.display()
-    );
+    job.report(Event::CacheUnusable { dir: &dir });
     None
 }
 
@@ -174,14 +231,19 @@ fn cache_for_run() -> Option<PathBuf> {
 ///
 /// Costs the download on every run, which is the price of having nowhere to put
 /// the archive. [`run`] removes the directory when it is done with it.
-fn download_unkept(url: &str, md5: &str) -> Result<cache::Archive> {
+fn download_unkept(
+    url: &str,
+    md5: &str,
+    job: &Job<'_>,
+    releases: ReleaseLookup,
+) -> Result<cache::Archive> {
     let work_dir = work_dir_for_process();
     fs::create_dir_all(&work_dir).map_err(|source| ArunaError::Io {
         path: work_dir.clone(),
         source,
     })?;
     let dest = work_dir.join(cache::archive_name(url, md5));
-    download_archive(url, md5, &dest)?;
+    download_archive(url, md5, &dest, job, releases)?;
     Ok(cache::Archive::Temporary(dest))
 }
 
@@ -192,22 +254,37 @@ fn download_unkept(url: &str, md5: &str) -> Result<cache::Archive> {
 /// check is asked here and nowhere else: the network is required anyway at this
 /// point and one small request costs nothing against 71 MiB, while a run served
 /// from the cache stays offline and stays fast.
-fn download_archive(url: &str, md5: &str, dest: &Path) -> Result<()> {
-    announce_release();
-    eprintln!("Downloading TLHdig archive from Zenodo…");
+///
+/// *Which* lookup is asked comes in as [`ReleaseLookup`] rather than being
+/// named here, so a test driving this at a local server does not have to reach
+/// Zenodo to do it.
+fn download_archive(
+    url: &str,
+    md5: &str,
+    dest: &Path,
+    job: &Job<'_>,
+    releases: ReleaseLookup,
+) -> Result<()> {
+    announce_release(job, releases);
+    job.report(Event::DownloadStarted);
     // The download lands through a scratch file and a rename, so an interrupted
     // run cannot leave half an archive under a name that promises a whole one.
-    download::download_verified(url, dest, Some(md5))
+    download::download_verified(url, dest, Some(md5), job)
 }
 
 /// Say what Zenodo publishes, when it differs from what this build expects.
 ///
 /// Advisory in both directions: a repository that will not answer is not a
 /// reason to refuse an archive it will happily serve, and what it says never
-/// overrides the pinned digest — see [`zenodo::report`].
-fn announce_release() {
-    match zenodo::latest_release(ZENODO_RECORD) {
-        Ok(latest) => zenodo::report(ZENODO_RECORD, download::ZENODO_ZIP_MD5, &latest),
+/// overrides the pinned digest — see [`zenodo::advice`].
+fn announce_release(job: &Job<'_>, releases: ReleaseLookup) {
+    match releases(ZENODO_RECORD) {
+        Ok(latest) => {
+            if let Some(message) = zenodo::advice(ZENODO_RECORD, download::ZENODO_ZIP_MD5, &latest)
+            {
+                job.report(Event::ZenodoNotice { message: &message });
+            }
+        }
         Err(err) => {
             // The innermost cause, not the chain: our wrapper and the HTTP
             // client both name the URL, and this is an aside on the way to a
@@ -215,7 +292,7 @@ fn announce_release() {
             let cause = std::error::Error::source(&err)
                 .map(|source| source.to_string())
                 .unwrap_or_else(|| err.to_string());
-            eprintln!("Could not check the record on Zenodo ({cause}); continuing.");
+            job.report(Event::ZenodoUnreachable { cause: &cause });
         }
     }
 }

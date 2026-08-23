@@ -27,7 +27,7 @@ fn main() -> ExitCode {
     let zip = PathBuf::from(zip);
     let out_path = PathBuf::from(out_path);
 
-    let records = match parse_zip(&zip) {
+    let records = match parse_zip(&zip, &aruna::job::Job::unattended()) {
         Ok(records) => records,
         Err(e) => {
             eprintln!("parse failed: {e}");

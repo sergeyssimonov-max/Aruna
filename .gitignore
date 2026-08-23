@@ -1,12 +1,7 @@
 node_modules/
 dist/
-.output/
-.vercel/
-.nitro/
-.tanstack/
-.vinxi/
 
-# Rust build directories (cli/, wasm/search/)
+# Rust build directories (cli/, src-tauri/)
 **/target/
 
 # Local release products — packages are published on the Releases page, never
@@ -19,8 +14,16 @@ cli/stage-dmg/
 # The TLHdig archive is ~71 MiB and is downloaded on demand.
 cli/fixtures/*.zip
 
-screenshots/*.png
 *.log
 .DS_Store
 .env
 .env.*
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# tauri
+src-tauri/target/
+src-tauri/gen/

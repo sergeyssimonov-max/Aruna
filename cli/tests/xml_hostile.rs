@@ -150,7 +150,13 @@ fn field_values_that_are_paths_stay_inside_the_package() {
         .expect("write");
     zip.finish().expect("finish");
 
-    export::build(&archive, &destination, "hostile").expect("builds");
+    export::build(
+        &archive,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("builds");
 
     let mut written = Vec::new();
     let mut stack = vec![destination.clone()];

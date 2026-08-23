@@ -79,7 +79,9 @@ fn parse_release(body: &str) -> Option<Release> {
 /// what this build is pinned to. `None` when the two agree — silence is the
 /// right answer to no news.
 ///
-/// A pure function so every branch can be tested; [`report`] does the printing.
+/// A pure function so every branch can be tested. It composes the prose and
+/// hands it back; who says it, and to whom, is the caller's — see
+/// [`crate::progress::Event::ZenodoNotice`].
 ///
 /// Deliberately advisory. The pinned digest stays the authority — it records
 /// the archive this parser was tested against, and taking Zenodo's word for it
@@ -113,13 +115,6 @@ pub fn advice(pinned_record: u64, pinned_md5: &str, latest: &Release) -> Option<
          expects {pinned_md5}.\n\
          The download will be checked against the expected digest and will fail."
     ))
-}
-
-/// Print [`advice`], if there is any.
-pub fn report(pinned_record: u64, pinned_md5: &str, latest: &Release) {
-    if let Some(message) = advice(pinned_record, pinned_md5, latest) {
-        eprintln!("{message}");
-    }
 }
 
 #[cfg(test)]

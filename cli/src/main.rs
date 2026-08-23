@@ -1,5 +1,9 @@
 //! Aruna CLI — zero-argument inventory generator for TLHdig (Zenodo).
 
+// See the note in `lib.rs`: the compiler is what holds this project to no
+// `unsafe` of its own.
+#![forbid(unsafe_code)]
+
 use aruna::error::ArunaError;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -8,9 +12,31 @@ fn main() -> ExitCode {
     // Optional override for offline / testing: ARUNA_ZIP=/path/to/archive.zip
     let local = std::env::var_os("ARUNA_ZIP").map(PathBuf::from);
 
-    match aruna::run(local.as_deref()) {
-        Ok(path) => {
-            println!("Готово. Опись сохранена: {}", path.display());
+    // The binary is the one front end that prints, and `progress::Stderr` is
+    // where it says so: the library below has no opinion about stderr.
+    //
+    // The cancellation handle is created and dropped here without ever being
+    // set. A terminal program is stopped with Ctrl-C, which this cannot catch
+    // and does not try to — the flag exists so that the same core can be
+    // driven by a window that has a Cancel button, and this binary is simply
+    // the caller that never presses it.
+    let cancel = aruna::job::Cancel::new();
+    let job = aruna::job::Job::new(&aruna::progress::Stderr, &cancel);
+
+    // Through `app`, not through `aruna::run` directly. The scenario is the
+    // same one a window will call, and a binary that reached past it would be
+    // the second answer to "what does building the inventory come to" — which
+    // is the arrangement that layer exists to prevent.
+    let request = aruna::app::InventoryRequest {
+        local_archive: local,
+    };
+    match aruna::app::build_inventory(&request, &job) {
+        Ok(report) => {
+            println!("Готово. Опись сохранена: {}", report.output.display());
+            println!(
+                "  рукописей: {}, групп: {}",
+                report.manuscripts, report.groups
+            );
             ExitCode::SUCCESS
         }
         Err(err) => {
@@ -21,7 +47,15 @@ fn main() -> ExitCode {
 }
 
 /// Print the failure, its cause, and what the person in front of it can do.
+///
+/// A cancellation is not a failure and is not worded as one. It reaches this
+/// function because it travels as an error — see `ArunaError::Cancelled` — and
+/// the wording is where the two are told apart.
 fn report(err: &ArunaError) {
+    if let ArunaError::Cancelled { phase } = err {
+        eprintln!("Остановлено на этапе: {phase}");
+        return;
+    }
     eprintln!("Ошибка: {err}");
     if let Some(src) = std::error::Error::source(err) {
         eprintln!("  причина: {src}");
@@ -119,6 +153,9 @@ fn advice(err: &ArunaError) -> Option<String> {
              Это ошибка сборщика, а не ваших данных."
                 .to_string()
         }
+        // Nothing to advise: the reader stopped the run on purpose, and
+        // `report` has already said so without calling it an error.
+        ArunaError::Cancelled { .. } => return None,
         ArunaError::Truncated { .. } | ArunaError::Io { .. } => return None,
     })
 }

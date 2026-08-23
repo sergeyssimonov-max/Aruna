@@ -32,9 +32,11 @@ pub use normalize::{normalize_document, normalize_into};
 pub use validate::{validate, Validation};
 
 use crate::error::{ArunaError, Result};
+use crate::job::{Job, Phase};
 use crate::order::sort_by_display_order;
 use crate::parse::{group_label, is_manuscript_xml, looks_like_manuscript, parse_manuscript};
 use crate::parse::{ManuscriptRecord, HEADER_READ_LIMIT};
+use crate::progress::Event;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Write as _};
@@ -43,9 +45,6 @@ use zip::ZipArchive;
 
 /// What the package is called, in the folder and in the inventory's file name.
 pub const PACKAGE: &str = "TLHdig_Beta_0.3";
-
-/// The page each CTH folder opens with. See [`inventory::render_group_index`].
-pub const GROUP_INDEX: &str = "index.html";
 
 /// The machine-readable model of the package.
 pub const MANIFEST: &str = "manifest.json";
@@ -161,6 +160,22 @@ fn disambiguator(source: &str) -> String {
     path_component(parent)
 }
 
+/// How many distinct CTH groups a set of fragments falls into.
+///
+/// Order-independent, and that is the whole point. This is reported after the
+/// headers are read and before anything is sorted, and the corpus files one
+/// group under several folders — `CTH 5_XML_HFR` and `CTH 5_XML_TLH` are two
+/// places and one group. Counting runs of equal neighbours instead of distinct
+/// values answered 826 for a corpus of 663, and the correct figure was printed
+/// four lines later by the summary, which is how it was noticed.
+fn distinct_groups(fragments: &[Fragment]) -> usize {
+    fragments
+        .iter()
+        .map(|f| group_label(&f.record))
+        .collect::<std::collections::HashSet<_>>()
+        .len()
+}
+
 /// Each CTH group: its label, the records in it, and where they were placed.
 ///
 /// `placed` is built from `records` in order, so a group's run of records lines
@@ -190,7 +205,6 @@ pub fn group_slices<'a>(
 pub struct Built {
     pub groups: usize,
     pub documents: usize,
-    pub group_links: usize,
     pub fragment_links: usize,
     /// Fragments that needed a suffix because their siglum was already taken.
     pub disambiguated: usize,
@@ -205,18 +219,28 @@ pub struct Built {
 /// a failure never leaves half a package behind. The published copy is then
 /// validated again, because what a caller opens is that one and not the staging
 /// directory it was renamed from.
-pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built> {
+///
+/// `job` hears each stage begin and is asked, between documents, whether to
+/// keep going. The build is six seconds and four stages with nothing in
+/// between them, which is exactly long enough for a window to look frozen —
+/// and long enough that a person who changed their mind should not have to
+/// wait it out.
+///
+/// A cancelled build publishes nothing. The work happens in a staging
+/// directory that removes itself unless it is published, so stopping leaves
+/// the destination exactly as it was found — the same guarantee a failed build
+/// already had, reached by the same mechanism.
+pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) -> Result<Built> {
     let final_root = destination.join(PACKAGE);
     let staging = destination.join(format!(".{PACKAGE}.build"));
 
     validate::check_destination(&final_root)?;
 
-    eprintln!("Reading headers…");
+    job.report(Event::ReadingHeaders);
     let mut fragments = collect_fragments(zip)?;
-    eprintln!("  {} manuscripts in {} groups", fragments.len(), {
-        let mut labels: Vec<&str> = fragments.iter().map(|f| group_label(&f.record)).collect();
-        labels.dedup();
-        labels.len()
+    job.report(Event::HeadersRead {
+        manuscripts: fragments.len(),
+        groups: distinct_groups(&fragments),
     });
     sort_by_display_order(&mut fragments, |f| &f.record);
     let placed = place(&fragments)?;
@@ -228,7 +252,9 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
 
     let staging = Staging::fresh(staging)?;
 
-    eprintln!("Writing {} documents…", placed.len());
+    job.report(Event::WritingDocuments {
+        documents: placed.len(),
+    });
     // The archive this package was built from, named in the manifest so a
     // reader can tell which edition of the corpus they are looking at.
     let archive_digest = digest_of(zip)?;
@@ -241,29 +267,22 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
         staging.path(),
         &mut applied,
         &mut fonts,
+        job,
     )?;
 
     let records: Vec<ManuscriptRecord> = fragments.iter().map(|f| f.record.clone()).collect();
-    let html = render_inventory(&records, &placed, source_label);
+
+    // What every document shows, decided once. Both pages are written from
+    // this and neither re-derives a name, a link or a fact of its own — see
+    // [`crate::presentation`].
+    let corpus = crate::presentation::CorpusPresentation::linked(&records, &placed, source_label);
+
+    let html = crate::html::render_linked_html(&corpus, "");
     let inventory = staging.path().join(format!("{PACKAGE}.html"));
     fs::write(&inventory, &html).map_err(|source| ArunaError::Io {
         path: inventory,
         source,
     })?;
-
-    // One page per group. Safari shows nothing for a `file://` directory, so a
-    // package that is opened by double-clicking cannot link to bare folders.
-    // All groups or none — a package where some links work and some do not is
-    // worse than either.
-    for (label, run, slice) in group_slices(&records, &placed) {
-        let index = staging.path().join(dir_component(label)).join(GROUP_INDEX);
-        fs::write(&index, inventory::render_group_index(label, run, slice)).map_err(|source| {
-            ArunaError::Io {
-                path: index,
-                source,
-            }
-        })?;
-    }
 
     let manifest_json = manifest::render_manifest(
         &records,
@@ -279,23 +298,32 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
         source,
     })?;
 
-    eprintln!("Checking the package…");
+    // Validation reads back everything just written; a run cancelled during
+    // the write should not spend six more seconds proving it was written.
+    job.check(Phase::Validating)?;
+    job.report(Event::CheckingPackage);
     let staged = validate(staging.path(), &records, &placed)?;
 
     // Only now does it get the name. The package already there is moved aside
     // first, and put back if the publish fails.
+    // The last moment at which stopping costs the reader nothing. Past this
+    // line the existing package is moved aside and a new one takes its name,
+    // and a run that stopped half way through that would leave the destination
+    // in a state neither the old build nor the new one describes.
+    job.check(Phase::Publishing)?;
     let previous = Replaced::aside(&final_root, destination)?;
     staging.publish(&final_root)?;
-    previous.committed();
+    for left in previous.committed() {
+        job.report(Event::PreviousPackageLeft { path: &left });
+    }
 
-    eprintln!("Checking the published copy…");
+    job.report(Event::CheckingPublished);
     let published = validate(&final_root, &records, &placed)?;
     debug_assert_eq!(staged, published, "the rename changed the package");
 
     Ok(Built {
         groups: crate::parse::group_runs(&records).count(),
         documents: placed.len(),
-        group_links: published.group_links,
         fragment_links: published.fragment_links,
         disambiguated,
         stylesheet_dropped,
@@ -318,7 +346,25 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str) -> Result<Built
 /// old package back.
 struct Replaced {
     target: PathBuf,
+    /// The package this run moved out of the way. Put back by [`Drop`].
     aside: Option<PathBuf>,
+    /// An aside copy an earlier run left behind and this one did not make.
+    ///
+    /// It exists when a process was killed between the rename that moved a
+    /// package aside and the one that published its replacement — the window
+    /// `Drop` cannot cover, because a kill runs no destructor. Nothing had ever
+    /// cleared it: [`aside`](Self::aside) only looks at that path when there is
+    /// a package at `target` to move, and after a kill there is not. The copy
+    /// then sat in the destination through the next build — a second, hidden
+    /// package the size of the real one — and was only swept up by the build
+    /// after that.
+    ///
+    /// Kept apart from `aside` rather than merged into it because the two are
+    /// owed different things. This one is the reader's only remaining copy of
+    /// the package they had, so it is removed once a new one is safely
+    /// published and never before — and [`Drop`] must not rename it onto
+    /// `target`, which would be restoring something this run did not move.
+    stale: Option<PathBuf>,
     committed: bool,
 }
 
@@ -331,12 +377,18 @@ impl Replaced {
         let mut held = Self {
             target: target.to_path_buf(),
             aside: None,
+            stale: None,
             committed: false,
         };
+        let aside = destination.join(format!(".{PACKAGE}.previous"));
         if fs::symlink_metadata(target).is_err() {
+            // Nothing to move. Anything under the aside name is an earlier
+            // run's, orphaned by a kill; see [`Replaced::stale`].
+            if aside.exists() {
+                held.stale = Some(aside);
+            }
             return Ok(held);
         }
-        let aside = destination.join(format!(".{PACKAGE}.previous"));
         if aside.exists() {
             remove_dir(&aside)?;
         }
@@ -350,18 +402,23 @@ impl Replaced {
 
     /// The replacement is in place; the old copy is now only occupying space.
     ///
-    /// Failing to remove it is not a reason to fail a build that worked, so it
-    /// is reported and left.
-    fn committed(mut self) {
+    /// Failing to remove it is not a reason to fail a build that worked, so
+    /// whatever is left is handed back for [`build`] to report. Returned rather
+    /// than printed here: this guard exists to be correct on every exit path,
+    /// and a sink threaded through it for one line would have to reach [`Drop`]
+    /// too, where there is no caller left to tell.
+    ///
+    /// Both copies go: the one this run moved aside, and an orphan an earlier
+    /// killed run left. Now is the moment for both — a new package is in place,
+    /// so neither is anybody's last copy of anything any more.
+    fn committed(mut self) -> Vec<PathBuf> {
         self.committed = true;
-        if let Some(aside) = &self.aside {
-            if remove_dir(aside).is_err() {
-                eprintln!(
-                    "  note: the previous package is left at {}",
-                    aside.display()
-                );
-            }
-        }
+        self.aside
+            .iter()
+            .chain(self.stale.iter())
+            .filter(|path| remove_dir(path).is_err())
+            .cloned()
+            .collect()
     }
 }
 
@@ -485,6 +542,7 @@ fn write_documents(
     staging: &Path,
     applied: &mut std::collections::BTreeMap<String, usize>,
     fonts: &mut manifest::FontContract,
+    job: &Job<'_>,
 ) -> Result<usize> {
     let wanted: HashMap<&str, &Path> = fragments
         .iter()
@@ -501,6 +559,14 @@ fn write_documents(
     let mut normalised = Vec::new();
 
     for i in 0..archive.len() {
+        // Between documents. Each one is inflated, normalised, checked against
+        // its source and written with `create_new`; stopping here leaves the
+        // staging directory holding whole documents and no half of one, and
+        // the directory itself is removed on the way out because it was never
+        // published. The reader's existing package is untouched throughout —
+        // it is not moved aside until every document is written.
+        job.check(Phase::Exporting)?;
+
         let mut entry = archive.by_index(i)?;
         let Some(relative) = wanted.get(entry.name()).copied() else {
             continue;
@@ -651,6 +717,30 @@ pub(crate) mod tests_support {
 mod tests {
     use super::tests_support::fragment;
     use super::*;
+
+    /// The corpus files one group under several folders, so a group's fragments
+    /// are not adjacent in the archive. Counting runs of equal neighbours
+    /// answered 826 groups for a corpus that has 663.
+    #[test]
+    fn groups_are_counted_by_how_many_there_are_not_by_how_they_are_ordered() {
+        let interleaved = [
+            fragment("A", "CTH 5", "root/CTH 5_XML_HFR/a.xml"),
+            fragment("B", "CTH 9", "root/CTH 9_XML_HFR/b.xml"),
+            fragment("C", "CTH 5", "root/CTH 5_XML_TLH/c.xml"),
+        ];
+        assert_eq!(distinct_groups(&interleaved), 2);
+
+        let adjacent = [
+            fragment("A", "CTH 5", "root/CTH 5_XML_HFR/a.xml"),
+            fragment("C", "CTH 5", "root/CTH 5_XML_TLH/c.xml"),
+            fragment("B", "CTH 9", "root/CTH 9_XML_HFR/b.xml"),
+        ];
+        assert_eq!(
+            distinct_groups(&adjacent),
+            distinct_groups(&interleaved),
+            "the same fragments in a different order are the same groups"
+        );
+    }
 
     #[test]
     fn a_repeated_siglum_gets_a_place_of_its_own_rather_than_overwriting() {

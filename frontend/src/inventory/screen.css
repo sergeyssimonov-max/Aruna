@@ -1,0 +1,282 @@
+/* The inventory's own section: what is on that page and no other.
+ *
+ * The document base — tokens, body, surface, headings, the metadata line and
+ * every print rule — moved to `canonical.css`, which `style.rs` emits before
+ * this file. What was cut out was a contiguous prefix and it is emitted in the
+ * same position, so the cascade here is unchanged; the declarations themselves
+ * now read from tokens that hold the values they used to state.
+ */
+
+/* The two counts are one fact about the corpus, so they share a line. */
+.meta .count {
+  display: inline-block;
+  margin-right: 1.5rem;
+}
+.meta .count:last-child {
+  margin-right: 0;
+}
+
+/* legend */
+.legend {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.legend-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #999;
+}
+.legend-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.legend-list li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.18rem 0.5rem 0.18rem 0.38rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #eee;
+  font-size: 0.75rem;
+  color: #555;
+}
+.legend-list .k {
+  font-weight: 600;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+.legend-list .d {
+  color: #666;
+}
+
+/* toolbar / filter */
+
+/* Both controls do their work in the inventory script, which adds this
+   class as it starts. Without the script the document is a plain, fully expanded table —
+   and it used to be a plain table with a search box above it that swallowed
+   whatever was typed into it and a button that folded nothing. */
+body:not(.filter-on) .toolbar {
+  display: none;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  /* Stretch, not centre: the two controls then take the same height whatever
+     each one's idea of its natural one is. Centring them let the taller of the
+     two hang over the other at both ends. */
+  align-items: stretch;
+  gap: 0.75rem;
+  margin: 0 0 1.15rem;
+}
+.toolbar input[type='search'] {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9rem;
+  /* Safari draws a search field natively, and a native search field ignores
+     `line-height` — so it came out about 5px shorter than the button beside it,
+     which is the misalignment this removes. Chrome sizes it like any other box
+     and never showed the difference. */
+  -webkit-appearance: none;
+  appearance: none;
+  line-height: 1.5;
+  outline: none;
+  background: #fff;
+}
+.toolbar input[type='search']:focus {
+  border-color: #ccc;
+  box-shadow: 0 0 0 3px #eee;
+}
+.toolbar .fold-all {
+  flex: 0 0 auto;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  /* The same as the field beside it, stated rather than inherited, so the two
+     cannot drift apart when the page's own line-height changes. */
+  line-height: 1.5;
+  color: #444;
+  cursor: pointer;
+}
+.toolbar .fold-all:hover {
+  background: #fafafa;
+}
+.toolbar .fold-all:focus-visible {
+  outline: none;
+  border-color: #ccc;
+  box-shadow: 0 0 0 3px #eee;
+}
+.toolbar .hint {
+  /* The controls stretch; the note beside them reads better on their centre
+     line than pinned to the top of a box it does not fill. */
+  align-self: center;
+  font-size: 0.8125rem;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+
+/* table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+/* Wide enough for six digits at 15px tabular-nums plus the gap to the siglum:
+   the table is `table-layout: fixed` and its cells clip, so a column that is
+   too narrow loses characters instead of widening. */
+col.c-num {
+  width: 4.75rem;
+}
+col.c-sig {
+  width: auto;
+}
+/* Wide enough for three codes — `Hit, Akk, Sum` is 92px at 15px, and 6% of the
+   corpus names more than one language. The table is `table-layout: fixed` and
+   its cells clip, so a column that is too narrow loses characters. */
+col.c-lang {
+  width: 7rem;
+}
+col.c-corp {
+  width: 5rem;
+}
+col.c-ed {
+  width: 28%;
+}
+col.c-year {
+  width: 4rem;
+}
+
+thead th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #888;
+  padding: 0.55rem 0.5rem 0.65rem 0;
+  border-bottom: 1px solid #e5e5e5;
+  white-space: nowrap;
+}
+thead th:last-child {
+  text-align: right;
+  padding-right: 0;
+}
+
+tbody td {
+  padding: 0.7rem 0.5rem 0.7rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+tbody td:last-child {
+  padding-right: 0;
+}
+td.num {
+  color: #999;
+  font-variant-numeric: tabular-nums;
+  /* Left, under the "№" heading. Right alignment put the digits against the
+     siglum and left the gap on the outside, so a long number read as though it
+     had been cut off. */
+  text-align: left;
+  padding-right: 0.75rem;
+}
+td.year {
+  font-variant-numeric: tabular-nums;
+  color: #444;
+  text-align: right;
+  white-space: nowrap;
+}
+
+tr.group td {
+  padding: 1.15rem 0 0.5rem;
+  border-bottom: 1px solid #e5e5e5;
+  background: #fff;
+}
+tr.group:first-child td {
+  padding-top: 0.2rem;
+}
+
+/* The heading is the control: a real button, so it works from the keyboard,
+   stripped of the chrome a button normally brings. */
+.group-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.group-toggle:focus-visible {
+  outline: 2px solid #ccc;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Drawn rather than an image: 663 copies of an inline SVG would be most of the
+   document. Points down while the group is open, right while it is folded. */
+.chevron {
+  align-self: center;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid #bbb;
+  border-bottom: 1.5px solid #bbb;
+  transform: rotate(45deg);
+  transform-origin: 55% 55%;
+  transition: transform 0.12s ease;
+}
+tr.group.folded .chevron {
+  transform: rotate(-45deg);
+}
+
+.group-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+.group-count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: #999;
+}
+.group-count::before {
+  content: '· ';
+  color: #ccc;
+}
+
+@media (max-width: 720px) {
+  col.c-ed {
+    width: 0;
+  }
+  th:nth-child(5),
+  td:nth-child(5) {
+    display: none;
+  }
+  col.c-corp {
+    width: 4.25rem;
+  }
+}

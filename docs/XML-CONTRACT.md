@@ -42,7 +42,27 @@ The export files every document under `CTH N/<siglum>.xml`. Only the path
 changes; the bytes do not, beyond a prologue rewrite named in §3. Checked:
 23 936 in, 23 936 out, no duplicates, no silent replacement (`create_new` on
 every file), the manifest names each output and its source group, and the
-inventory links exactly the set that was placed — both directions.
+inventory links exactly the set that was placed — both directions. 34 documents
+need a suffix because their siglum is already taken inside their group — the
+`disambiguated` line of `example export_beta` below — and a collision the suffix
+cannot resolve stops the build rather than overwriting.
+
+### The same input gives the same output
+
+Two builds of the archive produce the same package, byte for byte: **24 601
+files each time, 0 present in one and not the other, 0 with the same path and
+different bytes.**
+
+```sh
+cd cli
+cargo run --release --example determinism -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
+```
+
+This is contract-grade rather than incidental. A converter that maps 23 936
+documents to 23 936 PDFs has to place each one where the last run placed it —
+otherwise every re-run rewrites the whole corpus and nothing incremental is
+possible. `tests/reliability.rs` holds the property against a synthetic archive
+shaped like the awkward parts of this one, so it is checked without the 71 MiB.
 
 ---
 
@@ -58,6 +78,7 @@ TLHdig Beta 0.3, MD5 `f9acbc8db3111cc7dd88d82f7819a912`:
 | | |
 |---|---|
 | documents accepted | 23 936 |
+| CTH groups | 663 |
 | `.xml` entries the gates refuse | 644 |
 | total text | 339.5 MB |
 | size min / p50 / p95 / max | 807 B / 5 634 B / 49 010 B / 897 320 B |
@@ -91,6 +112,14 @@ documents carry real table structure.
 
 Collisions: 132 file names repeat across folders, 0 differ only by case, 600 ids
 are used by more than one element, 0 symbolic links.
+
+The group count is written down because it was once got wrong in a way nothing
+caught. The corpus files one group under several folders — `CTH 5_XML_HFR` and
+`CTH 5_XML_TLH` are one group — so counting adjacent runs of the label instead
+of distinct labels reported 826. It is 663, and the count is now
+order-independent and tested as such. `cargo run --release --example export_beta
+-- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip` prints both the progress line
+and the summary; they agree.
 
 Series, by leading letters of the file name: KBo 14 033, KUB 4 072, EBo 1 373,
 CHDS 1 060, IBoT 571, DAAM 441, DBH 404, ABoT 391, Bo 289, FHL 169, UBT 160,
@@ -286,3 +315,124 @@ Consequences for the font choice, in order of how much trouble they cause:
 Before any font is bundled: check the licence for redistribution **and** for
 embedding, and record both. Do not convert text to outlines — it destroys
 search, copying and accessibility and inflates the file.
+
+### What the installed fonts actually cover
+
+```sh
+cd cli
+cargo run --release --example font_coverage -- \
+  fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip [report.json]
+```
+
+Measured, not sampled: the `cmap` table of every font file on the machine, read
+against every code point the corpus really uses. There is no list of "the
+Hittitological characters" anywhere in that program — the code points come out
+of the archive.
+
+The program reads the declared stack out of the built canonical section rather
+than carrying its own copy of it — a second list would be a second statement of
+the same decision, and the two drifting apart is precisely what this exists to
+detect.
+
+On macOS 13.7.8, 366 font files:
+
+| | before | now |
+|---|---|---|
+| covered by the **declared** stack | 259 / 648 (40 %) | **642 / 648** |
+| covered outside it, by system fallback | 389 | **6** |
+| covered only by a font this machine happens to have | 1 | **0** |
+| covered by nothing anywhere | 5 | 5 |
+
+**`docs/FONTS.md` is the specification** — every face, its source, its SHA-256,
+its licence, its `fsType` embedding bit, and how to reproduce the environment on
+another machine. What follows here is why the corpus needs what it needs.
+
+### The stack was wrong, and this is what fixed it
+
+The first column is what this project shipped until 2026-08-22. **Three fifths
+of the corpus rendered only because macOS silently substituted a font nobody had
+chosen** — including the whole of the cuneiform, 376 signs across 19 021
+documents. Fallback is a property of one operating system: it differs between
+machines, and a PDF engine need not do it at all. "It looks right here" was the
+entire basis for believing those documents would print.
+
+Four faces close it, and all four are named in the stack now:
+
+| | |
+|---|---|
+| **Noto Sans Cuneiform** | 376 signs — every standard cuneiform character the corpus uses. System font, OFL, `fsType` 0. |
+| **UllikummiA** | 1 sign — `U+100000`, in 927 places. A cuneiform sign with no Unicode code point, allocated in the private use area by S. Vanséveren and published in the Hittite Sign List. Nothing else draws it. Not a system font; `docs/FONTS.md` says where to get it and how to check it. |
+| **STIX Two Math** | 6 signs: `U+24F5`–`U+24F8`, the double-circled digits used as editorial marks, and `U+27E8`/`U+27E9`, the angle brackets. System font, `fsType` 0. |
+| **Arial** | 1 sign — `U+05C3`, Hebrew punctuation, at most 26 documents. |
+
+`cli/src/style.rs::the_font_stack_names_what_the_corpus_needs` holds the stack to
+this. It is a source-level assertion because that is where the failure is
+visible: a missing family breaks no page, no build and no test — the document
+renders, on this machine, through a font nobody chose.
+
+**`Hiragino Sans GB` is deliberately not named**, though it would close one more
+point. It "covers" `U+E83A` in the sense that its private-use area happens to
+hold a Chinese glyph at that number. Naming it would make an unrelated sign the
+official rendering of a TLHdig character, which is worse than the empty box it
+would replace. The same test refuses it.
+
+### What is left, and why
+
+Six code points are outside the declared stack, and every one of them is private
+use. There is no longer any ordinary character relying on fallback.
+
+Five are cuneiform signs TLHdig encodes privately — `U+100001`, `U+100003`,
+`U+100005`, `U+100006`, `U+100009`, the last in 2 379 lines. **No font draws
+them**: not the official Ullikummi package from the portal, not Semiramis, not
+any of the 366 faces macOS ships. Nor are they in the Hittite Sign List, which
+allocates exactly three private-use points and of which this corpus uses one.
+TLHdig's allocation goes beyond what its font provider has published, and only
+the TLHdig editors can say what these signs are.
+
+The sixth is `U+E83A`, twice, and it is **not cuneiform at all** — it sits in a
+German footnote about a photograph collation, not in any `cu=` attribute. Almost
+certainly a leftover from a legacy encoding.
+
+None of the six comes out blank on macOS: `LastResort.otf` draws a placeholder
+box for the whole private-use range, which is what those characters look like on
+this machine and on the code-point websites. That is a marker meaning *nothing
+can render this*, not a rendering — `docs/FONTS.md` explains why the audit keeps
+the two apart, and records that failing to read that font at all was a defect in
+the audit until 2026-08-22.
+
+Both are in the source, and the source is not ours to correct. Substituting a
+similar sign would be worse than the gap: a wrong sign that renders beats nothing
+only until somebody reads it.
+
+### The three findings that remain
+
+**Five code points no font here draws.** `U+100001`, `U+100003`, `U+100005`,
+`U+100006`, `U+100009` — private use, and not covered by Ullikummi A/B/C or
+Semiramis Unicode 3 either, the Hittitological fonts on this machine.
+`U+100009` alone is in **976 documents**; it is in the shipped package, e.g.
+`CTH 572/KBo 58.64.xml`. A PDF will have a hole at each of them, whatever
+engine renders it. This is a question about the corpus rather than about this
+program: these code points mean whatever TLHdig assigned them, and no font
+outside the project knows it.
+
+**One that works only here.** `U+100000` is drawn by `UllikummiA.ttf` in
+`~/Library/Fonts` and by nothing else — tofu on any other Mac, unless that font
+is licensed and bundled.
+
+**One that renders the wrong sign.** `U+E83A` is "covered" — by Hiragino Sans
+GB, a Chinese font whose private-use slot holds an unrelated glyph. That is
+worse than an empty box: it draws something plausible, and nothing reports it.
+
+All three are private use, and all three are the same question: these code
+points mean whatever TLHdig assigned them, and no font outside the project
+knows it. Nothing in this program can decide that.
+
+The fourth finding — that three fifths of the corpus rendered through fallback,
+cuneiform included — was fixed on 2026-08-22 by naming the two faces above. It
+is recorded here rather than deleted because it is the kind of defect worth
+remembering: nothing failed. Every page rendered, every test passed, every
+linter was quiet, and the documents were one operating system away from being
+unreadable.
+
+`manifest.json` carries `fonts.private_use_points` so a renderer has the list
+without re-running this.
