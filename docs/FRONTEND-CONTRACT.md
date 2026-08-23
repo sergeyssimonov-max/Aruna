@@ -34,14 +34,14 @@ directories.
 Everything in this repository is aimed at one description. When a change is
 proposed, this is what it is measured against.
 
-**The program does what v1.0.9 does, plus the export v2.0.0 added.** The single
+**The program does what v1.0.9 does, plus the export the 2.x line added.** The single
 HTML inventory with its six columns and its filter, and the corpus written out
 as folders with a `CTH N/index.html` in each. Nothing is to be rolled back to
 reach this: the inventory's behaviour *already is* 1.0.9's — the columns are the
 same six, and the client script was **byte-for-byte identical** to the file at
 that tag until it was rebuilt in the new stack on 2026-08-23, behaviour
 unchanged and checked against the whole corpus (see *The client script*, below).
-(There is no build "1.9.0"; the tags are `v1.0.5`, `v1.0.9`, `v2.0.0`, and
+(There is no build "1.9.0"; the tags are `v1.0.5`, `v1.0.9`, `v2.1.0`, and
 `v1.0.9`'s manifest reads `version = "1.0.9"`.)
 
 **Svelte 5 · Vite · TypeScript is the only frontend technology in the

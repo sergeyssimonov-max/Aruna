@@ -12,7 +12,7 @@
     "is actually made of, and they live here.",
     "",
     "Three references, spread across the project rather than clustered at its end. v1.0.5 is",
-    "the floor, v1.0.9 closes the 1.x line, v2.0.0 opens the 2.x one. A release cannot record",
+    "the floor, v1.0.9 closes the 1.x line, v2.1.0 opens the 2.x one. A release cannot record",
     "itself — the commit it names is the commit that carries it, and no file can contain its",
     "own hash — so each entry here is added by the commit after the release it describes.",
     "",
@@ -34,11 +34,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.0.0",
-      "commit": "925867fa89171b1528560754b0c80e380c044fed",
-      "published": "2026-08-19T19:40:29Z",
-      "dmg_sha256": "29c720a90f84d70ba4db3309a2204f705091450abdce53972dc85aeb545b8e72",
-      "why": "The third reference and the first of the 2.x line: the corpus as a folder that can be opened, described for a program as well as a reader, with no document written until it is proven unchanged."
+      "tag": "v2.1.0",
+      "commit": "684dd8a7130b220bd566c5b0579921fc72321258",
+      "published": "2026-08-23T22:17:40Z",
+      "dmg_sha256": "682306b14bf9e844ad25e8b74fae8c702deabe48d400c0274c96453d8d58633c",
+      "why": "The third reference and the one that carries the 2.x line: the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. It replaced v2.0.0, which was withdrawn on 2026-08-24 along with its tag and its DMG."
     }
   ]
 }
