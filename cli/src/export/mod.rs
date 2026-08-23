@@ -232,7 +232,7 @@ pub struct Built {
 /// already had, reached by the same mechanism.
 pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) -> Result<Built> {
     let final_root = destination.join(PACKAGE);
-    let staging = destination.join(format!(".{PACKAGE}.build"));
+    let staging = destination.join(staging_name());
 
     validate::check_destination(&final_root)?;
 
@@ -485,6 +485,38 @@ impl Drop for Staging {
             let _ = fs::remove_dir_all(&self.path);
         }
     }
+}
+
+/// The name this run stages under: unique to the run, not to the destination.
+///
+/// **It used to be `.{PACKAGE}.build`, one name for every run, and that was
+/// safe only while nothing ran two builds into one destination.** Since 2.2.0
+/// the binary itself exports on every run, so two of them — a second
+/// double-click — meet in the reader's Downloads folder. Measured with the
+/// fixed name: each run's [`Staging::fresh`] cleared the other's directory and
+/// each `Drop` removed what the other was writing into, and **both runs failed
+/// leaving no package at all**, where before the export was wired in both had
+/// succeeded.
+///
+/// The same shape as [`crate::paths::scratch_sibling`], and for the same
+/// reason: process id, plus a counter so one process can stage twice.
+///
+/// **What this gives up.** A run killed with a signal leaves its staging
+/// directory behind, and the next run no longer clears it by finding it under
+/// the name it would have used itself — it simply builds beside it. That
+/// leftover is a real cost, up to the size of a package, and it is the price
+/// of two runs not destroying each other. Everything else about recovery is
+/// unchanged: a build that *fails* still clears its own staging through
+/// `Drop`, and an orphaned published copy is still swept by [`Replaced`].
+fn staging_name() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    format!(
+        ".{PACKAGE}.build.{}.{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    )
 }
 
 /// Pass 1: every entry the corpus's own gates accept, as a record and a path.

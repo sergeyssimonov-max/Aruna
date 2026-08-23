@@ -2,7 +2,7 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **371 tests** across fifteen integration binaries plus the library
+The suite is **372 tests** across fifteen integration binaries plus the library
 and the binary's own tests. It runs in about
 ten seconds and needs no network. Beside it, and in a language of its own, are
 the **53 `vitest` tests** in `frontend/` — see *Frontend* below. Retries are deliberately absent from
@@ -31,7 +31,7 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 cd cli
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus)'   # 368
+cargo nextest run --profile ci -E 'not binary(corpus)'   # 369
 ```
 
 ### Standard — about 25 s
@@ -203,7 +203,7 @@ test.
 |---|---|---|
 | library and `bin/aruna` | 248 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
-| `tests/cli_process.rs` | 14 | the binary as a child process, cache versus network |
+| `tests/cli_process.rs` | 15 | the binary as a child process, cache versus network |
 | `tests/cache_lifecycle.rs` | 9 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
 | `tests/export_integration.rs` | 8 | the export against an archive shaped like the corpus |
 | `tests/export_hostile.rs` | 12 | archives written to break the export, and destinations that refuse it |

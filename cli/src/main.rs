@@ -27,15 +27,20 @@ fn main() -> ExitCode {
     // same one a window will call, and a binary that reached past it would be
     // the second answer to "what does building the inventory come to" — which
     // is the arrangement that layer exists to prevent.
-    let request = aruna::app::InventoryRequest {
+    let request = aruna::app::CorpusRequest {
         local_archive: local,
     };
-    match aruna::app::build_inventory(&request, &job) {
+    match aruna::app::build_corpus(&request, &job) {
         Ok(report) => {
-            println!("Готово. Опись сохранена: {}", report.output.display());
+            // Two artifacts, named separately: one is a file to open, the other
+            // a folder to browse, and a reader who wants the second should not
+            // have to infer it from the first.
+            println!("Готово.");
+            println!("  Опись:  {}", report.inventory.output.display());
+            println!("  Корпус: {}", report.package.root.display());
             println!(
-                "  рукописей: {}, групп: {}",
-                report.manuscripts, report.groups
+                "  рукописей: {}, групп: {}, документов в папках: {}",
+                report.inventory.manuscripts, report.inventory.groups, report.package.documents
             );
             ExitCode::SUCCESS
         }

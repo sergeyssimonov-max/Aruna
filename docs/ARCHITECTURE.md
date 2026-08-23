@@ -15,7 +15,7 @@ document is about the Rust that runs underneath it.
 
 | | |
 |---|---|
-| `cli/` | package `aruna` 2.1.0 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
+| `cli/` | package `aruna` 2.2.0 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
 | `src-tauri/` | package `aruna` 0.1.0, library `aruna_lib` — the desktop shell. Today a proving ground for the frontend stack: it opens a window and contains no application logic. |
 
 They are **independent crates with separate `Cargo.lock` files**, not a
@@ -73,6 +73,12 @@ Zenodo / local .zip
                   ├─ export               folders, normalised documents, manifest
                   └─ (future) PDF         §6
 ```
+
+**One run drives both branches since 2.2.0.** `app::build_corpus` resolves the
+archive once and hands the same path to each: the inventory first, then the
+package beside it in the same directory. Until then the binary drove only the
+first branch and the second was reachable from an example — the program wrote a
+table of the corpus and never the corpus itself.
 
 `presentation` is the single fan-out point, and that is the property to keep:
 there is no path from XML to a rendered artefact that goes around it. The

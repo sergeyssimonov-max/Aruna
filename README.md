@@ -88,7 +88,7 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) carries the 2.x one — the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand.
+[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) carries the 2.x one — the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. From 2.2.0 the program writes that folder itself: until then the export existed in the crate and only an example called it.
 
 Three, spread across the project rather than clustered at its end, which is what makes them useful: a fault introduced this week is bracketed by v2.1.0, and one that turns out to be much older still has a floor under it.
 

@@ -28,12 +28,24 @@ use support::{manuscript, mixed_archive};
 use tempfile::{tempdir, TempDir};
 
 /// Everything directly inside `dir`, by name.
+/// What the destination holds besides the package and abandoned staging.
+///
+/// **Staging is excepted since 2.2.0, and that is a trade rather than a
+/// loosening.** A build used to stage under one name, `.{PACKAGE}.build`, so
+/// the next build found a killed run's directory and cleared it. That name is
+/// now unique to the run, because the binary exports on every run and two of
+/// them — a second double-click — meet in one Downloads folder: measured with
+/// the shared name, each cleared the other's directory and **both runs failed
+/// with no package at all**. The cost is here: a run killed by a signal leaves
+/// its staging behind, and the next run builds beside it rather than over it.
+/// What has not changed is that nothing from it is ever published, which the
+/// assertions below still hold.
 fn beside(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .expect("read")
         .flatten()
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n != PACKAGE)
+        .filter(|n| n != PACKAGE && !n.starts_with(&format!(".{PACKAGE}.build")))
         .collect();
     names.sort();
     names
@@ -277,7 +289,14 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
         .expect("read")
         .flatten()
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n != "TLHdig_Beta_0.3.html" && n != "TLHdig_Beta_0.3.html.999999.0.part")
+        // The package is what the run is now *for*; the scratch file is the
+        // orphan this test planted.
+        .filter(|n| {
+            n != "TLHdig_Beta_0.3.html"
+                && n != "TLHdig_Beta_0.3.html.999999.0.part"
+                && n != PACKAGE
+                && !n.starts_with(&format!(".{PACKAGE}.build"))
+        })
         .collect();
     assert!(
         leftovers.is_empty(),

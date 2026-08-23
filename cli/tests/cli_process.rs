@@ -1,5 +1,11 @@
 //! The program as a process: what a person running `aruna` actually meets.
 //!
+//! **Two artifacts since 2.2.0.** A run writes the standalone inventory *and*
+//! the package beside it — the corpus as folders of documents, with an
+//! inventory inside that links at each one. Until then the binary wrote only
+//! the first, and the export that makes the second was reachable from an
+//! example and nothing else.
+//!
 //! Everything else in this repository tests the library. That leaves the one
 //! surface users touch — the binary, its exit code, what it prints and what it
 //! leaves on disk — checked by nobody. These tests run the real executable.
@@ -16,6 +22,9 @@
 //! — and every test here sets all three. No test touches the real home, the
 //! real cache or Zenodo.
 
+// Taken from the crate rather than spelled again, so a rename cannot leave
+// these tests asserting the old name and passing.
+use aruna::export::PACKAGE;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -125,14 +134,32 @@ fn assert_no_panic(out: &Output) {
 }
 
 /// Anything left half-written, under any name.
+///
+/// The two things a run is *supposed* to leave are not leftovers: the
+/// inventory, and the package directory beside it. Everything else in the
+/// output directory is something that should not be there.
 fn leftovers(dir: &Path) -> Vec<String> {
     fs::read_dir(dir)
         .into_iter()
         .flatten()
         .flatten()
         .map(|e| e.file_name().to_string_lossy().to_string())
-        .filter(|name| name != OUTPUT)
+        .filter(|name| name != OUTPUT && name != PACKAGE)
         .collect()
+}
+
+/// The package a run wrote: its root, the CTH folders in it, and its own
+/// inventory.
+fn package(downloads: &Path) -> (PathBuf, usize, PathBuf) {
+    let root = downloads.join(PACKAGE);
+    let groups = fs::read_dir(&root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .count();
+    let inventory = root.join(OUTPUT);
+    (root, groups, inventory)
 }
 
 #[test]
@@ -221,6 +248,66 @@ fn the_command_line_is_not_read_and_arguments_change_nothing() {
     }
 }
 
+/// **The run writes the corpus, not only a list of it.**
+///
+/// The contract this test exists for: one run, two artifacts. Until 2.2.0 the
+/// binary wrote the inventory and stopped, and the table it wrote had nothing
+/// to click — the export that turns the archive into folders of documents was
+/// reachable only by `cargo run --example export_beta`. A reader who installed
+/// the application never saw it.
+#[test]
+fn an_ordinary_run_also_writes_the_package_beside_the_inventory() {
+    let sandbox = Sandbox::new();
+    let out = sandbox.run(&sandbox.corpus());
+    assert_no_panic(&out);
+    assert!(out.status.success(), "{}", stderr(&out));
+
+    let (root, groups, inventory) = package(&sandbox.downloads());
+    assert!(root.is_dir(), "no package at {}", root.display());
+    assert_eq!(groups, 2, "one directory per CTH group of the archive");
+    assert!(
+        inventory.is_file(),
+        "the package carries no inventory of its own"
+    );
+
+    // The documents themselves, under the group they belong to.
+    for (group, siglum) in [("CTH 5", "KBo 1.1"), ("CTH 9", "KUB 2.1")] {
+        let document = root.join(group).join(format!("{siglum}.xml"));
+        assert!(document.is_file(), "no {}", document.display());
+        let xml = fs::read_to_string(&document).expect("read");
+        assert!(
+            xml.starts_with("<?xml"),
+            "the document lost its declaration"
+        );
+        assert!(xml.contains(siglum), "the document is not the one named");
+    }
+
+    // The difference between the two inventories, and the whole point of the
+    // package: this one links at the documents beside it.
+    let linked = fs::read_to_string(&inventory).expect("read");
+    assert!(
+        linked.contains("href=\"./CTH%205/KBo%201.1.xml\""),
+        "the package's inventory does not link at its documents"
+    );
+    let standalone = fs::read_to_string(sandbox.output()).expect("read");
+    assert!(
+        !standalone.contains("href=\""),
+        "the standalone inventory links at files that are not beside it"
+    );
+
+    // And the run says where both went, because a reader cannot click what
+    // they were not told about.
+    let said = stdout(&out);
+    assert!(
+        said.contains(&sandbox.output().display().to_string()),
+        "stdout does not name the inventory: {said}"
+    );
+    assert!(
+        said.contains(&root.display().to_string()),
+        "stdout does not name the package: {said}"
+    );
+}
+
 #[test]
 fn a_second_run_replaces_the_inventory_rather_than_adding_to_it() {
     let sandbox = Sandbox::new();
@@ -242,11 +329,14 @@ fn a_second_run_replaces_the_inventory_rather_than_adding_to_it() {
         0,
         "the second run produced a different amount of inventory"
     );
+    // Two entries, not three: the inventory and the package, each replaced
+    // rather than added to.
     assert_eq!(
         fs::read_dir(sandbox.downloads()).expect("read").count(),
-        1,
-        "a second run left more than the inventory behind"
+        2,
+        "a second run left more than the inventory and the package behind"
     );
+    assert!(leftovers(&sandbox.downloads()).is_empty());
 }
 
 #[test]
@@ -567,9 +657,10 @@ fn repeated_runs_do_not_accumulate_anything() {
 
         assert_eq!(
             fs::read_dir(sandbox.downloads()).expect("read").count(),
-            1,
-            "after run {run} the Downloads folder holds more than the inventory"
+            2,
+            "after run {run} the Downloads folder holds more than the two artifacts"
         );
+        assert!(leftovers(&sandbox.downloads()).is_empty(), "run {run}");
         let cached = fs::read_dir(&cache).map(|d| d.count()).unwrap_or(0);
         assert!(
             cached <= 1,

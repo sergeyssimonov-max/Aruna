@@ -16,7 +16,7 @@
 //! [`Job`] and returns a report:
 //!
 //! ```text
-//!   CLI ──┐
+//!   CLI ──┐     app::build_corpus(…)     ──►  both of the below, one archive
 //!         ├──►  app::build_inventory(…)  ──►  archive, html, paths
 //!   Tauri ┘     app::build_package(…)    ──►  export, presentation, manifest
 //!         ▲              │
@@ -135,6 +135,98 @@ pub fn build_package(request: &PackageRequest, job: &Job<'_>) -> Result<PackageR
         groups: built.groups,
         disambiguated: built.disambiguated,
         stylesheet_dropped: built.stylesheet_dropped,
+    })
+}
+
+/// Build both artifacts from one archive: the inventory, and the package.
+///
+/// What the binary does. The two scenarios above are the halves — this is the
+/// whole, and it exists because the halves were never wired together: the
+/// program wrote the inventory and nothing else, while the export that turns
+/// the corpus into folders of documents was reachable only from an example.
+/// A reader who opened the inventory found a table with nothing to click.
+#[derive(Debug, Clone, Default)]
+pub struct CorpusRequest {
+    /// An archive to read instead of downloading one. As [`InventoryRequest`].
+    pub local_archive: Option<PathBuf>,
+}
+
+/// What building the corpus came to: one report for each artifact.
+///
+/// Kept as the two reports rather than flattened into one struct with six
+/// fields. They are answers to different questions — how many manuscripts the
+/// inventory lists, and what the package on disk contains — and a caller that
+/// wants only one should not have to know which fields belong to which.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CorpusReport {
+    pub job: JobId,
+    pub inventory: InventoryReport,
+    pub package: PackageReport,
+}
+
+/// Both artifacts, from one archive, in one run.
+///
+/// **The archive is resolved once.** [`crate::run`] would fetch or open it
+/// again, and the export a third time; resolving here and handing the same
+/// path to both means one download, one cache lookup, one digest check. The
+/// two passes that remain are over the bytes on disk, and they read different
+/// things out of them — records for the inventory, fragments and placements
+/// for the package — which is why they are two passes and not one.
+///
+/// **The inventory is written first, and that is the order cancellation
+/// needs.** Stopping in the middle of the package leaves the inventory
+/// standing and no half-package behind it: the export builds under a staging
+/// name and takes the final one last. Stopping the other way round would leave
+/// a package whose inventory was never written.
+pub fn build_corpus(request: &CorpusRequest, job: &Job<'_>) -> Result<CorpusReport> {
+    let source = match &request.local_archive {
+        Some(path) => crate::cache::Archive::Cached(path.clone()),
+        None => crate::obtain_archive(
+            crate::download::ZENODO_ZIP_URL,
+            crate::download::ZENODO_ZIP_MD5,
+            job,
+        )?,
+    };
+
+    // Both phases are handed the resolved path, so neither downloads.
+    let archive = source.path().to_path_buf();
+
+    let inventory = build_inventory(
+        &InventoryRequest {
+            local_archive: Some(archive.clone()),
+        },
+        job,
+    )?;
+
+    // Beside the inventory, from the same helper that decided where the
+    // inventory goes — so an overridden `HOME` moves both together.
+    let destination = inventory
+        .output
+        .parent()
+        .ok_or_else(|| ArunaError::DownloadsDir)?
+        .to_path_buf();
+
+    let package = build_package(
+        &PackageRequest {
+            archive: archive.clone(),
+            destination,
+            source_label: crate::SOURCE_LABEL.to_string(),
+        },
+        job,
+    )?;
+
+    // This run's own copy, if that is what it was: the inventory phase was
+    // handed it as `Cached` and so left it alone.
+    if let crate::cache::Archive::Temporary(path) = &source {
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::remove_dir_all(dir);
+        }
+    }
+
+    Ok(CorpusReport {
+        job: job.id(),
+        inventory,
+        package,
     })
 }
 

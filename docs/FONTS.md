@@ -29,6 +29,24 @@ copy, so the specification below and the documents cannot drift apart.
 The six are the whole of the remaining problem and have a section of their own
 at the end. Everything else is settled.
 
+**How much of the corpus each touches**, counted over the 23 936 documents the
+package holds (2026-08-24):
+
+| | documents |
+|---|---|
+| carry cuneiform proper, U+12000–U+1247F | 23 581 |
+| carry one of the five no font draws | **990** — and 976 of those are U+100009 alone |
+| carry U+100000, which only an installed `UllikummiA` draws | 370 |
+| carry U+E83A, which only a face this stack refuses would draw | 1 |
+
+**Rendered rather than inferred, 2026-08-24.** The `cmap` audit says a glyph
+exists; it does not say a browser picks it. Both were checked in Chrome against
+a document of the real corpus: cuneiform renders identically with the declared
+stack and with no font declared at all — macOS falls back to Noto Sans
+Cuneiform, which is a system face — so the package's XML documents display
+correctly even though they carry no stylesheet. The five uncovered points
+render as LastResort's striped box, exactly as the audit predicts.
+
 The wording of the last row is deliberate. On macOS those six are not blank:
 `LastResort.otf` puts a placeholder box in their place, which is a marker
 meaning *nothing can render this* rather than a rendering. The audit keeps that
