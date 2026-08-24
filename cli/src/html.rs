@@ -81,8 +81,11 @@ const COLUMNS: [Column; 6] = [
 /// `generated_at` — already-formatted local date/time string.
 /// The inventory as the CLI writes it: a document that stands on its own.
 ///
-/// Nothing is linked, because there is nothing beside it to link to — the file
-/// lands in `~/Downloads` on its own.
+/// Nothing is linked, because nothing is placed beside it: this renderer is
+/// handed a presentation without hrefs. It was what the program wrote until
+/// 2.3.0, and what it writes now is the package's own inventory —
+/// [`render_linked_html`] — which links at the documents around it. This one
+/// remains as a library capability, exercised by `tests/integration.rs`.
 pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &str) -> String {
     render(&CorpusPresentation::plain(records, source), generated_at)
 }

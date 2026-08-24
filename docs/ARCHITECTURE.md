@@ -74,11 +74,21 @@ Zenodo / local .zip
                   └─ (future) PDF         §6
 ```
 
-**One run drives both branches since 2.2.0.** `app::build_corpus` resolves the
-archive once and hands the same path to each: the inventory first, then the
-package beside it in the same directory. Until then the binary drove only the
-first branch and the second was reachable from an example — the program wrote a
-table of the corpus and never the corpus itself.
+**The binary drives the export branch, and only it, since 2.3.0.**
+`app::build_corpus` resolves the archive and builds the package into the
+reader's Downloads folder; the inventory a reader opens is the one inside it,
+which links at every document.
+
+Two releases were spent getting there. Until 2.2.0 the binary drove only the
+first branch — it wrote a table of the corpus and never the corpus itself,
+because the export was reachable from an example and nothing else. 2.2.0 wired
+the second branch in and wrote both, which put two files called
+`TLHdig_Beta_0.3.html` in one folder, and the one without links is the one a
+reader opens first. 2.3.0 gave the standalone one up.
+
+The library can still produce it: `crate::run` writes the unlinked inventory and
+`tests/integration.rs` exercises it. What is gone is the application scenario
+that had no caller left.
 
 `presentation` is the single fan-out point, and that is the property to keep:
 there is no path from XML to a rendered artefact that goes around it. The

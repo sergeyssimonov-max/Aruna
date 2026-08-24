@@ -2,13 +2,13 @@
 
 Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (Hittite cuneiform transliterations).
 
-Two programs share one parser. The CLI downloads the corpus from Zenodo and writes a standalone HTML inventory; the desktop application opens the same corpus in a window. The parser in [`cli/`](cli/) is the source of truth for both.
+Two programs share one parser. The CLI downloads the corpus from Zenodo and writes it out as a folder of normalised documents with an inventory over them; the desktop application opens the same corpus in a window. The parser in [`cli/`](cli/) is the source of truth for both.
 
 ## Layout
 
 | Path | Description |
 |------|-------------|
-| [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → HTML inventory. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
+| [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → a folder of documents with an HTML inventory over them. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
 | [`frontend/`](frontend/) | Desktop UI — Svelte 5, Vite, TypeScript, no SvelteKit |
 | [`src-tauri/`](src-tauri/) | The Tauri 2 shell the UI runs in, and the Rust side it talks to |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
@@ -22,7 +22,7 @@ Builds and is tested on macOS 13+ and Linux — both run in CI. Windows is untri
 ```bash
 cd cli
 cargo build --release        # any supported platform
-./target/release/aruna       # → ~/Downloads/TLHdig_Beta_0.3.html
+./target/release/aruna       # → ~/Downloads/TLHdig_Beta_0.3/ — open TLHdig_Beta_0.3.html inside it
 ```
 
 The first run downloads 71 MiB from Zenodo and keeps it in the OS cache directory, so later runs take about two seconds and need no network. `ARUNA_ZIP=/path/to.zip` uses a local archive instead. Details in [`cli/README.md`](cli/README.md).
@@ -88,7 +88,7 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) carries the 2.x one — the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. From 2.2.0 the program writes that folder itself: until then the export existed in the crate and only an example called it.
+[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) carries the 2.x one — the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. From 2.2.0 the program writes that folder itself: until then the export existed in the crate and only an example called it. 2.3.0 gave up the standalone inventory that had been written beside it — two files of the same name in one folder, and the one a reader opens first was the one without links.
 
 Three, spread across the project rather than clustered at its end, which is what makes them useful: a fault introduced this week is bracketed by v2.1.0, and one that turns out to be much older still has a floor under it.
 

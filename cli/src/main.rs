@@ -32,15 +32,16 @@ fn main() -> ExitCode {
     };
     match aruna::app::build_corpus(&request, &job) {
         Ok(report) => {
-            // Two artifacts, named separately: one is a file to open, the other
-            // a folder to browse, and a reader who wants the second should not
-            // have to infer it from the first.
+            // Two paths, named separately: the folder to browse, and the file
+            // inside it to open. The inventory sits under the package root
+            // rather than beside it, and a reader should not have to guess
+            // which of the files in there is the one to open.
             println!("Готово.");
-            println!("  Опись:  {}", report.inventory.output.display());
             println!("  Корпус: {}", report.package.root.display());
+            println!("  Опись:  {}", report.inventory.display());
             println!(
-                "  рукописей: {}, групп: {}, документов в папках: {}",
-                report.inventory.manuscripts, report.inventory.groups, report.package.documents
+                "  рукописей: {}, групп: {}",
+                report.package.documents, report.package.groups
             );
             ExitCode::SUCCESS
         }

@@ -271,7 +271,7 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
     assert!(out.status.success(), "the run failed:\n{stderr}");
     assert!(!stderr.contains("panicked"), "the run panicked:\n{stderr}");
 
-    let inventory = downloads.join("TLHdig_Beta_0.3.html");
+    let inventory = downloads.join(PACKAGE).join("TLHdig_Beta_0.3.html");
     let written = std::fs::read_to_string(&inventory).expect("the inventory");
     assert!(
         written.trim_end().ends_with("</html>"),

@@ -16,13 +16,20 @@
 //! [`Job`] and returns a report:
 //!
 //! ```text
-//!   CLI ──┐     app::build_corpus(…)     ──►  both of the below, one archive
-//!         ├──►  app::build_inventory(…)  ──►  archive, html, paths
-//!   Tauri ┘     app::build_package(…)    ──►  export, presentation, manifest
+//!   CLI ──┐     app::build_corpus(…)     ──►  the whole run, one archive
+//!         ├──►  app::build_package(…)    ──►  export, presentation, manifest
+//!   Tauri ┘              │
 //!         ▲              │
 //!         └── Report ────┘   typed, owned, and free of anything a window
 //!                            cannot be handed
 //! ```
+//!
+//! There was a third, `build_inventory`, for the standalone inventory the
+//! program wrote beside the package. That artifact was given up in 2.3.0 — two
+//! files of the same name in one folder, one of them linkless — and the
+//! scenario went with it rather than being left as a public function nothing
+//! calls. The library can still write one: `crate::run` is what it wraps, and
+//! `tests/integration.rs` exercises it.
 //!
 //! **Owned, not borrowed.** Everything below this module borrows, because it
 //! runs in one pass over data the caller holds. A report is the opposite: it
@@ -39,29 +46,25 @@
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, JobId, Phase};
 use crate::progress::Event;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-/// Build the standalone inventory the CLI writes to `~/Downloads`.
-///
-/// The whole of what `main` used to do, minus the printing.
-#[derive(Debug, Clone, Default)]
-pub struct InventoryRequest {
-    /// An archive to read instead of downloading one.
-    ///
-    /// `None` means the pinned Zenodo record, through the cache. Tests and
-    /// offline runs pass a path; so will a window that lets someone choose a
-    /// file they already have.
-    pub local_archive: Option<PathBuf>,
-}
+/// Build the package, and say what is in it.
+pub fn build_package(request: &PackageRequest, job: &Job<'_>) -> Result<PackageReport> {
+    let built = crate::export::build(
+        &request.archive,
+        &request.destination,
+        &request.source_label,
+        job,
+    )?;
 
-/// What building the inventory came to.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InventoryReport {
-    pub job: JobId,
-    /// The document that was written.
-    pub output: PathBuf,
-    pub manuscripts: usize,
-    pub groups: usize,
+    Ok(PackageReport {
+        job: job.id(),
+        root: request.destination.join(crate::export::PACKAGE),
+        documents: built.documents,
+        groups: built.groups,
+        disambiguated: built.disambiguated,
+        stylesheet_dropped: built.stylesheet_dropped,
+    })
 }
 
 /// Build the package: a folder of documents with an inventory over them.
@@ -97,88 +100,44 @@ pub struct PackageReport {
     pub stylesheet_dropped: usize,
 }
 
-/// Read the corpus and write the standalone inventory.
+/// Build the corpus: the package, and the inventory inside it.
 ///
-/// Reports `Indexed` on the way through, so a window can show what was found
-/// before the document is written.
-pub fn build_inventory(request: &InventoryRequest, job: &Job<'_>) -> Result<InventoryReport> {
-    let output = crate::run(request.local_archive.as_deref(), job)?;
-
-    // Counted from the document just written rather than by parsing the archive
-    // a second time. `run` does not hand these back — it returns a path,
-    // because that is what its caller has always needed — and re-reading 71 MiB
-    // to learn a number the run already knew would be the most expensive line
-    // in this module.
-    let (manuscripts, groups) = counts_from_inventory(&output)?;
-
-    Ok(InventoryReport {
-        job: job.id(),
-        output,
-        manuscripts,
-        groups,
-    })
-}
-
-/// Build the package, and say what is in it.
-pub fn build_package(request: &PackageRequest, job: &Job<'_>) -> Result<PackageReport> {
-    let built = crate::export::build(
-        &request.archive,
-        &request.destination,
-        &request.source_label,
-        job,
-    )?;
-
-    Ok(PackageReport {
-        job: job.id(),
-        root: request.destination.join(crate::export::PACKAGE),
-        documents: built.documents,
-        groups: built.groups,
-        disambiguated: built.disambiguated,
-        stylesheet_dropped: built.stylesheet_dropped,
-    })
-}
-
-/// Build both artifacts from one archive: the inventory, and the package.
+/// What the binary does. The export has been in this crate since the 2.x line
+/// opened and the binary never called it — a reader who installed the
+/// application got a table with nothing to click, because the folders of
+/// normalised documents it would have linked at were reachable only from an
+/// example.
 ///
-/// What the binary does. The two scenarios above are the halves — this is the
-/// whole, and it exists because the halves were never wired together: the
-/// program wrote the inventory and nothing else, while the export that turns
-/// the corpus into folders of documents was reachable only from an example.
-/// A reader who opened the inventory found a table with nothing to click.
+/// **One inventory, not two.** Until 2.3.0 a run also wrote a standalone
+/// inventory beside the package, under the same name and without links: the
+/// artifact from before there was anything to link to. Two files called
+/// `TLHdig_Beta_0.3.html` in one folder, one of them linkless, is a trap — it
+/// is the one a reader opens first, and it is the one that looks as though the
+/// links are missing. The package's own inventory is the inventory now.
 #[derive(Debug, Clone, Default)]
 pub struct CorpusRequest {
-    /// An archive to read instead of downloading one. As [`InventoryRequest`].
+    /// An archive to read instead of downloading one.
+    ///
+    /// `None` means the pinned Zenodo record, through the cache. Tests and
+    /// offline runs pass a path; so will a window that lets someone choose a
+    /// file they already have.
     pub local_archive: Option<PathBuf>,
 }
 
-/// What building the corpus came to: one report for each artifact.
-///
-/// Kept as the two reports rather than flattened into one struct with six
-/// fields. They are answers to different questions — how many manuscripts the
-/// inventory lists, and what the package on disk contains — and a caller that
-/// wants only one should not have to know which fields belong to which.
+/// What building the corpus came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CorpusReport {
     pub job: JobId,
-    pub inventory: InventoryReport,
+    /// The package, and what is in it.
     pub package: PackageReport,
+    /// The inventory inside it — the file a reader opens.
+    pub inventory: PathBuf,
 }
 
-/// Both artifacts, from one archive, in one run.
-///
-/// **The archive is resolved once.** [`crate::run`] would fetch or open it
-/// again, and the export a third time; resolving here and handing the same
-/// path to both means one download, one cache lookup, one digest check. The
-/// two passes that remain are over the bytes on disk, and they read different
-/// things out of them — records for the inventory, fragments and placements
-/// for the package — which is why they are two passes and not one.
-///
-/// **The inventory is written first, and that is the order cancellation
-/// needs.** Stopping in the middle of the package leaves the inventory
-/// standing and no half-package behind it: the export builds under a staging
-/// name and takes the final one last. Stopping the other way round would leave
-/// a package whose inventory was never written.
+/// The corpus, from one archive, in one run.
 pub fn build_corpus(request: &CorpusRequest, job: &Job<'_>) -> Result<CorpusReport> {
+    let destination = crate::paths::downloads_dir()?;
+
     let source = match &request.local_archive {
         Some(path) => crate::cache::Archive::Cached(path.clone()),
         None => crate::obtain_archive(
@@ -188,68 +147,34 @@ pub fn build_corpus(request: &CorpusRequest, job: &Job<'_>) -> Result<CorpusRepo
         )?,
     };
 
-    // Both phases are handed the resolved path, so neither downloads.
-    let archive = source.path().to_path_buf();
-
-    let inventory = build_inventory(
-        &InventoryRequest {
-            local_archive: Some(archive.clone()),
-        },
-        job,
-    )?;
-
-    // Beside the inventory, from the same helper that decided where the
-    // inventory goes — so an overridden `HOME` moves both together.
-    let destination = inventory
-        .output
-        .parent()
-        .ok_or_else(|| ArunaError::DownloadsDir)?
-        .to_path_buf();
-
     let package = build_package(
         &PackageRequest {
-            archive: archive.clone(),
+            archive: source.path().to_path_buf(),
             destination,
             source_label: crate::SOURCE_LABEL.to_string(),
         },
         job,
-    )?;
+    );
 
-    // This run's own copy, if that is what it was: the inventory phase was
-    // handed it as `Cached` and so left it alone.
+    // This run's own copy of the archive, if that is what it was — cleared
+    // whether the build succeeded or not, because either way nothing else will
+    // read it.
     if let crate::cache::Archive::Temporary(path) = &source {
         if let Some(dir) = path.parent() {
             let _ = std::fs::remove_dir_all(dir);
         }
     }
 
+    let package = package?;
+    let inventory = package
+        .root
+        .join(format!("{}.html", crate::export::PACKAGE));
+
     Ok(CorpusReport {
         job: job.id(),
         inventory,
         package,
     })
-}
-
-/// The two counts the inventory prints, read back out of it.
-///
-/// The document states them in one line, in a shape `html::write_summary`
-/// writes and nothing else produces. Reading them back is cheap — the file is
-/// under a megabyte — and it keeps this module from being a second opinion
-/// about what the corpus contains.
-fn counts_from_inventory(path: &Path) -> Result<(usize, usize)> {
-    let html = std::fs::read_to_string(path).map_err(|source| ArunaError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let after = |needle: &str| -> usize {
-        html.split_once(needle)
-            .and_then(|(_, rest)| {
-                let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
-                digits.parse().ok()
-            })
-            .unwrap_or(0)
-    };
-    Ok((after("Manuscripts: "), after("Groups (CTH): ")))
 }
 
 // ---------------------------------------------------------------------------
@@ -359,6 +284,7 @@ mod tests {
     use super::*;
     use crate::job::Cancel;
     use crate::progress::Silent;
+    use std::path::Path;
     use tempfile::tempdir;
 
     fn archive(dir: &Path, n: usize) -> PathBuf {

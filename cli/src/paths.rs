@@ -17,9 +17,18 @@ pub const OUTPUT_FILE_NAME: &str = "TLHdig_Beta_0.3.html";
 
 /// Resolve `~/Downloads/TLHdig_Beta_0.3.html`.
 pub fn output_html_path() -> Result<PathBuf> {
-    let downloads = dirs::download_dir().or_else(|| dirs::home_dir().map(|h| h.join("Downloads")));
-    let dir = downloads.ok_or(ArunaError::DownloadsDir)?;
-    Ok(dir.join(OUTPUT_FILE_NAME))
+    Ok(downloads_dir()?.join(OUTPUT_FILE_NAME))
+}
+
+/// Where the program writes: the reader's Downloads folder.
+///
+/// The one place that decides it. `HOME` moves it, which is what makes the
+/// tests hermetic — they set `HOME` to a temporary directory and everything
+/// this program writes goes there with it.
+pub fn downloads_dir() -> Result<PathBuf> {
+    dirs::download_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
+        .ok_or(ArunaError::DownloadsDir)
 }
 
 /// Sibling scratch path: `<name>.<pid>.<n>.part`, beside `path`.

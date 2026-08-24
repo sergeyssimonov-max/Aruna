@@ -345,14 +345,17 @@ fn the_binary_reports_the_same_run_on_stderr() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success(), "the run failed:\n{stderr}");
 
+    // The export's own first two stages, in order. The run used to open with
+    // "Parsing XML manuscripts" — that was the standalone inventory's phase,
+    // and there is no standalone inventory since 2.3.0.
     let started = stderr
-        .find("Parsing XML manuscripts")
-        .expect("the run says it started parsing");
-    let indexed = stderr
-        .find("Indexed ")
-        .expect("the run says what it indexed");
+        .find("Reading headers")
+        .expect("the run says it started reading");
+    let counted = stderr
+        .find(" manuscripts in ")
+        .expect("the run says what it found");
     assert!(
-        started < indexed,
+        started < counted,
         "the run reported what it found before it reported starting:\n{stderr}"
     );
     assert!(!stderr.contains("panicked"), "the run panicked:\n{stderr}");
