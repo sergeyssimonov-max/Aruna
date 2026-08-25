@@ -31,7 +31,7 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 cd cli
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus)'   # 369
+cargo nextest run --profile ci -E 'not binary(corpus)'   # 379
 ```
 
 ### Standard — about 25 s
@@ -155,6 +155,33 @@ cargo deny check
 cargo machete
 ```
 
+### The declared minimum compiler
+
+`rust-version` is not decoration: Cargo reads it when resolving, so a number
+below the truth widens the search to versions that cannot build here. Both
+manifests were checked on 2026-08-25 by compiling with the toolchain each
+declares.
+
+```sh
+rustup toolchain install 1.86 --profile minimal
+cargo +1.86 check --locked --manifest-path cli/Cargo.toml --all-targets
+```
+
+`cli` declares **1.86** and builds on it; CI runs exactly this on every push, so
+the claim cannot quietly stop being true.
+
+`src-tauri` declared **1.77.2**, which was impossible: that Cargo cannot even
+parse the locked tree — a dependency needs edition 2024, stabilised in 1.85 —
+and `darling` and the `icu_*` crates require 1.88. Corrected to **1.88**,
+measured the same way. It is not checked in CI: building the Tauri shell needs
+the GTK and WebKit stack no other job installs, and paying for that to verify
+one number is the wrong trade. Re-measure it by hand when the dependency tree
+moves:
+
+```sh
+cargo +1.88 check --locked --manifest-path src-tauri/Cargo.toml
+```
+
 ### Frontend — about 2 s, needs `pnpm`
 
 A second suite, in a second language, for the part of the program that is not
@@ -163,7 +190,7 @@ exported inventory carries.
 
 ```sh
 cd frontend
-pnpm check          # svelte-check over the app, tsc over the configs and node tests
+pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
 pnpm test:unit      # 53
@@ -179,6 +206,7 @@ fold controls against a document built in the shape `cli/src/html.rs` writes.
 | `tests/font-stack.test.ts` | the cuneiform stack in `src/inventory/canonical.css` and `src/app.css` name the same faces, in the same order |
 | `tests/readme-links.test.ts` | every link in the seven documents resolves |
 | `tests/one-frontend-stack.test.ts` | React is in no manifest, no lock file, no source file and no artifact — and the stack is Svelte without SvelteKit |
+| `tsconfig.e2e.json` | the E2E contour — `e2e/*.e2e.ts` and `wdio.conf.ts` — which no project covered until 2026-08-25. It found both a `wdio.conf.ts` annotated with `Options.Testrunner` (a standalone-session type with no `capabilities` key) and an import of `@wdio/types` that was never declared as a dependency and survived only because it is type-only |
 | `tests/spec-guard.test.ts` | the decisions `tauri-frontend-spec-v3.md` fixed — the pnpm pin, the `safari16` floor, the identifier and bundle targets, matching window and document titles, a permission for every registered plugin, and the four gates that keep the E2E contour out of a release |
 | `tests/inventory-artifact.test.ts` | everything in `cli/src/generated/` — the script and the three stylesheet sections — is byte-for-byte what `frontend/src/inventory/` now builds, builds the same twice, and carries none of the bundler's leavings |
 

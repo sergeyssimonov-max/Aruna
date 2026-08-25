@@ -299,7 +299,10 @@ What remains is a JSON catalogue with three callers inside the crate
 machine-readable export independent of any browser, kept for that reason. Its
 comments and the test's assertion messages named the deleted script throughout
 and were rewritten on 2026-08-23 to describe the format rather than a reader
-that no longer exists.
+that no longer exists — and again on 2026-08-25, for two the first pass had
+missed: a test's doc comment and the failure text beside it still said the
+script *refuses* a label, in the present tense, which is a diagnosis pointing at
+a file the reader cannot open.
 
 **Vercel.** The site was deployed from `src/`. Removing the source does not take
 a running deployment down by itself, but it orphans the project and the next
