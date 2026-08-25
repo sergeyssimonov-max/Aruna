@@ -99,8 +99,8 @@ future frontend DTO.
 ## 5. Application services, progress, cancellation, errors
 
 `app` holds the user-visible scenarios as typed request/report pairs —
-`InventoryRequest` → `InventoryReport`, `PackageRequest` → `PackageReport` —
-and `app::Failure` carries a partial result: a run that produced something and
+`CorpusRequest` → `CorpusReport` for the whole run the binary drives, and
+`PackageRequest` → `PackageReport` for the export it is built on — and `app::Failure` carries a partial result: a run that produced something and
 also has something to say about it. Phases are explicit, so a failure names the
 stage it happened in.
 
@@ -139,7 +139,7 @@ At `app`, and the wiring has been compiled rather than imagined. Adding
 aruna_core = { package = "aruna", path = "../cli" }
 ```
 
-to `src-tauri/Cargo.toml` makes `aruna_core::app::build_inventory`,
+to `src-tauri/Cargo.toml` makes `aruna_core::app::build_corpus`,
 `job::{Cancel, Job}` and `progress::Progress` reachable from the shell; both
 packages being named `aruna` is not an obstacle, because their library names
 differ (`aruna` and `aruna_lib`). Verified on 2026-08-23 and then reverted: an

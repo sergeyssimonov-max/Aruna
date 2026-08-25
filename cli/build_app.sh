@@ -175,13 +175,29 @@ PLIST
 plutil -lint "${APP_DIR}/Contents/Info.plist" >/dev/null
 echo -n "APPL????" > "${APP_DIR}/Contents/PkgInfo"
 
-if command -v codesign >/dev/null 2>&1; then
-  echo "==> Ad-hoc codesign"
-  codesign --force --deep --sign - "${APP_DIR}" || true
+# Ad-hoc, not Developer ID: this project has no paid Apple membership, so the
+# DMG it publishes is not notarized and Gatekeeper refuses it on first open —
+# README says so beside the download link, with the two ways through.
+#
+# What the signature still has to do is be there and be valid. An unsigned
+# universal binary is refused outright on Apple Silicon, which is a broken
+# release rather than an inconvenient one, and `|| true` here used to let that
+# out of the door quietly: the build printed its heading, codesign failed, and
+# the .app looked finished. Failing the build is the honest outcome.
+#
+# `codesign` ships with the command line tools, which is also what `lipo` and
+# `plutil` above come from — a machine that can reach this line has it, and one
+# that does not should stop rather than produce an unsigned bundle.
+if ! command -v codesign >/dev/null 2>&1; then
+  echo "error: codesign not found. Install the Xcode command line tools: xcode-select --install" >&2
+  exit 1
 fi
+echo "==> Ad-hoc codesign"
+codesign --force --deep --sign - "${APP_DIR}"
+codesign --verify --deep --strict "${APP_DIR}"
 
 echo ""
 echo "Готово: ${APP_DIR}"
 lipo -info "${APP_DIR}/Contents/MacOS/${APP_NAME}"
-echo "Запуск: open \"${APP_DIR}\""
 echo "CLI:    \"${APP_DIR}/Contents/MacOS/${APP_NAME}\""
+echo "Это консольная программа: двойной клик отработает молча, вывод — только в терминале."

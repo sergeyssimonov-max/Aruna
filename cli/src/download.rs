@@ -18,6 +18,28 @@ pub const ZENODO_ZIP_URL: &str =
 /// If Zenodo ever republishes the archive this has to be updated together with
 /// [`ZENODO_ZIP_URL`]; the mismatch error prints both digests, so the diagnosis
 /// is immediate.
+///
+/// **What a republish costs, decided before it happens.** Every copy of this
+/// program already installed stops working on that day: a moved record answers
+/// 404 and a re-cut file fails this digest, and neither is recoverable on the
+/// reader's machine — the pin is compiled in. So the answer is a release, not a
+/// note in an issue:
+///
+/// 1. take the new URL and the MD5 Zenodo publishes beside it, and update both
+///    constants here in one commit — they are a pair, and a URL updated alone
+///    turns a clear 404 into a mismatch that looks like corruption;
+/// 2. replace `cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip` with the new
+///    archive, so the corpus job and the fixture tests measure what readers get,
+///    and re-record any digest the tests carry;
+/// 3. expect the corpus numbers to move. 663 groups and 23 936 documents are
+///    asserted in several places, and a republished corpus is a different
+///    corpus; the numbers are updated deliberately, with the new ones read off
+///    a real run, and never loosened into ranges to avoid the work;
+/// 4. cut a release. `main.rs` sends both failures at the reader to
+///    `releases/latest`, which is the only fix they can apply.
+///
+/// A republish that changes only packaging (same documents, new digest) still
+/// takes all four steps; only step 3 comes back unchanged.
 pub const ZENODO_ZIP_MD5: &str = "f9acbc8db3111cc7dd88d82f7819a912";
 
 /// Attempts per download before giving up.

@@ -2,18 +2,28 @@
 
 Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (Hittite cuneiform transliterations).
 
-Two programs share one parser. The CLI downloads the corpus from Zenodo and writes it out as a folder of normalised documents with an inventory over them; the desktop application opens the same corpus in a window. The parser in [`cli/`](cli/) is the source of truth for both.
+**What exists today is a command-line program.** It downloads the corpus from
+Zenodo and writes it out as a folder of normalised documents with an inventory
+over them, in `~/Downloads`. That program is [`cli/`](cli/), it is what the
+releases ship, and it is the whole of the product.
+
+**A desktop application is being built and is not finished.**
+[`frontend/`](frontend/) and [`src-tauri/`](src-tauri/) hold the stack it will
+be built on — the toolchain is installed, pinned and under CI — but the window
+still shows the Svelte template it was scaffolded with, there is no Tauri
+command in the shell, and nothing in it reaches the corpus. Read those two
+directories as work in progress, not as a second program you can run.
 
 ## Layout
 
 | Path | Description |
 |------|-------------|
 | [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → a folder of documents with an HTML inventory over them. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
-| [`frontend/`](frontend/) | Desktop UI — Svelte 5, Vite, TypeScript, no SvelteKit |
-| [`src-tauri/`](src-tauri/) | The Tauri 2 shell the UI runs in, and the Rust side it talks to |
+| [`frontend/`](frontend/) | **Scaffold, no UI yet** — the stack the desktop application will be built on: Svelte 5, Vite, TypeScript, no SvelteKit. `App.svelte` is still the template |
+| [`src-tauri/`](src-tauri/) | **Scaffold, no commands yet** — the Tauri 2 shell that will host it. It exposes nothing to the window and does not call the parser |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
 
-There was a React web application here until 2026-08-23, served from `src/` with a WASM search module under `wasm/search/`. It has been removed along with the ARUN container built for it; the desktop application replaces it. [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what went and why.
+There was a React web application here until 2026-08-23, served from `src/` with a WASM search module under `wasm/search/`. It has been removed along with the ARUN container built for it; the desktop application is to replace it, once it exists. [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what went and why.
 
 ## CLI (Aruna)
 
@@ -37,7 +47,62 @@ bash scripts/make_release.sh   # Aruna.app + releases/Aruna-macos-universal.dmg
 
 Prebuilt DMG: [Releases](https://github.com/sergeyssimonov-max/Aruna/releases) (Universal Binary).
 
-## Desktop application
+### What the DMG contains, and what double-clicking it does
+
+`Aruna.app` is a command-line program in an application bundle. It has no
+window, no progress bar and no dialogs. Double-clicked from Finder it runs to
+completion and quits: on a good run it leaves `~/Downloads/TLHdig_Beta_0.3/`
+behind and says nothing, and on a bad one — no network, a corrupt archive, a
+full disk — **it says nothing either**. Everything the program prints, including
+the sentence that tells you what to do about the failure, goes to a terminal
+that Finder never gave it.
+
+So run it from a terminal, where those messages reach you:
+
+```bash
+/Applications/Aruna.app/Contents/MacOS/Aruna
+```
+
+A launcher that opens Terminal, or a real window with a progress bar, is the
+desktop application above — it is not built yet, and until it is, this is the
+honest instruction rather than a workaround.
+
+### Gatekeeper
+
+The `.app` is signed ad hoc: enough for macOS to run it locally, not a
+Developer ID, and it is not notarized — this project has no paid Apple
+membership. macOS will therefore refuse it on first open, with *"Aruna cannot
+be opened because the developer cannot be verified"* or *"is damaged and can't
+be opened"*, the second being what a quarantined download usually produces.
+
+Open it once through the exception, or clear the quarantine flag:
+
+```bash
+xattr -d com.apple.quarantine /Applications/Aruna.app   # then run it normally
+```
+
+Finder's route to the same exception: right-click the app → **Open** → **Open**
+in the dialog. On Ventura and later a blocked app can also be allowed under
+**System Settings → Privacy & Security**, where an *"Open Anyway"* button
+appears after the first refusal.
+
+Verify what you are letting through before you do — every release publishes the
+digest of its DMG, and `shasum -a 256 -c SHA256SUMS` beside the downloaded file
+checks it.
+
+## Desktop application — under construction
+
+**There is no desktop application yet.** What is in the tree is the stack it
+will be built on, wired end to end and kept green: `pnpm dev` opens a window,
+and what that window shows is Vite's Svelte template with a counter in it. The
+shell registers no `#[tauri::command]`, so nothing the window could click
+reaches the parser, and the corpus cannot be opened from it.
+
+The commands below therefore build and check the scaffold, not a product. They
+are here because the scaffold is under CI and has to stay buildable; the first
+real command — `build_corpus` with its progress events — is the next piece of
+work, and [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what
+the Rust core still owes it.
 
 pnpm only — the version is pinned by `packageManager` in [`package.json`](package.json), so `corepack` hands every machine the same one.
 
@@ -82,13 +147,21 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 ## Releases
 
-[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) is current, and is also the third of the releases this project keeps as references — states it measures itself against and can fall back to. Everything else has been withdrawn along with its tag and its DMG.
+**[v2.3.0](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
+current release — the one to download.** It is what `Releases` marks *Latest*,
+and it is the only version this project asks anyone to install.
+
+Three older releases are kept as **references**: states this project measures
+itself against and can fall back to when a fault has to be bracketed in time.
+They are baselines for the people working on it, not versions to run — a
+reference is by definition behind. Everything else has been withdrawn along with
+its tag and its DMG.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) carries the 2.x one — the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. From 2.2.0 the program writes that folder itself: until then the export existed in the crate and only an example called it. 2.3.0 gave up the standalone inventory that had been written beside it — two files of the same name in one folder, and the one a reader opens first was the one without links.
+[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) carries the 2.x one, and is the newest of the three — the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. From 2.2.0 the program writes that folder itself: until then the export existed in the crate and only an example called it. 2.3.0 gave up the standalone inventory that had been written beside it — two files of the same name in one folder, and the one a reader opens first was the one without links.
 
 Three, spread across the project rather than clustered at its end, which is what makes them useful: a fault introduced this week is bracketed by v2.1.0, and one that turns out to be much older still has a floor under it.
 
@@ -103,6 +176,7 @@ All three are recorded in [`.github/reference-release.json`](.github/reference-r
 | [`docs/PDF-ACCEPTANCE.md`](docs/PDF-ACCEPTANCE.md) | the criteria a future converter will be held to, written before it exists |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | the shape of the Rust side: the layers, which way they depend, and where a Tauri adapter and a PDF renderer attach |
 | [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) | the agreed desktop stack, what the Rust core still owes it, and what the removal of the React application took with it |
+| [`docs/PROJECT-SPEC.ru.md`](docs/PROJECT-SPEC.ru.md) | the normative specification of the desktop stack — every component pinned, with a status, and the rules a change is accepted under (in Russian) |
 | [`PERFORMANCE.md`](PERFORMANCE.md) | measured numbers, baselines, and the rules for changing them |
 | [`cli/fixtures/xml/MANIFEST.md`](cli/fixtures/xml/MANIFEST.md) | every XML fixture, with a SHA-256 and what it is for |
 

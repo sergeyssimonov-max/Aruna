@@ -152,11 +152,27 @@ chmod +x build_app.sh
   `LSMinimumSystemVersion = 13.0`, `CFBundleIconFile = AppIcon`;
 - ad-hoc `codesign`.
 
-Результат: `./Aruna.app` — запуск двойным кликом или:
+Результат: `./Aruna.app`. Это **консольная программа в бандле**: ни окна, ни
+полосы прогресса, ни диалогов. Двойной клик из Finder отработает молча — при
+удаче в `~/Downloads` появится папка корпуса, при неудаче (нет сети, битый
+архив, кончилось место) **не появится ничего и не будет сказано ничего**: всё,
+что программа печатает, включая совет, что с этой ошибкой делать, уходит в
+терминал, которого Finder ей не дал.
+
+Поэтому запускать стоит из терминала:
 
 ```bash
-open Aruna.app
-# / «Aruna.app/Contents/MacOS/Aruna»
+Aruna.app/Contents/MacOS/Aruna     # собранный здесь
+/Applications/Aruna.app/Contents/MacOS/Aruna   # установленный из DMG
+```
+
+Подпись — **ad-hoc**, не Developer ID, и без нотаризации: платного членства в
+Apple Developer Program у проекта нет. Gatekeeper на первом открытии скачанного
+`.app` откажет («не удаётся проверить разработчика» или «повреждён»). Обход:
+правый клик → **Открыть** → **Открыть**, либо снять карантин:
+
+```bash
+xattr -d com.apple.quarantine /Applications/Aruna.app
 ```
 
 ---

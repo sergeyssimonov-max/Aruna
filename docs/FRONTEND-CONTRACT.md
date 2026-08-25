@@ -34,9 +34,15 @@ directories.
 Everything in this repository is aimed at one description. When a change is
 proposed, this is what it is measured against.
 
-**The program does what v1.0.9 does, plus the export the 2.x line added.** The single
-HTML inventory with its six columns and its filter, and the corpus written out
-as folders with a `CTH N/index.html` in each. Nothing is to be rolled back to
+**The program does what v1.0.9 does, plus the export the 2.x line added.** The
+single HTML inventory with its six columns and its filter, and the corpus
+written out as folders of documents — one HTML file in the whole package, and
+that is the inventory. This sentence used to end *"with a `CTH N/index.html` in
+each"*; those pages were abolished on 2026-08-23 (see *No page for a CTH
+folder*), and the inventory has linked straight at every `.xml` ever since. The
+standalone copy the program also wrote into `~/Downloads` went in 2.3.0, for the
+same reason in miniature: two documents of one name, and the one without links
+opened first. Nothing is to be rolled back to
 reach this: the inventory's behaviour *already is* 1.0.9's — the columns are the
 same six, and the client script was **byte-for-byte identical** to the file at
 that tag until it was rebuilt in the new stack on 2026-08-23, behaviour
@@ -423,9 +429,13 @@ button.
 
 ### 2.5 Application services — done
 
-**2026-08-21.** `cli/src/app.rs`. The scenarios a front end invokes, named once:
-`build_inventory` and `build_package`, each taking a typed request and a `Job`
-and returning an owned report.
+**2026-08-21.** `cli/src/app.rs`. The scenarios a front end invokes, named once,
+each taking a typed request and a `Job` and returning an owned report. Today
+they are `build_corpus` — the whole run, which is what the binary drives — and
+`build_package`, the export under it. There was a third, `build_inventory`, for
+the standalone inventory the program wrote beside the package; 2.3.0 gave that
+artifact up and the scenario with it, rather than leave a public function with
+no caller.
 
 This is the layer where borrowing stops. Everything below it borrows because it
 runs in one pass over data the caller holds; a report outlives the call and a
