@@ -12,7 +12,7 @@ keywords = ["hittite", "cuneiform", "tlhdig", "zenodo", "cli"]
 categories = ["command-line-utilities", "text-processing"]
 
 [dependencies]
-dirs = "5"
+dirs = "6"
 memchr = "2"
 thiserror = "2"
 ureq = { version = "2.12", default-features = true, features = ["tls"] }
