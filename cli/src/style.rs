@@ -37,12 +37,16 @@
 /// Tokens and the base document: what both pages are before either adds
 /// anything.
 ///
-/// Public so a test can assert that a rendered document really contains it
-/// rather than something that merely looks like it.
-pub const SHARED: &str = include_str!("generated/canonical.css");
+/// The three sections are private, and the module is the boundary: the only
+/// thing outside it that has any business knowing about CSS is a rendered
+/// document, which gets it through [`inventory_css`]. This one was public with
+/// the reason "so a test can assert that a rendered document really contains
+/// it" — the tests that do so are in this file, where privacy is no obstacle,
+/// and nothing outside the crate ever named it.
+const SHARED: &str = include_str!("generated/canonical.css");
 
 /// How either document prints. Shared, and emitted last; see the module note.
-pub const PRINT: &str = include_str!("generated/print.css");
+const PRINT: &str = include_str!("generated/print.css");
 
 /// The inventory's own section: the legend, the toolbar, the table, the groups.
 const INVENTORY: &str = include_str!("generated/screen.css");

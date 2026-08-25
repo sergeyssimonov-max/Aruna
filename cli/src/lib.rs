@@ -48,9 +48,11 @@ pub const ZENODO_RECORD: u64 = 20328284;
 
 /// Human-readable Zenodo source attribution.
 ///
-/// This is the line the generated HTML prints and the string that travels into
-/// `inventory.json` and from there into the ARUN binary the site loads — so it
-/// is what every reader is told the data came from.
+/// This is the line the generated HTML prints, the line the package's inventory
+/// carries, and the `s` field of the catalog `catalog.rs` emits — so it is what
+/// every reader is told the data came from. It used to go on from there into an
+/// ARUN container the React site downloaded; the site was retired on
+/// 2026-08-23, and this attribution is what outlived it.
 ///
 /// It names the record and the edition, not the file: the ZIP's name told a
 /// reader nothing they could act on — the record number is what identifies the
@@ -238,10 +240,7 @@ fn download_unkept(
     releases: ReleaseLookup,
 ) -> Result<cache::Archive> {
     let work_dir = work_dir_for_process();
-    fs::create_dir_all(&work_dir).map_err(|source| ArunaError::Io {
-        path: work_dir.clone(),
-        source,
-    })?;
+    fs::create_dir_all(&work_dir).map_err(ArunaError::io(&work_dir))?;
     let dest = work_dir.join(cache::archive_name(url, md5));
     download_archive(url, md5, &dest, job, releases)?;
     Ok(cache::Archive::Temporary(dest))

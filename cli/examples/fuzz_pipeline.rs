@@ -56,7 +56,11 @@ const NASTY: [&str; 24] = [
 fn text(rng: &mut Rng) -> String {
     let mut s = String::new();
     for _ in 0..rng.below(6) {
-        s.push_str(rng.pick(&NASTY));
+        // The element type is named rather than inferred. Left to itself, the
+        // inference can run backwards from `push_str` and decide `T` is `str`,
+        // which is unsized and rejects the call; 1.86 does exactly that, and
+        // this crate declares 1.86.
+        s.push_str(rng.pick::<&str>(&NASTY));
     }
     s
 }

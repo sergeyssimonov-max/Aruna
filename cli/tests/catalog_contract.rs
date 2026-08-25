@@ -219,18 +219,21 @@ fn the_groups_are_the_record_runs_in_record_order() {
     assert_eq!(catalogued, parsed);
 }
 
-/// Only one label shape reaches the builder besides `CTH <n>`, and it is the
-/// one the builder refuses.
+/// Only one label shape reaches the catalog besides `CTH <n>`, and it is the
+/// one no reader of it could carry.
 ///
-/// ARUN stores a group as a `u16` and the reader rebuilds the label as
-/// `CTH ${n}`, so `build-inventory-bin.mjs` throws on anything that would not
-/// come back the same. `group_label` returns the dash for a record with no CTH
-/// at all — a manuscript the corpus has never had, and one that would stop the
-/// site's data build rather than corrupt it.
+/// The constraint is older than this test's subject: ARUN stored a group as a
+/// `u16` and rebuilt the label as `CTH ${n}`, so `build-inventory-bin.mjs`
+/// refused anything that would not come back the same. Both were deleted with
+/// the React site on 2026-08-23, and what is checked here is the property
+/// rather than that reader — a label the catalog cannot round-trip through a
+/// number is a label the *next* reader will not carry either, and `group_label`
+/// returns the dash for a record with no CTH at all: a manuscript this corpus
+/// has never had.
 ///
-/// Pinned so that stays a known, deliberate coupling: a release that introduced
+/// Pinned so that stays a known, deliberate shape: a release that introduced
 /// `CTH 12.1`, or an ungrouped manuscript, fails here — in a test that needs no
-/// archive and no Node — rather than in the job that needs 71 MiB.
+/// archive and no Node — rather than in whatever consumes the catalog next.
 #[test]
 fn the_only_label_the_container_cannot_carry_is_the_one_for_no_group() {
     let records = records();
@@ -245,8 +248,8 @@ fn the_only_label_the_container_cannot_carry_is_the_one_for_no_group() {
             .is_some_and(|n| n <= u32::from(u16::MAX) && format!("CTH {n}") == label);
         assert!(
             carried,
-            "group {label:?} is not a label ARUN can carry; \
-             scripts/build-inventory-bin.mjs refuses it and the site's data build stops"
+            "group {label:?} does not round-trip through `CTH <number>`, \
+             so a reader that stores the group as a number cannot rebuild it"
         );
     }
 

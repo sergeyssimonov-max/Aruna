@@ -322,10 +322,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
 
     let html = crate::html::render_linked_html(&corpus, "");
     let inventory = staging.path().join(format!("{PACKAGE}.html"));
-    fs::write(&inventory, &html).map_err(|source| ArunaError::Io {
-        path: inventory,
-        source,
-    })?;
+    fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
 
     let manifest_json = manifest::render_manifest(
         &records,
@@ -336,10 +333,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         &fonts,
     );
     let manifest_path = staging.path().join(MANIFEST);
-    fs::write(&manifest_path, &manifest_json).map_err(|source| ArunaError::Io {
-        path: manifest_path,
-        source,
-    })?;
+    fs::write(&manifest_path, &manifest_json).map_err(ArunaError::io(manifest_path))?;
 
     // Validation reads back everything just written; a run cancelled during
     // the write should not spend six more seconds proving it was written.
@@ -446,10 +440,7 @@ impl Replaced {
         if aside.exists() {
             remove_dir(&aside)?;
         }
-        fs::rename(target, &aside).map_err(|source| ArunaError::Io {
-            path: target.to_path_buf(),
-            source,
-        })?;
+        fs::rename(target, &aside).map_err(ArunaError::io(&target))?;
         held.aside = Some(aside);
         Ok(held)
     }
@@ -522,10 +513,7 @@ impl Staging {
 
     /// Give the finished package its name. After this there is nothing to clean.
     fn publish(mut self, destination: &Path) -> Result<()> {
-        fs::rename(&self.path, destination).map_err(|source| ArunaError::Io {
-            path: destination.to_path_buf(),
-            source,
-        })?;
+        fs::rename(&self.path, destination).map_err(ArunaError::io(&destination))?;
         self.published = true;
         Ok(())
     }
@@ -553,7 +541,9 @@ impl Drop for Staging {
 /// succeeded.
 ///
 /// The same shape as [`crate::paths::scratch_sibling`], and for the same
-/// reason: process id, plus a counter so one process can stage twice.
+/// reason: process id, plus a counter so one process can stage twice. It is now
+/// literally the same — both take it from [`crate::paths::run_tag`], which is
+/// where that shape is decided.
 ///
 /// **What this gives up.** A run killed with a signal leaves its staging
 /// directory behind, and the next run no longer clears it by finding it under
@@ -563,14 +553,7 @@ impl Drop for Staging {
 /// unchanged: a build that *fails* still clears its own staging through
 /// `Drop`, and an orphaned published copy is still swept by [`Replaced`].
 fn staging_name() -> String {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-
-    format!(
-        ".{PACKAGE}.build.{}.{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    )
+    format!(".{PACKAGE}.build.{}", crate::paths::run_tag())
 }
 
 /// Pass 1: every entry the corpus's own gates accept, as a record and a path.
@@ -597,10 +580,7 @@ pub fn collect_fragments(zip: &Path) -> Result<Vec<Fragment>> {
             .by_ref()
             .take(HEADER_READ_LIMIT as u64)
             .read_to_end(&mut window)
-            .map_err(|source| ArunaError::Io {
-                path: PathBuf::from(&path),
-                source,
-            })?;
+            .map_err(ArunaError::io(&path))?;
         let text = String::from_utf8_lossy(&window);
         if !looks_like_manuscript(&text) {
             continue;
@@ -671,10 +651,7 @@ fn write_documents(
             .by_ref()
             .take(MAX_DOCUMENT + 1)
             .read_to_end(&mut bytes)
-            .map_err(|source| ArunaError::Io {
-                path: relative.to_path_buf(),
-                source,
-            })?;
+            .map_err(ArunaError::io(relative))?;
         if bytes.len() as u64 > MAX_DOCUMENT {
             return Err(ArunaError::ExportDocumentTooLarge {
                 entry: name,
@@ -731,13 +708,8 @@ fn write_documents(
             .write(true)
             .create_new(true)
             .open(&out)
-            .map_err(|source| ArunaError::Io {
-                path: out.clone(),
-                source,
-            })?;
-        handle
-            .write_all(&normalised)
-            .map_err(|source| ArunaError::Io { path: out, source })?;
+            .map_err(ArunaError::io(&out))?;
+        handle.write_all(&normalised).map_err(ArunaError::io(out))?;
         written += 1;
         package_bytes = package_bytes.saturating_add(normalised.len() as u64);
         within_package_ceiling(package_bytes, MAX_PACKAGE)?;
@@ -754,10 +726,7 @@ fn write_documents(
 
 /// The archive's own digest, for the manifest to record.
 fn digest_of(path: &Path) -> Result<String> {
-    crate::md5::md5_file(path).map_err(|source| ArunaError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
+    crate::md5::md5_file(path).map_err(ArunaError::io(path))
 }
 
 /// The same gate the inventory pass opens through.
@@ -771,17 +740,11 @@ fn open(zip: &Path) -> Result<ZipArchive<BufReader<File>>> {
 }
 
 fn create_dir(path: &Path) -> Result<()> {
-    fs::create_dir_all(path).map_err(|source| ArunaError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
+    fs::create_dir_all(path).map_err(ArunaError::io(path))
 }
 
 fn remove_dir(path: &Path) -> Result<()> {
-    fs::remove_dir_all(path).map_err(|source| ArunaError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
+    fs::remove_dir_all(path).map_err(ArunaError::io(path))
 }
 
 /// Fragments built by hand, for the tests of every module in here.

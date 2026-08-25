@@ -61,19 +61,38 @@ pub fn downloads_dir() -> Result<PathBuf> {
 /// and they cannot end up with different ideas of what a half-written file
 /// looks like.
 pub fn scratch_sibling(path: &Path) -> PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(format!(".{}.part", run_tag()));
+    path.with_file_name(name)
+}
+
+/// What makes a name this run's own: `{process id}.{counter}`.
+///
+/// Two things this program writes need a name nobody else will choose — the
+/// scratch file above, and the staging directory in
+/// [`crate::export::build`] — and each grew its own copy of this, down to the
+/// same `AtomicU64` and the same doc comment about `Relaxed`; the second one's
+/// notes say outright that it is "the same shape as `scratch_sibling`". Two
+/// copies of a uniqueness rule is one edit away from two different rules, and
+/// the failures that follow are the quiet kind: a name that collides is only
+/// noticed by whichever run loses.
+///
+/// One counter serves both. It is shared rather than per-caller because what it
+/// has to guarantee is distinctness, and a counter that never repeats gives
+/// that whoever asks; the numbers a given caller sees are simply not
+/// consecutive, and nothing has ever read them.
+///
+/// `Relaxed` is enough: `fetch_add` is atomic whatever the ordering, and
+/// nothing here depends on the counter ordering against other memory.
+pub fn run_tag() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
-    /// Distinct for every scratch file this process asks for. `Relaxed` is
-    /// enough: `fetch_add` is atomic whatever the ordering, and nothing here
-    /// depends on the counter ordering against other memory.
     static NEXT: AtomicU64 = AtomicU64::new(0);
 
-    let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(format!(
-        ".{}.{}.part",
+    format!(
+        "{}.{}",
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
-    path.with_file_name(name)
+    )
 }
 
 /// Replace `path` with `bytes`, atomically.
@@ -85,12 +104,8 @@ pub fn scratch_sibling(path: &Path) -> PathBuf {
 /// the swap all-or-nothing: readers see either the old file or the new one.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     let scratch = scratch_sibling(path);
-    let io_err = |p: &Path| {
-        let p = p.to_path_buf();
-        move |source| ArunaError::Io { path: p, source }
-    };
 
-    let mut file = File::create(&scratch).map_err(io_err(&scratch))?;
+    let mut file = File::create(&scratch).map_err(ArunaError::io(&scratch))?;
     // Any failure past this point leaves the scratch file behind; drop it so a
     // failed run does not litter the output directory.
     let written = file
@@ -158,10 +173,7 @@ fn replace_with_retries(scratch: &Path, path: &Path) -> Result<()> {
 pub fn check_output_writable(path: &Path) -> Result<()> {
     ensure_output_parent(path)?;
     let probe = scratch_sibling(path);
-    std::fs::write(&probe, b"").map_err(|source| ArunaError::Io {
-        path: probe.clone(),
-        source,
-    })?;
+    std::fs::write(&probe, b"").map_err(ArunaError::io(&probe))?;
     let _ = std::fs::remove_file(&probe);
     Ok(())
 }
@@ -169,10 +181,7 @@ pub fn check_output_writable(path: &Path) -> Result<()> {
 /// Ensure the parent Downloads directory exists.
 pub fn ensure_output_parent(path: &std::path::Path) -> Result<()> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|source| ArunaError::Io {
-            path: parent.to_path_buf(),
-            source,
-        })?;
+        std::fs::create_dir_all(parent).map_err(ArunaError::io(&parent))?;
     }
     Ok(())
 }

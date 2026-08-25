@@ -14,7 +14,7 @@ use crate::parse::{
 use crate::progress::Event;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, Instant};
 use zip::ZipArchive;
 
@@ -241,10 +241,7 @@ pub(crate) fn open_zip(zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
 /// The limit as an argument, so the boundary can be tested with three entries
 /// rather than five hundred thousand.
 fn open_zip_within(zip_path: &Path, limit: usize) -> Result<ZipArchive<BufReader<File>>> {
-    let file = File::open(zip_path).map_err(|source| ArunaError::Io {
-        path: zip_path.to_path_buf(),
-        source,
-    })?;
+    let file = File::open(zip_path).map_err(ArunaError::io(zip_path))?;
     let archive = ZipArchive::new(BufReader::with_capacity(256 * 1024, file))?;
     if archive.len() > limit {
         return Err(ArunaError::ArchiveTooManyEntries {
@@ -275,10 +272,7 @@ fn read_header_window(entry: impl Read, path: &str, into: &mut Vec<u8>) -> Resul
     entry
         .take(HEADER_READ_LIMIT as u64)
         .read_to_end(into)
-        .map_err(|source| ArunaError::Io {
-            path: PathBuf::from(path),
-            source,
-        })?;
+        .map_err(ArunaError::io(path))?;
     Ok(())
 }
 

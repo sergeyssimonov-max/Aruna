@@ -178,6 +178,32 @@ pub enum ArunaError {
     DownloadsDir,
 }
 
+impl ArunaError {
+    /// The `map_err` argument for an I/O call that happened at `path`.
+    ///
+    /// [`Self::Io`] deliberately has no `#[from] io::Error`, so that a path can
+    /// never be dropped on the way out — and the cost of that decision was the
+    /// same four lines written twenty-three times across eight modules:
+    ///
+    /// ```text
+    /// .map_err(|source| ArunaError::Io { path: p.to_path_buf(), source })?
+    /// ```
+    ///
+    /// This is that, said once: `.map_err(ArunaError::io(&p))?`. `write_atomic`
+    /// had already grown its own local version of it, which is what a thing
+    /// being needed in more than one place looks like before it is moved.
+    ///
+    /// `impl Into<PathBuf>` takes every shape the call sites pass — `&Path`,
+    /// `&PathBuf`, `PathBuf`, `&str`, `String` — so the conversion is written
+    /// here rather than at each site. It returns `FnOnce` because it makes a
+    /// fresh closure per call: a site inside a loop mints one each time round,
+    /// and one that also needs the path afterwards passes a reference.
+    pub fn io(path: impl Into<PathBuf>) -> impl FnOnce(std::io::Error) -> ArunaError {
+        let path = path.into();
+        move |source| ArunaError::Io { path, source }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, ArunaError>;
 
 #[cfg(test)]

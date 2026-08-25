@@ -57,17 +57,11 @@ fn read_inventory(path: &Path) -> Result<String> {
 fn read_bounded(path: &Path, limit: u64) -> Result<String> {
     use std::io::Read as _;
 
-    let file = fs::File::open(path).map_err(|source| ArunaError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let file = fs::File::open(path).map_err(ArunaError::io(path))?;
     let mut text = String::new();
     file.take(limit.saturating_add(1))
         .read_to_string(&mut text)
-        .map_err(|source| ArunaError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
+        .map_err(ArunaError::io(path))?;
     if text.len() as u64 > limit {
         return Err(ArunaError::ExportInvalid {
             root: path.to_path_buf(),
@@ -323,10 +317,7 @@ pub fn check_destination(root: &Path) -> Result<()> {
     if !root.join(format!("{PACKAGE}.html")).is_file() {
         return refuse(format!("there is no {PACKAGE}.html in it"));
     }
-    let entries = fs::read_dir(root).map_err(|source| ArunaError::Io {
-        path: root.to_path_buf(),
-        source,
-    })?;
+    let entries = fs::read_dir(root).map_err(ArunaError::io(root))?;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         // Wider than the walk's rule on purpose: a group folder is ours, and a

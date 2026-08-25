@@ -45,7 +45,6 @@
 
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, JobId, Phase};
-use crate::progress::Event;
 use std::path::PathBuf;
 
 /// Build the package, and say what is in it.
@@ -275,15 +274,6 @@ impl From<&ArunaError> for Failure {
     fn from(error: &ArunaError) -> Failure {
         Failure::of(error)
     }
-}
-
-/// Say a stage has started, without the caller building the event itself.
-///
-/// A convenience with a purpose: it is the one place a scenario reports, so a
-/// scenario that wanted to invent its own vocabulary would have to do it
-/// visibly.
-pub fn announce(job: &Job<'_>, event: Event<'_>) {
-    job.report(event);
 }
 
 #[cfg(test)]

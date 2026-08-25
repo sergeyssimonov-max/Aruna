@@ -110,10 +110,7 @@ fn acquire_within(
             Ok(mut file) => {
                 use std::io::Write as _;
                 file.write_all(token.as_bytes())
-                    .map_err(|source| ArunaError::Io {
-                        path: path.clone(),
-                        source,
-                    })?;
+                    .map_err(ArunaError::io(&path))?;
                 drop(file);
 
                 // Read back what is on disk. Two runs that both judged an

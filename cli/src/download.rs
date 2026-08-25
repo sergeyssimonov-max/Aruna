@@ -332,10 +332,7 @@ fn create_parent(dest: &Path) -> Result<()> {
     let Some(parent) = dest.parent() else {
         return Ok(());
     };
-    std::fs::create_dir_all(parent).map_err(|source| ArunaError::Io {
-        path: parent.to_path_buf(),
-        source,
-    })
+    std::fs::create_dir_all(parent).map_err(ArunaError::io(&parent))
 }
 
 /// GET `url`, turning a refusal into the error that describes it.
@@ -539,10 +536,7 @@ impl Scratch {
     /// On failure the scratch file is dropped like any other uncommitted one —
     /// which is what a rename that could not happen means.
     fn commit(mut self, dest: &Path) -> Result<()> {
-        std::fs::rename(&self.path, dest).map_err(|source| ArunaError::Io {
-            path: dest.to_path_buf(),
-            source,
-        })?;
+        std::fs::rename(&self.path, dest).map_err(ArunaError::io(dest))?;
         self.committed = true;
         Ok(())
     }

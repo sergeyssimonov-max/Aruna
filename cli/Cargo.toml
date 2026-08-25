@@ -2,6 +2,11 @@
 name = "aruna"
 version = "2.3.0"
 edition = "2021"
+# Verified rather than asserted: `cargo +1.86 check --locked --all-targets`
+# passes, and CI runs it on every push so the number cannot quietly stop being
+# true. It comes from the dependencies, not from this crate's own code — the
+# toolchain everything is developed and measured with is pinned separately, in
+# `rust-toolchain.toml`, at 1.97.1.
 rust-version = "1.86"
 description = "Aruna — generates a Scandinavian-style HTML inventory of TLHdig (Zenodo) Hittite cuneiform transliterations"
 authors = ["Sergey Simonov"]

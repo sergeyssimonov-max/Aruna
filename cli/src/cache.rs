@@ -222,10 +222,7 @@ pub fn is_usable(dir: &Path) -> bool {
 
 /// Stream a file through MD5, as an [`ArunaError`] rather than an `io::Error`.
 fn digest_of(path: &Path) -> Result<String> {
-    crate::md5::md5_file(path).map_err(|source| ArunaError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
+    crate::md5::md5_file(path).map_err(ArunaError::io(path))
 }
 
 #[cfg(test)]
