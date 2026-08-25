@@ -17,6 +17,7 @@
 //! of four documents exercise the same code the 24 000-manuscript corpus does.
 
 pub mod inventory;
+mod lock;
 pub mod manifest;
 pub mod naming;
 pub mod normalize;
@@ -353,6 +354,17 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // and a run that stopped half way through that would leave the destination
     // in a state neither the old build nor the new one describes.
     job.check(Phase::Publishing)?;
+
+    // **One publication at a time in this directory.** Everything up to here is
+    // safe for two runs at once because each stages under a name carrying its
+    // own process id. Publishing is not: it is a move, a rename and a read-back,
+    // and a second run that renames in the gap leaves the first validating a
+    // package it did not publish. Measured, that is exactly what happened — the
+    // destination was correct every time and the losing run reported a
+    // validation failure. The guard is released when it goes out of scope,
+    // whichever way this function leaves.
+    let _publication = lock::Publication::acquire(destination, job)?;
+
     let previous = Replaced::aside(&final_root, destination)?;
     staging.publish(&final_root)?;
     for left in previous.committed() {

@@ -589,8 +589,9 @@ unsafe fn libc_kill(pid: i32, sig: i32) {
 ///
 /// Nothing stops a person starting the program twice, and both write the same
 /// destination. The scratch files carry the process id for exactly this reason;
-/// what that has to buy is two complete inventories rather than one truncated
-/// one, and nothing left over.
+/// what that has to buy is two complete packages rather than one truncated one,
+/// and nothing left over — including the publication lock, which is a leftover
+/// like any other if a run ends without releasing it.
 #[test]
 fn two_runs_at_once_do_not_interfere() {
     let sandbox = Sandbox::new();
@@ -612,20 +613,24 @@ fn two_runs_at_once_do_not_interfere() {
     let a = first.wait_with_output().expect("wait");
     let b = second.wait_with_output().expect("wait");
 
-    // **What two simultaneous runs guarantee, and what they do not.** Both
-    // stage under their own name, so neither destroys the other's work — that
-    // was measured, and with a shared staging name both used to fail leaving
-    // no package at all. What is still not serialised is publishing: one run
-    // can replace the package while the other is verifying the copy it just
-    // published, and that one then reports a validation failure. Measured on
-    // the real corpus: the package on disk was complete and valid every time,
-    // and at least one run always succeeded.
+    // **What two simultaneous runs guarantee.** Both stage under their own
+    // name, so neither destroys the other's work — that was measured, and with
+    // a shared staging name both used to fail leaving no package at all.
+    // Publishing is serialised as well now: it is a move, a rename and a
+    // read-back, and a run that renamed in the gap left the other validating a
+    // package it had not published. The contract that stood here until
+    // 2026-08-25 said as much — the disk was correct every time and *at least
+    // one* run succeeded — and this is the assertion that replaces it.
+    //
+    // Both succeed. Which of the two packages survives is whichever published
+    // last, and that is not a property worth pinning: they are built from one
+    // archive and the export is reproducible, so the two are the same package.
     for out in [&a, &b] {
         assert_no_panic(out);
     }
     assert!(
-        a.status.success() || b.status.success(),
-        "neither of two concurrent runs succeeded:\n{}\n{}",
+        a.status.success() && b.status.success(),
+        "both concurrent runs must now succeed:\n{}\n{}",
         stderr(&a),
         stderr(&b)
     );

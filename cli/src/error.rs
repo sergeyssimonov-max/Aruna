@@ -154,6 +154,18 @@ pub enum ArunaError {
         first: String,
     },
 
+    /// Another run is publishing into the same directory and has not finished.
+    ///
+    /// Publishing is a move, a rename and a read-back, and two runs interleaving
+    /// there leave one of them checking a package the other replaced. They take
+    /// turns instead; this is the run that waited long enough to conclude the
+    /// lock is not going to be released.
+    #[error("another run is publishing into {path} ({holder})")]
+    PublishBusy {
+        path: std::path::PathBuf,
+        holder: String,
+    },
+
     /// The destination holds something this exporter did not write, and a
     /// recursive delete aimed at the wrong directory cannot be taken back.
     #[error("refusing to replace {path}: {reason}")]

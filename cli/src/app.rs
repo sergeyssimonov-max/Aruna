@@ -253,6 +253,9 @@ impl Failure {
             ExportDocumentTooLarge { .. } => ("document_too_large", Some(Phase::Exporting), false),
             ExportDistorted { .. } => ("distorted", Some(Phase::Exporting), false),
             ExportDestination { .. } => ("destination_not_ours", Some(Phase::Exporting), false),
+            // The cure is the other run finishing, which is what waiting was
+            // for — but a caller that wants to try again is not wrong to.
+            PublishBusy { .. } => ("publish_busy", Some(Phase::Publishing), true),
             ExportInvalid { .. } => ("package_invalid", Some(Phase::Validating), false),
             ExportIncomplete { .. } => ("package_incomplete", Some(Phase::Validating), false),
             ExportPackageTooLarge { .. } => ("package_too_large", Some(Phase::Exporting), false),
