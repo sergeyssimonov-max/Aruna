@@ -16,7 +16,7 @@ dirs = "5"
 memchr = "2"
 thiserror = "2"
 ureq = { version = "2.12", default-features = true, features = ["tls"] }
-zip = { version = "2.2", default-features = false, features = ["deflate"] }
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
 
 [features]
 # Opens `parse::fields` for measurement. Off by default and never enabled by the
