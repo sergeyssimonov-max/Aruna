@@ -1,0 +1,25 @@
+{
+  // The end-to-end contour, which no other project covered.
+  //
+  // `tsconfig.app.json` takes `src/`, `tsconfig.node.json` takes the configs,
+  // the build helpers and `tests/` — and between them `e2e/*.e2e.ts` and
+  // `wdio.conf.ts` were checked by nothing. It showed: `wdio.conf.ts` imports
+  // `@wdio/types`, which was never declared as a dependency, and the import
+  // survived only because it is type-only and erased before anything runs.
+  //
+  // WebdriverIO's globals — `browser`, `$`, `expect` — and mocha's `describe`
+  // and `it` are ambient rather than imported, so both packages are named in
+  // `types` here; that is what WebdriverIO's own documentation prescribes for
+  // the mocha framework.
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node", "@wdio/globals/types", "@wdio/mocha-framework", "@wdio/tauri-service"],
+    "noEmit": true,
+    "isolatedModules": true,
+    "strict": true
+  },
+  "include": ["e2e/**/*.ts", "wdio.conf.ts"]
+}

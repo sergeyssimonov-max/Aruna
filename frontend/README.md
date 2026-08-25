@@ -1,47 +1,45 @@
-# Svelte + TS + Vite
+# frontend
 
-This template should help get you started developing with Svelte and TypeScript in Vite.
+Two things are built from this directory, and they have almost nothing to do
+with each other.
 
-## Recommended IDE Setup
+**`src/inventory/`** — the client script and the three stylesheet sections that
+the Rust CLI compiles into its binary and writes into the exported inventory.
+This is the half that ships today. `pnpm build:inventory` builds it into
+`../cli/src/generated/`, where the artifacts are committed; `tests/inventory-artifact.test.ts`
+fails if what is committed is not what these sources now produce.
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+**`src/App.svelte` and the rest of `src/`** — the desktop window, which is still
+the scaffold `create-vite` produced. It has no Aruna interface in it yet, the
+Tauri shell in `../src-tauri` registers no commands, and nothing here reaches
+the corpus. Read it as work in progress rather than as a second program.
 
-## Need an official Svelte framework?
+The stack is Svelte 5, Vite and TypeScript, with pnpm as the only package
+manager. **There is no SvelteKit**, and `tests/one-frontend-stack.test.ts` is
+what keeps it that way — along with React, which was removed with the website on
+2026-08-23.
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+## Commands
 
-## Technical considerations
-
-**Why use this over SvelteKit?**
-
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
-
-This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
-
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
-
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
-
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
-
-**Why include `.vscode/extensions.json`?**
-
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
-
-**Why enable `allowJs` in the TS template?**
-
-While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```ts
-// store.ts
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+```bash
+pnpm check          # svelte-check over the app, tsc over the configs and node tests
+pnpm lint           # eslint
+pnpm format:check   # prettier
+pnpm test:unit      # vitest — node project for tests/, jsdom for src/
+pnpm build          # the window, into dist/
+pnpm build:inventory # the CLI's artifacts, into ../cli/src/generated/
+pnpm test:e2e       # WebdriverIO inside a debug Tauri build
 ```
+
+`pnpm dev` and `pnpm build` for the window itself are run from the repository
+root, where Tauri drives them.
+
+## Where the decisions are written down
+
+| document                                                       | what it holds                                                                                            |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [`../README.md`](../README.md)                                 | what the project is today, and what it is not                                                            |
+| [`../docs/FRONTEND-CONTRACT.md`](../docs/FRONTEND-CONTRACT.md) | the agreed stack, what the Rust core owes it, and what the removal of the React application took with it |
+| [`../docs/PROJECT-SPEC.ru.md`](../docs/PROJECT-SPEC.ru.md)     | the normative specification: every component pinned, with a status                                       |
+| [`../docs/TESTING.md`](../docs/TESTING.md)                     | the test profiles and the exact command for each                                                         |
+| [`../docs/FONTS.md`](../docs/FONTS.md)                         | the cuneiform font stack, why it is duplicated, and what it costs                                        |

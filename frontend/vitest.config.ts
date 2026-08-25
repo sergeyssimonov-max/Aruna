@@ -37,7 +37,11 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,svelte}'],
-      exclude: ['src/**/*.test.ts', 'src/vite-env.d.ts'],
+      // Only the tests. `src/vite-env.d.ts` was named here too and no such file
+      // exists — the client types come from `"types": ["vite/client"]` in
+      // tsconfig.app.json instead. An exclude that matches nothing is a claim
+      // about the tree that stopped being true without anything failing.
+      exclude: ['src/**/*.test.ts'],
     },
   },
 })

@@ -1,6 +1,8 @@
-import type { Options } from '@wdio/types'
-
-export const config: Options.Testrunner = {
+// `WebdriverIO.Config`, not `Options.Testrunner`: the second is the shape of a
+// standalone remote session and has no `capabilities` key, so this file was
+// annotated with a type it does not satisfy. Nothing said so, because until
+// `tsconfig.e2e.json` existed no project included this file.
+export const config: WebdriverIO.Config = {
   runner: 'local',
   specs: ['./e2e/**/*.e2e.ts'],
   maxInstances: 1,
