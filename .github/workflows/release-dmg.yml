@@ -118,6 +118,15 @@ jobs:
       - name: Clippy (CLI)
         run: cargo clippy --manifest-path cli/Cargo.toml --all-targets -- -D warnings
 
+      # `bench` is off by default and the binary never enables it, so
+      # `--all-targets` alone never compiles `examples/bench_fields.rs` — it
+      # declares `required-features = ["bench"]` and is simply skipped. The
+      # example measures the parse's hot path, which is the code most likely to
+      # be rewritten, and nothing has been type-checking it. docs/TESTING.md has
+      # listed this invocation among the standard checks all along.
+      - name: Clippy (CLI, bench feature)
+        run: cargo clippy --manifest-path cli/Cargo.toml --all-targets --features bench -- -D warnings
+
       # nextest rather than `cargo test`, for one reason: it can stop a test
       # that hangs. The CLI suite spawns the real binary as a child process and
       # opens local sockets, and a test that waits on either of those forever
@@ -141,6 +150,26 @@ jobs:
       # the step is here so that adding one does not silently go unchecked.
       - name: Doctests (CLI)
         run: cargo test --manifest-path cli/Cargo.toml --doc
+
+      # The declared minimum, actually compiled with. `rust-version` is not
+      # decoration: Cargo reads it when resolving, so a number lower than the
+      # truth widens the search to versions that cannot build here — and until
+      # 2026-08-25 nothing checked it, so `cli` said 1.86 and `src-tauri` said
+      # 1.77.2, a version whose Cargo cannot even parse the locked tree.
+      #
+      # `--locked` matters: the point is that the versions actually pinned build
+      # on this compiler, not that some resolvable set does. `src-tauri` is not
+      # checked here — building the Tauri shell needs the GTK and WebKit stack
+      # no other job installs, and its floor (1.88) is recorded in its manifest
+      # from a local measurement instead.
+      - name: The declared MSRV is the truth (CLI)
+        run: |
+          msrv="$(sed -n 's/^rust-version = "\(.*\)"/\1/p' cli/Cargo.toml | head -1)"
+          case "$msrv" in
+            *[!0-9.]*|'') echo "::error file=cli/Cargo.toml::rust-version is not a version"; exit 1 ;;
+          esac
+          rustup toolchain install "$msrv" --profile minimal
+          cargo "+$msrv" check --locked --manifest-path cli/Cargo.toml --all-targets
 
       # The dependency tree is held to what it holds today: a new licence, a
       # new source or a fresh advisory fails here rather than arriving unnoticed
