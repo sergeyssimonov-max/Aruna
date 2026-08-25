@@ -44,9 +44,21 @@ const TAGS_DO_NOT_BALANCE: usize = 121;
 /// documents and had better place marks itself.
 const NOT_NFC: usize = 78;
 
+/// The archive, wherever this run keeps it.
+///
+/// Three names, in this order, and the second one is why this file exists as it
+/// does: `ARUNA_ZIP` is what a person passes and what the binary itself honours;
+/// `ARUNA_FIXTURE_ZIP` is what CI sets, because there the 71 MiB download lives
+/// in a cache directory outside the checkout. This suite used to read only the
+/// first, so the corpus job — which sets only the second, and sets
+/// `ARUNA_REQUIRE_FIXTURE=1` precisely so that a skip cannot pass — never ran a
+/// line of it, and the failure mode was silence rather than an error. Both are
+/// read here now, and `tests/integration.rs` reads the same pair.
 fn archive() -> Option<PathBuf> {
-    if let Some(named) = std::env::var_os("ARUNA_ZIP") {
-        return Some(PathBuf::from(named));
+    for name in ["ARUNA_ZIP", "ARUNA_FIXTURE_ZIP"] {
+        if let Some(named) = std::env::var_os(name) {
+            return Some(PathBuf::from(named));
+        }
     }
     let default = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip");

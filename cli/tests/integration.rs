@@ -173,19 +173,23 @@ fn run_with_local_zip_writes_downloads() {
 
 /// Where the full TLHdig archive lives, when it lives anywhere.
 ///
-/// `ARUNA_FIXTURE_ZIP` wins, so CI can keep the 71 MiB download in a cache
-/// directory outside the checkout. Otherwise it is `cli/fixtures/`, anchored to
+/// `ARUNA_ZIP` — the variable the binary itself honours — is read first, then
+/// `ARUNA_FIXTURE_ZIP`, so CI can keep the 71 MiB download in a cache directory
+/// outside the checkout. `tests/corpus.rs` reads the same pair, in the same
+/// order: one archive, named the same way wherever it is looked for. Otherwise it is `cli/fixtures/`, anchored to
 /// `CARGO_MANIFEST_DIR` rather than written relative: cargo happens to run tests
 /// from the package root, so a bare `fixtures/...` works today, but it is a
 /// property of the runner rather than of this test, and it silently produced a
 /// skip rather than an error when it did not hold.
 fn fixture_path() -> std::path::PathBuf {
-    match std::env::var_os("ARUNA_FIXTURE_ZIP") {
-        Some(p) => std::path::PathBuf::from(p),
-        None => Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("fixtures")
-            .join("TLHbasisONLINE25_1_ZENODO_Beta_03.zip"),
+    for name in ["ARUNA_ZIP", "ARUNA_FIXTURE_ZIP"] {
+        if let Some(p) = std::env::var_os(name) {
+            return std::path::PathBuf::from(p);
+        }
     }
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures")
+        .join("TLHbasisONLINE25_1_ZENODO_Beta_03.zip")
 }
 
 /// The whole corpus, parsed: 24 000 manuscripts of real cuneiform.

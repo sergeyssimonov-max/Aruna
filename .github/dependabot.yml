@@ -1,0 +1,51 @@
+# Pins do not maintain themselves.
+#
+# Two things in this repository are pinned by exact identity rather than by
+# range: the Actions in `workflows/`, now by commit SHA, and the npm packages in
+# `frontend/`, by exact version because the specification requires it. Both were
+# chosen so that nothing changes without someone deciding it should — and the
+# cost of that is that a fixed advisory or a fixed bug does not arrive either.
+# This is the thing that notices, and it is set to notice quietly.
+#
+# It opens pull requests, which is the one workflow this repository does not
+# otherwise use: work here is committed straight to `main`. A Dependabot pull
+# request is not work — it is a notification with a diff attached, to be read
+# and then applied or closed. Monthly, and few at a time, so it stays that.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/frontend"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "build"
+    # Exact pins are the project's rule, not an accident of the lockfile:
+    # `frontend/tests/spec-guard.test.ts` fails on a range. A version bump is
+    # therefore a decision, and a grouped one is easier to decide about.
+    groups:
+      frontend:
+        patterns:
+          - "*"
+
+  # Cargo is here for advisories rather than for versions: `cargo deny` already
+  # fails CI on a new advisory, and this says which release answers it.
+  - package-ecosystem: cargo
+    directories:
+      - "/cli"
+      - "/src-tauri"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"

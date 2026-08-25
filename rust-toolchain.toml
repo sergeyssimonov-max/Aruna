@@ -1,0 +1,18 @@
+# The one place the Rust version is stated.
+#
+# Until now nothing pinned it: locally it was whatever rustup called `default`,
+# and in CI whatever `dtolnay/rust-toolchain@stable` resolved to on the day.
+# That is fine until a new stable lands a new lint, and then `clippy -D
+# warnings` fails on a push that changed nothing — on someone else's push, at
+# that. A pinned toolchain moves that failure to the commit that raises the pin,
+# where it can be read and dealt with.
+#
+# 1.97.1 is the version this project is developed on (confirmed 2026-08-23) and
+# the one every measurement in PERFORMANCE.md was taken with. CI reads this file
+# rather than naming a version of its own, so the two cannot drift.
+#
+# Note this is not the MSRV: `cli/Cargo.toml` declares `rust-version = "1.86"`,
+# which comes from the dependencies and is not what anything is built with here.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
