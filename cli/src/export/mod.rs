@@ -72,6 +72,29 @@ pub fn is_root_file(name: &str) -> bool {
 /// name rather than read.
 pub const MAX_DOCUMENT: u64 = 64 * 1024 * 1024;
 
+/// The most a whole package may be.
+///
+/// [`MAX_DOCUMENT`] bounds one document and [`crate::archive::MAX_ENTRIES`]
+/// bounds how many there are; neither bounds their sum, and the product of the
+/// two is thirty terabytes. An archive of many documents each comfortably under
+/// the per-document limit passes both and still fills the reader's disk — the
+/// failure being a full disk in `~/Downloads`, reported as an I/O error from
+/// whichever write happened to be last.
+///
+/// The real package is 384 MiB. Eight gibibytes is twenty times that, and a
+/// corpus edition that genuinely crosses it is a decision to take deliberately
+/// rather than a number to discover here.
+pub const MAX_PACKAGE: u64 = 8 * 1024 * 1024 * 1024;
+
+/// Whether the package has outgrown its ceiling, as its own function so the
+/// only two sizes that matter can be tested without writing eight gibibytes.
+fn within_package_ceiling(written: u64, limit: u64) -> Result<()> {
+    if written > limit {
+        return Err(ArunaError::ExportPackageTooLarge { written, limit });
+    }
+    Ok(())
+}
+
 /// A record and the archive entry it was parsed from.
 ///
 /// The record alone cannot say where a document came from — `ManuscriptRecord`
@@ -111,8 +134,27 @@ pub struct Placed {
 /// collision error for a clash that was between two `.xml` files. The manifest
 /// is still held to distinct PDF names by [`validate`], which reads them back
 /// from the published file rather than trusting the rule.
+/// The key two paths collide under.
+///
+/// **Case-folded, because the filesystem this package is written to usually is.**
+/// APFS is case-insensitive by default and so is the Windows one; `KBo 1.xml`
+/// and `KBo 1.XML` are one file there and two on ext4. Comparing exact paths
+/// meant the export's own model said two documents and the disk held one — and
+/// what stopped that from being a silent overwrite was `create_new`, three
+/// hundred lines later, reporting `AlreadyExists` as an I/O error that named a
+/// path and no reason.
+///
+/// Folding here decides it in one place instead, for every platform alike: the
+/// second document is disambiguated exactly as an exact clash is, so the package
+/// a Mac writes and the package a Linux machine writes are the same package.
+/// ASCII folding is enough — every name in this corpus is Latin sigla and
+/// digits — and it does not touch what is written, only what is compared.
+fn collision_key(relative: &Path) -> String {
+    relative.to_string_lossy().to_lowercase()
+}
+
 pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
-    let mut taken: HashMap<PathBuf, String> = HashMap::with_capacity(fragments.len());
+    let mut taken: HashMap<String, String> = HashMap::with_capacity(fragments.len());
     let mut placed = Vec::with_capacity(fragments.len());
 
     for fragment in fragments {
@@ -120,14 +162,14 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
         let base = fragment.record.sigla.as_str();
 
         let mut relative = output_path(group, base);
-        if taken.contains_key(&relative) {
+        if taken.contains_key(&collision_key(&relative)) {
             // Stable, and derived from the one thing that is unique per
             // document: where it sits in the archive.
             let suffix = disambiguator(&fragment.source);
             relative = output_path(group, &format!("{base} ({suffix})"));
         }
 
-        if let Some(first) = taken.get(&relative) {
+        if let Some(first) = taken.get(&collision_key(&relative)) {
             return Err(ArunaError::ExportCollision {
                 group: group.to_string(),
                 fragment: base.to_string(),
@@ -136,7 +178,7 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
                 path: relative,
             });
         }
-        taken.insert(relative.clone(), fragment.source.clone());
+        taken.insert(collision_key(&relative), fragment.source.clone());
         placed.push(Placed {
             relative,
             label: base.to_string(),
@@ -585,6 +627,10 @@ fn write_documents(
     let mut archive = open(zip)?;
     let mut written = 0usize;
     let mut dropped = 0usize;
+    // The package's own size, accumulated as it is written rather than measured
+    // afterwards: the point of the ceiling is to stop before the disk is full,
+    // and a check after the last write is a check after the damage.
+    let mut package_bytes = 0u64;
     // Both buffers live across the loop: one document at a time, and the same
     // allocation for all 24 000 of them.
     let mut bytes = Vec::new();
@@ -681,6 +727,8 @@ fn write_documents(
             .write_all(&normalised)
             .map_err(|source| ArunaError::Io { path: out, source })?;
         written += 1;
+        package_bytes = package_bytes.saturating_add(normalised.len() as u64);
+        within_package_ceiling(package_bytes, MAX_PACKAGE)?;
     }
 
     if written != placed.len() {
@@ -700,12 +748,14 @@ fn digest_of(path: &Path) -> Result<String> {
     })
 }
 
+/// The same gate the inventory pass opens through.
+///
+/// Both passes read the same archive, and an entry count this program refuses
+/// in one of them is not one it should accept in the other — the export used to
+/// open the file itself, so `MAX_ENTRIES` applied to the first pass and not to
+/// the second.
 fn open(zip: &Path) -> Result<ZipArchive<BufReader<File>>> {
-    let file = File::open(zip).map_err(|source| ArunaError::Io {
-        path: zip.to_path_buf(),
-        source,
-    })?;
-    Ok(ZipArchive::new(BufReader::with_capacity(256 * 1024, file))?)
+    crate::archive::open_zip(zip)
 }
 
 fn create_dir(path: &Path) -> Result<()> {
@@ -749,6 +799,46 @@ pub(crate) mod tests_support {
 mod tests {
     use super::tests_support::fragment;
     use super::*;
+
+    /// Two documents whose names differ only in case are two documents, and on
+    /// most filesystems one file.
+    ///
+    /// Placement used to compare exact paths, so its model said two while APFS
+    /// and NTFS held one; the write then failed with `AlreadyExists` from
+    /// `create_new`, three hundred lines away from the decision that caused it.
+    /// Both are disambiguated now, on every platform, so the package does not
+    /// depend on the filesystem it was built on.
+    #[test]
+    fn two_names_that_differ_only_in_case_are_placed_as_two_files() {
+        let fragments = [
+            fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/KBo 1.1.xml"),
+            fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_TLH/KBo 1.1.xml"),
+            fragment("kbo 1.1", "CTH 5", "root/CTH 5_XML_ANO/kbo 1.1.xml"),
+        ];
+        let placed = place(&fragments).expect("all three are placed");
+
+        let keys: std::collections::HashSet<String> =
+            placed.iter().map(|p| collision_key(&p.relative)).collect();
+        assert_eq!(
+            keys.len(),
+            3,
+            "three documents must occupy three paths even where case does not distinguish them: {:?}",
+            placed.iter().map(|p| p.relative.clone()).collect::<Vec<_>>()
+        );
+    }
+
+    /// A ceiling on the package as a whole, at the only two sizes where it can
+    /// be wrong. Eight gibibytes are not written to test eight gibibytes.
+    #[test]
+    fn the_package_ceiling_admits_its_own_limit_and_refuses_one_byte_more() {
+        assert!(within_package_ceiling(1024, 1024).is_ok());
+        match within_package_ceiling(1025, 1024) {
+            Err(ArunaError::ExportPackageTooLarge { written, limit }) => {
+                assert_eq!((written, limit), (1025, 1024));
+            }
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+    }
 
     /// The corpus files one group under several folders, so a group's fragments
     /// are not adjacent in the archive. Counting runs of equal neighbours

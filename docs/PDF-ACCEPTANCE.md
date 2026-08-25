@@ -9,6 +9,31 @@ it. An `#[ignore]` that never runs is not coverage.
 
 ---
 
+## Before any of it: two things that have to be true first
+
+Reviewed 2026-08-25, and the answer was "not yet". Neither of the following is
+about how a converter should be built; both are about whether one should be
+started, and both are cheap to check.
+
+**Someone has to be able to read the result.** A PDF is a deliverable only if
+there is a viewer, a print route or a reader waiting for one. Absent that, the
+XML package *is* the end state — 663 folders a person can open, an inventory
+that links every one of them — and it is a finished thing rather than a stage on
+the way to a document nobody opens. So this work starts on one of two triggers:
+a viewer exists, or the project records the opposite decision explicitly, that
+the package is where the pipeline ends and PDF is closed rather than pending.
+Until one of those is written down, this file is a specification held in
+reserve.
+
+**And an XML crate must not cost the build what it is worth.** The dependency
+list is five crates, `cargo deny` holds licences, sources and advisories,
+`cargo-machete` fails on anything unused, and the tree is audited on every push.
+A parser is the largest dependency this project would have taken; the way to
+find out what it costs is to add the candidate, run the whole gate set, and read
+what breaks — before a line of conversion is written, not after. A parser that
+cannot pass those checks is not a parser this project can adopt, whatever it
+does with documents.
+
 ## 0. Prerequisite: a real XML parser
 
 The current pipeline reads seven metadata fields out of the first 16 KiB of a

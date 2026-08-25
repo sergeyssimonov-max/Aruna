@@ -219,13 +219,50 @@ fn read_archive<P: Probe>(
     Ok(records)
 }
 
-/// Open the ZIP, refusing one with nothing in it.
-fn open_archive(zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
+/// The most entries an archive may declare.
+///
+/// TLHdig Beta 0.3 is 24 537 entries, of which 23 936 are manuscripts; the rest
+/// are the AppleDouble stubs macOS put in the zip. Twenty times that is a
+/// ceiling no edition of this corpus approaches and no honest growth of it will.
+///
+/// It bounds the one cost the per-document limit does not. Every entry is a
+/// name copied out of the central directory and a decision about it, before
+/// anything is inflated — so an archive of a million empty entries is cheap to
+/// build, passes every size check there is, and spends this program's time and
+/// memory a name at a time. The central directory declares the count, so this
+/// is checked before the first entry is touched.
+pub const MAX_ENTRIES: usize = 500_000;
+
+/// Open the ZIP, refusing one with absurdly many entries in it.
+pub(crate) fn open_zip(zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
+    open_zip_within(zip_path, MAX_ENTRIES)
+}
+
+/// The limit as an argument, so the boundary can be tested with three entries
+/// rather than five hundred thousand.
+fn open_zip_within(zip_path: &Path, limit: usize) -> Result<ZipArchive<BufReader<File>>> {
     let file = File::open(zip_path).map_err(|source| ArunaError::Io {
         path: zip_path.to_path_buf(),
         source,
     })?;
     let archive = ZipArchive::new(BufReader::with_capacity(256 * 1024, file))?;
+    if archive.len() > limit {
+        return Err(ArunaError::ArchiveTooManyEntries {
+            entries: archive.len(),
+            limit,
+        });
+    }
+    Ok(archive)
+}
+
+/// Open the ZIP for the inventory pass, which also has nothing to do with an
+/// empty one.
+///
+/// The export makes its own decision about emptiness — it reports it as "no
+/// manuscripts found" after the gates, which is a different sentence — so the
+/// shared half is [`open_zip`] and this is the half that is not shared.
+fn open_archive(zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
+    let archive = open_zip(zip_path)?;
     if archive.is_empty() {
         return Err(ArunaError::EmptyArchive);
     }
@@ -327,6 +364,39 @@ mod tests {
     use tempfile::tempdir;
     use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
+
+    /// The entry count is refused before an entry is touched, and the boundary
+    /// is where a ceiling is either right or off by one.
+    ///
+    /// Three entries against a limit of three and of two: the archive that is
+    /// exactly at the ceiling opens, the one a single entry past it does not.
+    /// Writing five hundred thousand entries to prove the same arithmetic would
+    /// cost seconds on every run of this suite and prove nothing extra — which
+    /// is why the limit is an argument here and a constant at the call site.
+    #[test]
+    fn an_archive_with_more_entries_than_the_ceiling_is_refused_unread() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("many.zip");
+        write_zip(
+            &path,
+            &[
+                ("CTH 1_XML/a.xml", "<AOxml/>"),
+                ("CTH 1_XML/b.xml", "<AOxml/>"),
+                ("CTH 1_XML/c.xml", "<AOxml/>"),
+            ],
+        );
+
+        assert!(
+            open_zip_within(&path, 3).is_ok(),
+            "an archive exactly at the ceiling is not over it"
+        );
+        match open_zip_within(&path, 2) {
+            Err(ArunaError::ArchiveTooManyEntries { entries, limit }) => {
+                assert_eq!((entries, limit), (3, 2));
+            }
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+    }
 
     fn write_zip(path: &Path, files: &[(&str, &str)]) {
         let f = File::create(path).unwrap();

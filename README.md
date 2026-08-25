@@ -67,6 +67,21 @@ A launcher that opens Terminal, or a real window with a progress bar, is the
 desktop application above — it is not built yet, and until it is, this is the
 honest instruction rather than a workaround.
 
+### If a run is killed
+
+Ctrl-C stops the program the way the terminal stops any program: there is no
+signal handler. The machinery for a clean stop exists and is exercised — work
+checks a cancellation flag between documents — but nothing presses it from a
+terminal, and the window that would is not built yet.
+
+What a killed run leaves in `~/Downloads` is one hidden directory,
+`.TLHdig_Beta_0.3.build.<pid>.<n>`: its unfinished package. Nothing is published
+from it and the next run is not blocked by it — that one builds beside it under
+its own name — so it is safe to delete with `rm -rf
+~/Downloads/.TLHdig_Beta_0.3.build.*`. A finished package is never at risk from
+this: the previous one is moved aside only after the new one is written whole
+and checked.
+
 ### Gatekeeper
 
 The `.app` is signed ad hoc: enough for macOS to run it locally, not a

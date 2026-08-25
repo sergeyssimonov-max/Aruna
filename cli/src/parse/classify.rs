@@ -6,7 +6,7 @@
 //! survives a new release of the archive. Both must say yes.
 
 use super::{truncate_on_char_boundary, HEADER_READ_LIMIT};
-use crate::xml_scan::find_ci;
+use crate::xml_scan::{eq_ci, for_each_start_tag};
 use std::path::Path;
 
 /// Whether an archive entry's *path* could be a manuscript.
@@ -69,10 +69,23 @@ pub fn is_manuscript_xml(path: &str) -> bool {
 /// If a future release moves to a shape none of these markers match, every entry
 /// is rejected and the run fails with [`crate::error::ArunaError::EmptyArchive`]
 /// — loudly, rather than by publishing an inventory of debris.
+/// **Through the same walk as every other scan in this crate.** It used to look
+/// for the literal strings `<AOxml`, `<AOHeader` and so on with a
+/// case-insensitive substring search over the window, which answers a different
+/// question than the one this function asks: a marker named inside a comment,
+/// inside CDATA, or inside an attribute value made an entry a manuscript, and a
+/// namespace prefix — `<AO:AOxml`, which the rest of the parser handles by local
+/// name — stopped it being one. `for_each_start_tag` is what `parse::fields` and
+/// `strip_tags_bytes` are built on, so all three now agree on where a tag is.
 pub fn looks_like_manuscript(xml: &str) -> bool {
-    const MARKERS: [&[u8]; 5] = [b"<AOxml", b"<AOHeader", b"<docID", b"<TEI", b"<teiHeader"];
+    const MARKERS: [&[u8]; 5] = [b"AOxml", b"AOHeader", b"docID", b"TEI", b"teiHeader"];
     let window = truncate_on_char_boundary(xml, HEADER_READ_LIMIT).as_bytes();
-    MARKERS.iter().any(|m| find_ci(window, m).is_some())
+    let mut found = false;
+    for_each_start_tag(window, |name, _| {
+        found = MARKERS.iter().any(|marker| eq_ci(name, marker));
+        found
+    });
+    found
 }
 
 #[cfg(test)]
@@ -145,6 +158,33 @@ mod tests {
         assert!(
             looks_like_manuscript("<TEI><teiHeader/></TEI>"),
             "TEI is accepted too"
+        );
+    }
+
+    /// A marker is a tag or it is nothing.
+    ///
+    /// The substring search this replaced could not tell an element from a
+    /// mention of one, so a comment, a CDATA block or an attribute value that
+    /// happened to contain `<AOxml` made an entry a manuscript — and the
+    /// prefixed spelling the rest of the parser handles by local name did not.
+    /// Both halves are the same walk now, so both answers change together.
+    #[test]
+    fn a_marker_counts_where_a_tag_is_and_nowhere_else() {
+        for mentioned in [
+            "<html><!-- <AOxml> was here --><body>no</body></html>",
+            "<html><body><![CDATA[<AOHeader>]]></body></html>",
+            "<html><body data-note=\"<docID>\">no</body></html>",
+            "<html><body>&lt;AOxml&gt;</body></html>",
+        ] {
+            assert!(
+                !looks_like_manuscript(mentioned),
+                "a mention is not a manuscript: {mentioned}"
+            );
+        }
+
+        assert!(
+            looks_like_manuscript("<AO:AOxml xmlns:AO=\"x\"><AO:docID>1</AO:docID></AO:AOxml>"),
+            "a namespace prefix is stripped here as it is everywhere else"
         );
     }
 

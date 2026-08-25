@@ -42,7 +42,18 @@ fn read_inventory(path: &Path) -> Result<String> {
     read_bounded(path, MAX_INVENTORY)
 }
 
-/// Read at most `limit` bytes of a text file, or say which file failed.
+/// Read a text file no larger than `limit`, or say which file failed and why.
+///
+/// **Refusing is the point, and it used to truncate instead.** `take(limit)`
+/// stops reading and returns what it has, so a file one byte over the cap came
+/// back as its first `limit` bytes with nothing to say it was cut — and the
+/// caller then validated a document that does not exist on disk. An inventory
+/// truncated mid-`<a>` loses links it has, which is a validation failure with a
+/// false explanation; a manifest truncated mid-JSON parses as fewer entries,
+/// which is the same. Both doc comments here already promised a refusal.
+///
+/// `limit + 1` is the whole of the fix: read one byte past the cap, and having
+/// got it is proof the file is over.
 fn read_bounded(path: &Path, limit: u64) -> Result<String> {
     use std::io::Read as _;
 
@@ -50,14 +61,24 @@ fn read_bounded(path: &Path, limit: u64) -> Result<String> {
         path: path.to_path_buf(),
         source,
     })?;
-    let mut html = String::new();
-    file.take(limit)
-        .read_to_string(&mut html)
+    let mut text = String::new();
+    file.take(limit.saturating_add(1))
+        .read_to_string(&mut text)
         .map_err(|source| ArunaError::Io {
             path: path.to_path_buf(),
             source,
         })?;
-    Ok(html)
+    if text.len() as u64 > limit {
+        return Err(ArunaError::ExportInvalid {
+            root: path.to_path_buf(),
+            count: 1,
+            first: format!(
+                "{} is larger than the {limit} byte limit for this file, so it is not one this program wrote",
+                path.display()
+            ),
+        });
+    }
+    Ok(text)
 }
 
 /// What a clean package contains, counted while checking it.
@@ -571,9 +592,20 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join(format!("{PACKAGE}.html"));
         fs::write(&path, b"<html>").expect("write");
-        // The cap is what bounds the read; this only proves a normal one still
-        // arrives whole, since writing 256 MiB to prove the other half would
-        // cost more than the check does.
+        // A normal inventory arrives whole.
         assert_eq!(read_inventory(&path).expect("read"), "<html>");
+
+        // And the cap itself, at the only two sizes where it can be wrong.
+        // This used to say that proving the other half would mean writing
+        // 256 MiB — it does not: the limit is an argument, so a six-byte file
+        // and a limit of six answer the same question for a fraction of a
+        // millisecond. Truncation at exactly the cap is what `take` did and what
+        // the caller could not detect.
+        assert_eq!(read_bounded(&path, 6).expect("exactly the cap"), "<html>");
+        let over = read_bounded(&path, 5).expect_err("one byte over the cap");
+        assert!(
+            matches!(over, ArunaError::ExportInvalid { count: 1, .. }),
+            "an oversized file is refused, not truncated: {over}"
+        );
     }
 }

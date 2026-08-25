@@ -239,6 +239,9 @@ impl Failure {
             // The corpus.
             Zip(_) => ("archive_unreadable", Some(Phase::Parsing), false),
             EmptyArchive => ("archive_empty", Some(Phase::Parsing), false),
+            ArchiveTooManyEntries { .. } => {
+                ("archive_too_many_entries", Some(Phase::Parsing), false)
+            }
 
             // Where the output goes.
             DownloadsDir => ("no_output_directory", Some(Phase::Publishing), false),
@@ -252,6 +255,7 @@ impl Failure {
             ExportDestination { .. } => ("destination_not_ours", Some(Phase::Exporting), false),
             ExportInvalid { .. } => ("package_invalid", Some(Phase::Validating), false),
             ExportIncomplete { .. } => ("package_incomplete", Some(Phase::Validating), false),
+            ExportPackageTooLarge { .. } => ("package_too_large", Some(Phase::Exporting), false),
         };
 
         Failure {

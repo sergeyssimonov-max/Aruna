@@ -125,6 +125,25 @@ pub enum ArunaError {
     #[error("export wrote {written} documents but placed {expected}")]
     ExportIncomplete { expected: usize, written: usize },
 
+    /// An archive with more entries than a corpus has documents.
+    ///
+    /// The per-document ceiling bounds one entry; nothing bounded how many
+    /// there were. An archive of a million empty entries costs a name, a header
+    /// parse and a gate decision each — no inflation, and so nothing the size
+    /// limit would notice — and the real corpus is 24 537 entries, so the shape
+    /// of that attack is two orders of magnitude away from anything real.
+    #[error("archive holds {entries} entries, more than the {limit} this program will read")]
+    ArchiveTooManyEntries { entries: usize, limit: usize },
+
+    /// A package that would be larger than any corpus this program is for.
+    ///
+    /// The companion to [`Self::ExportDocumentTooLarge`]: that one bounds a
+    /// document, this one bounds their sum. An archive of many documents each
+    /// just under the per-document limit passed both the entry count and the
+    /// size check and still filled a disk.
+    #[error("the package reached {written} bytes, more than the {limit} this program will write")]
+    ExportPackageTooLarge { written: u64, limit: u64 },
+
     /// A finished package does not match the model it was built from. The count
     /// is the whole tally; the text is the first few, because a package with
     /// four hundred broken links is one problem, not four hundred.

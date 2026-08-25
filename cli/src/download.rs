@@ -371,13 +371,29 @@ pub fn fetch_text(url: &str, deadline: Duration) -> Result<String> {
     Ok(body)
 }
 
+/// What this program calls itself to a server.
+///
+/// One place, and derived: [`request_within`] sets it, and the test below is
+/// what keeps it from drifting back into a literal.
+pub fn user_agent() -> String {
+    format!(
+        "Aruna/{} (+https://github.com/sergeyssimonov-max/Aruna)",
+        env!("CARGO_PKG_VERSION")
+    )
+}
+
 /// As [`request`], with the deadline given — the tests need one they can wait for.
 fn request_within(url: &str, deadline: Duration) -> Result<ureq::Response> {
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(Duration::from_secs(300))
         .timeout(deadline)
-        .user_agent("Aruna/1.0 (+https://github.com/sergeyssimonov-max/Aruna)")
+        // Built from the manifest rather than written out. It said `Aruna/1.0`
+        // through every release of the 2.x line — a version string that stopped
+        // being true at v1.0.9 and would have gone on being wrong forever,
+        // because nothing ever fails when it is. Zenodo's logs are the one place
+        // this shows, which is exactly why nobody would have noticed.
+        .user_agent(&user_agent())
         .build();
 
     match agent.get(url).call() {
@@ -573,6 +589,9 @@ mod tests {
     struct FakeServer {
         port: u16,
         hits: Arc<AtomicU32>,
+        /// The request heads it was sent, so a test can ask what the client
+        /// said about itself as well as what it asked for.
+        heads: Arc<std::sync::Mutex<Vec<String>>>,
     }
 
     impl FakeServer {
@@ -595,6 +614,8 @@ mod tests {
             let port = listener.local_addr().expect("addr").port();
             let hits = Arc::new(AtomicU32::new(0));
             let counter = Arc::clone(&hits);
+            let heads: Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+            let recorder = Arc::clone(&heads);
 
             std::thread::spawn(move || {
                 for stream in listener.incoming().flatten() {
@@ -605,9 +626,14 @@ mod tests {
                     // Read the request line so the client is not writing into a
                     // closed socket while we answer.
                     let mut head = String::new();
+                    let mut line = String::new();
                     let mut reader = std::io::BufReader::new(stream.try_clone().expect("clone"));
-                    while reader.read_line(&mut head).unwrap_or(0) > 2 {
-                        head.clear();
+                    while reader.read_line(&mut line).unwrap_or(0) > 2 {
+                        head.push_str(&line);
+                        line.clear();
+                    }
+                    if let Ok(mut seen) = recorder.lock() {
+                        seen.push(head);
                     }
 
                     match reply {
@@ -655,7 +681,7 @@ mod tests {
                 }
             });
 
-            FakeServer { port, hits }
+            FakeServer { port, hits, heads }
         }
 
         fn url(&self) -> String {
@@ -665,6 +691,43 @@ mod tests {
         fn hits(&self) -> u32 {
             self.hits.load(Ordering::SeqCst)
         }
+
+        /// The head of the first request, headers and all.
+        fn first_head(&self) -> String {
+            self.heads
+                .lock()
+                .expect("the recorder is not poisoned")
+                .first()
+                .cloned()
+                .unwrap_or_default()
+        }
+    }
+
+    /// The program tells a server which version of itself is asking.
+    ///
+    /// It said `Aruna/1.0` from 1.0.0 through 2.3.0 — true for one release and
+    /// wrong for every one after, and invisible, because a wrong User-Agent
+    /// never fails anything. Zenodo's logs are where it shows, which is the one
+    /// place nobody here can read. It is built from the manifest now, and this
+    /// test is what keeps it from being written out by hand again: it asks a
+    /// real server what arrived.
+    #[test]
+    fn the_user_agent_carries_the_version_from_the_manifest() {
+        let server = FakeServer::with_bodies(vec![Some(b"body".to_vec())]);
+        let dir = tempdir().expect("tempdir");
+        let dest = dir.path().join("out.zip");
+        download_file(&server.url(), &dest, &Job::unattended()).expect("download");
+
+        let head = server.first_head();
+        let expected = format!("User-Agent: {}", user_agent());
+        assert!(
+            head.contains(&expected),
+            "the request should carry {expected:?}; it carried:\n{head}"
+        );
+        assert!(
+            user_agent().contains(env!("CARGO_PKG_VERSION")),
+            "and the version in it is the manifest's, not a literal"
+        );
     }
 
     /// A body cut short must be rejected, not written out as a complete file.

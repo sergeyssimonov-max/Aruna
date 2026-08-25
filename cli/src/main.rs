@@ -150,6 +150,21 @@ fn advice(err: &ArunaError) -> Option<String> {
              раздуться при распаковке. Пакет не собран, память не израсходована."
                 .to_string()
         }
+        // Two ceilings that are not about one document but about the archive as
+        // a whole; both mean the same thing to a reader, and neither is
+        // answered by trying again.
+        ArunaError::ArchiveTooManyEntries { .. } => {
+            "В архиве больше записей, чем эта программа готова прочитать.\n\
+             Корпус TLHdig — около 24 500; архив такого размера собран не из него.\n\
+             Ничего не распаковано и не записано."
+                .to_string()
+        }
+        ArunaError::ExportPackageTooLarge { .. } => {
+            "Пакет вырос больше допустимого предела, сборка остановлена.\n\
+             Опубликованного пакета это не коснулось: всё писалось во временную\n\
+             папку, и она удалена."
+                .to_string()
+        }
         // The one failure that means the data was at risk rather than the run.
         ArunaError::ExportDistorted { .. } => {
             "Документ изменился при нормализации сверх разрешённого — сборка остановлена.\n\
