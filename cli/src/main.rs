@@ -84,8 +84,8 @@ fn advice(err: &ArunaError) -> Option<String> {
         ArunaError::Network { .. } => {
             "Проверьте сетевое соединение и доступность Zenodo.".to_string()
         }
-        // A republished record is not something the reader can fix, and until
-        // 2.4.0 this told them to edit a source file they may well not have:
+        // A republished record is not something the reader can fix, and this
+        // used to tell them to edit a source file they may well not have:
         // the advice reaches a reader who installed a .app just as often as one
         // with the repository checked out. The new release is the fix; the
         // constants are how it is made, and that line is for whoever makes it.
