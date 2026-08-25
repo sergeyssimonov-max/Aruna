@@ -1,6 +1,6 @@
 [package]
 name = "aruna"
-version = "2.3.0"
+version = "2.4.0"
 edition = "2021"
 # Verified rather than asserted: `cargo +1.86 check --locked --all-targets`
 # passes, and CI runs it on every push so the number cannot quietly stop being
