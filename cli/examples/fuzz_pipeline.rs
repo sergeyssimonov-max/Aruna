@@ -57,9 +57,10 @@ fn text(rng: &mut Rng) -> String {
     let mut s = String::new();
     for _ in 0..rng.below(6) {
         // The element type is named rather than inferred. Left to itself, the
-        // inference can run backwards from `push_str` and decide `T` is `str`,
-        // which is unsized and rejects the call; 1.86 does exactly that, and
-        // this crate declares 1.86.
+        // inference can run backwards from `push_str` and settle on `str`,
+        // which is unsized and rejects the call — measured on 1.86, which does
+        // exactly that. Naming it costs nothing and does not depend on which
+        // way a given compiler happens to infer.
         s.push_str(rng.pick::<&str>(&NASTY));
     }
     s

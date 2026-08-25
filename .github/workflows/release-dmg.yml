@@ -151,26 +151,6 @@ jobs:
       - name: Doctests (CLI)
         run: cargo test --manifest-path cli/Cargo.toml --doc
 
-      # The declared minimum, actually compiled with. `rust-version` is not
-      # decoration: Cargo reads it when resolving, so a number lower than the
-      # truth widens the search to versions that cannot build here — and until
-      # 2026-08-25 nothing checked it, so `cli` said 1.86 and `src-tauri` said
-      # 1.77.2, a version whose Cargo cannot even parse the locked tree.
-      #
-      # `--locked` matters: the point is that the versions actually pinned build
-      # on this compiler, not that some resolvable set does. `src-tauri` is not
-      # checked here — building the Tauri shell needs the GTK and WebKit stack
-      # no other job installs, and its floor (1.88) is recorded in its manifest
-      # from a local measurement instead.
-      - name: The declared MSRV is the truth (CLI)
-        run: |
-          msrv="$(sed -n 's/^rust-version = "\(.*\)"/\1/p' cli/Cargo.toml | head -1)"
-          case "$msrv" in
-            *[!0-9.]*|'') echo "::error file=cli/Cargo.toml::rust-version is not a version"; exit 1 ;;
-          esac
-          rustup toolchain install "$msrv" --profile minimal
-          cargo "+$msrv" check --locked --manifest-path cli/Cargo.toml --all-targets
-
       # The dependency tree is held to what it holds today: a new licence, a
       # new source or a fresh advisory fails here rather than arriving unnoticed
       # with a transitive dependency. Policy and reasoning in cli/deny.toml.

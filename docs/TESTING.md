@@ -155,32 +155,29 @@ cargo deny check
 cargo machete
 ```
 
-### The declared minimum compiler
+### The compiler version
 
-`rust-version` is not decoration: Cargo reads it when resolving, so a number
-below the truth widens the search to versions that cannot build here. Both
-manifests were checked on 2026-08-25 by compiling with the toolchain each
-declares.
+There is one, it is in `rust-toolchain.toml`, and rustup installs it before
+anything is built. Neither manifest declares a `rust-version` any more.
 
-```sh
-rustup toolchain install 1.86 --profile minimal
-cargo +1.86 check --locked --manifest-path cli/Cargo.toml --all-targets
-```
+They did until 2026-08-25, and the field was doing nothing here: it steers
+dependency resolution only under the MSRV-aware resolver, which is the default
+from edition 2024 onward, and both crates are edition 2021. Neither is published
+to crates.io either, so the promise had no audience — and one of the two was
+false. `src-tauri` claimed 1.77.2, a version whose Cargo cannot parse the locked
+tree at all, since a dependency needs edition 2024; `darling` and the `icu_*`
+crates put the real floor at 1.88. Nothing noticed for months, because nothing
+ever compiled with it.
 
-`cli` declares **1.86** and builds on it; CI runs exactly this on every push, so
-the claim cannot quietly stop being true.
-
-`src-tauri` declared **1.77.2**, which was impossible: that Cargo cannot even
-parse the locked tree — a dependency needs edition 2024, stabilised in 1.85 —
-and `darling` and the `icu_*` crates require 1.88. Corrected to **1.88**,
-measured the same way. It is not checked in CI: building the Tauri shell needs
-the GTK and WebKit stack no other job installs, and paying for that to verify
-one number is the wrong trade. Re-measure it by hand when the dependency tree
-moves:
+A dependency that needs a newer compiler still says so through its own
+`rust-version`, which is exactly how that floor was measured:
 
 ```sh
 cargo +1.88 check --locked --manifest-path src-tauri/Cargo.toml
 ```
+
+If either crate is ever published, declare a minimum then — and measure it the
+same way rather than writing down a number.
 
 ### Frontend — about 2 s, needs `pnpm`
 

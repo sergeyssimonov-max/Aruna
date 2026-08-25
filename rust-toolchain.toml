@@ -11,8 +11,21 @@
 # the one every measurement in PERFORMANCE.md was taken with. CI reads this file
 # rather than naming a version of its own, so the two cannot drift.
 #
-# Note this is not the MSRV: `cli/Cargo.toml` declares `rust-version = "1.86"`,
-# which comes from the dependencies and is not what anything is built with here.
+# **This is the only place a Rust version is named.** Both manifests used to
+# carry a `rust-version` as well, and neither was doing anything: that field
+# steers dependency resolution only under the MSRV-aware resolver, which is the
+# default for edition 2024 and these crates are edition 2021 — so all it did was
+# make a promise, to nobody, that nothing checked. `cli` claimed 1.86, which
+# happened to be true; `src-tauri` claimed 1.77.2, whose Cargo cannot so much as
+# parse the locked tree, and it went unnoticed for months.
+#
+# Neither is published to crates.io, so no downstream reads such a promise, and
+# rustup installs the version below before anything is built — nobody compiles
+# this with a different compiler. A dependency that needs something newer still
+# says so itself, by its own `rust-version`, which is where that error came from
+# when it was measured.
+#
+# Add one back the day this crate is published, and measure it then.
 [toolchain]
 channel = "1.97.1"
 components = ["rustfmt", "clippy"]

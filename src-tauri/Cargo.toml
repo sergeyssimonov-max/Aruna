@@ -6,15 +6,6 @@ authors = ["Sergey Simonov"]
 license = "MIT"
 repository = "https://github.com/sergeyssimonov-max/Aruna"
 edition = "2021"
-# Measured, not guessed: 1.77.2 was declared here and is impossible — a
-# dependency in the locked tree needs edition 2024, which Cargo did not stabilise
-# until 1.85, and `darling` and the `icu_*` crates each require 1.88. Checked
-# 2026-08-25 across 1.77.2 (refuses the manifest), 1.86 (refuses the tree) and
-# 1.88 (builds).
-#
-# The field is not decoration: Cargo reads it when resolving, so a number lower
-# than the truth widens the search to versions that cannot build here.
-rust-version = "1.88"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
