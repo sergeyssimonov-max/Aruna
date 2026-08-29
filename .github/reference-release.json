@@ -40,6 +40,13 @@
       "published": "2026-08-17T21:53:21Z",
       "dmg_sha256": "0395b641dd94671166e44d4b3bc29b0ccf988a522119706bd1511825a5cd9b2e",
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
+    },
+    {
+      "tag": "v2.5.0",
+      "commit": "2e99f9326502857b418f055686cb68413a809a51",
+      "published": "2026-08-29T22:40:33Z",
+      "dmg_sha256": "4e08550c8300a0329828349120a19fcda81094a77ec24cd31aa716c6fc804071",
+      "why": "The current release and the third reference: two questions answered before any work, a seam a window can name a destination through, four ceilings and a retry policy where they were missing, and a zip floor that closes RUSTSEC-2025-0168. It replaced v2.1.0, withdrawn on 2026-08-30 together with v2.2.0, v2.3.0 and v2.4.0. The tag was re-cut the same day onto the commit that gives the release job the history its build number is counted from: the first publication carried build 1 where the same commit built locally carried 168, and a number that does not move is a number LaunchServices cannot tell releases apart by."
     }
   ]
 }
