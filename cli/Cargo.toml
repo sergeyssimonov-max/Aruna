@@ -1,6 +1,6 @@
 [package]
 name = "aruna"
-version = "2.4.0"
+version = "2.5.0"
 edition = "2021"
 description = "Aruna — generates a Scandinavian-style HTML inventory of TLHdig (Zenodo) Hittite cuneiform transliterations"
 authors = ["Sergey Simonov"]
@@ -15,7 +15,10 @@ dirs = "5"
 memchr = "2"
 thiserror = "2"
 ureq = { version = "2.12", default-features = true, features = ["tls"] }
-zip = { version = "2.2", default-features = false, features = ["deflate"] }
+# Floor at 2.3, not 2.2: RUSTSEC-2025-0168 (CVE-2025-29787) is patched there,
+# and a lock file resolved from a lower floor is one `cargo update` away from
+# picking a vulnerable version back up.
+zip = { version = "2.3", default-features = false, features = ["deflate"] }
 
 [features]
 # Opens `parse::fields` for measurement. Off by default and never enabled by the
