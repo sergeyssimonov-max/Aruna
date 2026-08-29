@@ -2,7 +2,7 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **372 tests** across fifteen integration binaries plus the library
+The suite is **400 tests** across seventeen integration binaries plus the library
 and the binary's own tests. It runs in about
 ten seconds and needs no network. Beside it, and in a language of its own, are
 the **53 `vitest` tests** in `frontend/` — see *Frontend* below. Retries are deliberately absent from
@@ -31,7 +31,7 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 cd cli
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus)'   # 379
+cargo nextest run --profile ci -E 'not binary(corpus)'   # 389
 ```
 
 ### Standard — about 25 s
@@ -193,18 +193,26 @@ pnpm format:check
 pnpm test:unit      # 53
 ```
 
-`vitest` runs two projects. **`component`** is jsdom: `Counter.test.ts` and the
-15 tests of `src/inventory/filter.test.ts`, which drive the search box and the
-fold controls against a document built in the shape `cli/src/html.rs` writes.
+`vitest` runs two projects. **`component`** is jsdom: the 14 tests of
+`src/inventory/filter.test.ts`, which drive the search box and the fold controls
+against a document built in the shape `cli/src/html.rs` writes. It held
+`Counter.test.ts` as well until 2026-08-29, when the Vite starter's demo screen
+went. Nothing replaced it at this level, and nothing will while the window holds
+a prototype: that screen is redrawn through `/design` on every maintenance pass,
+so a jsdom test of its markup would be rewritten as often as the markup. What
+holds the screen to its contract is `e2e/smoke.e2e.ts`, which clicks the probe
+button in the real WKWebView — the same three steps the deleted test did in
+jsdom, moved to the engine the window actually runs in.
 **`node`** holds the tests that read the repository rather than a DOM:
 
 | test | what it holds |
 |---|---|
 | `tests/font-stack.test.ts` | the cuneiform stack in `src/inventory/canonical.css` and `src/app.css` name the same faces, in the same order |
 | `tests/readme-links.test.ts` | every link in the seven documents resolves |
+| `tests/release-version.test.ts` | the release the README calls current is the version `cli/Cargo.toml` declares — CI holds the tag to the manifest, this holds the sentence a reader acts on |
 | `tests/one-frontend-stack.test.ts` | React is in no manifest, no lock file, no source file and no artifact — and the stack is Svelte without SvelteKit |
 | `tsconfig.e2e.json` | the E2E contour — `e2e/*.e2e.ts` and `wdio.conf.ts` — which no project covered until 2026-08-25. It found both a `wdio.conf.ts` annotated with `Options.Testrunner` (a standalone-session type with no `capabilities` key) and an import of `@wdio/types` that was never declared as a dependency and survived only because it is type-only |
-| `tests/spec-guard.test.ts` | the decisions `tauri-frontend-spec-v3.md` fixed — the pnpm pin, the `safari16` floor, the identifier and bundle targets, matching window and document titles, a permission for every registered plugin, and the four gates that keep the E2E contour out of a release |
+| `tests/spec-guard.test.ts` | the decisions [`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) fixed — the pnpm pin, the `safari16` floor, the identifier and bundle targets, matching window and document titles, a permission for every registered plugin, and the four gates that keep the E2E contour out of a release |
 | `tests/inventory-artifact.test.ts` | everything in `cli/src/generated/` — the script and the three stylesheet sections — is byte-for-byte what `frontend/src/inventory/` now builds, builds the same twice, and carries none of the bundler's leavings |
 
 The last of those is what makes committed build products safe. The script and
@@ -226,21 +234,23 @@ test.
 
 | binary | tests | what it holds |
 |---|---|---|
-| library and `bin/aruna` | 248 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
+| library and `bin/aruna` | 270 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
-| `tests/cli_process.rs` | 15 | the binary as a child process, cache versus network |
+| `tests/cli_process.rs` | 16 | the binary as a child process, cache versus network, and the two words it answers on the command line |
 | `tests/cache_lifecycle.rs` | 9 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
 | `tests/export_integration.rs` | 8 | the export against an archive shaped like the corpus |
 | `tests/export_hostile.rs` | 12 | archives written to break the export, and destinations that refuse it |
 | `tests/export_recovery.rs` | 7 | building again over what a killed run left behind |
 | `tests/package_pages.rs` | 11 | the inventory against the package it describes, and that no CTH folder has a page |
-| `tests/cancellation.rs` | 9 | stopping a run, and that it leaves the reader's package alone |
+| `tests/cancellation.rs` | 10 | stopping a run, that it leaves the reader's package alone, and that a run stopped half way is followed by a complete one in the same process |
 | `tests/cache_concurrency.rs` | 4 | several runs competing for one cache: the race, the sweep, the sockets |
 | `tests/catalog_contract.rs` | 12 | the shape of the JSON catalog, held steady now that its former reader is gone |
 | `tests/progress_flow.rs` | 6 | which stages a run reports, in what order, with what numbers |
 | `tests/reliability.rs` | 4 | two builds byte-identical, no descriptors accumulated, nothing left beside the package |
 | `tests/xml_contract.rs` | 9 | the fixture set: immutability, the permit list, field extraction |
 | `tests/xml_hostile.rs` | 9 | XXE, entity expansion, external DTD, XInclude, resource exhaustion |
+| `tests/authenticity.rs` | 2 | the published package against the archive, as multisets of file contents: nothing lost, invented, altered or written twice. The second is `#[ignore]` and runs the whole corpus — `--run-ignored ignored-only` |
+| `tests/window_seams.rs` | 3 | the seams a window will drive: the build on a thread of its own stopped from the caller's, that the library neither prints nor ends the process, and that the destination is the caller's to name |
 | `tests/corpus.rs` | 3 | the whole archive: non-distortion, no writes, the malformed count, and that nothing the gates admit comes out of decoding damaged |
 
 Fixtures are described in `cli/fixtures/xml/MANIFEST.md` with a SHA-256 for each.

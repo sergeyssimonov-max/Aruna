@@ -9,8 +9,10 @@ releases ship, and it is the whole of the product.
 
 **A desktop application is being built and is not finished.**
 [`frontend/`](frontend/) and [`src-tauri/`](src-tauri/) hold the stack it will
-be built on — the toolchain is installed, pinned and under CI — but the window
-still shows the Svelte template it was scaffolded with, there is no Tauri
+be built on — the toolchain is installed and pinned, and the frontend half is
+checked and built by CI; `src-tauri` is not, and is kept buildable by the
+pre-commit battery and by CI on macOS — but the window
+shows a placeholder that says so, there is no Tauri
 command in the shell, and nothing in it reaches the corpus. Read those two
 directories as work in progress, not as a second program you can run.
 
@@ -19,7 +21,7 @@ directories as work in progress, not as a second program you can run.
 | Path | Description |
 |------|-------------|
 | [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → a folder of documents with an HTML inventory over them. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
-| [`frontend/`](frontend/) | **Scaffold, no UI yet** — the stack the desktop application will be built on: Svelte 5, Vite, TypeScript, no SvelteKit. `App.svelte` is still the template |
+| [`frontend/`](frontend/) | **Scaffold, no UI yet** — the stack the desktop application will be built on: Svelte 5, Vite, TypeScript, no SvelteKit. `App.svelte` is a placeholder: a heading, a sentence saying the interface is not implemented, and the probe button the E2E scenario clicks |
 | [`src-tauri/`](src-tauri/) | **Scaffold, no commands yet** — the Tauri 2 shell that will host it. It exposes nothing to the window and does not call the parser |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
 
@@ -93,8 +95,13 @@ be opened"*, the second being what a quarantined download usually produces.
 Open it once through the exception, or clear the quarantine flag:
 
 ```bash
-xattr -d com.apple.quarantine /Applications/Aruna.app   # then run it normally
+xattr -dr com.apple.quarantine /Applications/Aruna.app   # then run it normally
 ```
+
+`-r` because the flag is set on files inside the bundle as well as on the
+bundle itself, and clearing only the top one leaves the copy that stops it
+opening. Point it wherever the `.app` actually is — `/Applications` is where
+this project suggests putting it, not where macOS requires it.
 
 Finder's route to the same exception: right-click the app → **Open** → **Open**
 in the dialog. On Ventura and later a blocked app can also be allowed under
@@ -109,12 +116,20 @@ checks it.
 
 **There is no desktop application yet.** What is in the tree is the stack it
 will be built on, wired end to end and kept green: `pnpm dev` opens a window,
-and what that window shows is Vite's Svelte template with a counter in it. The
-shell registers no `#[tauri::command]`, so nothing the window could click
-reaches the parser, and the corpus cannot be opened from it.
+and what that window shows is a prototype screen saying so. **The screen is
+deliberately disposable.** Every maintenance pass draws it again through
+`/design` and rebuilds it by hand in `App.svelte` and `app.css`; that is how the
+design tool is kept proven against this stack — Svelte 5 and Vite without
+SvelteKit — rather than assumed to work with it. What survives each round is not
+the markup but the contract: the heading, the sentence about the unimplemented
+interface, and one probe button, which the end-to-end test clicks to prove that a
+state change reaches the DOM in the WKWebView this system ships. The shell
+registers no `#[tauri::command]`, so nothing the window could click reaches the
+parser, and the corpus cannot be opened from it.
 
 The commands below therefore build and check the scaffold, not a product. They
-are here because the scaffold is under CI and has to stay buildable; the first
+are here because the scaffold has to stay buildable, and — since no CI job
+compiles `src-tauri` — running them is the only thing that says it still is; the first
 real command — `build_corpus` with its progress events — is the next piece of
 work, and [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what
 the Rust core still owes it.
@@ -162,15 +177,16 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 ## Releases
 
-**[v2.3.0](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
+**[v2.5.0](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
 current release — the one to download.** It is what `Releases` marks *Latest*,
 and it is the only version this project asks anyone to install.
 
 Three older releases are kept as **references**: states this project measures
 itself against and can fall back to when a fault has to be bracketed in time.
 They are baselines for the people working on it, not versions to run — a
-reference is by definition behind. Everything else has been withdrawn along with
-its tag and its DMG.
+reference is by definition behind. Superseded releases between them — v2.2.0 and
+v2.3.0 — are left published rather than withdrawn: they are neither references
+nor the version to install, and nothing points a reader at them.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
 

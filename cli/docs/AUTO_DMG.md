@@ -21,17 +21,17 @@
 
 | Событие | Действие |
 |---------|----------|
-| push / PR в `main` | Сборка на `macos-14` → artifact DMG |
-| `workflow_dispatch` | То же вручную |
-| tag `v1.0.3` | DMG + **GitHub Release** |
+| push / PR в `main` | Тесты и clippy, полный разбор корпуса, проверки фронтенда. DMG **не** собирается |
+| `workflow_dispatch` | То же плюс Universal `.app` и DMG артефактом сборки |
+| tag `v*` | То же плюс DMG и **GitHub Release** |
 
 ```bash
-# ручной запуск
+# ручной запуск: соберет артефакт, но релиза не выпустит
 gh workflow run release-dmg.yml
 
-# релиз
-git tag v1.0.3
-git push origin v1.0.3
+# релиз: тег обязан совпадать с version в cli/Cargo.toml — CI это проверяет
+git tag v2.5.0
+git push origin v2.5.0
 ```
 
 ## Локально

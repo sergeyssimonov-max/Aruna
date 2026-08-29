@@ -6,7 +6,7 @@ without the layers below them changing.
 
 The environment, the frontend stack, the pinned versions and the checks that
 guard them are **not** described here. They are fixed by
-`tauri-frontend-spec-v3.md` (редакция 3, 2026-08-23), which is normative; this
+[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 8, 2026-08-29), which is normative; this
 document is about the Rust that runs underneath it.
 
 ---
@@ -15,8 +15,8 @@ document is about the Rust that runs underneath it.
 
 | | |
 |---|---|
-| `cli/` | package `aruna` 2.2.0 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
-| `src-tauri/` | package `aruna` 0.1.0, library `aruna_lib` — the desktop shell. Today a proving ground for the frontend stack: it opens a window and contains no application logic. |
+| `cli/` | package `aruna` 2.5.0 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
+| `src-tauri/` | package `aruna-desktop` 0.1.0, library `aruna_desktop_lib` — the desktop shell. Today a proving ground for the frontend stack: it opens a window and contains no application logic. |
 
 They are **independent crates with separate `Cargo.lock` files**, not a
 workspace. Nothing in `src-tauri/` depends on `cli/` yet, and that is the
@@ -136,15 +136,21 @@ against the real corpus.
 At `app`, and the wiring has been compiled rather than imagined. Adding
 
 ```toml
-aruna_core = { package = "aruna", path = "../cli" }
+aruna = { path = "../cli" }
 ```
 
-to `src-tauri/Cargo.toml` makes `aruna_core::app::build_corpus`,
-`job::{Cancel, Job}` and `progress::Progress` reachable from the shell; both
-packages being named `aruna` is not an obstacle, because their library names
-differ (`aruna` and `aruna_lib`). Verified on 2026-08-23 and then reverted: an
-unused dependency is a `cargo-machete` finding, and there is nothing to call it
-from until the first real command exists.
+to `src-tauri/Cargo.toml` makes `aruna::app::build_corpus`, `job::{Cancel, Job}`
+and `progress::Progress` reachable from the shell. Verified on 2026-08-23 and
+then reverted: an unused dependency is a `cargo-machete` finding, and there is
+nothing to call it from until the first real command exists. What was reverted
+is that dependency line, not the rename described below.
+
+**It used to need renaming on import.** Both packages were called `aruna`, so
+the line read `aruna_core = { package = "aruna", path = "../cli" }` and rested
+on the two library names differing — `aruna` and `aruna_lib`. The shell was
+renamed to package `aruna-desktop`, library `aruna_desktop_lib`, which removes
+the collision at its source: the dependency is now an ordinary one, and there
+is no second name for a reader to keep in their head.
 
 What that adapter will own, and the core will not: job identifiers, IPC events,
 the dialog and opener plugins, the store, the window. What it will need from

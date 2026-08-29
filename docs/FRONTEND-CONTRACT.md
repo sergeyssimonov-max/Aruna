@@ -16,9 +16,9 @@ one took with it, and what the core still owes the new one.
 |---|---|
 | where | `frontend/` (Svelte 5, Vite, TypeScript) and `src-tauri/` (Tauri 2) |
 | package manager | pnpm only, pinned by `packageManager` in the root `package.json` |
-| entry | `src-tauri/src/main.rs` → `aruna_lib::run()` |
+| entry | `src-tauri/src/main.rs` → `aruna_desktop_lib::run()` |
 | plugins | dialog, opener, store, window-state, log |
-| checked by CI | the frontend only: `pnpm check`, `pnpm test` and `pnpm build` in `frontend/` |
+| checked by CI | `pnpm check`, `pnpm lint`, `pnpm format:check`, `pnpm test:unit` and `pnpm build` in `frontend/`; `cargo fmt`, `clippy --all-features`, `nextest` and `cargo deny` for `src-tauri/`, on macOS because that is the only platform this targets |
 | bundle | `pnpm build` targets `universal-apple-darwin` — Intel and Apple Silicon in one binary |
 
 There is no SvelteKit: no `@sveltejs/kit`, no adapter, no `svelte-kit` command.
@@ -105,7 +105,7 @@ binary out of `cli/src/generated/`. What is left is the markup of
 | build | `pnpm build:inventory` in `frontend/`, options in `build/inventory.ts` |
 | artifacts | `cli/src/generated/{inventory_filter.js,canonical.css,screen.css,print.css}`, **committed**, never edited by hand |
 | compiled in by | `html::INVENTORY_SCRIPT`, `style::{SHARED,INVENTORY,PRINT}` |
-| behaviour | `frontend/src/inventory/filter.test.ts`, 15 tests against a document in the shape `html.rs` writes |
+| behaviour | `frontend/src/inventory/filter.test.ts`, 14 tests against a document in the shape `html.rs` writes |
 | the artifacts are current | `frontend/tests/inventory-artifact.test.ts` |
 
 **The three sections stay three files.** The order they are emitted in *is* the
@@ -260,7 +260,7 @@ app's, holding `@tauri-apps/cli`, the pnpm pin and four scripts.
    `frontend/tests/font-stack.test.ts` reads `frontend/src/inventory/canonical.css` and
    `frontend/src/app.css` and fails if the cuneiform stack in one is not
    mirrored in the other — in composition, in order, and in being referenced by
-   all three of the frontend's font variables. It runs as `pnpm test`, in the
+   all three of the frontend's font variables. It runs as `pnpm test:unit`, in the
    `Check + build (frontend)` CI job, and it is mutation-tested: dropping a face,
    leaving `--corpus` defined but unused, and reordering the Rust side each make
    it fail.
