@@ -181,20 +181,25 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 current release — the one to download.** It is what `Releases` marks *Latest*,
 and it is the only version this project asks anyone to install.
 
-Three older releases are kept as **references**: states this project measures
-itself against and can fall back to when a fault has to be bracketed in time.
-They are baselines for the people working on it, not versions to run — a
-reference is by definition behind. Superseded releases between them — v2.2.0 and
-v2.3.0 — are left published rather than withdrawn: they are neither references
-nor the version to install, and nothing points a reader at them.
+**Three releases are published, and no others.** Two are kept as **references**:
+states this project measures itself against and can fall back to when a fault
+has to be bracketed in time. They are baselines for the people working on it,
+not versions to run — a reference is by definition behind. The release above is
+the third of them, so the one to install is a baseline too.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.1.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.1.0) carries the 2.x one, and is the newest of the three — the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. From 2.2.0 the program writes that folder itself: until then the export existed in the crate and only an example called it. 2.3.0 gave up the standalone inventory that had been written beside it — two files of the same name in one folder, and the one a reader opens first was the one without links.
+[v2.5.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.0) is the third: the release named at the top of this section.
 
-Three, spread across the project rather than clustered at its end, which is what makes them useful: a fault introduced this week is bracketed by v2.1.0, and one that turns out to be much older still has a floor under it.
+**What that costs, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
+withdrawn on 2026-08-30 — tags and DMGs both. Until then the three references
+were deliberately spread across the project, and v2.1.0 was what bracketed a
+fault introduced recently from below; nothing between v1.0.9 and v2.5.0 does
+that now. The floor still holds, and the history of what changed when is in the
+commits, which were not touched. The next reference worth adding is the first
+2.x state after this one that is worth falling back to.
 
 All three are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if any tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to point at.
 
