@@ -11,10 +11,18 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references, spread across the project rather than clustered at its end. v1.0.5 is",
-    "the floor, v1.0.9 closes the 1.x line, v2.1.0 opens the 2.x one. A release cannot record",
-    "itself — the commit it names is the commit that carries it, and no file can contain its",
-    "own hash — so each entry here is added by the commit after the release it describes.",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.0 is the",
+    "current release, made a reference on 2026-08-30 by the owner's decision. A release",
+    "cannot record itself — the commit it names is the commit that carries it, and no file",
+    "can contain its own hash — so each entry here is added by the commit after the release",
+    "it describes.",
+    "",
+    "They used to be spread across the project rather than clustered at its end, and v2.1.0",
+    "was the third. It was withdrawn with v2.2.0, v2.3.0 and v2.4.0 on 2026-08-30, so the 2.x",
+    "line is now represented by its head alone. What that costs is named rather than hidden:",
+    "a fault introduced this week is no longer bracketed from below by anything nearer than",
+    "v1.0.9. The next reference worth adding is the first 2.x state after this one that is",
+    "worth falling back to.",
     "",
     "Adding or changing any value below is a deliberate act and shows up in the diff as one."
   ],
@@ -34,11 +42,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.1.0",
-      "commit": "684dd8a7130b220bd566c5b0579921fc72321258",
-      "published": "2026-08-23T22:17:40Z",
-      "dmg_sha256": "682306b14bf9e844ad25e8b74fae8c702deabe48d400c0274c96453d8d58633c",
-      "why": "The third reference and the one that carries the 2.x line: the corpus as a folder that can be opened, the CTH pages given up, and the inventory's own script and stylesheet built by the frontend stack rather than written by hand. It replaced v2.0.0, which was withdrawn on 2026-08-24 along with its tag and its DMG."
+      "tag": "v2.5.0",
+      "commit": "1fcd23c564f201b3c4e17738cdf9f564acb82319",
+      "published": "2026-08-29T22:12:27Z",
+      "dmg_sha256": "75a958295ac5e94ff819bda649dcf41e2084544fb9f53088e00a1dee9258a294",
+      "why": "The current release and the third reference: two questions answered before any work, a seam a window can name a destination through, four ceilings and a retry policy where they were missing, and a zip floor that closes RUSTSEC-2025-0168. It replaced v2.1.0, withdrawn on 2026-08-30 together with v2.2.0, v2.3.0 and v2.4.0."
     }
   ]
 }
