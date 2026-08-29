@@ -26,6 +26,18 @@
 # when it was measured.
 #
 # Add one back the day this crate is published, and measure it then.
+#
+# `targets` is here for the same reason the channel is. A toolchain rustup
+# installs comes with the host target and nothing else, and targets are per
+# toolchain — so pinning the channel above quietly dropped
+# `x86_64-apple-darwin`, which had been added to whatever toolchain used to be
+# default. Nothing failed: CI names both targets itself when it installs the
+# compiler, so the release DMG kept coming out universal, and only `pnpm build`
+# on a developer's machine broke — with an error about a target the
+# specification lists as installed. Declaring them here means rustup installs
+# both before the first build, on any machine, and the next time the channel is
+# raised it does not have to be remembered.
 [toolchain]
 channel = "1.97.1"
 components = ["rustfmt", "clippy"]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
