@@ -434,7 +434,16 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     steps:
+      # Full history, and `build_app.sh` is why: it takes the bundle's
+      # `CFBundleVersion` from `git rev-list --count HEAD`, so that LaunchServices
+      # — which caches an application by that number — can tell two releases
+      # apart. A shallow checkout has one commit, so the published DMG carried
+      # build 1 while the same commit built locally carried 168. Nothing failed
+      # loudly; it was found by mounting the published image and reading its
+      # Info.plist.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       # As above: the pin in rust-toolchain.toml decides, and the DMG is the
       # artifact where a surprise compiler is least welcome.

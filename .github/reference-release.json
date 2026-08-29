@@ -40,13 +40,6 @@
       "published": "2026-08-17T21:53:21Z",
       "dmg_sha256": "0395b641dd94671166e44d4b3bc29b0ccf988a522119706bd1511825a5cd9b2e",
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
-    },
-    {
-      "tag": "v2.5.0",
-      "commit": "1fcd23c564f201b3c4e17738cdf9f564acb82319",
-      "published": "2026-08-29T22:12:27Z",
-      "dmg_sha256": "75a958295ac5e94ff819bda649dcf41e2084544fb9f53088e00a1dee9258a294",
-      "why": "The current release and the third reference: two questions answered before any work, a seam a window can name a destination through, four ceilings and a retry policy where they were missing, and a zip floor that closes RUSTSEC-2025-0168. It replaced v2.1.0, withdrawn on 2026-08-30 together with v2.2.0, v2.3.0 and v2.4.0."
     }
   ]
 }
