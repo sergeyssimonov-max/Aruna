@@ -2,11 +2,11 @@
  * The decisions the specification fixed, checked against the files that hold
  * them.
  *
- * `tauri-frontend-spec-v3.md` (редакция 3, 2026-08-23) settles a long list of
+ * `docs/PROJECT-SPEC.ru.md` (редакция 8, 2026-08-29) settles a long list of
  * things by name — a package manager, an engine floor, a bundle identifier,
  * which Tauri plugins are registered and under which permissions, and the whole
  * mechanism by which the end-to-end contour is kept out of a release build. Its
- * §9.16 then says, in as many words, what counts as a violation.
+ * §6.5 then says, in as many words, what counts as a violation.
  *
  * Until now every one of those was held by someone remembering. Several of them
  * fail *silently*: a `build.target` quietly raised produces a bundle that runs
@@ -14,7 +14,7 @@
  * the scanned capabilities directory breaks the ordinary build with an error
  * about a plugin nobody registered; a `tauri-plugin-log` registered under the
  * `e2e` feature panics at start-up because the wdio crates install a global
- * logger first. The specification's own deviation log (§9.20) is a list of
+ * logger first. The specification's own deviation log (§7.1) is a list of
  * exactly these, each found the hard way.
  *
  * So this file reads the real configuration and fails when it stops saying what

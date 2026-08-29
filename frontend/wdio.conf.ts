@@ -10,7 +10,7 @@ export const config: WebdriverIO.Config = {
     {
       browserName: 'tauri',
       'tauri:options': {
-        application: '../src-tauri/target/debug/aruna',
+        application: '../src-tauri/target/debug/aruna-desktop',
       },
     } as WebdriverIO.Capabilities,
   ],

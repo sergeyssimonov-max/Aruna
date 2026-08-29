@@ -11,11 +11,27 @@ export default ts.config(
   prettier,
   ...svelte.configs['flat/prettier'],
   {
-    files: ['**/*.svelte'],
+    files: ['src/**/*.ts'],
+    extends: [...ts.configs.recommendedTypeChecked],
     languageOptions: {
-      parser: svelteParser,
-      parserOptions: { parser: ts.parser },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
   },
-  { ignores: ['dist/', 'node_modules/'] },
+  {
+    files: ['**/*.svelte'],
+    extends: [...ts.configs.recommendedTypeChecked],
+    languageOptions: {
+      parser: svelteParser,
+      parserOptions: {
+        parser: ts.parser,
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+        extraFileExtensions: ['.svelte'],
+      },
+    },
+  },
+  { ignores: ['dist/', 'node_modules/', 'coverage/'] },
 )

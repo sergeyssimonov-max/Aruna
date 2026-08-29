@@ -76,251 +76,117 @@
     --social-bg: rgba(47, 48, 58, 0.5);
     --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
 }
+
+/* The window, while it holds a placeholder.
+ *
+ * The screen this styles is redrawn through `/design` on every maintenance
+ * pass — see the note in `App.svelte` — so these rules are expected to move.
+ * What does not move is what they style: a heading, a sentence, and the probe
+ * button the end-to-end scenario clicks. The tokens above stay whatever the
+ * screen becomes: they are this application's palette and its font stack, and
+ * the stack is mirrored from `src/inventory/canonical.css` under the eye of
+ * `tests/font-stack.test.ts`. */
 
 body {
   margin: 0;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+/* Left-aligned and vertically centred, not centred both ways: the column reads
+ * as the top of a document, which is what a window that sends the reader back
+ * to the terminal should look like.
+ *
+ * The narrow step is not a phone rule — this application has no phone. It is
+ * the window the reader actually gets: `tauri-plugin-window-state` reopens it
+ * at whatever size it was last left, and a manual check on 2026-08-29 found it
+ * restored to 321×262 points, where the generous spacing pushed the probe
+ * button below the fold. Below 1024px the column takes the width back from the
+ * margins, which is what turns six lines of the sentence into four. */
+#app {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  padding: 64px 72px;
+  box-sizing: border-box;
+
+  @media (max-width: 1024px) {
+    padding: 12px 24px;
+  }
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+  max-width: 46ch;
+
+  @media (max-width: 1024px) {
+    gap: 10px;
+  }
 }
 
 h1 {
+  font-family: var(--heading);
+  font-weight: 500;
   font-size: 56px;
+  line-height: 100%;
   letter-spacing: -1.68px;
-  margin: 32px 0;
+  color: var(--text-h);
+  margin: 0;
+
   @media (max-width: 1024px) {
     font-size: 36px;
-    margin: 20px 0;
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+
+/* The rule under the heading, and the only structure on the screen. Its own
+ * element rather than a border on the heading: it spans the column, not the
+ * word. */
+hr {
+  width: 100%;
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: var(--border);
 }
+
 p {
   margin: 0;
+  text-wrap: pretty;
 }
 
-code,
-.counter {
+/* The engine probe.
+ *
+ * It carries its border at rest rather than on hover: the screen holds one
+ * control and nothing else, and a button that only looks like one under the
+ * pointer reads as text on a page a reader is told is not finished. Hover
+ * deepens the edge to the accent itself — the same two tokens, no third. */
+.probe {
   font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
-.counter {
   font-size: 16px;
-  padding: 5px 10px;
+  line-height: 145%;
+  display: inline-flex;
+  margin-top: 4px;
+  padding: 7px 14px;
   border-radius: 5px;
   color: var(--accent);
   background: var(--accent-bg);
-  border: 2px solid transparent;
+  border: 2px solid var(--accent-border);
   transition: border-color 0.3s;
-  margin-bottom: 24px;
 
   &:hover {
-    border-color: var(--accent-border);
+    border-color: var(--accent);
   }
   &:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-}
 
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg) scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg) scale(0.8);
-  }
-}
-
-#app {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
+  /* The extra breath above the control is what the gap already gives once the
+   * gap is the narrow one; keeping both is four points the button does not
+   * have. */
   @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
-}
-
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
-  width: 100%;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
-
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
+    margin-top: 0;
   }
 }
