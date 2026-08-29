@@ -436,7 +436,20 @@ fn a_redirect_loop_gives_up_instead_of_going_round_for_ever() {
         (outcome, started.elapsed())
     });
 
-    assert!(outcome.is_err(), "a redirect loop was followed to a result");
+    // `let Err` rather than `expect_err`: `Archive` carries no `Debug`, and
+    // giving it one to phrase an assertion would be the test deciding what the
+    // type looks like.
+    let Err(error) = outcome else {
+        panic!("a redirect loop was followed to a result");
+    };
+    // What the client decided, said again to whoever is watching. `Failure`
+    // called every network failure retryable, so the one transport failure this
+    // client knows to be settled was the one a window would have offered
+    // *Retry* for — 71 MiB fetched again to walk the identical chain.
+    assert!(
+        !aruna::app::Failure::of(&error).retryable,
+        "a window was offered Retry for a redirect loop"
+    );
     assert!(
         elapsed < Duration::from_secs(60),
         "gave up only after {elapsed:?}"

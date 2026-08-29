@@ -148,8 +148,10 @@ pub struct Placed {
 /// Folding here decides it in one place instead, for every platform alike: the
 /// second document is disambiguated exactly as an exact clash is, so the package
 /// a Mac writes and the package a Linux machine writes are the same package.
-/// ASCII folding is enough — every name in this corpus is Latin sigla and
-/// digits — and it does not touch what is written, only what is compared.
+/// The folding is Unicode `to_lowercase`, not an ASCII one. Every name in this
+/// corpus is Latin sigla and digits, where the two answers agree; the wider rule
+/// costs nothing and does not surprise the day a name arrives that is neither.
+/// It does not touch what is written, only what is compared.
 fn collision_key(relative: &Path) -> String {
     relative.to_string_lossy().to_lowercase()
 }
@@ -313,7 +315,12 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         job,
     )?;
 
-    let records: Vec<ManuscriptRecord> = fragments.iter().map(|f| f.record.clone()).collect();
+    // Moved out of the fragments rather than copied out of them: the archive
+    // paths are what a fragment carries beyond its record, and the last thing
+    // that wanted them was the pass above. Cloning here duplicated every one of
+    // 23 936 records — ten owned strings each — beside the originals, which then
+    // stayed alive to the end of the build with nothing left to read them.
+    let records: Vec<ManuscriptRecord> = fragments.into_iter().map(|f| f.record).collect();
 
     // What every document shows, decided once. Both pages are written from
     // this and neither re-derives a name, a link or a fact of its own — see
@@ -627,6 +634,8 @@ fn write_documents(
     // allocation for all 24 000 of them.
     let mut bytes = Vec::new();
     let mut normalised = Vec::new();
+    // See the write below: the directory this loop made last.
+    let mut last_dir: Option<PathBuf> = None;
 
     for i in 0..archive.len() {
         // Between documents. Each one is inflated, normalised, checked against
@@ -699,7 +708,19 @@ fn write_documents(
 
         let out = staging.join(relative);
         if let Some(parent) = out.parent() {
-            create_dir(parent)?;
+            // The last directory made, remembered. The archive lists a group's
+            // documents together, so 23 936 documents ask about 663
+            // directories — and `create_dir_all` on one that exists is still a
+            // syscall per document, measured at 219 ms of a six-second run.
+            //
+            // Only ever skips a directory this loop made itself, moments ago,
+            // inside a staging directory named for this process. A cache that
+            // is wrong is a cache that is stale, and there is nothing here to
+            // go stale against.
+            if last_dir.as_deref() != Some(parent) {
+                create_dir(parent)?;
+                last_dir = Some(parent.to_path_buf());
+            }
         }
         // `create_new` rather than `create`: if anything ever computed the same
         // path twice, the filesystem says so instead of the second silently

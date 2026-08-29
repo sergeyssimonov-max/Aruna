@@ -240,7 +240,7 @@ impl<'a> Job<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::progress::Silent;
+    use crate::progress::{Progress, Silent};
 
     #[test]
     fn a_fresh_run_is_not_cancelled_and_a_cancelled_one_stays_cancelled() {
@@ -325,6 +325,52 @@ mod tests {
         let names: std::collections::BTreeSet<&str> =
             phases.iter().map(|(p, _)| p.code()).collect();
         assert_eq!(names.len(), phases.len());
+    }
+
+    /// A job is carried to the thread the work runs on, and the handle stays
+    /// with the caller — so both halves have to cross a thread boundary.
+    ///
+    /// Stated as a compile-time assertion rather than left to be discovered:
+    /// the day something in here stops being `Send` it stops being possible to
+    /// build the corpus off the main thread, and the error would appear at the
+    /// call site in the desktop crate rather than here.
+    #[test]
+    fn a_job_and_its_handle_cross_thread_boundaries() {
+        fn shared<T: Send + Sync>() {}
+        shared::<Cancel>();
+        shared::<Job<'static>>();
+        shared::<&'static dyn Progress>();
+    }
+
+    /// The sink is handed back as it was handed in.
+    ///
+    /// `progress()` is what a caller uses to pass the job's sink to something
+    /// that still takes a `&dyn Progress` of its own. Nothing in this crate
+    /// does yet — the accessor is here for the window — so this is what says it
+    /// works: reporting through the job and through the sink it returns has to
+    /// reach the same place.
+    #[test]
+    fn the_sink_a_job_carries_is_the_sink_it_was_given() {
+        #[derive(Default)]
+        struct Counting(std::sync::atomic::AtomicUsize);
+        impl Progress for Counting {
+            fn report(&self, _event: Event<'_>) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        let sink = Counting::default();
+        let cancel = Cancel::new();
+        let job = Job::new(&sink, &cancel);
+
+        job.report(Event::ParsingArchive);
+        job.progress().report(Event::CheckingPackage);
+
+        assert_eq!(
+            sink.0.load(Ordering::Relaxed),
+            2,
+            "one of the two reports went somewhere else"
+        );
     }
 
     #[test]

@@ -9,6 +9,17 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
+    // Answered before anything else, because everything else is work: reading
+    // the environment, then either a 71 MiB download or a full pass over the
+    // corpus. Until now `--version` was a word the program never looked at, so
+    // the answer to it was a package in the reader's Downloads folder — see
+    // §7.3 of the specification, which recorded that as an open position and
+    // named this as the minimal answer.
+    if asks_what_this_is() {
+        print!("{}", usage());
+        return ExitCode::SUCCESS;
+    }
+
     // Optional override for offline / testing: ARUNA_ZIP=/path/to/archive.zip
     let local = std::env::var_os("ARUNA_ZIP").map(PathBuf::from);
 
@@ -50,6 +61,44 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Whether the first word on the command line is one of the two questions.
+///
+/// Two flags, and deliberately no parser. This program takes no arguments —
+/// the corpus, the destination and the output name are all decided for it — so
+/// there is no command line to read; what it needs is an answer to "what is
+/// this and how do I point it at a file I already have".
+///
+/// `-h`, `-V`, a subcommand or a second flag further along the line are not
+/// recognised, and the run proceeds as it always has: inventing a command line
+/// this program does not have would be a larger change than the one asked for,
+/// and `tests/cli_process.rs` holds both halves of that.
+fn asks_what_this_is() -> bool {
+    matches!(
+        std::env::args_os()
+            .nth(1)
+            .as_deref()
+            .and_then(|arg| arg.to_str()),
+        Some("--help" | "--version")
+    )
+}
+
+/// The name, the version and the one environment variable that changes a run.
+///
+/// The version is taken from the manifest rather than written out: a number
+/// repeated by hand is a number that stops being true — `download::user_agent`
+/// told Zenodo `Aruna/1.0` through the whole 2.x line for exactly that reason.
+fn usage() -> String {
+    format!(
+        "Aruna {} – опись корпуса TLHdig (Zenodo) в HTML.\n\
+         \n\
+         Запускается без аргументов: берет архив из кеша или скачивает его\n\
+         с Zenodo (71 МиБ), собирает пакет с описью в папке Downloads.\n\
+         \n\
+         ARUNA_ZIP=/путь/к/архиву.zip – взять готовый архив вместо загрузки.\n",
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 /// Print the failure, its cause, and what the person in front of it can do.
@@ -124,6 +173,18 @@ fn advice(err: &ArunaError) -> Option<String> {
         // it cannot say is that a body which outruns its own header is almost
         // never Zenodo, and that the one case where it is has a fix in the
         // source rather than in the network.
+        // Two ceilings raise this, and they are different accidents: the
+        // archive outrunning what its own header promised, and a question
+        // answered with more than a record document can be. Naming the wrong
+        // constant sends the reader to the wrong line of the source.
+        ArunaError::Oversized { limit, .. } if *limit == aruna::download::MAX_METADATA => {
+            "Ответ на запрос о записи оказался длиннее, чем запись бывает.\n\
+             Обычно это значит, что вместо Zenodo ответил кто-то другой —\n\
+             портал Wi-Fi, корпоративный прокси или подмена ответа.\n\
+             Если же запись просто выросла — предел поднимается в исходниках\n\
+             (MAX_METADATA в cli/src/download.rs)."
+                .to_string()
+        }
         ArunaError::Oversized { .. } => "Ответ оказался длиннее, чем сервер сам объявил.\n\
              Обычно это значит, что до Zenodo дотянулось что-то по дороге —\n\
              портал Wi-Fi, корпоративный прокси или подмена ответа.\n\

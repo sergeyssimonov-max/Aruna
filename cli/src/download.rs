@@ -79,6 +79,16 @@ const MAX_RETRY_AFTER: Duration = Duration::from_secs(30);
 /// short of any volume it would be reasonable to fill.
 const MAX_DOWNLOAD: u64 = 1024 * 1024 * 1024;
 
+/// The most a metadata answer may be. Zenodo's record documents run to a few
+/// tens of KiB; this is two orders of magnitude above that, and the point of it
+/// is that a repository answering a question with a gigabyte is not answering
+/// the question.
+///
+/// Public because the binary reads it: [`ArunaError::Oversized`] is raised
+/// against two different ceilings, and the advice a reader is given has to say
+/// which one was hit.
+pub const MAX_METADATA: u64 = 4 * 1024 * 1024;
+
 /// Download `url` into `dest`, retrying transient failures and rejecting the
 /// result unless it hashes to `expected_md5`.
 ///
@@ -128,7 +138,12 @@ pub fn download_verified(
 /// These say the server could not serve the request *right now*: overloaded,
 /// rate-limiting, a bad gateway in front of it. Every other status is a verdict
 /// on the request itself, and repeating it only hammers the archive.
-fn is_retryable_status(status: u16) -> bool {
+///
+/// Read by `app::Failure` as well, which is why it is not private: a front end
+/// that offers *Retry* has to agree with the client that does the retrying, and
+/// it agreed by restating the set as a pattern of its own until the two lists
+/// drifted apart over 501 and 505.
+pub(crate) fn is_retryable_status(status: u16) -> bool {
     matches!(status, 408 | 425 | 429 | 500 | 502 | 503 | 504)
 }
 
@@ -146,7 +161,7 @@ fn is_retryable_status(status: u16) -> bool {
 ///
 /// Listing what may be retried rather than what may not also means a kind
 /// nobody anticipated costs one download instead of three.
-fn is_retryable_io(err: &std::io::Error) -> bool {
+pub(crate) fn is_retryable_io(err: &std::io::Error) -> bool {
     matches!(
         err.kind(),
         std::io::ErrorKind::UnexpectedEof
@@ -159,7 +174,10 @@ fn is_retryable_io(err: &std::io::Error) -> bool {
 }
 
 /// Whether another attempt has any chance of succeeding.
-fn is_retryable(err: &ArunaError) -> bool {
+///
+/// The one answer to that question in this crate. `app::Failure` asks it rather
+/// than judging for itself — see [`is_retryable_status`].
+pub(crate) fn is_retryable(err: &ArunaError) -> bool {
     match err {
         // A redirect loop is settled, not transient. Measured before this
         // arm existed: a server redirecting to itself was walked five times
@@ -352,20 +370,55 @@ fn request(url: &str) -> Result<ureq::Response> {
 /// metadata response has any business being. A repository answering a question
 /// with a gigabyte is not answering the question.
 pub fn fetch_text(url: &str, deadline: Duration) -> Result<String> {
-    /// Zenodo's record documents run to a few tens of KiB.
-    const MAX_METADATA: u64 = 4 * 1024 * 1024;
+    fetch_text_within(url, deadline, MAX_METADATA)
+}
 
+/// The limit as an argument, so the boundary can be tested with six bytes
+/// rather than four mebibytes.
+///
+/// **Refusing is the point, and it used to truncate instead.** `take(limit)`
+/// stops reading and hands back what it has, so an answer one byte over the cap
+/// arrived as its first `limit` bytes with nothing to say it had been cut. The
+/// only caller parses the result as JSON ([`crate::zenodo`]), and JSON cut
+/// mid-token fails to parse — so the truncation surfaced as "the repository
+/// sent something that is not a record", which is a false account of what
+/// happened. [`crate::export::validate::read_bounded`] had the same fault and
+/// the same fix: read one byte past the cap, and having got it is proof the
+/// body is over.
+fn fetch_text_within(url: &str, deadline: Duration, limit: u64) -> Result<String> {
     let response = request_within(url, deadline)?;
-    let mut body = String::new();
+
+    // Bytes first, text after the length check, and in that order for a
+    // reason: `read_to_string` validates UTF-8 across the whole read, so a body
+    // cut one byte past the cap in the middle of a multi-byte character failed
+    // as `InvalidData` — and came back as `Network`, which is retryable, rather
+    // than as the refusal this function exists to give. A record document full
+    // of Hittite sigla is exactly where that cut lands mid-character.
+    let mut bytes = Vec::new();
     response
         .into_reader()
-        .take(MAX_METADATA)
-        .read_to_string(&mut body)
+        .take(limit.saturating_add(1))
+        .read_to_end(&mut bytes)
         .map_err(|source| ArunaError::Network {
             url: url.to_string(),
             source: Box::new(source),
         })?;
-    Ok(body)
+
+    if bytes.len() as u64 > limit {
+        return Err(ArunaError::Oversized {
+            url: url.to_string(),
+            limit,
+            got: bytes.len() as u64,
+        });
+    }
+
+    // An answer that is not text at all is still refused — a captive portal
+    // answering with binary is the ordinary way that happens — but now it is
+    // refused for being binary rather than for being long.
+    String::from_utf8(bytes).map_err(|source| ArunaError::Network {
+        url: url.to_string(),
+        source: Box::new(source),
+    })
 }
 
 /// What this program calls itself to a server.
@@ -1138,14 +1191,67 @@ mod tests {
     }
 
     #[test]
-    fn a_flood_is_capped_by_size() {
+    fn a_flood_is_refused_by_size() {
         let flood = vec![b'x'; 8 * 1024 * 1024];
         let server = FakeServer::start(vec![Reply::Body(flood)]);
-        let body = fetch_text(&server.url(), Duration::from_secs(30)).expect("read succeeds");
+        let err = fetch_text(&server.url(), Duration::from_secs(30))
+            .expect_err("a flood is not an answer");
         assert!(
-            body.len() <= 4 * 1024 * 1024,
-            "read {} bytes, which is not a cap",
-            body.len()
+            matches!(err, ArunaError::Oversized { limit, .. } if limit == MAX_METADATA),
+            "an oversized answer came back as {err}"
+        );
+    }
+
+    /// A body cut mid-character is refused as too long, not as not-text.
+    ///
+    /// Three two-byte characters against a three-byte cap: the read stops
+    /// inside the second one. Reading straight into a `String` failed there on
+    /// the invalid UTF-8 and reported a network error — retryable, and about
+    /// the wrong thing.
+    #[test]
+    fn a_cut_inside_a_character_is_still_a_refusal() {
+        let server = FakeServer::start(vec![Reply::Body("ααα".as_bytes().to_vec())]);
+        let err = fetch_text_within(&server.url(), Duration::from_secs(5), 3)
+            .expect_err("six bytes against a three byte cap");
+        assert!(
+            matches!(
+                err,
+                ArunaError::Oversized {
+                    limit: 3,
+                    got: 4,
+                    ..
+                }
+            ),
+            "a cut inside a character came back as {err}"
+        );
+    }
+
+    /// The cap refuses rather than truncates, and it refuses one byte over it.
+    ///
+    /// Exactly at the cap is an answer; a byte past it is not, and the caller
+    /// hears that instead of being handed a prefix it cannot tell from the
+    /// whole.
+    #[test]
+    fn the_metadata_cap_is_a_refusal_and_not_a_prefix() {
+        let server = FakeServer::start(vec![Reply::Body(b"<html>".to_vec())]);
+        assert_eq!(
+            fetch_text_within(&server.url(), Duration::from_secs(5), 6).expect("exactly the cap"),
+            "<html>"
+        );
+
+        let server = FakeServer::start(vec![Reply::Body(b"<html>".to_vec())]);
+        let err = fetch_text_within(&server.url(), Duration::from_secs(5), 5)
+            .expect_err("one byte over the cap");
+        assert!(
+            matches!(
+                err,
+                ArunaError::Oversized {
+                    limit: 5,
+                    got: 6,
+                    ..
+                }
+            ),
+            "one byte over came back as {err}"
         );
     }
 

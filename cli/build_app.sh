@@ -16,6 +16,10 @@ if [[ -z "${APP_VERSION}" ]]; then
   echo "error: could not read version from Cargo.toml" >&2
   exit 1
 fi
+# The build number, monotonic where the marketing version is not. Zero outside a
+# git checkout — a source tarball still builds, it just cannot say which build
+# it is.
+BUILD_NUMBER="$(git -C "${ROOT}" rev-list --count HEAD 2>/dev/null || echo 0)"
 APP_DIR="${ROOT}/${APP_NAME}.app"
 ICON_MASTER="${ROOT}/icon.png"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/aruna-app.XXXXXX")"
@@ -158,8 +162,15 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
   <string>${APP_VERSION}</string>
+  <!-- The build identity, and macOS treats it as one: LaunchServices caches an
+       application by CFBundleVersion, so a fixed "1" made every release look
+       like the same build to the system that has to notice it changed.
+       The marketing version is not enough on its own here, because this
+       project's ordinary release operation is recutting a tag rather than
+       bumping it — two builds of v2.4.0 would share a number again. The commit
+       count moves with every commit, including the one a recut points at. -->
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>${BUILD_NUMBER}</string>
   <key>LSMinimumSystemVersion</key>
   <string>${MIN_SYSTEM}</string>
   <key>NSHighResolutionCapable</key>

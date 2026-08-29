@@ -317,6 +317,14 @@ pub fn check_destination(root: &Path) -> Result<()> {
     if !root.join(format!("{PACKAGE}.html")).is_file() {
         return refuse(format!("there is no {PACKAGE}.html in it"));
     }
+    // The name the writer gives the group of documents the corpus files under
+    // no CTH number: `dir_component` of the missing-value dash. Taken from the
+    // writer's own rule rather than written out here, because that is what
+    // decides it — and until this line existed the exporter refused to replace
+    // a package it had written itself, naming that folder as something it did
+    // not put there.
+    let ungrouped = dir_component(crate::parse::MISSING);
+
     let entries = fs::read_dir(root).map_err(ArunaError::io(root))?;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
@@ -324,7 +332,7 @@ pub fn check_destination(root: &Path) -> Result<()> {
         // `.DS_Store` is the Finder's business rather than a reason to refuse
         // to replace our own package.
         let ours = super::is_root_file(&name)
-            || (entry.path().is_dir() && name.starts_with("CTH"))
+            || (entry.path().is_dir() && (name.starts_with("CTH") || name == ungrouped))
             || name == ".DS_Store";
         if !ours {
             return refuse(format!(
@@ -547,6 +555,43 @@ mod tests {
         fs::create_dir_all(ours.join("CTH 1")).expect("mkdir");
         fs::write(ours.join(format!("{PACKAGE}.html")), b"<html>").expect("write");
         check_destination(&ours).expect("our own build may be replaced");
+    }
+
+    /// The folder a package makes for documents the corpus files under no CTH
+    /// number is this exporter's own too.
+    ///
+    /// Every other group directory is named `CTH …`, and the check recognised
+    /// its own work by that prefix alone — so a package holding one
+    /// unclassified document could not be rebuilt over. The second run refused
+    /// the destination the first had written a minute earlier, naming the
+    /// missing-value dash as something "this exporter did not put there", and
+    /// advised the reader to move their package aside. Reproduced end to end
+    /// with the release binary on a three-document archive carrying no CTH
+    /// number in either its paths or its documents.
+    ///
+    /// TLHdig Beta 0.3 files all 663 of its groups under a number, so nothing
+    /// in the corpus as it stands reaches this. A republished edition with one
+    /// unclassified document does.
+    #[test]
+    fn the_folder_for_documents_without_a_cth_number_is_ours_as_well() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path().join(PACKAGE);
+        fs::create_dir_all(&root).expect("mkdir");
+
+        let fragments = vec![fragment(
+            "KBo 1.1",
+            crate::parse::MISSING,
+            "root/x_XML_HFR/a.xml",
+        )];
+        let placed = package(&root, &fragments);
+
+        let ungrouped = dir_component(crate::parse::MISSING);
+        assert_eq!(
+            placed[0].relative.parent().and_then(|p| p.to_str()),
+            Some(ungrouped.as_str()),
+            "the writer files an unclassified document under the missing-value dash"
+        );
+        check_destination(&root).expect("a package this exporter wrote may be rebuilt over");
     }
 
     #[test]

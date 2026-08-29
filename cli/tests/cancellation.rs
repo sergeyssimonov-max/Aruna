@@ -223,6 +223,66 @@ fn a_cancelled_rebuild_leaves_the_existing_package_untouched() {
     );
 }
 
+/// Stopping is not a state the program has to be restarted out of.
+///
+/// The clause a window depends on: a person clicks *Cancel*, then clicks
+/// *Build* again, and the second run has to produce the whole package — in the
+/// same process, with no leftover to trip over and no memory of the first
+/// attempt. `a_cancelled_rebuild_leaves_the_existing_package_untouched` is the
+/// other half, and stops where the cancellation does.
+///
+/// Three things are asserted, and the first is the one that would fail
+/// quietly: after the cancelled run the destination holds *nothing* — no
+/// staging directory, no `.previous`, no partial package. A leftover would not
+/// break the second run, it would sit beside its output for good.
+#[test]
+fn a_run_stopped_half_way_is_followed_by_a_complete_one() {
+    let (_dir, zip, destination) = scene(40);
+    let elsewhere = tempdir().expect("tempdir");
+
+    let cancel = Cancel::new();
+    let sink = CancelAt::new("WritingDocuments", &cancel);
+    let stopped = export::build(&zip, &destination, "label", &Job::new(&sink, &cancel));
+    assert!(matches!(stopped, Err(ArunaError::Cancelled { .. })));
+    assert_eq!(
+        files(&destination),
+        Vec::<PathBuf>::new(),
+        "the cancelled run left something behind in the destination"
+    );
+
+    // The same process, a fresh handle, and nothing said about the first
+    // attempt.
+    let again = export::build(&zip, &destination, "label", &Job::unattended())
+        .expect("the second run builds");
+    let reference = export::build(&zip, elsewhere.path(), "label", &Job::unattended())
+        .expect("a run that was never stopped");
+    assert_eq!(again.documents, reference.documents);
+    assert_eq!(again.groups, reference.groups);
+
+    let (after, never) = (destination.join(PACKAGE), elsewhere.path().join(PACKAGE));
+    assert_eq!(
+        files(&after),
+        files(&never),
+        "the package built after a cancellation holds different files"
+    );
+    for relative in files(&after) {
+        assert_eq!(
+            std::fs::read(after.join(&relative)).expect("after"),
+            std::fs::read(never.join(&relative)).expect("never"),
+            "{} differs from what a run that was never stopped writes",
+            relative.display()
+        );
+    }
+    assert_eq!(
+        files(&destination),
+        files(&after)
+            .iter()
+            .map(|relative| PathBuf::from(PACKAGE).join(relative))
+            .collect::<Vec<_>>(),
+        "the second run published beside something the first one left"
+    );
+}
+
 /// The parse stops inside its loop rather than finishing and reporting
 /// afterwards.
 ///

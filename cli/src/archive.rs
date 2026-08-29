@@ -13,7 +13,7 @@ use crate::parse::{
 };
 use crate::progress::Event;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 use std::time::{Duration, Instant};
 use zip::ZipArchive;
@@ -230,7 +230,18 @@ fn read_archive<P: Probe>(
 /// anything is inflated — so an archive of a million empty entries is cheap to
 /// build, passes every size check there is, and spends this program's time and
 /// memory a name at a time. The central directory declares the count, so this
-/// is checked before the first entry is touched.
+/// is checked before the first entry is read.
+///
+/// **It bounds the directory too, and that took reading the trailer first.**
+/// `ZipArchive::new` parses the whole central directory before anything can ask
+/// how many entries there are, so a ceiling checked on the archive it returns
+/// has already paid for what it refuses: a million records built in memory, and
+/// then a refusal. For the archive this program downloads that was half
+/// answered — `download::MAX_DOWNLOAD` bounds what may arrive — but a local
+/// file handed over with `ARUNA_ZIP` had no bound at all. The count is declared
+/// in the End of Central Directory record at the very end of the file, so
+/// [`declared_entries`] reads it in one short read and the refusal happens
+/// before the directory is touched.
 pub const MAX_ENTRIES: usize = 500_000;
 
 /// Open the ZIP, refusing one with absurdly many entries in it.
@@ -240,8 +251,26 @@ pub(crate) fn open_zip(zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
 
 /// The limit as an argument, so the boundary can be tested with three entries
 /// rather than five hundred thousand.
+///
+/// Checked twice, and the two are not the same check. The trailer is asked
+/// first, before the directory exists in memory, and it is what makes the
+/// ceiling worth having. The archive is asked afterwards because a trailer this
+/// program could not read leaves the first check with nothing to say — and
+/// because an archive whose trailer lies about the count would otherwise walk
+/// past a limit it does not meet.
 fn open_zip_within(zip_path: &Path, limit: usize) -> Result<ZipArchive<BufReader<File>>> {
-    let file = File::open(zip_path).map_err(ArunaError::io(zip_path))?;
+    let mut file = File::open(zip_path).map_err(ArunaError::io(zip_path))?;
+
+    if let Some(declared) = declared_entries(&mut file) {
+        if declared > limit as u64 {
+            return Err(ArunaError::ArchiveTooManyEntries {
+                entries: usize::try_from(declared).unwrap_or(usize::MAX),
+                limit,
+            });
+        }
+    }
+    file.rewind().map_err(ArunaError::io(zip_path))?;
+
     let archive = ZipArchive::new(BufReader::with_capacity(256 * 1024, file))?;
     if archive.len() > limit {
         return Err(ArunaError::ArchiveTooManyEntries {
@@ -250,6 +279,76 @@ fn open_zip_within(zip_path: &Path, limit: usize) -> Result<ZipArchive<BufReader
         });
     }
     Ok(archive)
+}
+
+/// Signature of the End of Central Directory record: `PK\x05\x06`.
+const EOCD: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
+/// Signature of the ZIP64 locator that sits just before it: `PK\x06\x07`.
+const ZIP64_LOCATOR: [u8; 4] = [0x50, 0x4b, 0x06, 0x07];
+/// Signature of the ZIP64 End of Central Directory record: `PK\x06\x06`.
+const ZIP64_EOCD: [u8; 4] = [0x50, 0x4b, 0x06, 0x06];
+
+/// The trailer is twenty-two bytes, and a ZIP may carry a comment after it that
+/// is at most a `u16` long. Everything the search below needs is inside that.
+const TRAILER_SEARCH: u64 = 22 + u16::MAX as u64;
+
+/// How many entries the archive says it holds, read from its own trailer.
+///
+/// A ZIP states the count twice: in the End of Central Directory record at the
+/// end of the file, and implicitly in the directory itself. The first is a
+/// short read at a known place; the second costs the parse this exists to
+/// avoid.
+///
+/// `None` when the trailer cannot be read as one, and that is deliberate rather
+/// than an error path: a truncated, empty or otherwise broken archive belongs to
+/// the `zip` crate to describe, and it describes it better than a hand-written
+/// scanner would. The caller falls through to `ZipArchive::new` and gets that
+/// description — which is the behaviour this program had before, unchanged for
+/// every archive whose trailer is unreadable.
+fn declared_entries(file: &mut File) -> Option<u64> {
+    let end = file.seek(SeekFrom::End(0)).ok()?;
+    let window = end.min(TRAILER_SEARCH);
+    let from = end - window;
+    file.seek(SeekFrom::Start(from)).ok()?;
+
+    let mut tail = vec![0u8; window as usize];
+    file.read_exact(&mut tail).ok()?;
+
+    // The last one, not the first: a ZIP may contain another archive as an
+    // entry, signature and all, and the trailer that governs this file is the
+    // one nearest the end.
+    let at = (0..=tail.len().checked_sub(22)?)
+        .rev()
+        .find(|&i| tail[i..i + 4] == EOCD)?;
+    let record = &tail[at..];
+
+    let entries = u16::from_le_bytes([record[10], record[11]]);
+    if entries != u16::MAX {
+        return Some(u64::from(entries));
+    }
+
+    // `0xFFFF` is ZIP64 saying the real number is elsewhere: the locator that
+    // precedes the record says where.
+    zip64_entries(file, &tail, at)
+}
+
+/// The count from the ZIP64 record the locator points at.
+fn zip64_entries(file: &mut File, tail: &[u8], eocd_at: usize) -> Option<u64> {
+    let locator_at = eocd_at.checked_sub(20)?;
+    let locator = tail.get(locator_at..locator_at + 20)?;
+    if locator[..4] != ZIP64_LOCATOR {
+        return None;
+    }
+    let offset = u64::from_le_bytes(locator[8..16].try_into().ok()?);
+
+    file.seek(SeekFrom::Start(offset)).ok()?;
+    let mut record = [0u8; 40];
+    file.read_exact(&mut record).ok()?;
+    if record[..4] != ZIP64_EOCD {
+        return None;
+    }
+    // Total entries in the central directory, across all disks.
+    Some(u64::from_le_bytes(record[32..40].try_into().ok()?))
 }
 
 /// Open the ZIP for the inventory pass, which also has nothing to do with an
@@ -389,6 +488,139 @@ mod tests {
                 assert_eq!((entries, limit), (3, 2));
             }
             other => panic!("expected a refusal, got {other:?}"),
+        }
+    }
+
+    /// **An archive too big for the ordinary trailer is read through ZIP64.**
+    ///
+    /// The plain End of Central Directory record holds the entry count in two
+    /// bytes, so it can say at most 65 535 — and above that the format writes
+    /// `0xFFFF` there and puts the real number, sixty-four bits of it, in a
+    /// ZIP64 record the trailer points at. Which means the archives this
+    /// ceiling exists for are precisely the ones whose count the short record
+    /// cannot state: an archive of a million entries is a ZIP64 archive.
+    ///
+    /// Written by hand rather than produced, because the `zip` crate emits a
+    /// ZIP64 trailer only for an archive that genuinely needs one, and building
+    /// 65 536 entries to test a ceiling would cost more than the ceiling saves.
+    /// The bytes below are the two records as the format defines them, appended
+    /// to a real archive of three files: the count is the only thing that lies.
+    #[test]
+    fn a_zip64_trailer_is_read_and_its_count_refused() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("zip64.zip");
+        write_zip(
+            &path,
+            &[
+                ("CTH 1_XML/a.xml", "<AOxml/>"),
+                ("CTH 1_XML/b.xml", "<AOxml/>"),
+                ("CTH 1_XML/c.xml", "<AOxml/>"),
+            ],
+        );
+
+        let bytes = std::fs::read(&path).expect("read the archive back");
+        let at = bytes
+            .windows(4)
+            .rposition(|w| w == EOCD)
+            .expect("the archive has a trailer");
+        let (head, eocd) = bytes.split_at(at);
+
+        // The ZIP64 record: 56 bytes, with the total entry count at offset 32.
+        let declared: u64 = 70_000;
+        let mut zip64 = Vec::with_capacity(56);
+        zip64.extend_from_slice(&ZIP64_EOCD);
+        zip64.extend_from_slice(&44u64.to_le_bytes()); // size of the rest
+        zip64.extend_from_slice(&[45, 0, 45, 0]); // versions made / needed
+        zip64.extend_from_slice(&[0; 8]); // this disk, disk with the directory
+        zip64.extend_from_slice(&declared.to_le_bytes()); // entries on this disk
+        zip64.extend_from_slice(&declared.to_le_bytes()); // entries in total
+        zip64.extend_from_slice(&[0; 16]); // size and offset of the directory
+
+        // The locator that points at it, 20 bytes, offset at 8.
+        let mut locator = Vec::with_capacity(20);
+        locator.extend_from_slice(&ZIP64_LOCATOR);
+        locator.extend_from_slice(&[0; 4]); // disk holding the record
+        locator.extend_from_slice(&(head.len() as u64).to_le_bytes());
+        locator.extend_from_slice(&1u32.to_le_bytes()); // number of disks
+
+        // And the short record, saying `0xFFFF` — "the real count is above".
+        let mut short = eocd.to_vec();
+        short[8..10].copy_from_slice(&u16::MAX.to_le_bytes());
+        short[10..12].copy_from_slice(&u16::MAX.to_le_bytes());
+
+        let mut patched = head.to_vec();
+        patched.extend_from_slice(&zip64);
+        patched.extend_from_slice(&locator);
+        patched.extend_from_slice(&short);
+        std::fs::write(&path, &patched).expect("write the patched archive");
+
+        let Err(refusal) = open_zip_within(&path, 3) else {
+            panic!("a ZIP64 archive of 70 000 entries was opened against a limit of 3");
+        };
+        match refusal {
+            ArunaError::ArchiveTooManyEntries { entries, limit } => {
+                assert_eq!(
+                    (entries, limit),
+                    (70_000, 3),
+                    "the count did not come from the ZIP64 record"
+                );
+            }
+            other => panic!("expected the ZIP64 count to be refused, got {other:?}"),
+        }
+    }
+
+    /// **The ceiling is read from the trailer, before the directory is built.**
+    ///
+    /// The point of the check is not that a huge archive is refused — the old
+    /// one refused it too — but that it is refused before `ZipArchive::new`
+    /// has built an index of it. That is hard to observe directly and easy to
+    /// observe indirectly: this archive lies. It holds three entries and its
+    /// End of Central Directory record declares sixty thousand.
+    ///
+    /// `ZipArchive::new` on such a file fails while parsing, looking for
+    /// records that are not there, and the failure it produces is
+    /// `ArunaError::Zip`. So a refusal that names the count and the limit can
+    /// only have come from the trailer, ahead of the parse. Before this, the
+    /// same file produced the `Zip` error — the same "no", one directory later.
+    #[test]
+    fn the_declared_count_is_refused_before_the_directory_is_parsed() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("liar.zip");
+        write_zip(
+            &path,
+            &[
+                ("CTH 1_XML/a.xml", "<AOxml/>"),
+                ("CTH 1_XML/b.xml", "<AOxml/>"),
+                ("CTH 1_XML/c.xml", "<AOxml/>"),
+            ],
+        );
+
+        let mut bytes = std::fs::read(&path).expect("read the archive back");
+        let at = bytes
+            .windows(4)
+            .rposition(|w| w == [0x50, 0x4b, 0x05, 0x06])
+            .expect("the archive has a trailer");
+        // Both counts the record carries: entries on this disk, and in total.
+        let declared = 60_000u16.to_le_bytes();
+        bytes[at + 8..at + 10].copy_from_slice(&declared);
+        bytes[at + 10..at + 12].copy_from_slice(&declared);
+        std::fs::write(&path, &bytes).expect("write the patched archive");
+
+        // `let Err` rather than `expect_err`: the success type is a
+        // `ZipArchive`, which carries no `Debug`, and giving it one to phrase
+        // an assertion would be the test deciding what the type looks like.
+        let Err(refusal) = open_zip_within(&path, 3) else {
+            panic!("the lying archive was opened instead of refused");
+        };
+        match refusal {
+            ArunaError::ArchiveTooManyEntries { entries, limit } => {
+                assert_eq!(
+                    (entries, limit),
+                    (60_000, 3),
+                    "the refusal did not come from the trailer"
+                );
+            }
+            other => panic!("expected a refusal from the trailer, got {other:?}"),
         }
     }
 

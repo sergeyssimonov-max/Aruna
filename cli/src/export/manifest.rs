@@ -187,6 +187,13 @@ const BLOCKS: [(&str, u32, u32); 24] = [
     ("Supplementary Private Use Area-A", 0xF0000, 0xFFFFD),
 ];
 
+/// Where [`BLOCKS`] holds Basic Latin.
+///
+/// The printable-ASCII fast path in [`FontContract::observe`] names this index
+/// instead of searching for it, so the block table's order is load-bearing in a
+/// second place; the block-table test pins both by name.
+const BASIC_LATIN: usize = 0;
+
 /// Where [`BLOCKS`] holds the combining marks.
 ///
 /// Pinned by name in the block-table test rather than trusted: the NFC count
@@ -229,29 +236,46 @@ impl FontContract {
         let mut private = false;
         let mut odd = [false; 6];
 
-        // By code point, never by UTF-16 unit: cuneiform lives above the BMP,
-        // and splitting a surrogate pair would corrupt the count as surely as
-        // it would corrupt the text.
-        for ch in text.chars() {
+        // The corpus is three hundred million code points and very nearly all
+        // of them are ordinary printable ASCII, for which every question below
+        // has one answer: [`BASIC_LATIN`], no anomaly, no private use. Those
+        // are stepped over as bytes rather than decoded as characters — the
+        // decoding was the whole cost of this scan, 355 ms of `bench_fonts`
+        // over the real archive.
+        //
+        // Everything else is decoded, and by code point, never by UTF-16 unit:
+        // cuneiform lives above the BMP, and splitting a surrogate pair would
+        // corrupt the count as surely as it would corrupt the text. Cutting the
+        // run at the first byte outside printable ASCII lands on a character
+        // boundary — a multi-byte character has no ASCII byte in it — so what
+        // is left is still a `str`.
+        let mut rest = text;
+        loop {
+            let plain = rest
+                .as_bytes()
+                .iter()
+                .position(|b| !(0x20..0x7F).contains(b))
+                .unwrap_or(rest.len());
+            if plain > 0 {
+                seen[BASIC_LATIN] = true;
+                rest = &rest[plain..];
+            }
+            let Some(ch) = rest.chars().next() else { break };
             let cp = ch as u32;
-            // The corpus is four hundred million characters and most of them
-            // are ordinary printable ASCII; those cannot be an anomaly and are
-            // let past before anything else is asked.
-            if !(0x20..0x7F).contains(&cp) {
-                if let Some(class) = anomaly_of(cp) {
-                    odd[class] = true;
-                }
-                if PRIVATE_USE_RANGES
-                    .iter()
-                    .any(|(lo, hi)| cp >= *lo && cp <= *hi)
-                {
-                    self.private_use_points.insert(cp);
-                }
+            if let Some(class) = anomaly_of(cp) {
+                odd[class] = true;
+            }
+            if PRIVATE_USE_RANGES
+                .iter()
+                .any(|(lo, hi)| cp >= *lo && cp <= *hi)
+            {
+                self.private_use_points.insert(cp);
             }
             match BLOCKS.iter().position(|(_, lo, hi)| cp >= *lo && cp <= *hi) {
                 Some(i) => seen[i] = true,
                 None => other = true,
             }
+            rest = &rest[ch.len_utf8()..];
         }
         let counters = [
             &mut self.anomalies.unusual_space,
@@ -734,6 +758,19 @@ mod tests {
             "COMBINING no longer points at the combining marks, and the NFC \
              count rides on it"
         );
+        assert_eq!(
+            BLOCKS[BASIC_LATIN].0, "Basic Latin",
+            "BASIC_LATIN no longer points at Basic Latin, and the printable \
+             ASCII shortcut in `observe` credits every ordinary character to it"
+        );
+        for cp in 0x20..0x7Fu32 {
+            assert_eq!(
+                BLOCKS.iter().position(|(_, lo, hi)| cp >= *lo && cp <= *hi),
+                Some(BASIC_LATIN),
+                "U+{cp:04X} is printable ASCII, which `observe` credits to \
+                 Basic Latin without looking — and the table now disagrees"
+            );
+        }
         for name in PRIVATE_USE {
             assert!(
                 BLOCKS.iter().any(|(b, _, _)| *b == name),
@@ -778,6 +815,82 @@ mod tests {
                 ch as u32
             );
         }
+    }
+
+    /// Printable ASCII is stepped over as bytes rather than decoded, so what
+    /// it can get wrong is the seam: a character that begins where a run of
+    /// ASCII ends, or a run that ends the document. Padding a document with
+    /// ordinary text must therefore add Basic Latin and change nothing else,
+    /// wherever the padding is put.
+    #[test]
+    fn padding_a_document_with_printable_ascii_changes_only_basic_latin() {
+        // One from each side of the shortcut: an anomaly, a private-use point,
+        // a combining mark, a character above the BMP, and one whose block the
+        // table does not list.
+        for ch in ['\u{00A0}', '\u{E000}', '\u{0301}', '\u{12000}', '\u{0416}'] {
+            let mut bare = FontContract::default();
+            bare.observe(&ch.to_string());
+
+            for padded in [
+                format!("KBo 1.1{ch}"),
+                format!("{ch}KBo 1.1"),
+                format!("KBo{ch}1.1"),
+                format!("{ch}"),
+            ] {
+                let mut with = FontContract::default();
+                with.observe(&padded);
+
+                let mut expected = bare.blocks.clone();
+                if padded.bytes().any(|b| (0x20..0x7F).contains(&b)) {
+                    *expected.entry("Basic Latin").or_default() += 1;
+                }
+                assert_eq!(
+                    with.blocks, expected,
+                    "U+{:04X} in {padded:?} was read differently beside ASCII",
+                    ch as u32
+                );
+                assert_eq!(with.anomalies, bare.anomalies, "{padded:?}");
+                assert_eq!(with.private_use, bare.private_use, "{padded:?}");
+                assert_eq!(
+                    with.private_use_points, bare.private_use_points,
+                    "{padded:?}"
+                );
+                assert_eq!(with.not_nfc, bare.not_nfc, "{padded:?}");
+            }
+        }
+    }
+
+    /// The two code points on the edge of the shortcut, which is where an
+    /// off-by-one lands: U+001F is the last control below it and U+007F the
+    /// first above, and both are anomalies the fast path must not swallow.
+    /// U+0020 and U+007E are the ends of the run it may take, and neither is.
+    #[test]
+    fn the_edges_of_the_printable_range_are_read_as_themselves() {
+        for ch in ['\u{001F}', '\u{007F}'] {
+            for text in [
+                format!("{ch}"),
+                format!("KBo{ch}"),
+                format!("{ch}KBo"),
+                format!("K{ch}Bo"),
+            ] {
+                let mut fonts = FontContract::default();
+                fonts.observe(&text);
+                assert_eq!(
+                    fonts.anomalies.control, 1,
+                    "U+{:04X} in {text:?} stopped being a control character",
+                    ch as u32
+                );
+            }
+        }
+
+        let mut fonts = FontContract::default();
+        fonts.observe("\u{0020}\u{007E}");
+        assert!(
+            !fonts.anomalies.any(),
+            "the ends of the printable range were reported as anomalies: {:?}",
+            fonts.anomalies
+        );
+        assert_eq!(fonts.blocks.get("Basic Latin"), Some(&1));
     }
 
     /// Ordinary text is not an anomaly, and the three whitespace characters a

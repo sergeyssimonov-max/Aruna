@@ -209,22 +209,63 @@ fn an_ordinary_run_writes_the_inventory_and_says_where() {
     assert!(leftovers(&sandbox.downloads()).is_empty());
 }
 
-/// **A zero-argument program, and this is what that means today.**
+/// **The two questions are answered, and answered before any work.**
 ///
-/// `aruna` parses no command line at all: there is no argument parser in the
-/// binary, so `--help` is not a request it can refuse — it is a word the
-/// program never looks at, and the run proceeds exactly as if nothing had been
-/// typed. The one input it does take arrives through the environment
-/// (`ARUNA_ZIP`), which is what the rest of this file uses.
+/// They were not, until this was written: `aruna --version` started a full
+/// corpus build, and without `ARUNA_ZIP` it fetched 71 MiB to do it. That was
+/// this program's honest zero-argument behaviour rather than a bug — and it was
+/// pinned here as such — but §7.3 of the specification recorded it as an open
+/// position and named the minimal answer: the name, the version and the one
+/// environment variable, printed before anything happens. The owner asked for
+/// it on 2026-08-29 and this is the contract that replaced the old one.
 ///
-/// This is characterization, not endorsement. A person typing `--help` and
-/// getting a full corpus run instead of a usage line is a reasonable thing to
-/// change; the point of pinning it is that changing it then reads as a
-/// decision — this test failing — rather than as a silent difference between
-/// two versions. Until then, an argument parser bolted on without touching
-/// this test would be an unnoticed change of contract.
+/// **Nothing written is the load-bearing assertion.** Exit code 0 alone would
+/// also be true of a run that built the package and succeeded; an empty
+/// destination is what says the program returned before it reached the archive
+/// — which is the whole point, because the reader who typed `--version` has not
+/// asked for a download.
 #[test]
-fn the_command_line_is_not_read_and_arguments_change_nothing() {
+fn the_two_questions_are_answered_before_any_work() {
+    let sandbox = Sandbox::new();
+    let corpus = sandbox.corpus();
+
+    for flag in ["--help", "--version"] {
+        let out = sandbox.run_with(&corpus, &[flag]);
+        assert_no_panic(&out);
+        assert_eq!(out.status.code(), Some(0), "{flag} did not exit 0");
+
+        let said = stdout(&out);
+        // From the manifest, not written out here: a version repeated by hand
+        // is a version that stops being true.
+        assert!(
+            said.contains(env!("CARGO_PKG_VERSION")),
+            "{flag} did not name the version the manifest declares: {said}"
+        );
+        assert!(
+            said.contains("ARUNA_ZIP"),
+            "{flag} did not name the one variable that changes a run: {said}"
+        );
+
+        assert!(
+            !sandbox.package_root().exists(),
+            "{flag} built the package instead of answering"
+        );
+        assert!(
+            !sandbox.output().exists(),
+            "{flag} wrote the inventory instead of answering"
+        );
+    }
+}
+
+/// **Every other word is still ignored, and the run proceeds.**
+///
+/// The two flags above are answers to questions, not a command line: this
+/// program takes no arguments, so a word it does not recognise is not an error
+/// it can report. Characterization, not endorsement — it is here so that giving
+/// this program a parser later fails this test and reads as a decision rather
+/// than as a silent difference between two versions.
+#[test]
+fn every_other_word_is_ignored_and_the_run_proceeds() {
     let sandbox = Sandbox::new();
     let corpus = sandbox.corpus();
 
@@ -232,12 +273,7 @@ fn the_command_line_is_not_read_and_arguments_change_nothing() {
     let inventory = fs::read_to_string(sandbox.output()).expect("read");
     fs::remove_dir_all(sandbox.package_root()).expect("clear");
 
-    for args in [
-        vec!["--help"],
-        vec!["--version"],
-        vec!["nonsense"],
-        vec!["-x", "--", "/etc/passwd"],
-    ] {
+    for args in [vec!["nonsense"], vec!["-x", "--", "/etc/passwd"]] {
         let out = sandbox.run_with(&corpus, &args);
         assert_no_panic(&out);
         assert_eq!(

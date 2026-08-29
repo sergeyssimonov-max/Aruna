@@ -45,7 +45,7 @@
 
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, JobId, Phase};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Build the package, and say what is in it.
 pub fn build_package(request: &PackageRequest, job: &Job<'_>) -> Result<PackageReport> {
@@ -135,7 +135,29 @@ pub struct CorpusReport {
 
 /// The corpus, from one archive, in one run.
 pub fn build_corpus(request: &CorpusRequest, job: &Job<'_>) -> Result<CorpusReport> {
-    let destination = crate::paths::downloads_dir()?;
+    build_corpus_into(request, &crate::paths::downloads_dir()?, job)
+}
+
+/// [`build_corpus`], into a folder the caller names.
+///
+/// The scenario used to read the destination out of the environment itself, so
+/// the one thing a caller most obviously decides — where the package goes — was
+/// the one thing it could not say. A window that lets someone choose a folder
+/// would have had to reach past this layer to `export::build` and reassemble
+/// the report on the other side, which is the arrangement this module exists to
+/// prevent.
+///
+/// So the default moves out of the way rather than out of the crate:
+/// [`build_corpus`] is now the caller that answers "wherever this platform
+/// keeps downloads", and everything else can answer differently. Existing
+/// callers see no change, and there is exactly one place that still asks the
+/// environment.
+pub fn build_corpus_into(
+    request: &CorpusRequest,
+    destination: &Path,
+    job: &Job<'_>,
+) -> Result<CorpusReport> {
+    let destination = destination.to_path_buf();
 
     let source = match &request.local_archive {
         Some(path) => crate::cache::Archive::Cached(path.clone()),
@@ -218,16 +240,25 @@ impl Failure {
         let (code, phase, retryable) = match error {
             Cancelled { phase } => ("cancelled", Some(*phase), false),
 
-            // The network, and what a second attempt can fix.
-            Network { .. } => ("network", Some(Phase::Obtaining), true),
+            // The network, and what a second attempt can fix — asked of the
+            // client that would be doing the retrying. Saying `true` here said
+            // more than the client does: a redirect loop comes back as
+            // `Network` and is settled, so *Retry* was offered for a chain that
+            // will be walked to the same end every time.
+            Network { .. } => (
+                "network",
+                Some(Phase::Obtaining),
+                crate::download::is_retryable(error),
+            ),
             // The statuses that mean "not right now" rather than "not this
-            // request" — the same set `download::is_retryable_status` acts on,
-            // stated here as a pattern because a front end offering *Retry* has
-            // to agree with the client that does the retrying.
-            Http {
-                status: 408 | 425 | 429 | 500..=599,
-                ..
-            } => ("server_busy", Some(Phase::Obtaining), true),
+            // request". Asked of `download::is_retryable_status` rather than
+            // restated as a pattern: the pattern read `500..=599`, which is
+            // wider than the set the client retries — 501 and 505 are verdicts
+            // on the request, and its own test pins them as such — so a front
+            // end was offered *Retry* for failures no retry would reach.
+            Http { status, .. } if crate::download::is_retryable_status(*status) => {
+                ("server_busy", Some(Phase::Obtaining), true)
+            }
             Http { .. } => ("http", Some(Phase::Obtaining), false),
             Truncated { .. } => ("truncated", Some(Phase::Obtaining), true),
             Oversized { .. } => ("oversized", Some(Phase::Obtaining), false),
@@ -245,7 +276,13 @@ impl Failure {
             // Where the output goes.
             DownloadsDir => ("no_output_directory", Some(Phase::Publishing), false),
             Replace { .. } => ("output_locked", Some(Phase::Publishing), true),
-            Io { .. } => ("io", None, true),
+            // Which I/O failures are worth another attempt is a question the
+            // download client already answers, and answers narrowly: an
+            // allowlist of interruptions, with a full disk and a permission
+            // error deliberately outside it. Saying `true` here said the
+            // opposite to a front end — *Retry* offered for a disk that will
+            // still be full — so the two now read from the same list.
+            Io { source, .. } => ("io", None, crate::download::is_retryable_io(source)),
 
             // The export refusing to do something wrong.
             ExportCollision { .. } => ("collision", Some(Phase::Exporting), false),
@@ -263,10 +300,53 @@ impl Failure {
         Failure {
             code,
             phase,
-            message: error.to_string(),
+            message: message_of(error),
             retryable,
             cancelled: matches!(error, Cancelled { .. }),
         }
+    }
+}
+
+/// The sentence, with no path from the machine's filesystem in it.
+///
+/// [`Failure`] promises exactly that above, and for most errors `Display`
+/// already keeps the promise. Five variants do not, because they are read by
+/// two audiences: `main` prints `ArunaError` itself to a terminal, where the
+/// path is the most useful thing in the line, and this crosses to a window,
+/// where it is a leak and a person can act on none of it. This is where the two
+/// part; `error.to_string()` alone used to send the path both ways.
+///
+/// [`ArunaError::ExportInvalid`] loses its first problem as well as its root:
+/// the problems are built with paths inside them
+/// ([`crate::export::validate`]), so keeping the sentence would keep the path
+/// through the back door. The count survives, which is what a window can say.
+fn message_of(error: &ArunaError) -> String {
+    use ArunaError::*;
+    match error {
+        Io { source, .. } => format!("I/O error: {source}"),
+        Replace { .. } => {
+            "could not replace the inventory; the new one is complete and kept beside it"
+                .to_string()
+        }
+        PublishBusy { holder, .. } => format!("another run is publishing into it ({holder})"),
+        ExportDestination { reason, .. } => {
+            format!("refusing to replace the destination: {reason}")
+        }
+        ExportInvalid { count, .. } => {
+            format!("the package failed validation with {count} problem(s)")
+        }
+        // The place inside the package is dropped and the two sources are not:
+        // a reader who has to decide which of two documents keeps the name
+        // needs to know which two, and both of those are entries inside the
+        // archive rather than anywhere on this machine.
+        ExportCollision {
+            group,
+            fragment,
+            first,
+            second,
+            ..
+        } => format!("{group}: {fragment} is claimed by both {first} and {second}"),
+        other => other.to_string(),
     }
 }
 
@@ -484,5 +564,139 @@ mod tests {
             .phase,
             None
         );
+    }
+
+    /// **No sentence handed to a front end names a path on this machine.**
+    ///
+    /// The struct says so in its own documentation, and every one of these used
+    /// to break it: `Display` is written for the terminal, where the path is
+    /// the useful part, and the translation reused it unchanged.
+    #[test]
+    fn a_failure_never_carries_a_filesystem_path() {
+        let secret = std::path::PathBuf::from("/Users/nobody/Downloads/secret-corpus");
+        let cases = [
+            ArunaError::Io {
+                path: secret.clone(),
+                source: std::io::Error::other("busy"),
+            },
+            ArunaError::Replace {
+                path: secret.clone(),
+                scratch: secret.join("scratch"),
+                source: std::io::Error::other("locked"),
+            },
+            ArunaError::PublishBusy {
+                path: secret.clone(),
+                holder: "pid 1".into(),
+            },
+            ArunaError::ExportDestination {
+                path: secret.clone(),
+                reason: "it holds files this exporter did not write".into(),
+            },
+            ArunaError::ExportInvalid {
+                root: secret.clone(),
+                count: 3,
+                first: format!("{} is larger than the limit", secret.display()),
+            },
+            // The sixth, and the one that was missing. `place` only ever builds
+            // this with a path relative to the package, so the leak could not
+            // happen from any input the program produces today — which is
+            // exactly why it went unnoticed: the promise above was being kept
+            // by every construction site rather than by the translation, and a
+            // seventh caller would not have known that.
+            ArunaError::ExportCollision {
+                group: "CTH 5".into(),
+                fragment: "KBo 1.1".into(),
+                first: "a.xml".into(),
+                second: "b.xml".into(),
+                path: secret.join("CTH 5/KBo 1.1.xml"),
+            },
+        ];
+
+        for error in &cases {
+            let failure = Failure::of(error);
+            assert!(
+                !failure.message.contains("/Users/nobody"),
+                "{} sent a path to the front end: {}",
+                failure.code,
+                failure.message
+            );
+            assert!(
+                !failure.message.is_empty(),
+                "{} has no sentence left",
+                failure.code
+            );
+        }
+    }
+
+    /// Retry is offered for the HTTP statuses the download client would retry,
+    /// and for no others.
+    ///
+    /// The same fault the I/O case below had, in the arm above it: the set was
+    /// restated here as `500..=599` while the client retries seven named
+    /// statuses, so a 501 — a verdict on the request, and pinned as one by
+    /// `download::retryable_statuses_are_the_transient_ones` — reached a window
+    /// as *server busy, try again*. Both now read the same list.
+    #[test]
+    fn an_http_failure_is_retryable_only_where_the_client_would_retry() {
+        let http = |status| ArunaError::Http {
+            url: "u".into(),
+            status,
+            retry_after: None,
+        };
+
+        for status in [408, 425, 429, 500, 502, 503, 504] {
+            let failure = Failure::of(&http(status));
+            assert!(
+                failure.retryable,
+                "{status} is transient and the client retries it"
+            );
+            assert_eq!(failure.code, "server_busy", "{status}");
+        }
+
+        for status in [400, 401, 403, 404, 410, 451, 501, 505] {
+            let failure = Failure::of(&http(status));
+            assert!(
+                !failure.retryable,
+                "{status} is a verdict on the request and must not be offered as retryable"
+            );
+            assert_eq!(failure.code, "http", "{status}");
+        }
+    }
+
+    /// Retry is offered for the I/O failures the download client would retry,
+    /// and for no others.
+    ///
+    /// A full disk was offered as retryable: the same disk, the same file, the
+    /// same result — and a window that shows *Retry* for it is lying in the way
+    /// this struct's `retryable` field exists to prevent.
+    #[test]
+    fn an_io_failure_is_retryable_only_where_the_client_would_retry() {
+        let io = |kind: std::io::ErrorKind| ArunaError::Io {
+            path: "/x".into(),
+            source: std::io::Error::from(kind),
+        };
+
+        for kind in [
+            std::io::ErrorKind::UnexpectedEof,
+            std::io::ErrorKind::Interrupted,
+            std::io::ErrorKind::TimedOut,
+        ] {
+            assert!(
+                Failure::of(&io(kind)).retryable,
+                "{kind:?} is an interruption and should be retryable"
+            );
+        }
+
+        for kind in [
+            std::io::ErrorKind::StorageFull,
+            std::io::ErrorKind::PermissionDenied,
+            std::io::ErrorKind::ReadOnlyFilesystem,
+            std::io::ErrorKind::QuotaExceeded,
+        ] {
+            assert!(
+                !Failure::of(&io(kind)).retryable,
+                "{kind:?} is settled and must not be offered as retryable"
+            );
+        }
     }
 }
