@@ -103,10 +103,16 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: clippy, rustfmt
 
+      # One workspace, one target directory, and it is at the repository root
+      # since the crates were joined on 2026-08-30 (specification 4.9.1). The
+      # entries here used to name `cli → target` and `src-tauri → target`, which
+      # after the move point at directories cargo no longer writes to: the cache
+      # would have been saved and restored empty, silently, and only a longer
+      # build would have shown it.
       - name: Cache cargo
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
-          workspaces: cli → target
+          workspaces: . -> target
 
       # docs/TESTING.md has listed `cargo fmt --check` among the checks a change
       # is held to since before there was a CI file; nothing ran it, so the
@@ -116,7 +122,7 @@ jobs:
         run: cargo fmt --manifest-path cli/Cargo.toml --check
 
       - name: Clippy (CLI)
-        run: cargo clippy --manifest-path cli/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path cli/Cargo.toml --all-targets -- -D warnings
 
       # `bench` is off by default and the binary never enables it, so
       # `--all-targets` alone never compiles `examples/bench_fields.rs` — it
@@ -125,7 +131,7 @@ jobs:
       # be rewritten, and nothing has been type-checking it. docs/TESTING.md has
       # listed this invocation among the standard checks all along.
       - name: Clippy (CLI, bench feature)
-        run: cargo clippy --manifest-path cli/Cargo.toml --all-targets --features bench -- -D warnings
+        run: cargo clippy --locked --manifest-path cli/Cargo.toml --all-targets --features bench -- -D warnings
 
       # nextest rather than `cargo test`, for one reason: it can stop a test
       # that hangs. The CLI suite spawns the real binary as a child process and
@@ -144,23 +150,26 @@ jobs:
           tool: nextest
 
       - name: Test (CLI)
-        run: cargo nextest run --profile ci --manifest-path cli/Cargo.toml
+        run: cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml
 
       # Doctests are the one thing nextest does not run. There are none today;
       # the step is here so that adding one does not silently go unchecked.
       - name: Doctests (CLI)
-        run: cargo test --manifest-path cli/Cargo.toml --doc
+        run: cargo test --locked --manifest-path cli/Cargo.toml --doc
 
       # The dependency tree is held to what it holds today: a new licence, a
       # new source or a fresh advisory fails here rather than arriving unnoticed
-      # with a transitive dependency. Policy and reasoning in cli/deny.toml.
+      # with a transitive dependency. Policy and reasoning in the root
+      # `deny.toml` — one file for one workspace since 2026-08-30, when two
+      # policies over one graph started disagreeing with each other about a
+      # licence the tree had carried all along.
       - name: Install cargo-deny
         uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
         with:
           tool: cargo-deny
 
       - name: Dependency policy
-        run: cargo deny --manifest-path cli/Cargo.toml check
+        run: cargo deny check
 
   # The desktop crate, held to the same battery `docs/PROJECT-SPEC.ru.md` §6.1
   # prescribes for it locally. Until now nothing here touched `src-tauri` at
@@ -175,11 +184,27 @@ jobs:
   # would mean installing a toolchain for a configuration nobody ships in order
   # to learn nothing about the one that is.
   #
-  # It does not gate the release. What the DMG carries is built by
-  # `cli/scripts/make_release.sh` from the console crate; the desktop shell
-  # ships in nothing today, so failing it must not stop a release of something
-  # it is not part of. When the first Tauri command exists, this job belongs in
-  # the `needs` list of `macos` — and that is a decision to take then.
+  # **It gates the release, and the reason is not the artifact.** What the DMG
+  # carries is still built by `cli/scripts/make_release.sh` from the console
+  # crate; the desktop shell ships in nothing, so a red job here says nothing
+  # about the bytes a reader downloads. What it says is about the tree the
+  # release is cut from, and that is worth a gate for one concrete reason: the
+  # shell depends on the core by path and consumes its public contract from
+  # outside. A public item removed or reshaped in a way only the shell uses
+  # compiles fine in `check`, where the core is built with its own tests, and
+  # fails here. That is a fact about the core, found by the only job that looks
+  # at it from the outside.
+  #
+  # The cost is named rather than hidden: `macos` now waits for this job instead
+  # of running beside it, so a release is slower by one macOS run, and a failure
+  # here for a reason unrelated to the release — a flaky runner, an unrelated
+  # regression in the shell — blocks a release of something it is not part of.
+  # That trade was made deliberately on 2026-08-31: not shipping from a red tree
+  # is worth more than shipping fast from one.
+  #
+  # This comment used to say the opposite, and promised the job would join
+  # `macos`'s `needs` when the first Tauri command existed. Two exist —
+  # `corpus_location` and `corpus_stats` — so the promise came due.
   desktop:
     name: Check + clippy (src-tauri)
     runs-on: macos-14
@@ -208,7 +233,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
-          workspaces: src-tauri → target
+          workspaces: . -> target
 
       - name: Formatting (src-tauri)
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
@@ -217,7 +242,7 @@ jobs:
       # be type-checked. The same flag on nextest below would be a mistake —
       # see the step's own note.
       - name: Clippy (src-tauri)
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: Install nextest
         uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
@@ -230,17 +255,13 @@ jobs:
       # stays as insurance for a crate that temporarily has none. §6.1 of the
       # specification states both.
       - name: Test (src-tauri)
-        run: cargo nextest run --manifest-path src-tauri/Cargo.toml --no-tests=pass
+        run: cargo nextest run --locked --manifest-path src-tauri/Cargo.toml --no-tests=pass
 
-      - name: Install cargo-deny
-        uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
-        with:
-          tool: cargo-deny
-
-      # `src-tauri/deny.toml` carries its own platform filter, so this asks
-      # about the two Apple targets and not about the Linux half of the tree.
-      - name: Dependency policy (src-tauri)
-        run: cargo deny --manifest-path src-tauri/Cargo.toml check
+      # No dependency policy step here. One workspace means one graph and one
+      # `deny.toml` at the root, and the `check` job above reads all of it in a
+      # single run; asking again from this job would put the same question to
+      # the same tree. The platform filter lives in that file, so what is asked
+      # is about the two Apple targets and not the Linux half of the tree.
 
   # The full 24 000-manuscript parse. It lives in its own job because it needs
   # the 71 MiB Zenodo archive, which is not in the repository — so until now the
@@ -282,7 +303,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
-          workspaces: cli → target
+          workspaces: . -> target
 
       # Keyed on the digest the CLI verifies against, so republishing the
       # archive invalidates the cache by itself.
@@ -339,12 +360,26 @@ jobs:
       # that reports success without the archive is exactly what
       # ARUNA_REQUIRE_FIXTURE exists to prevent, and it was set on a command
       # that never reached that file.
+      - name: Install nextest
+        uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
+        with:
+          tool: nextest
+
+      # nextest rather than `cargo test`, for the reason the `check` job gives
+      # at length: it can stop a test that hangs, and `cargo test` cannot. This
+      # job is the one where that matters most — it is the only one that reads
+      # a 71 MiB archive off disk and walks 23 936 documents, so a wedged read
+      # here would hold a runner for six hours and report nothing.
+      #
+      # The `ci` profile's guard fits without loosening: both suites together
+      # take under three seconds on a warm machine, against a thirty-second
+      # warning and a two-minute kill.
       - name: Parse the full corpus
         env:
           ARUNA_REQUIRE_FIXTURE: "1"
         run: |
           export ARUNA_FIXTURE_ZIP="$HOME/aruna-fixtures/corpus.zip"
-          cargo test --manifest-path cli/Cargo.toml --test integration --test corpus -- --nocapture
+          cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml --test integration --test corpus
 
   # The desktop frontend. It replaced a React site that had its own job here,
   # and the shape of the check changed with it: no separate typecheck, because
@@ -430,7 +465,7 @@ jobs:
     # .test.ts` proves is what the frontend stack builds today. Without that
     # edge a red frontend job still produced a signed DMG carrying a stale
     # client script — green release, wrong artifact.
-    needs: [check, corpus, frontend]
+    needs: [check, corpus, frontend, desktop]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     steps:
@@ -469,7 +504,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
-          workspaces: cli → target
+          workspaces: . -> target
 
       - name: Build .app + DMG
         working-directory: cli
