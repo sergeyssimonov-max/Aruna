@@ -11,9 +11,9 @@ releases ship, and it is the whole of the product.
 [`frontend/`](frontend/) and [`src-tauri/`](src-tauri/) hold the stack it will
 be built on — the toolchain is installed and pinned, and the frontend half is
 checked and built by CI; `src-tauri` is not, and is kept buildable by the
-pre-commit battery and by CI on macOS — but the window
-shows a placeholder that says so, there is no Tauri
-command in the shell, and nothing in it reaches the corpus. Read those two
+pre-commit battery and by CI on macOS. Since 2026-08-30 the shell is wired to
+the core: it declares the dependency, and its first command asks the program
+where the package it built went, which the window then shows. Read those two
 directories as work in progress, not as a second program you can run.
 
 ## Layout
@@ -21,21 +21,24 @@ directories as work in progress, not as a second program you can run.
 | Path | Description |
 |------|-------------|
 | [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → a folder of documents with an HTML inventory over them. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
-| [`frontend/`](frontend/) | **Scaffold, no UI yet** — the stack the desktop application will be built on: Svelte 5, Vite, TypeScript, no SvelteKit. `App.svelte` is a placeholder: a heading, a sentence saying the interface is not implemented, and the probe button the E2E scenario clicks |
-| [`src-tauri/`](src-tauri/) | **Scaffold, no commands yet** — the Tauri 2 shell that will host it. It exposes nothing to the window and does not call the parser |
+| [`frontend/`](frontend/) | **The window** — Svelte 5, Vite, TypeScript, no SvelteKit. One screen: the corpus is ready, what the built package holds — the manuscript and CTH-group counts, how they are spread across the groups, and what the manifest counted about the corpus's writing — and a button that closes the window |
+| [`src-tauri/`](src-tauri/) | **The Tauri 2 shell** that hosts it. Two commands: `corpus_location` says where the package is, `corpus_stats` counts what is in it — both answered by the `cli` crate's own paths and its own manifest |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
 
 There was a React web application here until 2026-08-23, served from `src/` with a WASM search module under `wasm/search/`. It has been removed along with the ARUN container built for it; the desktop application is to replace it, once it exists. [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what went and why.
 
 ## CLI (Aruna)
 
-Builds and is tested on macOS 13+ and Linux — both run in CI. Windows is untried. Only the `.app` bundle and the DMG are macOS-only.
+Builds on macOS 13+ and Linux. The tests run in CI on Linux; the macOS jobs check the desktop crate and build the `.app` and the DMG, and run no CLI tests — the CLI's own suite is the Ubuntu one. Windows is untried. Only the `.app` bundle and the DMG are macOS-only.
 
 ```bash
-cd cli
-cargo build --release        # any supported platform
-./target/release/aruna       # → ~/Downloads/TLHdig_Beta_0.3/ — open TLHdig_Beta_0.3.html inside it
+cargo build --release --locked -p aruna   # any supported platform, from the repository root
+./target/release/aruna                    # → ~/Downloads/TLHdig_Beta_0.3/ — open TLHdig_Beta_0.3.html inside it
 ```
+
+The path is the workspace's, not the crate's: since the two crates were joined
+on 2026-08-30 `cargo` writes to `target/` at the root whichever directory it is
+invoked from.
 
 The first run downloads 71 MiB from Zenodo and keeps it in the OS cache directory, so later runs take about two seconds and need no network. `ARUNA_ZIP=/path/to.zip` uses a local archive instead. Details in [`cli/README.md`](cli/README.md).
 
@@ -92,7 +95,12 @@ membership. macOS will therefore refuse it on first open, with *"Aruna cannot
 be opened because the developer cannot be verified"* or *"is damaged and can't
 be opened"*, the second being what a quarantined download usually produces.
 
-Open it once through the exception, or clear the quarantine flag:
+**Check what you are letting through before you let it through.** Every release
+publishes the digest of its DMG, and `shasum -a 256 -c SHA256SUMS` beside the
+downloaded file checks it. The steps below hand an unverified binary the
+system's benefit of the doubt; do them after the digest matches, not before.
+
+Then open it once through the exception, or clear the quarantine flag:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Aruna.app   # then run it normally
@@ -108,31 +116,31 @@ in the dialog. On Ventura and later a blocked app can also be allowed under
 **System Settings → Privacy & Security**, where an *"Open Anyway"* button
 appears after the first refusal.
 
-Verify what you are letting through before you do — every release publishes the
-digest of its DMG, and `shasum -a 256 -c SHA256SUMS` beside the downloaded file
-checks it.
+## Desktop application — a status window, not yet a product
 
-## Desktop application — under construction
+**What exists is one screen, and it is honest about being one.** The stack under
+it is wired end to end and kept green: `pnpm dev` opens a window,
+and since 2026-08-30 that window says something true about the machine it runs
+on. It reads the package the CLI built — how many manuscripts, how many CTH
+groups, how unevenly the one is spread across the other, and what the manifest
+counted about the corpus's writing — through two Tauri commands, and closes on
+the one button it carries.
+The screen was drawn through `/design` once and rebuilt by hand in `App.svelte`
+and `app.css`. It is not redrawn on a schedule: what it carries — the two
+commands, the readiness heading, the counts, and the button the end-to-end test
+clicks to prove that a state change reaches the DOM in the WKWebView this system
+ships — is a contract, and replacing it is a decision rather than a routine. The
+design tool is still checked against this stack, on a mockup built beside the
+repository and never carried into it.
 
-**There is no desktop application yet.** What is in the tree is the stack it
-will be built on, wired end to end and kept green: `pnpm dev` opens a window,
-and what that window shows is a prototype screen saying so. **The screen is
-deliberately disposable.** Every maintenance pass draws it again through
-`/design` and rebuilds it by hand in `App.svelte` and `app.css`; that is how the
-design tool is kept proven against this stack — Svelte 5 and Vite without
-SvelteKit — rather than assumed to work with it. What survives each round is not
-the markup but the contract: the heading, the sentence about the unimplemented
-interface, and one probe button, which the end-to-end test clicks to prove that a
-state change reaches the DOM in the WKWebView this system ships. The shell
-registers no `#[tauri::command]`, so nothing the window could click reaches the
-parser, and the corpus cannot be opened from it.
-
-The commands below therefore build and check the scaffold, not a product. They
-are here because the scaffold has to stay buildable, and — since no CI job
-compiles `src-tauri` — running them is the only thing that says it still is; the first
-real command — `build_corpus` with its progress events — is the next piece of
-work, and [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what
-the Rust core still owes it.
+What the window cannot do is build anything: it reads a package the CLI has
+already produced. The first command that does work — `build_corpus` with its
+progress events — is the next piece, and
+[`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what the Rust
+core still owes it. The commands below build and check the shell; since
+2026-08-29 a `desktop` job on macOS runs the same battery in CI, so a break
+surfaces on the push that caused it rather than on the next person to run them
+by hand.
 
 pnpm only — the version is pinned by `packageManager` in [`package.json`](package.json), so `corepack` hands every machine the same one.
 
@@ -157,7 +165,7 @@ macOS-only; `build:host` is the escape hatch anywhere else.
 
 [`.github/workflows/release-dmg.yml`](.github/workflows/release-dmg.yml) · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
-Three jobs on every push, all on Ubuntu: tests and clippy for the CLI; `svelte-check`, vitest and a production build for the frontend; and a full parse of all 23 936 manuscripts against the real archive.
+Four jobs on every push. Three on Ubuntu: tests and clippy for the CLI; `svelte-check`, vitest and a production build for the frontend; and a full parse of all 23 936 manuscripts against the real archive. The fourth is on macOS — formatting, clippy and tests for `src-tauri`, because a Tauri crate on Linux needs GTK and WebKitGTK to compile at all, and checking it there would say nothing about the one platform this ships on. Since 2026-08-31 that fourth job also gates the release: the DMG is built from the console crate and carries no shell code, but a release is not cut from a tree whose desktop crate is red — the shell consumes the core's public contract from outside, and it is the only job that does.
 
 The Universal `.app` and DMG are built on macOS, but only when a release is being cut or when the workflow is run by hand — macOS minutes bill at ten times the rate, and nothing but a release consumes that artifact. Run it by hand before tagging, since a break in the packaging script no longer surfaces on the push that caused it:
 
@@ -177,21 +185,21 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 ## Releases
 
-**[v2.5.0](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
+**[v2.5.1](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
 current release — the one to download.** It is what `Releases` marks *Latest*,
 and it is the only version this project asks anyone to install.
 
 **Three releases are published, and no others.** Two are kept as **references**:
 states this project measures itself against and can fall back to when a fault
 has to be bracketed in time. They are baselines for the people working on it,
-not versions to run — a reference is by definition behind. The release above is
-the third of them, so the one to install is a baseline too.
+not versions to run — a reference is by definition behind. The third is the
+release above, the one to install.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.5.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.0) is the third: the release named at the top of this section.
+[v2.5.0](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.0) is the third: the head of the 2.x line, and the state v2.5.1 is cut from.
 
 **What that costs, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
 withdrawn on 2026-08-30 — tags and DMGs both. Until then the three references

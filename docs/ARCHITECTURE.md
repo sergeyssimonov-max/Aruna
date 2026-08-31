@@ -6,26 +6,36 @@ without the layers below them changing.
 
 The environment, the frontend stack, the pinned versions and the checks that
 guard them are **not** described here. They are fixed by
-[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 8, 2026-08-29), which is normative; this
+[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 15, 2026-08-30), which is normative; this
 document is about the Rust that runs underneath it.
 
 ---
 
-## 1. Two crates, no workspace
+## 1. Two crates, one workspace
 
 | | |
 |---|---|
 | `cli/` | package `aruna` 2.5.0 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
-| `src-tauri/` | package `aruna-desktop` 0.1.0, library `aruna_desktop_lib` — the desktop shell. Today a proving ground for the frontend stack: it opens a window and contains no application logic. |
+| `src-tauri/` | package `aruna-desktop` 0.2.0, library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its two commands ask the core where the package went and count what is in it; the logic stays in `cli/`. |
 
-They are **independent crates with separate `Cargo.lock` files**, not a
-workspace. Nothing in `src-tauri/` depends on `cli/` yet, and that is the
-current design rather than an omission — see §7.
+They were independent crates with a `Cargo.lock` each until 2026-08-30, when
+they were joined: the root manifest lists both, **one lock file** sits beside it
+and one `target/` serves both. `src-tauri/` now depends on `cli/` by path and
+calls it through its first command — see §7.
+
+Profiles live in the root manifest and only there. A workspace ignores the
+profile sections of its members, so a copy left in `cli/Cargo.toml` would have
+stopped taking effect without saying so.
 
 Both crates carry `#![forbid(unsafe_code)]` in every library and binary root.
 The compiler holds it; `cargo-geiger` was excluded from this project and is not
 to be reinstalled. What the *dependency* tree contains is `cargo-deny`'s
-subject, and each crate has its own `deny.toml`.
+subject, and since the crates were joined into one workspace on 2026-08-30 that
+subject has one policy: a single `deny.toml` at the root. The per-crate files
+were removed with the merge — one dependency graph judged by two policies is not
+a stricter arrangement but an incoherent one, and it showed: the run from
+`src-tauri` began failing on `ISC`, a licence the same tree had carried all
+along and the other file had allowed for two weeks.
 
 ## 2. The layers, and which module is which
 
@@ -53,8 +63,10 @@ Checked, not asserted:
   every test passes. A window will pass a third.
 - **It never exits.** No `std::process::exit` outside `main.rs`; the binary is
   the only thing that turns a `Result` into an `ExitCode`.
-- **It holds no global mutable state.** The one `OnceLock` in the crate is a
-  test fixture.
+- **It holds no global mutable state.** The one `OnceLock` in the crate is in
+  `Job::unattended`: a cancel flag shared by every unattended run and never set,
+  because nothing is handed out that could set it. It is initialised once and
+  read-only thereafter, which is what makes it not state.
 - **It is not async, and has no thread pool.** The two `std::thread::spawn`
   calls in the crate are both inside `#[cfg(test)]`. Tauri's async commands do
   not require an async core — a window runs this on a blocking worker.
@@ -133,17 +145,58 @@ against the real corpus.
 
 ## 7. Where a Tauri adapter attaches
 
-At `app`, and the wiring has been compiled rather than imagined. Adding
+At `app`, and it is attached. `src-tauri/Cargo.toml` carries
 
 ```toml
 aruna = { path = "../cli" }
 ```
 
-to `src-tauri/Cargo.toml` makes `aruna::app::build_corpus`, `job::{Cancel, Job}`
-and `progress::Progress` reachable from the shell. Verified on 2026-08-23 and
-then reverted: an unused dependency is a `cargo-machete` finding, and there is
-nothing to call it from until the first real command exists. What was reverted
-is that dependency line, not the rename described below.
+since 2026-08-30, which makes `aruna::app::build_corpus`, `job::{Cancel, Job}`,
+`progress::Progress` and `aruna::paths` reachable from the shell. The line was
+compiled once before, on 2026-08-23, and reverted the same day: an unused
+dependency is a `cargo-machete` finding, and there was nothing to call it from
+until a command existed. One does now.
+
+**The first command is the shape the rest are held to.** `corpus_location` asks
+`aruna::paths` for the downloads directory, takes the package and inventory
+names from the constants declared beside it, and does nothing else but join the
+path and ask whether it is there. No second answer to where the corpus goes, and
+no path logic in the shell — that is the whole point of §4.9.6.
+
+**One rule about the wire, because nothing checks it.** Tauri 2 expects a
+command's arguments in camelCase on the JavaScript side unless the command
+declares `#[tauri::command(rename_all = "snake_case")]` — confirmed against the
+pinned version's documentation on 2026-08-31 (`tauri.app/develop/calling-rust`).
+`corpus_stats(path: String)` is a single word and reads the same either way, so
+the call site is right by accident rather than by care. The next argument with
+two words is where that stops being true, and without `specta` nothing in the
+build will say so: the mismatch surfaces as a command that fails at run time
+with an argument it never received.
+
+**The second one shows what "held to" means.** `corpus_stats` counts the
+manuscripts and the CTH groups in a package — and takes the path to it as an
+argument rather than working it out, because working it out would be that second
+answer. The window asks `corpus_location` first and hands the result on. The
+counts come from the `counts` object of the manifest the core's exporter wrote,
+under the file name the core declares (`aruna::export::MANIFEST`); a package with
+no manifest, a broken one, or one without those fields is counted by walking it
+instead, and the answer says which of the two happened.
+
+It answers two further questions from the same manifest, and both are about how
+uneven the corpus is rather than how large. The **spread** — the largest group
+with its size, how many groups hold a single fragment, how many fragments carry
+no CTH at all — is read from the `groups` array the exporter already writes,
+whose per-group document lists are counted without being materialised; the walk
+derives the same three from the directories when there is no manifest. The
+**writing counters** — documents outside NFC, documents using private-use code
+points and how many such points there are, and the sum of the manifest's
+anomaly counters — come only from the manifest, because they were counted while
+the documents were parsed and a walk cannot recover them; there they are `null`
+rather than zero, since zero anomalies and an uncounted corpus are different
+statements. The group with no CTH is recognised by the label the core gives it
+(`aruna::parse::MISSING`), not by a string written here. What stays in the shell
+is the counting, which is about a directory on disk; what the core owns is every
+name involved in finding it.
 
 **It used to need renaming on import.** Both packages were called `aruna`, so
 the line read `aruna_core = { package = "aruna", path = "../cli" }` and rested

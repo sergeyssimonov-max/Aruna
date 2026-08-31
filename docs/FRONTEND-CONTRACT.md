@@ -18,7 +18,7 @@ one took with it, and what the core still owes the new one.
 | package manager | pnpm only, pinned by `packageManager` in the root `package.json` |
 | entry | `src-tauri/src/main.rs` → `aruna_desktop_lib::run()` |
 | plugins | dialog, opener, store, window-state, log |
-| checked by CI | `pnpm check`, `pnpm lint`, `pnpm format:check`, `pnpm test:unit` and `pnpm build` in `frontend/`; `cargo fmt`, `clippy --all-features`, `nextest` and `cargo deny` for `src-tauri/`, on macOS because that is the only platform this targets |
+| checked by CI | `pnpm check`, `pnpm lint`, `pnpm format:check`, `pnpm test:unit` and `pnpm build` in `frontend/`; `cargo fmt`, `clippy --all-features` and `nextest` for `src-tauri/`, on macOS because that is the only platform this targets; `cargo deny` runs once, in the Ubuntu `check` job, because the workspace is one dependency graph judged by one policy |
 | bundle | `pnpm build` targets `universal-apple-darwin` — Intel and Apple Silicon in one binary |
 
 There is no SvelteKit: no `@sveltejs/kit`, no adapter, no `svelte-kit` command.
@@ -175,20 +175,34 @@ held it level with the website's search index. Both went with the React site on
 
 ### CI does not build the application, and that is the decision
 
-**2026-08-23.** No CI job compiles `src-tauri` or produces a bundle, and none is
-to be added yet. What CI controls at this stage is the **correctness of the
-frontend stack** — that `frontend/` typechecks and builds — and nothing beyond
-it.
+**2026-08-23, superseded 2026-08-29.** The rule read: no CI job compiles
+`src-tauri`, and none is to be added yet — what CI controls at this stage is the
+correctness of the frontend stack, and nothing beyond it. The reason given was
+what the application then *was*: Rust logic with no interface on top, so
+compiling a shell around it in CI would spend macOS minutes proving that a
+scaffold still links.
 
-The reason is what the application currently *is*: Rust logic with no interface
-on top, the same shape it had at v1.0.9. Compiling a shell around it in CI would
-spend macOS minutes proving that a scaffold still links, which is not a fact
-worth paying for. When there is an interface to break, the job is worth adding;
-until then this gap is deliberate and should not be reported as an oversight.
+The condition it named — «when there is an interface to break, the job is worth
+adding» — has been met. A `desktop` job runs the specification's §6.1 battery for
+the crate on macOS since 2026-08-29, and on 2026-08-30 the shell stopped being a
+scaffold: it depends on the core and calls it. The gap is closed rather than
+still deliberate.
 
-The bundle *is* built and checked by hand — the last verification produced a
-Universal `.app` and `aruna_0.1.0_universal.dmg`, with the hashed
-`frontend/dist` assets present in both architecture slices.
+The bundle *has been* built and checked by hand — the last such verification, on
+2026-08-30, produced a Universal `.app` and `aruna_0.2.0_universal.dmg`, with the
+hashed `frontend/dist` assets present in both architecture slices, and confirmed
+that the version in that name comes from `src-tauri/Cargo.toml` and from nowhere
+else: the `version` field was taken out of `tauri.conf.json` the same day, so the
+two can no longer disagree.
+
+**The image is not built again until it is wanted.** The owner said so on
+2026-08-30, and §6.7 of the specification is the reason it costs nothing: what
+users receive is built from the core, so a disk image of the shell is a five
+megabyte artifact nobody installs. `bundle.targets` still names `dmg` — the
+configuration is what a release would use, not an instruction to produce one now
+— and routine checking of the shell goes through
+`cargo tauri build --debug --no-bundle`, which is what the E2E run already does.
+Ask before bundling.
 
 ### No page for a CTH folder — decided 2026-08-23
 

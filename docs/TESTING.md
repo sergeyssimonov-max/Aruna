@@ -2,10 +2,13 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **400 tests** across seventeen integration binaries plus the library
-and the binary's own tests. It runs in about
-ten seconds and needs no network. Beside it, and in a language of its own, are
-the **53 `vitest` tests** in `frontend/` — see *Frontend* below. Retries are deliberately absent from
+The suite is **410 tests** across seventeen integration binaries plus the library
+and the binary's own tests. Since the crates were joined into one workspace on
+2026-08-30, `cargo nextest run` from the repository root runs both of them —
+**419**, the other nine being the desktop shell's — and `-p aruna` narrows it
+back to the console crate. It runs in about ten seconds and needs no network.
+Beside it, and in a language of its own, are the **63 `vitest` tests** in
+`frontend/` — see *Frontend* below. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
 
 **A misspelled key in that file is a warning, not an error** — nextest prints
@@ -190,19 +193,20 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 53
+pnpm test:unit      # 57
 ```
 
 `vitest` runs two projects. **`component`** is jsdom: the 14 tests of
 `src/inventory/filter.test.ts`, which drive the search box and the fold controls
-against a document built in the shape `cli/src/html.rs` writes. It held
-`Counter.test.ts` as well until 2026-08-29, when the Vite starter's demo screen
-went. Nothing replaced it at this level, and nothing will while the window holds
-a prototype: that screen is redrawn through `/design` on every maintenance pass,
-so a jsdom test of its markup would be rewritten as often as the markup. What
-holds the screen to its contract is `e2e/smoke.e2e.ts`, which clicks the probe
-button in the real WKWebView — the same three steps the deleted test did in
-jsdom, moved to the engine the window actually runs in.
+against a document built in the shape `cli/src/html.rs` writes, and the 4 tests
+of `src/App.test.ts`, which render the window against a mocked `invoke`. The
+second file arrived on 2026-08-30 with the screen it tests: before that the
+window held a prototype nobody intended to keep, so a jsdom test of its markup
+would have been rewritten as often as the markup, and there was none. What it holds is what the screen
+promises — both counts, the path they were asked for, the error text in place of
+the counts when the command refuses, and the click counter — while
+`e2e/smoke.e2e.ts` holds the same button in the real WKWebView, which is the one
+thing jsdom cannot answer for.
 **`node`** holds the tests that read the repository rather than a DOM:
 
 | test | what it holds |
