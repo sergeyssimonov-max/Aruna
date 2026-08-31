@@ -33,11 +33,31 @@
     border-radius: 0;
   }
 
-  /* Screen-only affordances: both are controls, and a control on paper is an
-   * instruction the reader cannot follow. */
-  .toolbar,
-  .group-toggle {
+  /* Screen-only affordances: a control on paper is an instruction the reader
+   * cannot follow. The toolbar goes whole — it is nothing but controls.
+   *
+   * The group control cannot: the CTH heading lives *inside* it, as
+   * `.group-label`, so hiding the button hid every «CTH 5» in the printed
+   * inventory and left 663 groups of rows with nothing saying which group. What
+   * is hidden is the part that is genuinely a control — the chevron that says
+   * folded or open, a state paper does not have — while the button itself is
+   * demoted to plain text: no pointer, no focus ring, nothing that reads as
+   * something to press. */
+  .toolbar {
     display: none !important;
+  }
+
+  .group-toggle {
+    display: inline-flex;
+    cursor: auto;
+  }
+
+  .group-toggle .chevron {
+    display: none !important;
+  }
+
+  .group-toggle:focus-visible {
+    outline: 0;
   }
 
   a {

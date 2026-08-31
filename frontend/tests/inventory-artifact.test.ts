@@ -86,6 +86,26 @@ describe('the artifacts the crate compiles in', () => {
   })
 
   /**
+   * **The CTH heading has to survive printing, and it nearly did not.**
+   *
+   * The group's name is markup inside the button that folds the group
+   * (`<span class="group-label">` inside `.group-toggle`, written by
+   * `cli/src/html.rs`), so the print rule that hid the control as a
+   * screen-only affordance hid every «CTH 5» with it: 663 groups of rows on
+   * paper with nothing saying which group any row belonged to. What must go is
+   * the chevron — a folded/open state paper does not have — and what must stay
+   * is the heading.
+   */
+  it('keeps the CTH group headings on paper', async () => {
+    const print = (await committed())['print.css']
+    expect(print, 'the print rules hide the group control whole again').not.toMatch(
+      /\.toolbar,\s*\.group-toggle\s*\{[^}]*display:\s*none/,
+    )
+    expect(print).toMatch(/\.group-toggle\s*\{[^}]*display:\s*inline-flex/)
+    expect(print).toMatch(/\.group-toggle\s+\.chevron\s*\{[^}]*display:\s*none/)
+  })
+
+  /**
    * The shape the document needs, rather than the shape a module needs: it is
    * pasted inside a `<script>` element in a file that may be opened from a
    * `file://` URL, with no module loader and no network.

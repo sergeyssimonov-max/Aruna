@@ -30,7 +30,7 @@
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #999;
+  color: #6b6b6b;
 }
 .legend-list {
   display: flex;
@@ -131,7 +131,7 @@ body:not(.filter-on) .toolbar {
      line than pinned to the top of a box it does not fill. */
   align-self: center;
   font-size: 0.8125rem;
-  color: #888;
+  color: #595959;
   font-variant-numeric: tabular-nums;
 }
 
@@ -172,7 +172,7 @@ thead th {
   font-size: 0.7rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #888;
+  color: #595959;
   padding: 0.55rem 0.5rem 0.65rem 0;
   border-bottom: 1px solid #e5e5e5;
   white-space: nowrap;
@@ -193,7 +193,7 @@ tbody td:last-child {
   padding-right: 0;
 }
 td.num {
-  color: #999;
+  color: #6b6b6b;
   font-variant-numeric: tabular-nums;
   /* Left, under the "№" heading. Right alignment put the digits against the
      siglum and left the gap on the outside, so a long number read as though it
@@ -261,7 +261,7 @@ tr.group.folded .chevron {
 .group-count {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  color: #999;
+  color: #6b6b6b;
 }
 .group-count::before {
   content: '· ';

@@ -1,43 +1,115 @@
 <script lang="ts">
-  /**
-   * The window, while there is no interface to put in it.
-   *
-   * Aruna is a command-line program: it downloads the TLHdig corpus, normalises
-   * it and writes the package with its inventory. The desktop shell exists —
-   * window, permissions, the bridge — but not one command is registered on the
-   * Rust side yet, so there is nothing here to drive.
-   *
-   * **The screen is deliberately disposable.** It is drawn again through
-   * `/design` on every maintenance pass and rebuilt by hand from what comes
-   * back, so that the design tool and this stack — Svelte 5 and Vite without
-   * SvelteKit — are known to still work together. What survives each round is
-   * not the markup but the contract: this heading, this sentence, and one probe
-   * button.
-   *
-   * This round reads as a document rather than a splash: the column is
-   * left-aligned under a hairline, which is the one place `--border` earns its
-   * keep on this screen. A window that tells the reader to go back to the
-   * terminal should not announce itself like a title card.
-   *
-   * **The button is not a feature.** It is the one place in this repository
-   * where a state change is proven to reach the DOM in the WKWebView macOS 13
-   * ships and never updates. That is why `build.target` is pinned at `safari16`
-   * and why §4.3 of the specification says a dev-mode run proves nothing about
-   * the floor: only the built application, driven by `e2e/smoke.e2e.ts`, does —
-   * and it does it by clicking this and reading the text back. The scenario is
-   * the measuring instrument and does not move; the screen around it may.
-   */
+  import { invoke } from '@tauri-apps/api/core'
+  import { getCurrentWindow } from '@tauri-apps/api/window'
+  import type { CorpusStats } from './stats'
+
+  type CorpusLocation = {
+    downloads: string
+    package: string
+    inventory: string
+    package_exists: boolean
+    inventory_exists: boolean
+  }
+
+  let stats: CorpusStats | null = $state(null)
+  let failure: string | null = $state(null)
   let clicks: number = $state(0)
+
+  /**
+   * Два вызова подряд, а не один: где лежит пакет, знает `corpus_location`, и
+   * второй догадки об этом в программе быть не должно. `corpus_stats` считает
+   * то, что лежит по названному пути, и о папке загрузок ничего не знает.
+   *
+   * Отказ любого из двух виден на месте метрик – заголовок и кнопка остаются:
+   * окно сообщает, что смогло, а не заменяется сообщением об ошибке целиком.
+   */
+  async function load(): Promise<void> {
+    try {
+      const where = await invoke<CorpusLocation>('corpus_location')
+      stats = await invoke<CorpusStats>('corpus_stats', { path: where.package })
+    } catch (error: unknown) {
+      failure = String(error)
+    }
+  }
+
+  void load()
+
+  /**
+   * Разряды неразрывным пробелом, вручную.
+   *
+   * `toLocaleString` дал бы то же самое там, где ICU полон, и другое – там, где
+   * он урезан: в jsdom, которым идут модульные тесты, и в WKWebView, которым
+   * идет окно, разрядка разная. Число на экране не должно зависеть от того,
+   * чем его смотрят.
+   */
+  function spaced(value: number): string {
+    return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  }
+
+  /**
+   * Кнопка закрывает окно, и счетчик растет раньше выхода.
+   *
+   * Порядок здесь – контракт со сценарием E2E: под `VITE_E2E` закрывать окно
+   * нельзя, иначе проверять станет нечего, но `data-clicks` к этому моменту
+   * уже увеличен, и сценарий читает его после первого нажатия.
+   */
+  async function confirm(): Promise<void> {
+    clicks += 1
+    if (import.meta.env.VITE_E2E) {
+      return
+    }
+    try {
+      await getCurrentWindow().close()
+    } catch (error: unknown) {
+      failure = String(error)
+    }
+  }
 </script>
 
 <main>
-  <h1>Aruna</h1>
-  <hr />
-  <p>
-    The desktop interface is not implemented yet. The corpus package and its inventory are built by
-    the command-line program.
-  </p>
-  <button type="button" class="probe" onclick={() => (clicks += 1)}>
-    Engine probe: {clicks}
-  </button>
+  <div class="ready">
+    <h1>Библиотека Thesaurus Linguarum Hethaeorum Digitalis готова к работе</h1>
+    {#if failure}
+      <p class="failure">{failure}</p>
+    {:else if stats}
+      <p class="metrics">
+        <span>Manuscripts – <span class="count">{spaced(stats.manuscripts)}</span></span>
+        <span>Groups (CTH) – <span class="count">{spaced(stats.groups)}</span></span>
+      </p>
+      <!--
+        Разбивка стоит отдельной строкой и мельче: два итога выше – это ответ
+        на вопрос «что собрано», а эти три – на вопрос «как оно устроено»,
+        который задают вторым. Строки нет вовсе, когда групп нет: нулями она
+        сказала бы о пустом пакете больше, чем о нем известно.
+      -->
+      {#if stats.spread.largest}
+        <p class="spread">
+          <span>
+            Largest group – <span class="count">{stats.spread.largest.label}</span>
+            ({spaced(stats.spread.largest.fragments)})
+          </span>
+          <span>Groups of one – <span class="count">{spaced(stats.spread.singletons)}</span></span>
+          <span>Without CTH – <span class="count">{spaced(stats.spread.without_cth)}</span></span>
+        </p>
+      {/if}
+      <!--
+        Счетчики письма приходят только из манифеста. Когда его нет, строки
+        нет: обход каталога считает файлы, а не читает их, и нули на этом месте
+        утверждали бы, что аномалий не нашлось, – тогда как их не искали.
+      -->
+      {#if stats.fonts}
+        <p class="spread">
+          <span>Not in NFC – <span class="count">{spaced(stats.fonts.not_in_nfc)}</span></span>
+          <span>
+            Private use – <span class="count">{spaced(stats.fonts.with_private_use)}</span>
+            ({stats.fonts.private_use_points} points)
+          </span>
+          <span>Anomalies – <span class="count">{spaced(stats.fonts.anomalies)}</span></span>
+        </p>
+      {/if}
+    {:else}
+      <p class="failure">Читаю, что собрано…</p>
+    {/if}
+  </div>
+  <button type="button" class="confirm" data-clicks={clicks} onclick={confirm}>Понятно</button>
 </main>

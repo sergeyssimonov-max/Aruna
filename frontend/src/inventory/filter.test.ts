@@ -37,7 +37,7 @@ function inventory(groups: { label: string; rows: Row[] }[]): void {
     .join('')
 
   document.body.innerHTML =
-    `<div class="toolbar"><input type="search" id="q" /><button type="button" id="fold-all" aria-expanded="true">Collapse fragments</button><span class="hint" id="hint"></span></div>` +
+    `<div class="toolbar"><input type="search" id="q" aria-label="Поиск по описи" /><button type="button" id="fold-all" aria-expanded="true">Collapse fragments</button><span class="hint" id="hint"></span></div>` +
     `<table id="inv"><tbody>${body}</tbody></table>`
   document.body.className = ''
 }

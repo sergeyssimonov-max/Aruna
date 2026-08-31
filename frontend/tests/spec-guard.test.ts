@@ -2,7 +2,7 @@
  * The decisions the specification fixed, checked against the files that hold
  * them.
  *
- * `docs/PROJECT-SPEC.ru.md` (редакция 8, 2026-08-29) settles a long list of
+ * `docs/PROJECT-SPEC.ru.md` (редакция 15, 2026-08-30) settles a long list of
  * things by name — a package manager, an engine floor, a bundle identifier,
  * which Tauri plugins are registered and under which permissions, and the whole
  * mechanism by which the end-to-end contour is kept out of a release build. Its
@@ -92,10 +92,35 @@ describe('the engine floor of the window', () => {
 })
 
 describe('the Tauri application is configured as agreed', () => {
-  it('keeps its identifier, product name and bundle targets', () => {
-    expect(TAURI_CONF.identifier).toBe('ru.hippo.aruna')
-    expect(TAURI_CONF.productName).toBe('aruna')
+  /**
+   * **The shell may not be named or identified like the product.**
+   *
+   * There is one thing this project distributes: `Aruna.app`, built by
+   * `cli/build_app.sh` from the console crate, `com.sergeyssimonov.aruna`,
+   * version 2.5.0. The Tauri bundle is not a second product — it is the
+   * environment the window is built in, and the owner said so on 2026-08-30.
+   *
+   * Until that day it was called `aruna`, and on macOS's case-insensitive
+   * filesystem `aruna.app` and `Aruna.app` are one name: dragging the shell
+   * into `/Applications` would have replaced the shipped program with a window
+   * that cannot build anything, and the only prompt would have been the
+   * ordinary "an item named Aruna already exists". Verified rather than
+   * assumed — `ls -di /Applications/Aruna.app /Applications/aruna.app` returns
+   * the same inode for both spellings.
+   *
+   * So the name says what the thing is (`aruna-desktop`, the crate's own
+   * name), and the identifier is a child of the product's rather than a second
+   * root: `com.sergeyssimonov.aruna.shell`. LaunchServices treats it as
+   * unrelated, which is the point, while a reader can see whose it is.
+   */
+  it('names the shell as a shell, not as the product', () => {
+    expect(TAURI_CONF.identifier).toBe('com.sergeyssimonov.aruna.shell')
+    expect(TAURI_CONF.productName).toBe('aruna-desktop')
     expect(TAURI_CONF.bundle.targets).toEqual(['app', 'dmg'])
+
+    // The one that would undo all of it: a bundle whose name differs from the
+    // product's only by case is the same file on this filesystem.
+    expect(TAURI_CONF.productName.toLowerCase()).not.toBe('aruna')
   })
 
   /** The E2E service finds the window by the document's title, not by config. */

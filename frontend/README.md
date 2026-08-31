@@ -10,8 +10,9 @@ This is the half that ships today. `pnpm build:inventory` builds it into
 fails if what is committed is not what these sources now produce.
 
 **`src/App.svelte` and the rest of `src/`** — the desktop window, which is still
-the scaffold `create-vite` produced. It has no Aruna interface in it yet, the
-Tauri shell in `../src-tauri` registers no commands, and nothing here reaches
+the scaffold `create-vite` produced. Since 2026-08-30 it carries one real
+screen, the Tauri shell in `../src-tauri` registers two commands
+(`corpus_location` and `corpus_stats`), and what is still true is that nothing here reaches
 the corpus. Read it as work in progress rather than as a second program.
 
 The stack is Svelte 5, Vite and TypeScript, with pnpm as the only package

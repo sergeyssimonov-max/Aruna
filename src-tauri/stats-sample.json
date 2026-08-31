@@ -1,0 +1,25 @@
+{
+  "manifest": {
+    "manuscripts": 23936,
+    "groups": 663,
+    "source": "manifest",
+    "spread": {
+      "largest": { "label": "CTH 832", "fragments": 4480 },
+      "singletons": 116,
+      "without_cth": 0
+    },
+    "fonts": {
+      "not_in_nfc": 78,
+      "with_private_use": 1269,
+      "private_use_points": 7,
+      "anomalies": 0
+    }
+  },
+  "walk": {
+    "manuscripts": 0,
+    "groups": 0,
+    "source": "walk",
+    "spread": { "largest": null, "singletons": 0, "without_cth": 0 },
+    "fonts": null
+  }
+}

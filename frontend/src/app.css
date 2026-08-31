@@ -1,14 +1,25 @@
+/* Экран готовности главного окна.
+ *
+ * Правила здесь плоские нарочно: вложенные селекторы и вложенный `@media`
+ * Safari 16 не понимает, а окно живет в системном WKWebView, который на macOS
+ * 13 больше не обновляется. Vite их пока разворачивал сам, но исходник, из
+ * которого верстку читает человек, обязан быть тем же кодом, что и результат.
+ *
+ * Палитра объявлена дважды – в `:root` и под `prefers-color-scheme: dark`, – и
+ * ни одно значение не спрятано только в темной ветке: переключателя тем в окне
+ * нет, тему выбирает система, и смена в Системных настройках должна доходить
+ * до открытого окна без перезапуска. `color-scheme: light dark` рядом с
+ * палитрой – это то же самое для системных контролов: полосы прокрутки и
+ * рамка фокуса перекрашиваются вместе с ней. */
 :root {
   --text: #6b6375;
   --text-h: #08060d;
   --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Рамка единственного контрола. Отдельный токен, а не оттенок текста: у
+   * границы кнопки своя работа – очертить область нажатия, не притягивая к
+   * себе взгляд. */
+  --control: #d9d8dc;
+  --control-hover: #b9b8be;
 
   /* The corpus faces, and why they are in every stack below.
    *
@@ -48,8 +59,10 @@
   --heading: system-ui, 'Segoe UI', Roboto, var(--corpus), sans-serif;
   --mono: ui-monospace, Consolas, var(--corpus), monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  /* Средний уровень шкалы. Их всего три – 21, 15 и 13, – и метрики стоят
+   * посередине, поэтому базовым размером назначен именно он: заголовок и
+   * кнопка объявляют свой, остальное наследует этот и не расходится. */
+  font: 15px/1.4 var(--sans);
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
@@ -57,10 +70,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,125 +77,119 @@
     --text: #9ca3af;
     --text-h: #f3f4f6;
     --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+    --control: #3a3c47;
+    --control-hover: #565964;
   }
 }
-
-/* The window, while it holds a placeholder.
- *
- * The screen this styles is redrawn through `/design` on every maintenance
- * pass — see the note in `App.svelte` — so these rules are expected to move.
- * What does not move is what they style: a heading, a sentence, and the probe
- * button the end-to-end scenario clicks. The tokens above stay whatever the
- * screen becomes: they are this application's palette and its font stack, and
- * the stack is mirrored from `src/inventory/canonical.css` under the eye of
- * `tests/font-stack.test.ts`. */
 
 body {
   margin: 0;
 }
 
-/* Left-aligned and vertically centred, not centred both ways: the column reads
- * as the top of a document, which is what a window that sends the reader back
- * to the terminal should look like.
- *
- * The narrow step is not a phone rule — this application has no phone. It is
- * the window the reader actually gets: `tauri-plugin-window-state` reopens it
- * at whatever size it was last left, and a manual check on 2026-08-29 found it
- * restored to 321×262 points, where the generous spacing pushed the probe
- * button below the fold. Below 1024px the column takes the width back from the
- * margins, which is what turns six lines of the sentence into four. */
+/* Окно не меняет размер мышью и открывается 800×600 из `tauri.conf.json`, так
+ * что мерок на узкий шаг здесь больше нет: они были ответом на окно, которое
+ * `tauri-plugin-window-state` возвращал 321×262. Это окно в списке исключений
+ * плагина, и такого размера у него не бывает. */
 #app {
   min-height: 100svh;
   display: flex;
-  align-items: center;
-  padding: 64px 72px;
-  box-sizing: border-box;
-
-  @media (max-width: 1024px) {
-    padding: 12px 24px;
-  }
 }
 
+/* Заголовок с метриками стоит в центре свободного места, кнопка прижата к низу:
+ * растет средний блок, а не отступ под ним, поэтому при любой высоте окна
+ * кнопка остается на своем расстоянии от края. */
 main {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 24px;
-  max-width: 46ch;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 96px 44px;
+}
 
-  @media (max-width: 1024px) {
-    gap: 10px;
-  }
+.ready {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
 }
 
 h1 {
+  max-width: 480px;
+  margin: 0;
+  text-align: center;
   font-family: var(--heading);
+  font-size: 21px;
   font-weight: 500;
-  font-size: 56px;
-  line-height: 100%;
-  letter-spacing: -1.68px;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
   color: var(--text-h);
-  margin: 0;
-
-  @media (max-width: 1024px) {
-    font-size: 36px;
-  }
 }
 
-/* The rule under the heading, and the only structure on the screen. Its own
- * element rather than a border on the heading: it spans the column, not the
- * word. */
-hr {
-  width: 100%;
-  height: 1px;
-  border: 0;
+/* Две метрики в строку. Разделителя между ними нет – только промежуток: на
+ * экране из трех элементов черта была бы четвертым. */
+.metrics {
+  display: flex;
+  gap: 48px;
   margin: 0;
-  background: var(--border);
+  color: var(--text);
 }
 
-p {
-  margin: 0;
-  text-wrap: pretty;
-}
-
-/* The engine probe.
+/* Разбивка и счетчики письма: те же две метрики размером ниже.
  *
- * It carries its border at rest rather than on hover: the screen holds one
- * control and nothing else, and a button that only looks like one under the
- * pointer reads as text on a page a reader is told is not finished. Hover
- * deepens the edge to the accent itself — the same two tokens, no third. */
-.probe {
-  font-family: var(--mono);
-  font-size: 16px;
-  line-height: 145%;
-  display: inline-flex;
-  margin-top: 4px;
-  padding: 7px 14px;
+ * Третий, младший размер шкалы – тот же, которым набрана кнопка, – и меньший
+ * промежуток: строк теперь три, и одинаковый набор превратил бы их в список,
+ * у которого нет главного. Промежуток 32, а не 48, еще и потому, что в этих
+ * строках по три подписи вместо двух, а ширина окна не меняется. */
+.spread {
+  display: flex;
+  gap: 32px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Число – единственное, что здесь меняется от пакета к пакету, и единственное,
+ * что набрано цветом заголовка: подпись читают один раз, число ищут глазами. */
+.count {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+/* Отказ команды стоит на месте метрик и в их же размере: это ответ на тот же
+ * вопрос, а не сообщение о сбое поверх экрана. */
+.failure {
+  max-width: 480px;
+  margin: 0;
+  text-align: center;
+  color: var(--text);
+}
+
+/* Кнопка носит рамку в покое, а не по наведению: на экране один контрол, и
+ * элемент, который выглядит кнопкой только под курсором, читается как строка
+ * текста. */
+.confirm {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  height: 30px;
+  padding: 0 18px;
+  border: 1px solid var(--control);
   border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid var(--accent-border);
-  transition: border-color 0.3s;
+  background: transparent;
+  color: var(--text-h);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
 
-  &:hover {
-    border-color: var(--accent);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+.confirm:hover {
+  border-color: var(--control-hover);
+}
 
-  /* The extra breath above the control is what the gap already gives once the
-   * gap is the narrow one; keeping both is four points the button does not
-   * have. */
-  @media (max-width: 1024px) {
-    margin-top: 0;
-  }
+.confirm:focus-visible {
+  outline: 2px solid var(--text-h);
+  outline-offset: 2px;
 }
