@@ -128,6 +128,62 @@ fn files(root: &Path) -> Vec<PathBuf> {
 
 // ---------------------------------------------------------------------------
 
+/// Данные первой записи архива, испорченные так, что их нельзя прочитать.
+///
+/// Оглавление архива не трогается: сам файл открывается как прежде, имена и
+/// смещения на месте, — ломается только распаковка первой записи. Смещение
+/// считается по локальному заголовку: подпись и 26 байт полей, затем длина
+/// имени и длина дополнительного поля, и сразу за ними данные.
+fn break_first_entry(zip: &Path) {
+    let mut bytes = std::fs::read(zip).expect("read archive");
+    assert_eq!(
+        &bytes[0..4],
+        b"PK\x03\x04",
+        "не локальный заголовок в начале"
+    );
+    let name_len = u16::from_le_bytes([bytes[26], bytes[27]]) as usize;
+    let extra_len = u16::from_le_bytes([bytes[28], bytes[29]]) as usize;
+    let data = 30 + name_len + extra_len;
+    for byte in bytes[data..data + 16].iter_mut() {
+        *byte ^= 0xff;
+    }
+    std::fs::write(zip, &bytes).expect("write archive");
+}
+
+/// **Отмена, услышанная на чтении заголовков, останавливает само чтение.**
+///
+/// Соседний тест ниже проверяет исход: отмененная сборка ничего не пишет. Он
+/// был зеленым и до этой правки, потому что флаг замечался следующей проверкой
+/// — уже после того, как заголовки всех записей архива прочитаны до конца. На
+/// настоящем корпусе этот проход занимает 1,6 с из 6,3 с работы, то есть
+/// четверть, и все это время кнопка «Отмена» в окне была бы мертвой.
+///
+/// Проверяется это не временем, а тем, читаются ли данные вообще. Данные
+/// первой записи испорчены: сборка, которая до них добралась, обязана
+/// сообщить об ошибке разбора, а сборка, которая услышала отмену раньше, —
+/// об отмене. До правки тест падал именно так: `Cancelled` не приходил,
+/// приходила ошибка чтения записи.
+#[test]
+fn a_cancelled_scan_stops_before_reading_an_entry() {
+    let (_dir, zip, destination) = scene(40);
+    break_first_entry(&zip);
+    let cancel = Cancel::new();
+    let sink = CancelAt::new("ReadingHeaders", &cancel);
+
+    let outcome = export::build(&zip, &destination, "cancelled", &Job::new(&sink, &cancel));
+
+    assert!(
+        matches!(outcome, Err(ArunaError::Cancelled { .. })),
+        "сканирование дочитало до испорченной записи вместо того, чтобы \
+         остановиться по отмене: {outcome:?}"
+    );
+    assert!(
+        files(&destination).is_empty(),
+        "the destination holds {:?}",
+        files(&destination)
+    );
+}
+
 /// A build cancelled before it writes writes nothing.
 #[test]
 fn a_build_cancelled_at_the_first_stage_writes_no_documents() {

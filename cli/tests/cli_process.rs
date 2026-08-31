@@ -209,7 +209,7 @@ fn an_ordinary_run_writes_the_inventory_and_says_where() {
     assert!(leftovers(&sandbox.downloads()).is_empty());
 }
 
-/// **The two questions are answered, and answered before any work.**
+/// **The two questions are answered, in all four spellings, before any work.**
 ///
 /// They were not, until this was written: `aruna --version` started a full
 /// corpus build, and without `ARUNA_ZIP` it fetched 71 MiB to do it. That was
@@ -229,7 +229,7 @@ fn the_two_questions_are_answered_before_any_work() {
     let sandbox = Sandbox::new();
     let corpus = sandbox.corpus();
 
-    for flag in ["--help", "--version"] {
+    for flag in ["--help", "--version", "-h", "-V"] {
         let out = sandbox.run_with(&corpus, &[flag]);
         assert_no_panic(&out);
         assert_eq!(out.status.code(), Some(0), "{flag} did not exit 0");

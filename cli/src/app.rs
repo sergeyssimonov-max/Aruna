@@ -187,9 +187,7 @@ pub fn build_corpus_into(
     }
 
     let package = package?;
-    let inventory = package
-        .root
-        .join(format!("{}.html", crate::export::PACKAGE));
+    let inventory = package.root.join(crate::paths::OUTPUT_FILE_NAME);
 
     Ok(CorpusReport {
         job: job.id(),
@@ -286,6 +284,9 @@ impl Failure {
 
             // The export refusing to do something wrong.
             ExportCollision { .. } => ("collision", Some(Phase::Exporting), false),
+            // A property of the archive, not of this run: the same archive will
+            // fail the same way, so there is nothing to try again.
+            ArchiveDuplicateEntry { .. } => ("archive_duplicate", Some(Phase::Exporting), false),
             ExportDocumentTooLarge { .. } => ("document_too_large", Some(Phase::Exporting), false),
             ExportDistorted { .. } => ("distorted", Some(Phase::Exporting), false),
             ExportDestination { .. } => ("destination_not_ours", Some(Phase::Exporting), false),
@@ -346,6 +347,7 @@ fn message_of(error: &ArunaError) -> String {
             second,
             ..
         } => format!("{group}: {fragment} is claimed by both {first} and {second}"),
+        ArchiveDuplicateEntry { entry } => format!("the archive names {entry} twice"),
         other => other.to_string(),
     }
 }
@@ -611,6 +613,17 @@ mod tests {
                 path: secret.join("CTH 5/KBo 1.1.xml"),
             },
         ];
+
+        // `ArchiveDuplicateEntry` is deliberately not in that list, and so are
+        // `ExportDocumentTooLarge` and `ExportDistorted`, which have the same
+        // shape. What all three carry is an `entry`: a name read out of the
+        // archive's own index, which is the only thing that identifies the
+        // document to a reader looking at the corpus. Passing it through is the
+        // point of the message. The promise above is about the reader's disk —
+        // the cases listed are the ones that hold a `PathBuf` of it — and
+        // trimming an archive-internal name to satisfy a test about a different
+        // secret would leave the message unable to say which document is
+        // duplicated.
 
         for error in &cases {
             let failure = Failure::of(error);

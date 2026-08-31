@@ -341,7 +341,7 @@ pub fn render_manifest(
     let _ = writeln!(
         out,
         "  \"inventory\": {},",
-        string(&format!("{PACKAGE}.html"))
+        string(crate::paths::OUTPUT_FILE_NAME)
     );
 
     let _ = writeln!(out, "  \"source\": {{");

@@ -70,7 +70,14 @@ fn main() -> ExitCode {
 /// there is no command line to read; what it needs is an answer to "what is
 /// this and how do I point it at a file I already have".
 ///
-/// `-h`, `-V`, a subcommand or a second flag further along the line are not
+/// Four spellings, not two. `-h` and `-V` were left out when the long forms
+/// were added, and the short ones are the first reflex of anyone who meets an
+/// unfamiliar binary — so `aruna -V` did not print a version, it started a full
+/// corpus build, and without `ARUNA_ZIP` that meant fetching 71 MiB and leaving
+/// a package in the reader's Downloads folder. Someone asking what this program
+/// is has not asked for that. Added on 2026-08-31 at the owner's word.
+///
+/// A subcommand or a second flag further along the line is still not
 /// recognised, and the run proceeds as it always has: inventing a command line
 /// this program does not have would be a larger change than the one asked for,
 /// and `tests/cli_process.rs` holds both halves of that.
@@ -80,7 +87,7 @@ fn asks_what_this_is() -> bool {
             .nth(1)
             .as_deref()
             .and_then(|arg| arg.to_str()),
-        Some("--help" | "--version")
+        Some("--help" | "-h" | "--version" | "-V")
     )
 }
 
@@ -199,6 +206,15 @@ fn advice(err: &ArunaError) -> Option<String> {
              Это расхождение в исходных данных, а не сбой сборки —\n\
              сверьте оба исходных пути, названных выше."
             .to_string(),
+        // Same shape as the collision above and the same answer: the archive
+        // says two things at once, and only whoever built it can say which was
+        // meant.
+        ArunaError::ArchiveDuplicateEntry { .. } => {
+            "В архиве два документа с одним и тем же именем.\n\
+             Это расхождение в исходных данных, а не сбой сборки —\n\
+             имя названо выше."
+                .to_string()
+        }
         // The export's own messages already carry the paths and the counts;
         // what they cannot say is that none of these three is something the
         // reader broke, and what to do about each differs.
@@ -264,6 +280,41 @@ fn advice(err: &ArunaError) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// **Оба расхождения в исходных данных советуют одно и то же и говорят
+    /// это по-разному.**
+    ///
+    /// Два отказа – два документа на одно место и одно имя записи дважды –
+    /// одинаковы для читателя по действию: чинить надо не программу, а корпус.
+    /// Ветка для второго появилась 30.08.2026 и до этого теста не выполнялась
+    /// ни разу: `llvm-cov` показывал ее непокрытой. Совет, который никто не
+    /// читал, легко удалить незаметно.
+    #[test]
+    fn both_kinds_of_corpus_disagreement_are_advised_and_not_confused() {
+        let duplicate = advice(&ArunaError::ArchiveDuplicateEntry {
+            entry: "xml/KBo 1.1.xml".into(),
+        })
+        .expect("a duplicated entry has advice");
+        let collision = advice(&ArunaError::ExportCollision {
+            group: "CTH 5".into(),
+            fragment: "KBo 1.1".into(),
+            first: "a.xml".into(),
+            second: "b.xml".into(),
+            path: std::path::PathBuf::from("CTH 5/KBo 1.1.xml"),
+        })
+        .expect("a collision has advice");
+
+        for text in [&duplicate, &collision] {
+            assert!(
+                text.contains("исходных данных"),
+                "the reader is not told this is the corpus, not the program: {text}"
+            );
+        }
+        assert_ne!(
+            duplicate, collision,
+            "two different faults must not read as one"
+        );
+    }
 
     /// The two cases that are advised differently by status must stay
     /// distinguishable: a gone file needs the URL updated, a busy server needs

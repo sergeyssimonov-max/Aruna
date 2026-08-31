@@ -21,8 +21,21 @@
     padding: 0;
   }
 
-  .toolbar, .group-toggle {
+  .toolbar {
     display: none !important;
+  }
+
+  .group-toggle {
+    cursor: auto;
+    display: inline-flex;
+  }
+
+  .group-toggle .chevron {
+    display: none !important;
+  }
+
+  .group-toggle:focus-visible {
+    outline: 0;
   }
 
   a {

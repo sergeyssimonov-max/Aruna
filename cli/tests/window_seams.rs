@@ -261,3 +261,166 @@ fn the_corpus_is_built_where_the_caller_says() {
         );
     }
 }
+
+/// **Два прогона в одном процессе дают побайтово одно и то же.**
+///
+/// Свойство, без которого окно не построить: пользователь нажимает «Собрать»
+/// второй раз, не перезапуская программу. Ловится здесь не расхождение сумм, а
+/// три вещи, которые к нему приводят: состояние, пережившее операцию;
+/// инициализация, срабатывающая один раз на процесс; и общий изменяемый
+/// объект, до которого добрались оба прогона.
+///
+/// Каталоги назначения разные нарочно – в них не должно быть ничего от
+/// прошлого раза, и сравнение идет по содержимому, а не по времени файлов.
+#[test]
+fn two_runs_in_one_process_produce_the_same_bytes() {
+    let dir = tempdir().expect("tempdir");
+    let zip = corpus(dir.path(), 24);
+
+    let build = |name: &str| {
+        let destination = dir.path().join(name);
+        std::fs::create_dir(&destination).expect("destination");
+        let report = app::build_corpus_into(
+            &CorpusRequest {
+                local_archive: Some(zip.clone()),
+            },
+            &destination,
+            &Job::unattended(),
+        )
+        .expect("builds");
+        report.package.root
+    };
+
+    let first = build("first");
+    let second = build("second");
+
+    let listing = |root: &Path| {
+        let mut names: Vec<PathBuf> = Vec::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("read_dir").flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    names.push(path.strip_prefix(root).expect("under root").to_path_buf());
+                }
+            }
+        }
+        names.sort();
+        names
+    };
+
+    let names = listing(&first);
+    assert_eq!(
+        names,
+        listing(&second),
+        "the two runs wrote different files"
+    );
+    assert!(!names.is_empty(), "the run wrote nothing at all");
+
+    for name in &names {
+        let a = std::fs::read(first.join(name)).expect("read first");
+        let b = std::fs::read(second.join(name)).expect("read second");
+        assert!(
+            a == b,
+            "{} differs between the first run and the second",
+            name.display()
+        );
+    }
+}
+
+/// **С приемником прогресса и без него получается одно и то же, а этапы идут
+/// в одном порядке.**
+///
+/// Приемник заведен под окно, и это проверка обоих его свойств сразу: он
+/// слышит ход работы – этапы приходят в том порядке, в котором выполняются, и
+/// число документов в объявлении совпадает с тем, что операция вернула, – и он
+/// ни на что не влияет: пакет, собранный с ним, побайтово равен собранному без
+/// него.
+///
+/// Чего здесь нет намеренно: проверки счетчика по документам. Событие о записи
+/// приходит один раз на весь этап, а не по документу, так что полосу с
+/// движущимся числом по нему не нарисовать. Это шов, которого не хватает, и
+/// добавить его – значит изменить перечень событий; находка вынесена в отчет,
+/// а не сделана здесь.
+#[test]
+fn a_run_with_a_sink_reports_its_stages_and_changes_nothing() {
+    #[derive(Default)]
+    struct Stages {
+        seen: Mutex<Vec<&'static str>>,
+        documents: Mutex<Vec<usize>>,
+    }
+
+    impl Progress for Stages {
+        fn report(&self, event: Event<'_>) {
+            let name = match event {
+                Event::ReadingHeaders => "ReadingHeaders",
+                Event::HeadersRead { .. } => "HeadersRead",
+                Event::WritingDocuments { documents } => {
+                    self.documents.lock().expect("not poisoned").push(documents);
+                    "WritingDocuments"
+                }
+                Event::CheckingPackage => "CheckingPackage",
+                Event::CheckingPublished => "CheckingPublished",
+                _ => "other",
+            };
+            self.seen.lock().expect("not poisoned").push(name);
+        }
+    }
+
+    let dir = tempdir().expect("tempdir");
+    let zip = corpus(dir.path(), 30);
+
+    let build = |name: &str, job: &Job<'_>| {
+        let destination = dir.path().join(name);
+        std::fs::create_dir(&destination).expect("destination");
+        let built = export::build(&zip, &destination, "seam", job).expect("builds");
+        (destination.join(PACKAGE), built)
+    };
+
+    let watched = Stages::default();
+    let cancel = Cancel::new();
+    let (with_sink, report) = build("watched", &Job::new(&watched, &cancel));
+    let (without_sink, quiet) = build("silent", &Job::unattended());
+
+    // Этапы: те, что должны быть, и в том порядке, в каком идут.
+    let seen = watched.seen.lock().expect("not poisoned").clone();
+    let at = |name: &str| seen.iter().position(|s| *s == name);
+    for name in [
+        "ReadingHeaders",
+        "WritingDocuments",
+        "CheckingPackage",
+        "CheckingPublished",
+    ] {
+        assert!(at(name).is_some(), "{name} не прозвучал: {seen:?}");
+    }
+    assert!(
+        at("ReadingHeaders") < at("WritingDocuments"),
+        "запись объявлена раньше чтения заголовков: {seen:?}"
+    );
+    assert!(
+        at("WritingDocuments") < at("CheckingPackage"),
+        "проверка объявлена раньше записи: {seen:?}"
+    );
+    assert!(
+        at("CheckingPackage") < at("CheckingPublished"),
+        "опубликованное проверено раньше собранного: {seen:?}"
+    );
+
+    let announced = watched.documents.lock().expect("not poisoned").clone();
+    assert_eq!(
+        announced,
+        vec![report.documents],
+        "объявленное число документов не совпало с записанным"
+    );
+
+    // И приемник ничего не изменил: два пакета побайтово равны.
+    assert_eq!(report.documents, quiet.documents);
+    let inventory = |root: &Path| std::fs::read(root.join(aruna::paths::OUTPUT_FILE_NAME));
+    assert!(
+        inventory(&with_sink).expect("watched inventory")
+            == inventory(&without_sink).expect("silent inventory"),
+        "опись, собранная с приемником, отличается от собранной без него"
+    );
+}

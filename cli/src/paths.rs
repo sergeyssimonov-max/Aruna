@@ -13,6 +13,17 @@ use std::path::{Path, PathBuf};
 /// it — which is what tells two downloads apart in a Downloads folder.
 ///
 /// No spaces, so it survives a shell, a URL and an email attachment unquoted.
+///
+/// **The one place the inventory is named.** The exporter used to write
+/// `format!("{PACKAGE}.html")` in four places while the window and the
+/// standalone path read this constant; the two agreed only because
+/// `PACKAGE` happens to be `TLHdig_Beta_0.3`, and nothing said they had to.
+/// The day the corpus edition moves to Beta 0.4, that arrangement would have
+/// renamed the file the exporter writes and left the window reporting
+/// `inventory_exists: false` about a package that was right there. Everything
+/// now joins this constant, and
+/// [`the_inventory_is_named_after_the_package`] holds the relationship the
+/// name still carries.
 pub const OUTPUT_FILE_NAME: &str = "TLHdig_Beta_0.3.html";
 
 /// Resolve `~/Downloads/TLHdig_Beta_0.3.html`.
@@ -235,6 +246,22 @@ mod tests {
     }
 
     /// The point of the check is that it costs nothing and leaves nothing.
+    /// **The inventory is named after the package, and that is now checked.**
+    ///
+    /// Two constants said the same thing in different words —
+    /// [`OUTPUT_FILE_NAME`] here and `format!("{PACKAGE}.html")` in the
+    /// exporter — and agreed by coincidence. This is the coincidence written
+    /// down: rename the package without renaming the file and the failure is
+    /// this line, not a window that says the inventory is missing.
+    #[test]
+    fn the_inventory_is_named_after_the_package() {
+        assert_eq!(
+            OUTPUT_FILE_NAME,
+            format!("{}.html", crate::export::PACKAGE),
+            "the inventory's name and the package's name have drifted apart"
+        );
+    }
+
     #[test]
     fn the_writability_probe_leaves_the_directory_as_it_found_it() {
         let dir = tempdir().unwrap();

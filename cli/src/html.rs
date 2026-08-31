@@ -306,7 +306,7 @@ const HEAD_TO_BODY: &str = r#"  </style>
 /// [`INVENTORY_SCRIPT`]; without it the document is a plain, fully expanded
 /// table.
 const TOOLBAR: &str = r#"    <div class="toolbar">
-      <input type="search" id="q" placeholder="Search CTH, siglum, lang, corpus, editor, year…" autocomplete="off" spellcheck="false" />
+      <input type="search" id="q" aria-label="Поиск по описи" placeholder="Search CTH, siglum, lang, corpus, editor, year…" autocomplete="off" spellcheck="false" />
       <button type="button" id="fold-all" class="fold-all" aria-expanded="true">Collapse fragments</button>
       <span class="hint" id="hint"></span>
     </div>

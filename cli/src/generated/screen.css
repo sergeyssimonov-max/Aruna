@@ -18,7 +18,7 @@
 .legend-title {
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #999;
+  color: #6b6b6b;
   margin: 0 0 .4rem;
   font-size: .68rem;
   font-weight: 500;
@@ -113,7 +113,7 @@ body:not(.filter-on) .toolbar {
 }
 
 .toolbar .hint {
-  color: #888;
+  color: #595959;
   font-variant-numeric: tabular-nums;
   align-self: center;
   font-size: .8125rem;
@@ -153,7 +153,7 @@ thead th {
   text-align: left;
   letter-spacing: .05em;
   text-transform: uppercase;
-  color: #888;
+  color: #595959;
   white-space: nowrap;
   border-bottom: 1px solid #e5e5e5;
   padding: .55rem .5rem .65rem 0;
@@ -179,7 +179,7 @@ tbody td:last-child {
 }
 
 td.num {
-  color: #999;
+  color: #6b6b6b;
   font-variant-numeric: tabular-nums;
   text-align: left;
   padding-right: .75rem;
@@ -244,7 +244,7 @@ tr.group.folded .chevron {
 
 .group-count {
   font-variant-numeric: tabular-nums;
-  color: #999;
+  color: #6b6b6b;
   font-size: .75rem;
 }
 

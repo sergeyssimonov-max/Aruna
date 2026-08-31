@@ -12,7 +12,7 @@
 
 use super::manifest;
 use super::naming::{dir_component, pdf_path, resolve};
-use super::{inventory, Placed, MANIFEST, PACKAGE};
+use super::{inventory, Placed, MANIFEST};
 use crate::error::{ArunaError, Result};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
 use std::collections::HashSet;
@@ -91,7 +91,7 @@ pub fn validate(
     records: &[ManuscriptRecord],
     placed: &[Placed],
 ) -> Result<Validation> {
-    let inventory_path = root.join(format!("{PACKAGE}.html"));
+    let inventory_path = root.join(crate::paths::OUTPUT_FILE_NAME);
     let html = read_inventory(&inventory_path)?;
 
     let mut errors: Vec<String> = Vec::new();
@@ -267,7 +267,24 @@ fn walk(
         // written, so one appearing here is either a leftover from an older
         // export or a regression, and both are worth failing on.
         let belongs = at_root && super::is_root_file(&name);
-        if path.is_dir() {
+        // **`symlink_metadata`, not `is_dir`.** `is_dir` follows the link, so a
+        // symlinked directory inside the package sent the walk out of the
+        // package and validated whatever it pointed at as if the export had
+        // written it. The export never creates a link, so anything the walk
+        // meets is either a leftover or someone else's doing; either way it is
+        // not a directory this validator descends into. `check_destination`
+        // above already reads the root this way — the walk had been left
+        // behind.
+        let kind = fs::symlink_metadata(&path)
+            .ok()
+            .map(|meta| meta.file_type());
+        let is_link = kind.is_some_and(|t| t.is_symlink());
+        if is_link {
+            errors.push(format!(
+                "the package holds a symbolic link, which an export never writes: {}",
+                path.display()
+            ));
+        } else if kind.is_some_and(|t| t.is_dir()) {
             walk(root, &path, depth - 1, files, errors);
         } else if belongs {
             continue;
@@ -314,8 +331,11 @@ pub fn check_destination(root: &Path) -> Result<()> {
         return refuse("it is a file, not a package".to_string());
     }
 
-    if !root.join(format!("{PACKAGE}.html")).is_file() {
-        return refuse(format!("there is no {PACKAGE}.html in it"));
+    if !root.join(crate::paths::OUTPUT_FILE_NAME).is_file() {
+        return refuse(format!(
+            "there is no {} in it",
+            crate::paths::OUTPUT_FILE_NAME
+        ));
     }
     // The name the writer gives the group of documents the corpus files under
     // no CTH number: `dir_component` of the missing-value dash. Taken from the
@@ -346,7 +366,13 @@ pub fn check_destination(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::export::{place, render_inventory, tests_support::fragment};
+    // `PACKAGE` is imported here rather than at the top of the file on
+    // purpose. The working code above joins `paths::OUTPUT_FILE_NAME`, the
+    // one place the inventory is named; these tests spell the name the
+    // other way — after the package — so that the two ways of saying it
+    // are still compared by something, and by a test rather than by
+    // coincidence.
+    use crate::export::{place, render_inventory, tests_support::fragment, PACKAGE};
     use tempfile::tempdir;
 
     /// A package built by hand, so the validator can be shown things a real
@@ -394,6 +420,39 @@ mod tests {
 
     fn records(fragments: &[crate::export::Fragment]) -> Vec<ManuscriptRecord> {
         fragments.iter().map(|f| f.record.clone()).collect()
+    }
+
+    /// **Ссылка на каталог не уводит проверку из пакета.**
+    ///
+    /// `is_dir` идет за ссылкой, и подложенная в пакет ссылка на чужой каталог
+    /// заставляла валидатор читать то, чего экспорт не писал, и судить об этом
+    /// как о своем. Экспорт ссылок не создает вовсе, поэтому встреченная —
+    /// либо чужая работа, либо остаток, и в обоих случаях это повод отказать,
+    /// а не повод пойти по ней.
+    #[test]
+    fn a_symlinked_directory_in_the_package_is_refused_rather_than_followed() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path().join(PACKAGE);
+        let outside = dir.path().join("elsewhere");
+        fs::create_dir_all(root.join("CTH 5")).expect("mkdir");
+        fs::create_dir_all(&outside).expect("mkdir");
+        fs::write(outside.join("stranger.xml"), b"<x/>").expect("write");
+        std::os::unix::fs::symlink(&outside, root.join("CTH 6")).expect("symlink");
+
+        let mut files = std::collections::HashSet::new();
+        let mut errors = Vec::new();
+        walk(&root, &root, MAX_DEPTH, &mut files, &mut errors);
+
+        assert!(
+            errors.iter().any(|e| e.contains("symbolic link")),
+            "ссылка не названа: {errors:?}"
+        );
+        assert!(
+            !files
+                .iter()
+                .any(|f| f.to_string_lossy().contains("stranger")),
+            "проверка ушла по ссылке наружу пакета: {files:?}"
+        );
     }
 
     #[test]
@@ -600,9 +659,16 @@ mod tests {
         check_destination(&dir.path().join("nothing-here")).expect("nothing to refuse");
     }
 
-    /// The validator is pointed at trees it did not write, and `is_dir` follows
-    /// symbolic links — so a link to its own parent was unbounded recursion,
-    /// which ends as a stack overflow rather than as a report.
+    /// The validator is pointed at trees it did not write, and a link to its own
+    /// parent used to be unbounded recursion — a stack overflow instead of a
+    /// report. `MAX_DEPTH` bounded it; since 2026-08-30 the walk does not follow
+    /// a directory link at all, so the loop is refused at its first link instead
+    /// of after fifteen descents.
+    ///
+    /// The assertion moved with the behaviour and did not soften: it used to
+    /// accept "nested deeper", the message of a bound reached, and now demands
+    /// the link be named. Reaching the bound would still be a pass in the old
+    /// wording and is not one here.
     #[cfg(unix)]
     #[test]
     fn a_looping_directory_is_reported_rather_than_followed_forever() {
@@ -613,11 +679,11 @@ mod tests {
         let group = dir.path().join("CTH 5");
         std::os::unix::fs::symlink(&group, group.join("loop")).expect("symlink");
 
-        // The process survives and says what is wrong; without the bound this
+        // The process survives and says what is wrong; without either guard this
         // never returns.
         let err = validate(dir.path(), &records(&fragments), &placed).expect_err("must fail");
         assert!(
-            format!("{err}").contains("nested deeper"),
+            format!("{err}").contains("symbolic link"),
             "the loop was not the thing reported: {err}"
         );
     }

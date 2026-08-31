@@ -282,7 +282,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     validate::check_destination(&final_root)?;
 
     job.report(Event::ReadingHeaders);
-    let mut fragments = collect_fragments(zip)?;
+    let mut fragments = collect_fragments_with(zip, job)?;
     job.report(Event::HeadersRead {
         manuscripts: fragments.len(),
         groups: distinct_groups(&fragments),
@@ -328,7 +328,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     let corpus = crate::presentation::CorpusPresentation::linked(&records, &placed, source_label);
 
     let html = crate::html::render_linked_html(&corpus, "");
-    let inventory = staging.path().join(format!("{PACKAGE}.html"));
+    let inventory = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
     fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
 
     let manifest_json = manifest::render_manifest(
@@ -366,6 +366,14 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // whichever way this function leaves.
     let _publication = lock::Publication::acquire(destination, job)?;
 
+    // **Второй раз, и уже под замком.** Первая проверка стоит в начале сборки,
+    // за шесть секунд до этой строки: между ними чужой процесс успевает
+    // положить в назначение что угодно, и первая проверка о том уже ничего не
+    // говорит. Здесь она стоит ровно там, где начинается необратимое, — после
+    // захвата блокировки и до переименования, — так что между проверкой и
+    // публикацией не может вклиниться другой прогон Aruna.
+    validate::check_destination(&final_root)?;
+
     let previous = Replaced::aside(&final_root, destination)?;
     staging.publish(&final_root)?;
     for left in previous.committed() {
@@ -374,7 +382,11 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
 
     job.report(Event::CheckingPublished);
     let published = validate(&final_root, &records, &placed)?;
-    debug_assert_eq!(staged, published, "the rename changed the package");
+    // `assert_eq!`, а не `debug_assert_eq!`: сравнение двух уже собранных
+    // описей стоит микросекунды, а обещание «опубликованное равно собранному»
+    // до сих пор держалось только в отладочной сборке — то есть нигде, где
+    // работает читатель.
+    assert_eq!(staged, published, "the rename changed the package");
 
     Ok(Built {
         groups: crate::parse::group_runs(&records).count(),
@@ -570,12 +582,33 @@ fn staging_name() -> String {
 /// several hundred megabytes for data each of which is finished with the moment
 /// it is written.
 pub fn collect_fragments(zip: &Path) -> Result<Vec<Fragment>> {
+    collect_fragments_with(zip, &Job::unattended())
+}
+
+/// The same scan, told what may stop it.
+///
+/// **A quarter of the run used to be unstoppable.** The scan reads a header
+/// window out of every entry in the archive, and on the real corpus that is
+/// 1,6 seconds of the 6,3 the build takes — measured on 2026-08-30. Nothing in
+/// it asked whether the run had been cancelled, so a flag raised at
+/// `ReadingHeaders` was not seen until the write loop's first check, and the
+/// window's Cancel button would have been dead for that quarter.
+///
+/// The cost of noticing is one relaxed atomic load per entry, at a boundary
+/// where stopping leaves nothing behind: no file is open and nothing has been
+/// written yet.
+///
+/// Kept as a second function rather than a changed signature, because
+/// `collect_fragments` is public and a caller that has no job should not have
+/// to invent one.
+pub fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>> {
     let mut archive = open(zip)?;
     let mut fragments = Vec::new();
     let mut window = Vec::with_capacity(HEADER_READ_LIMIT);
     let mut path = String::new();
 
     for i in 0..archive.len() {
+        job.check(Phase::Exporting)?;
         let mut entry = archive.by_index(i)?;
         path.clear();
         path.push_str(entry.name());
@@ -617,11 +650,26 @@ fn write_documents(
     fonts: &mut manifest::FontContract,
     job: &Job<'_>,
 ) -> Result<usize> {
-    let wanted: HashMap<&str, &Path> = fragments
-        .iter()
-        .zip(placed)
-        .map(|(f, p)| (f.source.as_str(), p.relative.as_path()))
-        .collect();
+    // **One slot per entry name, and the archive is held to it here.**
+    //
+    // `collect` on a map keeps the last value for a repeated key, so an archive
+    // with two entries of the same name used to lose one of the two places
+    // `place` had reserved. Both entries then resolved to the surviving path:
+    // the first write took it, the second met `create_new` and failed as
+    // `AlreadyExists` on a path — an I/O error that named the destination and
+    // said nothing about the archive that caused it, three hundred lines away.
+    // Inserting one at a time turns that into a sentence about the archive.
+    let mut wanted: HashMap<&str, &Path> = HashMap::with_capacity(fragments.len());
+    for (fragment, placement) in fragments.iter().zip(placed) {
+        if wanted
+            .insert(fragment.source.as_str(), placement.relative.as_path())
+            .is_some()
+        {
+            return Err(ArunaError::ArchiveDuplicateEntry {
+                entry: fragment.source.clone(),
+            });
+        }
+    }
 
     let mut archive = open(zip)?;
     let mut written = 0usize;
@@ -795,6 +843,47 @@ pub(crate) mod tests_support {
 mod tests {
     use super::tests_support::fragment;
     use super::*;
+
+    /// **An archive that names one entry twice is stopped by name.**
+    ///
+    /// The map from an entry's name to its place in the package has one slot
+    /// per name, and `collect` used to fill it by keeping the last writer: one
+    /// of the two reserved places disappeared, both entries then resolved to
+    /// the survivor, and the second write failed as `AlreadyExists` on a path —
+    /// an I/O error that named the destination and not the archive.
+    ///
+    /// The archive path here does not exist, and that is the second half of
+    /// what this checks: the failure must come before anything is opened, so
+    /// the duplicate is reported as a fact about the input rather than as
+    /// whatever the reader happens to hit first.
+    #[test]
+    fn an_archive_that_names_one_entry_twice_is_refused_by_name() {
+        let fragments = vec![
+            fragment("KBo 1.1", "CTH 5", "xml/KBo 1.1.xml"),
+            fragment("KBo 2.2", "CTH 5", "xml/KBo 1.1.xml"),
+        ];
+        let placed = place(&fragments).expect("two distinct sigla take two places");
+        let mut applied = std::collections::BTreeMap::new();
+        let mut fonts = manifest::FontContract::default();
+
+        let failure = write_documents(
+            Path::new("/nowhere/there-is-no-archive.zip"),
+            &fragments,
+            &placed,
+            Path::new("/nowhere/staging"),
+            &mut applied,
+            &mut fonts,
+            &Job::unattended(),
+        )
+        .expect_err("a duplicated entry name must not be written");
+
+        match failure {
+            ArunaError::ArchiveDuplicateEntry { entry } => {
+                assert_eq!(entry, "xml/KBo 1.1.xml");
+            }
+            other => panic!("expected the duplicate to be named, got {other}"),
+        }
+    }
 
     /// Two documents whose names differ only in case are two documents, and on
     /// most filesystems one file.

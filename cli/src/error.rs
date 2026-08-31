@@ -104,6 +104,16 @@ pub enum ArunaError {
         path: std::path::PathBuf,
     },
 
+    /// The archive names two entries the same. ZIP permits it; this exporter
+    /// cannot answer it, because the map from an entry's name to the place it
+    /// is written has one slot per name — the second document would silently
+    /// take the first one's place, and the write that follows would fail as a
+    /// bare `AlreadyExists` on a path, hundreds of lines from the archive that
+    /// caused it. Named here instead, so the message says what is wrong with
+    /// the archive rather than what went wrong with the write.
+    #[error("the archive names {entry} twice; a document may not appear in it more than once")]
+    ArchiveDuplicateEntry { entry: String },
+
     /// One archive entry is larger than the export will hold in memory. The
     /// archive is compressed, so a few hundred kilobytes on disk can be a few
     /// hundred megabytes once inflated — measured at 834 MiB of peak memory

@@ -51,13 +51,20 @@ echo "==> Ensuring Rust Apple targets"
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
 echo "==> Building aarch64-apple-darwin (release)"
-cargo build --release --target aarch64-apple-darwin
+cargo build --release --locked --target aarch64-apple-darwin
 
 echo "==> Building x86_64-apple-darwin (release)"
-cargo build --release --target x86_64-apple-darwin
+cargo build --release --locked --target x86_64-apple-darwin
 
-ARM_BIN="${ROOT}/target/aarch64-apple-darwin/release/aruna"
-X86_BIN="${ROOT}/target/x86_64-apple-darwin/release/aruna"
+# The target directory is the workspace's, not this crate's. The two crates were
+# joined on 2026-08-30 (specification 4.9.1) and cargo moved its output one level
+# up; `cli/target` stopped being written to, and these two paths pointed at files
+# that no longer appear. Asked of cargo rather than assumed, so that moving the
+# manifest again does not break the release quietly.
+TARGET_ROOT="$(dirname "$(cargo locate-project --workspace --message-format plain)")"
+
+ARM_BIN="${TARGET_ROOT}/target/aarch64-apple-darwin/release/aruna"
+X86_BIN="${TARGET_ROOT}/target/x86_64-apple-darwin/release/aruna"
 UNI_BIN="${WORK}/aruna"
 
 if [[ ! -x "${ARM_BIN}" || ! -x "${X86_BIN}" ]]; then

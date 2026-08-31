@@ -1,6 +1,6 @@
 [package]
 name = "aruna"
-version = "2.5.0"
+version = "2.5.1"
 edition = "2021"
 description = "Aruna — generates a Scandinavian-style HTML inventory of TLHdig (Zenodo) Hittite cuneiform transliterations"
 authors = ["Sergey Simonov"]
@@ -32,14 +32,3 @@ required-features = ["bench"]
 
 [dev-dependencies]
 tempfile = "3"
-
-[profile.release]
-lto = true
-codegen-units = 1
-strip = true
-opt-level = 3
-# No `panic = "abort"`: a panic here must print where it happened. Aborting
-# turned a parser bug into a silent crash with no message for the user.
-
-[profile.dev]
-opt-level = 1

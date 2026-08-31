@@ -102,17 +102,17 @@ fn acquire_within(
         // lock failure, which is what it would look like from the outside.
         job.check(Phase::Publishing)?;
 
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(mut file) => {
-                use std::io::Write as _;
-                file.write_all(token.as_bytes())
-                    .map_err(ArunaError::io(&path))?;
-                drop(file);
-
+        // **The lock file is not left empty by a kill.**
+        //
+        // It used to be created with `create_new` and written a line later, and
+        // a run killed between those two calls left a nameless zero-byte lock:
+        // `holder` had nothing to report, and every other run waited out the
+        // full five-minute staleness before it could publish. The token is now
+        // written into a scratch file beside the destination and moved into
+        // place with `rename`, which is atomic on one filesystem — the same
+        // move the export uses for everything else it publishes.
+        match write_token(&path, &token) {
+            Ok(()) => {
                 // Read back what is on disk. Two runs that both judged an
                 // abandoned lock stale in the same poll can each remove a file
                 // and each create one — and one of the removals may be of the
@@ -128,11 +128,29 @@ fn acquire_within(
                 }
             }
             Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                // Read the holder *before* judging its age, so that what is
+                // removed is the file that was judged. Between the judgement
+                // and the removal the holder can finish and a third run can
+                // take the lock: removing then would hand the directory to two
+                // runs at once. Comparing what is on disk with what was read a
+                // moment ago does not close that window — nothing short of an
+                // atomic compare-and-delete would — but it turns it from the
+                // whole staleness check into two adjacent syscalls, and a lock
+                // that was replaced in between survives.
+                let seen = fs::read_to_string(&path).ok();
                 if abandoned(&path, stale) {
-                    // Not `?`: a removal that fails because someone else got
-                    // there first is the normal outcome of two waiters, and the
-                    // next attempt is what settles it.
-                    let _ = fs::remove_file(&path);
+                    // Not `?` in either arm: a removal that fails because
+                    // someone else got there first is the normal outcome of two
+                    // waiters, and the next attempt is what settles it.
+                    match seen {
+                        Some(seen) => remove_if_unchanged(&path, &seen),
+                        // Unreadable, which is the case `abandoned` already
+                        // treats as abandoned: either not ours or broken, and
+                        // there is nothing to compare it against.
+                        None => {
+                            let _ = fs::remove_file(&path);
+                        }
+                    }
                     continue;
                 }
                 if SystemTime::now() >= deadline {
@@ -155,6 +173,73 @@ fn acquire_within(
 
 /// Whether the lock on disk is old enough to be treated as left behind.
 ///
+/// Put `token` at `path`, atomically, failing if something is already there.
+///
+/// `create_new` on the scratch file keeps two runs from sharing it, and the
+/// rename is what makes the lock appear whole or not at all. `rename` replaces
+/// an existing file silently, so the `create_new` that decides who holds the
+/// lock has to be the one on the destination — hence the check below it: a
+/// scratch file that renames over somebody else's lock would hand the directory
+/// to two runs.
+fn write_token(path: &Path, token: &str) -> std::io::Result<()> {
+    let scratch = crate::paths::scratch_sibling(path);
+    {
+        use std::io::Write as _;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&scratch)?;
+        file.write_all(token.as_bytes())?;
+    }
+    // The gate: whoever creates this empty marker owns the name. Only then is
+    // the token moved onto it.
+    //
+    // One thing this shape does not promise, said here rather than left to be
+    // discovered: between this line and the rename the file exists and is
+    // empty, so a reader in that window learns nothing from `holder` — it waits
+    // and retries, which is correct, but the message it would print is blank.
+    // The window is two syscalls wide and costs a blank line in a diagnostic,
+    // not a wait.
+    //
+    // What it does promise is that nothing is left behind. A rename that fails
+    // used to leave the empty marker in place, and every other run then waited
+    // out the full staleness on a lock nobody held — the very failure this
+    // function exists to prevent, moved to a rarer path. Both files go now.
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(_) => {}
+        Err(err) => {
+            let _ = fs::remove_file(&scratch);
+            return Err(err);
+        }
+    }
+    let renamed = fs::rename(&scratch, path);
+    if renamed.is_err() {
+        // Both, and in this order: the marker is what would block other runs,
+        // the scratch file is only litter.
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(&scratch);
+    }
+    renamed
+}
+
+/// Remove `path` only if it still holds what was read from it.
+///
+/// The narrow half of the race above: a lock that was replaced between the
+/// staleness judgement and this call belongs to whoever holds it now, and
+/// removing it would let two runs publish at once. The read here is not atomic
+/// with the removal, so this narrows the window rather than closing it — which
+/// is the honest description and the reason it is a named function with a test
+/// rather than three lines inside the loop.
+fn remove_if_unchanged(path: &Path, seen: &str) {
+    if matches!(fs::read_to_string(path), Ok(found) if found == seen) {
+        let _ = fs::remove_file(path);
+    }
+}
+
 /// A file whose age cannot be read at all is treated as abandoned: it is either
 /// gone — in which case the next attempt takes it — or on a filesystem that
 /// cannot answer, where waiting for an answer that never comes is worse than
@@ -226,6 +311,68 @@ mod tests {
     /// One run publishes at a time, and the one that cannot say so names who
     /// can. `holder` is the whole point of the message: "busy" is not a
     /// diagnosis, "pid 4711 since …" is.
+    /// **Убийство между созданием и записью не оставляет пустого файла, а
+    /// попытка занять чужой не оставляет следов.**
+    ///
+    /// Отказ, ради которого сделана правка, наблюдается только под убийством
+    /// процесса между созданием файла и записью токена, и тестом это не
+    /// разыгрывается. Разыгрывается то, что правка добавила и что можно
+    /// проверить: имя занято – отказ, и рядом не остается ни одного рабочего
+    /// файла, а занятое имя содержит токен целиком, а не пустоту.
+    #[test]
+    fn a_lock_is_written_whole_or_not_at_all() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join(".aruna-publish.lock");
+
+        write_token(&path, "pid 1, since 1.0\n").expect("free name is taken");
+        assert_eq!(
+            fs::read_to_string(&path).expect("read"),
+            "pid 1, since 1.0\n",
+            "имя занято, но токена в файле нет"
+        );
+
+        let taken = write_token(&path, "pid 2, since 2.0\n");
+        assert!(taken.is_err(), "занятое имя было перезаписано");
+        assert_eq!(
+            fs::read_to_string(&path).expect("read"),
+            "pid 1, since 1.0\n",
+            "чужой токен был затерт"
+        );
+
+        let leftovers: Vec<_> = fs::read_dir(dir.path())
+            .expect("read_dir")
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n != ".aruna-publish.lock")
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "неудачная попытка оставила после себя {leftovers:?}"
+        );
+    }
+
+    /// **A lock replaced under our feet is not removed.**
+    ///
+    /// The whole point of [`remove_if_unchanged`]: the run that judged a lock
+    /// stale must not delete the fresh one that took its place while it was
+    /// deciding.
+    #[test]
+    fn a_lock_that_changed_hands_is_left_alone() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join(".aruna-publish.lock");
+
+        fs::write(&path, "pid 1, since 1.0\n").expect("write");
+        remove_if_unchanged(&path, "pid 1, since 1.0\n");
+        assert!(!path.exists(), "the lock we read is the lock we remove");
+
+        fs::write(&path, "pid 2, since 2.0\n").expect("write");
+        remove_if_unchanged(&path, "pid 1, since 1.0\n");
+        assert!(
+            path.exists(),
+            "a lock taken by another run between the judgement and the removal was deleted"
+        );
+    }
+
     #[test]
     fn a_second_publication_waits_and_then_says_who_holds_it() {
         let dir = tempdir().expect("tempdir");
