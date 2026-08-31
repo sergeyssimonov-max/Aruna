@@ -11,18 +11,20 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.0 is the",
-    "current release, made a reference on 2026-08-30 by the owner's decision. A release",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.1 is the",
+    "current release, made a reference on 2026-09-01 by the owner's decision. A release",
     "cannot record itself — the commit it names is the commit that carries it, and no file",
     "can contain its own hash — so each entry here is added by the commit after the release",
     "it describes.",
     "",
     "They used to be spread across the project rather than clustered at its end, and v2.1.0",
-    "was the third. It was withdrawn with v2.2.0, v2.3.0 and v2.4.0 on 2026-08-30, so the 2.x",
-    "line is now represented by its head alone. What that costs is named rather than hidden:",
-    "a fault introduced this week is no longer bracketed from below by anything nearer than",
-    "v1.0.9. The next reference worth adding is the first 2.x state after this one that is",
-    "worth falling back to.",
+    "was the third. It was withdrawn with v2.2.0, v2.3.0 and v2.4.0 on 2026-08-30, and v2.5.0",
+    "followed on 2026-09-01 when v2.5.1 replaced it — so the 2.x line is still represented by",
+    "its head alone. What that costs is named rather than hidden: a fault introduced this week",
+    "is no longer bracketed from below by anything nearer than v1.0.9. The list is kept at",
+    "three deliberately; the next reference worth adding is the first 2.x state after this one",
+    "that is worth falling back to, and adding it is a decision rather than a consequence of",
+    "publishing.",
     "",
     "Adding or changing any value below is a deliberate act and shows up in the diff as one."
   ],
@@ -42,11 +44,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.5.0",
-      "commit": "2e99f9326502857b418f055686cb68413a809a51",
-      "published": "2026-08-29T22:40:33Z",
-      "dmg_sha256": "4e08550c8300a0329828349120a19fcda81094a77ec24cd31aa716c6fc804071",
-      "why": "The current release and the third reference: two questions answered before any work, a seam a window can name a destination through, four ceilings and a retry policy where they were missing, and a zip floor that closes RUSTSEC-2025-0168. It replaced v2.1.0, withdrawn on 2026-08-30 together with v2.2.0, v2.3.0 and v2.4.0. The tag was re-cut the same day onto the commit that gives the release job the history its build number is counted from: the first publication carried build 1 where the same commit built locally carried 168, and a number that does not move is a number LaunchServices cannot tell releases apart by."
+      "tag": "v2.5.1",
+      "commit": "64e36daddcd5811a63ffc249275d2cef38476170",
+      "published": "2026-08-31T21:11:50Z",
+      "dmg_sha256": "01a4bd77d410fc28dfc028524a892e5cc836a2e232d002688196b531879325bd",
+      "why": "The current release and the third reference: `-h` and `-V` answer instead of starting a 71 MiB corpus build, an archive that names one entry twice is refused by name rather than surfacing as a bare AlreadyExists on a path, and a cancellation is heard by the header scan — a quarter of the run that could not be stopped before. The window that reads the package became a real screen with it. It replaced v2.5.0, withdrawn on 2026-09-01: that release was the reference this one is cut from, and a reference cannot be re-cut, so the work took a number of its own and the old reference was retired rather than left standing beside it."
     }
   ]
 }
