@@ -1,17 +1,28 @@
 # What this dependency tree is allowed to contain.
 #
-# The companion of `cli/deny.toml`, and the same principle: the list below is
-# not a policy someone chose in the abstract, it is what the tree holds today,
-# read out of `cargo deny list` and written down. A *new* licence then becomes a
-# decision someone makes on purpose, with a failing check to prompt it, rather
-# than something that arrives with a transitive dependency and is noticed by
-# nobody.
+# One file for one workspace. Until 2026-08-30 there were two — `cli/deny.toml`
+# and `src-tauri/deny.toml` — and that was right while the crates had a lock
+# file each. Joining them (specification 4.9.1) left one graph judged by two
+# policies, which is not a stricter arrangement but an incoherent one: the run
+# from `src-tauri` began failing on `ISC`, a licence the very same tree had
+# carried all along and which the other file had allowed for two weeks.
+#
+# The list below is the union of the two, entry for entry, with each reason
+# carried over from wherever it was written. No licence is approved here that
+# was not already approved for this tree; what changed is that one file now says
+# so.
+#
+# The principle is unchanged: this is not a policy someone chose in the
+# abstract, it is what the tree holds today, read out of `cargo deny list` and
+# written down. A *new* licence then becomes a decision someone makes on
+# purpose, with a failing check to prompt it, rather than something that arrives
+# with a transitive dependency and is noticed by nobody.
 #
 #   cargo deny check            — everything below
 #   cargo deny check licenses   — this section alone
 #
-# The specification (§4, §9.7.5) asked for this file and for the platform
-# filter below in particular.
+# The specification (§4.7, §6.2) asks for this file and for the platform filter
+# below in particular.
 
 [graph]
 # **The filter that makes this check mean anything here.** Tauri's dependency
@@ -33,17 +44,24 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
 # own expression.
 allow = [
     "MIT",
+    # `zopfli` (via `zip`) is Apache-2.0 alone, and `Apache-2.0 AND ISC` needs
+    # both halves.
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
-    # `alloc-no-stdlib` and `alloc-stdlib`, under `brotli`, which reaches here
-    # through `reqwest`.
-    "BSD-3-Clause",
-    # `foldhash`, the default hasher of `hashbrown`.
-    "Zlib",
+    # `rustls-webpki` and `untrusted`, under `ureq` in the core.
+    "ISC",
     # The ICU stack, reached through URL parsing. `unicode-ident` is
     # `(MIT OR Apache-2.0) AND Unicode-3.0`, so this is required rather than
     # merely offered.
     "Unicode-3.0",
+    # `webpki-roots`: the root certificate bundle TLS verifies against.
+    "CDLA-Permissive-2.0",
+    # `subtle`, the constant-time comparison helper under `ring`; and
+    # `alloc-no-stdlib` and `alloc-stdlib`, under `brotli`, which reaches the
+    # shell through `reqwest`.
+    "BSD-3-Clause",
+    # `foldhash`, the default hasher of `hashbrown`.
+    "Zlib",
     # `cssparser`, `cssparser-macros`, `dtoa-short` and `selectors` — the CSS
     # selector engine `dom_query` is built on — and `option-ext`, a transitive
     # of `dirs`. MPL-2.0 is file-level weak copyleft: these crates are used
@@ -80,7 +98,7 @@ deny = []
 # its default, so an actual security advisory anywhere in the tree still fails.
 unmaintained = "workspace"
 
-# **No ignores, and that is deliberate.** The specification (§4) keeps the
+# **No ignores, and that is deliberate.** The specification keeps the
 # `unmaintained` and `unsound` warnings visible on purpose: they are the
 # indicator that would otherwise be the first thing silenced when a real
 # vulnerability appears behind one of them. An advisory silenced in a config
