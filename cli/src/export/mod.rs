@@ -87,6 +87,18 @@ pub const MAX_DOCUMENT: u64 = 64 * 1024 * 1024;
 /// rather than a number to discover here.
 pub const MAX_PACKAGE: u64 = 8 * 1024 * 1024 * 1024;
 
+/// How often the write pass says how many documents are out.
+///
+/// Only a sink drawing a window reads these; [`crate::progress::Stderr`] drops
+/// them. Batched by count rather than by time, which is the other half of the
+/// decision `docs/FRONTEND-CONTRACT.md` §3 asks to be stated: the write is
+/// bounded work with a known total, so a count is a fraction of something,
+/// where an interval would only say how fast the disk is. Five hundred puts the
+/// present corpus at forty-eight events — enough that a bar moves several times
+/// a second over six seconds, few enough that the IPC costs nothing. One per
+/// document would be 23 936 round trips, which the same section forbids by name.
+const DOCUMENTS_PER_TICK: usize = 500;
+
 /// Whether the package has outgrown its ceiling, as its own function so the
 /// only two sizes that matter can be tested without writing eight gibibytes.
 fn within_package_ceiling(written: u64, limit: u64) -> Result<()> {
@@ -780,8 +792,24 @@ fn write_documents(
             .map_err(ArunaError::io(&out))?;
         handle.write_all(&normalised).map_err(ArunaError::io(out))?;
         written += 1;
+        if written.is_multiple_of(DOCUMENTS_PER_TICK) {
+            job.report(Event::DocumentsWritten {
+                done: written,
+                total: placed.len(),
+            });
+        }
         package_bytes = package_bytes.saturating_add(normalised.len() as u64);
         within_package_ceiling(package_bytes, MAX_PACKAGE)?;
+    }
+
+    // The remainder, so the last thing a window hears is the whole of it. A run
+    // of 23 936 documents ticks 47 times on the multiple and once here; a run
+    // that divides exactly says so already and is not told twice.
+    if !written.is_multiple_of(DOCUMENTS_PER_TICK) {
+        job.report(Event::DocumentsWritten {
+            done: written,
+            total: placed.len(),
+        });
     }
 
     if written != placed.len() {

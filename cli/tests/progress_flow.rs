@@ -41,14 +41,30 @@ use tempfile::tempdir;
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum Seen {
     ParsingArchive,
-    EntriesSkipped { by_path: usize, by_content: usize },
+    EntriesSkipped {
+        by_path: usize,
+        by_content: usize,
+    },
     Indexed(usize),
     ReadingHeaders,
-    HeadersRead { manuscripts: usize, groups: usize },
+    HeadersRead {
+        manuscripts: usize,
+        groups: usize,
+    },
     WritingDocuments(usize),
     CheckingPackage,
     CheckingPublished,
     Other(&'static str),
+    /// A refinement of a stage rather than a stage — `Event::is_tick`. Kept
+    /// apart from `Other` so a run's milestones can be read without the
+    /// forty-eight fractions of the write pass in among them.
+    Tick(&'static str),
+    /// The write pass's refinement, with its numbers: this file asserts on how
+    /// often it arrives and what it says, not only that it did.
+    Written {
+        done: usize,
+        total: usize,
+    },
 }
 
 impl Seen {
@@ -64,6 +80,8 @@ impl Seen {
             Seen::CheckingPackage => "CheckingPackage",
             Seen::CheckingPublished => "CheckingPublished",
             Seen::Other(name) => name,
+            Seen::Tick(name) => name,
+            Seen::Written { .. } => "DocumentsWritten",
         }
     }
 }
@@ -104,6 +122,12 @@ impl Progress for Recording {
             Event::DownloadRetrying { .. } => Seen::Other("DownloadRetrying"),
             Event::ArchiveKept { .. } => Seen::Other("ArchiveKept"),
             Event::PreviousPackageLeft { .. } => Seen::Other("PreviousPackageLeft"),
+            // Ticks, and this file is about the order of the stages. They are
+            // kept apart by name so `the_stages_come_in_the_one_order` reads a
+            // sequence of milestones rather than one interleaved with however
+            // many refinements the corpus happened to produce.
+            Event::Downloading { .. } => Seen::Tick("Downloading"),
+            Event::DocumentsWritten { done, total } => Seen::Written { done, total },
         };
         self.0.lock().expect("not poisoned").push(seen);
     }
@@ -114,8 +138,26 @@ impl Recording {
         self.0.lock().expect("not poisoned").clone()
     }
 
+    /// The milestones, without the refinements between them.
     fn stages(&self) -> Vec<&'static str> {
-        self.events().iter().map(Seen::stage).collect()
+        self.events()
+            .iter()
+            .filter(|seen| !matches!(seen, Seen::Tick(_) | Seen::Written { .. }))
+            .map(Seen::stage)
+            .collect()
+    }
+
+    /// Only the refinements, with the two halves they carried.
+    fn ticks(&self) -> Vec<(usize, usize)> {
+        self.0
+            .lock()
+            .expect("not poisoned")
+            .iter()
+            .filter_map(|seen| match seen {
+                Seen::Written { done, total } => Some((*done, *total)),
+                _ => None,
+            })
+            .collect()
     }
 }
 
@@ -281,14 +323,19 @@ fn the_parse_reports_what_it_found_after_it_reports_starting() {
     assert!(!records.is_empty());
 }
 
-/// The number of events does not grow with the corpus.
+/// The number of *stages* does not grow with the corpus.
 ///
-/// Twelve times the documents, the same number of reports. This is what keeps
+/// Twelve times the documents, the same number of milestones. This is what keeps
 /// progress out of the hot path: a per-document event would be a formatted
 /// string and a channel send 24 000 times, and a window would spend the build
 /// draining messages instead of painting.
+///
+/// The write pass also refines the stage it is in, and those refinements do grow
+/// — by design and at one five-hundredth of the rate. They are counted by
+/// [`the_write_is_refined_in_batches_and_ends_on_the_whole`] instead, which is
+/// where the batching promise belongs.
 #[test]
-fn the_number_of_events_does_not_grow_with_the_archive() {
+fn the_number_of_stages_does_not_grow_with_the_archive() {
     let dir = tempdir().expect("tempdir");
 
     let count_for = |documents: usize, name: &str| {
@@ -307,15 +354,50 @@ fn the_number_of_events_does_not_grow_with_the_archive() {
         let zip = archive(&dir.path().join(name), &borrowed);
         let (built, sink) = build_recording(&zip);
         assert_eq!(built.documents, documents);
-        sink.events().len()
+        sink.stages().len()
     };
 
     let small = count_for(5, "small.zip");
     let large = count_for(60, "large.zip");
     assert_eq!(
         small, large,
-        "the export reported {small} events for 5 documents and {large} for 60 — \
+        "the export reported {small} stages for 5 documents and {large} for 60 — \
          progress is being emitted per document, not per stage"
+    );
+}
+
+/// The write pass says how far it has got, in batches, and its last word is the
+/// whole of it.
+///
+/// Both halves of the promise `docs/FRONTEND-CONTRACT.md` §3 asks to be stated.
+/// One every five hundred documents is what keeps 23 936 documents to
+/// forty-eight messages instead of 23 936; ending on `done == total` is what
+/// lets a window finish its bar on the number the report will carry, rather than
+/// leaving it at 500 short and jumping.
+#[test]
+fn the_write_is_refined_in_batches_and_ends_on_the_whole() {
+    let dir = tempdir().expect("tempdir");
+    let entries: Vec<(String, String)> = (0..600)
+        .map(|i| {
+            (
+                format!("root/CTH {}_XML_HFR/doc {i}.xml", i % 7),
+                manuscript(&format!("KBo {i}"), "FB", "2017-03-28"),
+            )
+        })
+        .collect();
+    let borrowed: Vec<(&str, String)> = entries
+        .iter()
+        .map(|(path, body)| (path.as_str(), body.clone()))
+        .collect();
+    let zip = archive(&dir.path().join("six-hundred.zip"), &borrowed);
+    let (built, sink) = build_recording(&zip);
+    assert_eq!(built.documents, 600);
+
+    assert_eq!(
+        sink.ticks(),
+        [(500, 600), (600, 600)],
+        "the write pass no longer reports in batches of five hundred, or no \
+         longer ends on the whole"
     );
 }
 

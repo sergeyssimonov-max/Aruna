@@ -7,7 +7,7 @@ use crate::progress::Event;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Stable Zenodo URL for TLHdig Beta 0.3.
 pub const ZENODO_ZIP_URL: &str =
@@ -78,6 +78,16 @@ const MAX_RETRY_AFTER: Duration = Duration::from_secs(30);
 /// (71 MiB), so a corpus that keeps growing does not walk into it, and far
 /// short of any volume it would be reasonable to fill.
 const MAX_DOWNLOAD: u64 = 1024 * 1024 * 1024;
+
+/// How often the transfer says how far it has got.
+///
+/// Only a sink drawing a window reads these; [`crate::progress::Stderr`] drops
+/// them. The interval is the whole of the batching decision the contract asks
+/// to be stated — `docs/FRONTEND-CONTRACT.md` §3 — and it is an interval rather
+/// than a count of chunks because a chunk is 64 KiB of wire, not of progress:
+/// the same file would tick 1 141 times on a fast link and four times on a slow
+/// one, which describes the network instead of the download.
+const TRANSFER_TICK: Duration = Duration::from_millis(250);
 
 /// The most a metadata answer may be. Zenodo's record documents run to a few
 /// tens of KiB; this is two orders of magnitude above that, and the point of it
@@ -284,7 +294,13 @@ fn attempt_download(
     // download must never leave a truncated archive sitting at `dest` looking
     // like a complete one.
     let scratch = Scratch::beside(dest);
-    let transfer = stream_bounded(response.into_reader(), limit, scratch.path(), job)?;
+    let transfer = stream_bounded(
+        response.into_reader(),
+        limit,
+        announced,
+        scratch.path(),
+        job,
+    )?;
     transfer.verify(url, limit, announced, expected_md5)?;
     scratch.commit(dest)
 }
@@ -295,8 +311,19 @@ fn attempt_download(
 /// one place to test. One byte past the limit is read on purpose: it is what
 /// tells a body that runs over apart from one that ends exactly on it, and
 /// [`Transfer::verify`] is what turns that byte into a refusal.
-fn stream_bounded(reader: impl Read, limit: u64, path: &Path, job: &Job<'_>) -> Result<Transfer> {
-    stream_to_file(&mut reader.take(limit.saturating_add(1)), path, job)
+fn stream_bounded(
+    reader: impl Read,
+    limit: u64,
+    announced: Option<u64>,
+    path: &Path,
+    job: &Job<'_>,
+) -> Result<Transfer> {
+    stream_to_file(
+        &mut reader.take(limit.saturating_add(1)),
+        announced,
+        path,
+        job,
+    )
 }
 
 /// Wait out `delay`, unless the run is cancelled while waiting.
@@ -522,7 +549,12 @@ impl Transfer {
 ///
 /// Hashed in the same pass: a second read over 71 MiB just to digest the file
 /// would cost more than the check it feeds.
-fn stream_to_file(reader: &mut impl Read, path: &Path, job: &Job<'_>) -> Result<Transfer> {
+fn stream_to_file(
+    reader: &mut impl Read,
+    announced: Option<u64>,
+    path: &Path,
+    job: &Job<'_>,
+) -> Result<Transfer> {
     let io = |source| ArunaError::Io {
         path: path.to_path_buf(),
         source,
@@ -532,6 +564,13 @@ fn stream_to_file(reader: &mut impl Read, path: &Path, job: &Job<'_>) -> Result<
     let mut bytes: u64 = 0;
     let mut digest = Md5::new();
     let mut buf = [0u8; 64 * 1024];
+    // Told by time rather than by chunk, and this is the seam the contract asks
+    // to be named (`docs/FRONTEND-CONTRACT.md` §3: batch by count or by
+    // interval, and say which). By chunk would be 1 141 events for 71 MiB on a
+    // fast link and four on a slow one — the rate would say how quick the
+    // network is, not how far the transfer got. A quarter-second is fast enough
+    // that a bar never looks stuck and slow enough that the events cost nothing.
+    let mut ticked = Instant::now();
 
     let outcome = loop {
         // Between chunks of 64 KiB. The scratch file is dropped on the way out
@@ -552,6 +591,13 @@ fn stream_to_file(reader: &mut impl Read, path: &Path, job: &Job<'_>) -> Result<
         }
         digest.update(&buf[..n]);
         bytes += n as u64;
+        if ticked.elapsed() >= TRANSFER_TICK {
+            ticked = Instant::now();
+            job.report(Event::Downloading {
+                bytes,
+                total: announced,
+            });
+        }
     };
     // The data is only on disk once `sync_all` returns, and the file has to be
     // closed before the rename that follows.
@@ -1057,8 +1103,14 @@ mod tests {
 
         // `repeat` never returns 0, exactly like a connection that keeps
         // delivering. Nothing bounds it here but the function under test.
-        let transfer = stream_bounded(std::io::repeat(b'x'), limit, &scratch, &Job::unattended())
-            .expect("the write itself succeeds");
+        let transfer = stream_bounded(
+            std::io::repeat(b'x'),
+            limit,
+            None,
+            &scratch,
+            &Job::unattended(),
+        )
+        .expect("the write itself succeeds");
 
         assert_eq!(
             transfer.bytes,
@@ -1299,7 +1351,7 @@ mod tests {
         let started = std::time::Instant::now();
         let outcome =
             request_within(&server.url(), Duration::from_millis(400)).and_then(|response| {
-                stream_to_file(&mut response.into_reader(), &dest, &Job::unattended())
+                stream_to_file(&mut response.into_reader(), None, &dest, &Job::unattended())
             });
         let waited = started.elapsed();
 

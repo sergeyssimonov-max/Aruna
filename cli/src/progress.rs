@@ -46,6 +46,13 @@ pub enum Event<'a> {
     ZenodoUnreachable { cause: &'a str },
     /// The 71 MiB are on their way.
     DownloadStarted,
+    /// How much of the archive has arrived. A tick, not a stage — see
+    /// [`Event::is_tick`].
+    ///
+    /// `total` is what the server announced, and it is `None` when it announced
+    /// nothing: a fraction of an unknown whole is not a number to show, and
+    /// inventing one would be the interface saying more than the transfer knows.
+    Downloading { bytes: u64, total: Option<u64> },
     /// An attempt failed in a way another attempt can fix.
     DownloadRetrying {
         attempt: u32,
@@ -68,12 +75,40 @@ pub enum Event<'a> {
     HeadersRead { manuscripts: usize, groups: usize },
     /// The package is being written into its staging directory.
     WritingDocuments { documents: usize },
+    /// How many of them are written. A tick, not a stage — see
+    /// [`Event::is_tick`].
+    ///
+    /// Both halves, so that a sink showing a fraction cannot show one whose
+    /// denominator drifted from the stage line above it.
+    DocumentsWritten { done: usize, total: usize },
     /// The staged package is being checked against the model it came from.
     CheckingPackage,
     /// The same check again, on the copy that was published.
     CheckingPublished,
     /// The package this build replaced could not be removed and is still there.
     PreviousPackageLeft { path: &'a Path },
+}
+
+impl Event<'_> {
+    /// Whether this is a refinement of a stage rather than a stage.
+    ///
+    /// A tick says how far along the stage already announced is: two of the
+    /// seventeen milestones take minutes and used to pass in silence, and an
+    /// interface that shows a run has to show them moving. They are told apart
+    /// here rather than at each sink, because "does this deserve a line" is one
+    /// question with one answer: a line-oriented sink drops them — fifty of
+    /// them under `Writing 23936 documents…` would bury the sentence they
+    /// refine — and a sink drawing a window is exactly what they are for.
+    ///
+    /// The rate they arrive at is the reporter's business and is documented
+    /// where they are sent: a quarter-second for the transfer, five hundred
+    /// documents for the write.
+    pub fn is_tick(&self) -> bool {
+        matches!(
+            self,
+            Event::Downloading { .. } | Event::DocumentsWritten { .. }
+        )
+    }
 }
 
 /// The CLI's wording, kept on the event rather than inside the printing.
@@ -111,6 +146,11 @@ impl fmt::Display for Event<'_> {
                 )
             }
             Event::DownloadStarted => write!(f, "Downloading TLHdig archive from Zenodo…"),
+            Event::Downloading {
+                bytes,
+                total: Some(total),
+            } => write!(f, "  {bytes} of {total} bytes"),
+            Event::Downloading { bytes, total: None } => write!(f, "  {bytes} bytes"),
             Event::DownloadRetrying {
                 attempt,
                 delay,
@@ -139,6 +179,7 @@ impl fmt::Display for Event<'_> {
                 groups,
             } => write!(f, "  {manuscripts} manuscripts in {groups} groups"),
             Event::WritingDocuments { documents } => write!(f, "Writing {documents} documents…"),
+            Event::DocumentsWritten { done, total } => write!(f, "  {done} of {total} documents"),
             Event::CheckingPackage => write!(f, "Checking the package…"),
             Event::CheckingPublished => write!(f, "Checking the published copy…"),
             Event::PreviousPackageLeft { path } => write!(
@@ -166,13 +207,20 @@ pub trait Progress: Send + Sync {
     fn report(&self, event: Event<'_>);
 }
 
-/// The sink the CLI runs with: one line on stderr per event.
+/// The sink the CLI runs with: one line on stderr per stage.
 ///
-/// The wording is [`Event`]'s, so this is the whole of it.
+/// The wording is [`Event`]'s, so this is the whole of it — apart from the one
+/// judgement a line-oriented sink has to make. Ticks are dropped: the terminal
+/// gets the seventeen stage lines it has always got, not those plus fifty
+/// fractions of the two stages that take time. What a tick is, and why it is
+/// the event and not this sink that decides, is on [`Event::is_tick`].
 pub struct Stderr;
 
 impl Progress for Stderr {
     fn report(&self, event: Event<'_>) {
+        if event.is_tick() {
+            return;
+        }
         eprintln!("{event}");
     }
 }
@@ -291,6 +339,49 @@ mod tests {
         ];
 
         for (event, expected) in cases {
+            // Seventeen stages, and the definition of a stage is that this sink
+            // prints it: `Stderr` drops a tick, so a milestone that answered
+            // true here would silently stop reaching the terminal.
+            assert!(!event.is_tick(), "a stage was classified as a tick");
+            assert_eq!(event.to_string(), expected);
+        }
+    }
+
+    /// The two refinements, apart from the seventeen stages above.
+    ///
+    /// They were never printed, so they are not in that list — the wording here
+    /// is for a sink that draws rather than prints, and the classification is
+    /// what keeps them out of the terminal. `total` is optional on the transfer
+    /// alone: a server that announces no length leaves a numerator with no
+    /// denominator, and saying so is better than inventing one.
+    #[test]
+    fn a_tick_says_how_far_along_a_stage_is_and_is_not_one() {
+        let cases: [(Event<'_>, &str); 3] = [
+            (
+                Event::Downloading {
+                    bytes: 1_048_576,
+                    total: Some(74_907_648),
+                },
+                "  1048576 of 74907648 bytes",
+            ),
+            (
+                Event::Downloading {
+                    bytes: 1_048_576,
+                    total: None,
+                },
+                "  1048576 bytes",
+            ),
+            (
+                Event::DocumentsWritten {
+                    done: 500,
+                    total: 23_936,
+                },
+                "  500 of 23936 documents",
+            ),
+        ];
+
+        for (event, expected) in cases {
+            assert!(event.is_tick(), "a tick was classified as a stage");
             assert_eq!(event.to_string(), expected);
         }
     }
