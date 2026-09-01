@@ -3,14 +3,24 @@
 //! Rows are grouped by CTH catalogue number (tablet family); fragments of the
 //! same text (e.g. all CTH 547) render under one section heading.
 //!
-//! The document is assembled from three kinds of thing, kept apart on purpose:
-//! the fixed chunks below, which are the page as it would be written by hand;
-//! [`COLUMNS`], the one description of the table's columns; and the rows, which
-//! are the only part that depends on the records.
+//! **The markup is not written here.** It is authored in
+//! `frontend/src/inventory/` as Svelte components, rendered once at build time
+//! into `generated/*.html` with a placeholder wherever data goes, and compiled
+//! in below — the same arrangement the stylesheet and the client script already
+//! had, and the last of the three parts of the target state
+//! (`docs/FRONTEND-CONTRACT.md`, *The target state*). What is left in this file
+//! is the substitution: which record fills which hole, in what order, and how
+//! many of each fragment there are.
+//!
+//! The document is still assembled from three kinds of thing, kept apart on
+//! purpose: [`DOCUMENT`], which is the page as the frontend wrote it; the
+//! fragments it repeats, one per group, manuscript and column; and [`COLUMNS`],
+//! the one description of the table's columns, which stays here because a
+//! second list of them in TypeScript is exactly the duplication this project
+//! has paid for before.
 
 use crate::parse::ManuscriptRecord;
 use crate::presentation::{CorpusPresentation, FragmentPresentation};
-use std::fmt::Write as _;
 
 /// Escape text for safe HTML text/attribute embedding.
 pub fn escape_html(s: &str) -> String {
@@ -75,6 +85,139 @@ const COLUMNS: [Column; 6] = [
     },
 ];
 
+// ---------------------------------------------------------------------------
+// What the frontend built
+// ---------------------------------------------------------------------------
+
+/// The page itself, from the doctype to `</html>`, with a hole in it wherever
+/// a corpus goes.
+///
+/// A build product, like the stylesheet sections and the script beside it.
+/// `frontend/build/inventory.ts` renders `Document.svelte` with every prop set
+/// to its own placeholder and writes the result here; the artifact is committed
+/// so that `cargo build` never needs Node, which is the premise of the `.app`
+/// and the DMG, and `frontend/tests/inventory-artifact.test.ts` fails if what is
+/// committed is not what the sources now produce.
+const DOCUMENT: &str = include_str!("generated/document.html");
+
+/// A CTH section heading, and the control that folds the manuscripts under it.
+///
+/// The whole heading is a `<button>` rather than a row with a click handler, so
+/// the group can be folded from the keyboard and a screen reader is told what
+/// the control does and what state it is in. `aria-expanded` starts `true`
+/// because a document opened without JavaScript shows everything.
+///
+/// A CTH label is text, never a link. Grouping is a way of reading the table,
+/// not a destination: the folders hold XML files and the rows under this
+/// heading link straight at them. Group pages existed until 2026-08-23 and were
+/// given up deliberately — see `docs/FRONTEND-CONTRACT.md`.
+const GROUP_HEADING: &str = include_str!("generated/group_heading.html");
+
+/// One manuscript: the six cells, in the order [`COLUMNS`] names them.
+const MANUSCRIPT_ROW: &str = include_str!("generated/manuscript_row.html");
+
+/// The title cell's contents when there is a file to link at.
+const MANUSCRIPT_LINK: &str = include_str!("generated/manuscript_link.html");
+
+/// One `<col>`, which the stylesheet gives its width.
+const COLUMN_WIDTH: &str = include_str!("generated/column_width.html");
+
+/// One `<th>`.
+const COLUMN_HEADING: &str = include_str!("generated/column_heading.html");
+
+/// One line of the legend above the table.
+const LEGEND_ENTRY: &str = include_str!("generated/legend_entry.html");
+
+/// The `Generated:` line, which a package's inventory does not carry.
+const GENERATED_LINE: &str = include_str!("generated/generated_line.html");
+
+/// The client script the inventory carries: the search box and the folding.
+///
+/// Vite bundles `frontend/src/inventory/main.ts` into it, in the same build and
+/// on the same terms as the markup above.
+const INVENTORY_SCRIPT: &str = include_str!("generated/inventory_filter.js");
+
+// ---------------------------------------------------------------------------
+// Filling the holes
+// ---------------------------------------------------------------------------
+
+/// The two characters that fence a placeholder: `@@ROWS@@`.
+///
+/// Chosen because nothing in HTML, in a stylesheet, in the script or in the
+/// corpus's own text means anything by them, and because a placeholder that
+/// survives into a document is then obvious on sight rather than invisible.
+const FENCE: &str = "@@";
+
+/// Substitute into a fragment, and append the result.
+///
+/// A value is written out as it stands: whatever a record contributes has been
+/// through [`escape_html`] before it gets here, and it is never scanned for
+/// placeholders of its own — a manuscript titled `@@ROWS@@` is a title.
+///
+/// A placeholder this caller has no value for is left as the frontend wrote it
+/// rather than silently dropped. That cannot happen — every template's holes
+/// are filled a few lines below, and a test asserts a rendered document has
+/// none left — and if it ever does, the document says so instead of quietly
+/// missing a line.
+fn fill(out: &mut String, template: &str, values: &[(&str, &str)]) {
+    let mut rest = template;
+    while let Some(open) = rest.find(FENCE) {
+        let after = &rest[open + FENCE.len()..];
+        let Some(close) = after.find(FENCE) else {
+            break;
+        };
+        let name = &after[..close];
+        out.push_str(&rest[..open]);
+        match values.iter().find(|(key, _)| *key == name) {
+            Some((_, value)) => out.push_str(value),
+            None => {
+                out.push_str(FENCE);
+                out.push_str(name);
+                out.push_str(FENCE);
+            }
+        }
+        rest = &after[close + FENCE.len()..];
+    }
+    out.push_str(rest);
+}
+
+/// [`fill`], for a fragment that is going to be a value in its turn.
+fn filled(template: &str, values: &[(&str, &str)]) -> String {
+    let mut out = String::with_capacity(template.len() + 64);
+    fill(&mut out, template, values);
+    out
+}
+
+/// A fragment without the newline the artifact file ends in.
+fn trimmed(template: &str) -> &str {
+    template.trim_matches('\n')
+}
+
+/// How the document wants a list of fragments joined.
+///
+/// Read off the document rather than decided here. A placeholder that stands on
+/// a line of its own — the rows, the legend — is asking for one fragment per
+/// line, indented to where it sits; a placeholder inside a line —
+/// `<colgroup>@@COLGROUP@@</colgroup>` — is asking for one line, so its
+/// fragments follow one another without a break. Either way the layout of the
+/// exported document is the frontend's to decide, which is the point of the
+/// markup living there.
+fn separator(template: &str, name: &str) -> String {
+    let hole = format!("{FENCE}{name}{FENCE}");
+    let Some(at) = template.find(&hole) else {
+        return String::new();
+    };
+    let line = match template[..at].rfind('\n') {
+        Some(newline) => &template[newline + 1..at],
+        None => &template[..at],
+    };
+    if line.is_empty() || line.chars().all(|c| c == ' ') {
+        format!("\n{line}")
+    } else {
+        String::new()
+    }
+}
+
 /// Build the full HTML document.
 ///
 /// `source` — human-readable source line (Zenodo record).
@@ -104,34 +247,32 @@ pub fn render_linked_html(corpus: &CorpusPresentation<'_>, generated_at: &str) -
 }
 
 fn render(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
-    let (body_rows, groups) = render_rows(corpus);
-
-    let mut html = String::with_capacity(4096 + body_rows.len());
-    html.push_str(DOCUMENT_HEAD);
+    let (rows, groups) = render_rows(corpus);
     // The stylesheet is assembled in [`crate::style`] rather than held here.
     // It was shared with the CTH group pages until those were given up on
     // 2026-08-23; the seam stays because the print and screen rules are still
     // built from one source.
-    html.push_str(&crate::style::inventory_css());
-    html.push_str(HEAD_TO_BODY);
-    write_summary(
-        &mut html,
-        corpus.source,
-        generated_at,
-        corpus.manuscripts(),
-        groups,
-    );
-    write_legend(&mut html);
-    html.push_str(TOOLBAR);
-    write_table(&mut html, &body_rows);
-    html.push_str(BODY_TO_SCRIPT);
-    // Built from `frontend/src/inventory/`, not written here: the search and
-    // the folding are the frontend's to author, and `pnpm build:inventory`
-    // bundles them into the file below. Compiled in like the stylesheets, so
-    // exporting still needs nothing but this binary.
-    html.push_str(INVENTORY_SCRIPT);
-    html.push_str(DOCUMENT_TAIL);
-    html
+    let css = crate::style::inventory_css();
+    // Not the `Editor` column, which says who edited one manuscript. These four
+    // are credited with the corpus itself, and the label has to keep the two
+    // apart on a page that shows both.
+    let authors = escape_html(&crate::corpus_authors_line());
+    filled(
+        DOCUMENT,
+        &[
+            ("STYLE", &css),
+            ("SCRIPT", INVENTORY_SCRIPT),
+            ("SOURCE", &escape_html(corpus.source)),
+            ("AUTHORS", &authors),
+            ("GENERATED", &generated_line(generated_at)),
+            ("MANUSCRIPTS", &corpus.manuscripts().to_string()),
+            ("GROUPS", &groups.to_string()),
+            ("LEGEND", &legend()),
+            ("COLGROUP", &colgroup()),
+            ("THEAD", &thead()),
+            ("ROWS", &rows),
+        ],
+    )
 }
 
 /// The table body: one section row per CTH group, then its manuscripts.
@@ -142,14 +283,19 @@ fn render(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
 /// The records arrive sorted (`order::sort_records`), so a group is a run of
 /// equal labels rather than something to collect into a map.
 fn render_rows(corpus: &CorpusPresentation<'_>) -> (String, usize) {
+    let between = separator(DOCUMENT, "ROWS");
     let mut rows = String::new();
     let mut row_n = 0usize;
 
     for group in &corpus.groups {
+        if !rows.is_empty() {
+            rows.push_str(&between);
+        }
         write_group_row(&mut rows, group.label, group.fragments.len());
 
         for fragment in &group.fragments {
             row_n += 1;
+            rows.push_str(&between);
             write_item_row(&mut rows, row_n, fragment, fragment.href.as_deref());
         }
     }
@@ -157,21 +303,19 @@ fn render_rows(corpus: &CorpusPresentation<'_>) -> (String, usize) {
     (rows, corpus.groups.len())
 }
 
-/// A section heading, and the control that folds the manuscripts under it.
+/// A section heading, and how many manuscripts it stands for.
 ///
-/// The whole heading is a `<button>` rather than a row with a click handler, so
-/// the group can be folded from the keyboard and a screen reader is told what
-/// the control does and what state it is in. `aria-expanded` starts `true`
-/// because a document opened without JavaScript shows everything.
-/// A CTH label is text, never a link. Grouping is a way of reading the table,
-/// not a destination: the folders hold XML files and the rows under this
-/// heading link straight at them. Group pages existed until 2026-08-23 and were
-/// given up deliberately — see `docs/FRONTEND-CONTRACT.md`.
+/// The cell spans the table, which is [`COLUMNS`]'s business and not the
+/// template's: `colspan` is a hole like any other.
 fn write_group_row(out: &mut String, label: &str, count: usize) {
-    let label = escape_html(label);
-    let _ = writeln!(
+    fill(
         out,
-        "        <tr class=\"group\">\n          <td colspan=\"6\"><button type=\"button\" class=\"group-toggle\" aria-expanded=\"true\"><span class=\"chevron\" aria-hidden=\"true\"></span><span class=\"group-label\">{label}</span><span class=\"group-count\">{count}</span></button></td>\n        </tr>"
+        trimmed(GROUP_HEADING),
+        &[
+            ("SPAN", &COLUMNS.len().to_string()),
+            ("LABEL", &escape_html(label)),
+            ("COUNT", &count.to_string()),
+        ],
     );
 }
 
@@ -185,143 +329,80 @@ fn write_item_row(
     // decision, made once for every document rather than here.
     let rec = fragment.record;
     let title = escape_html(fragment.display_name);
-    let lang = escape_html(&rec.lang);
-    let auth = escape_html(&rec.authorship);
-    let year = escape_html(&rec.year);
-    let corpus = escape_html(&rec.corpus);
     // A link where there is one, the bare name where there is not. The cell's
     // text is the same either way, which is what the search reads.
     let title = match href {
-        Some(href) => format!(
-            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\">{title}</a>",
-            escape_html(href)
+        Some(href) => filled(
+            trimmed(MANUSCRIPT_LINK),
+            &[("HREF", &escape_html(href)), ("TITLE", &title)],
         ),
         None => title,
     };
-    let _ = writeln!(
+    fill(
         out,
-        "        <tr>\n          <td class=\"num\">{row_n}</td>\n          <td>{title}</td>\n          <td>{lang}</td>\n          <td>{corpus}</td>\n          <td>{auth}</td>\n          <td class=\"year\">{year}</td>\n        </tr>"
+        trimmed(MANUSCRIPT_ROW),
+        &[
+            ("NUMBER", &row_n.to_string()),
+            ("TITLE", &title),
+            ("LANG", &escape_html(&rec.lang)),
+            ("CORPUS", &escape_html(&rec.corpus)),
+            ("EDITOR", &escape_html(&rec.authorship)),
+            ("YEAR", &escape_html(&rec.year)),
+        ],
     );
 }
 
-/// The line under the title: where the data came from, who made it, and how
-/// much of it there is.
+/// The line under the title that says when the document was written.
 ///
-/// The two counts share a line — they are one fact about the corpus, and each
-/// on its own row made a four-line block out of a header.
-fn write_summary(out: &mut String, source: &str, generated_at: &str, count: usize, groups: usize) {
-    let source = escape_html(source);
-    let generated = escape_html(generated_at);
-    // Not the `Editor` column, which says who edited one manuscript. These four
-    // are credited with the corpus itself, and the label has to keep the two
-    // apart on a page that shows both.
-    let authors = escape_html(&crate::corpus_authors_line());
-    out.push_str("    <p class=\"meta\">\n");
-    let _ = writeln!(out, "      <span>Source: {source}</span>");
-    let _ = writeln!(out, "      <span>Corpus authors: {authors}</span>");
-    // Omitted when the caller has no timestamp to give. A package is rebuilt
-    // from the same archive and has to come out the same every time, and a
-    // clock reading in the document would be the one thing that never did.
-    if !generated.is_empty() {
-        let _ = writeln!(out, "      <span>Generated: {generated}</span>");
+/// Omitted when the caller has no timestamp to give. A package is rebuilt from
+/// the same archive and has to come out the same every time, and a clock
+/// reading in the document would be the one thing that never did.
+fn generated_line(generated_at: &str) -> String {
+    if generated_at.is_empty() {
+        return String::new();
     }
-    let _ = writeln!(
-        out,
-        "      <span class=\"counts\"><span class=\"count\">Manuscripts: {count}</span><span class=\"count\">Groups (CTH): {groups}</span></span>"
-    );
-    out.push_str("    </p>\n");
+    filled(
+        trimmed(GENERATED_LINE),
+        &[("GENERATED", &escape_html(generated_at))],
+    )
+}
+
+/// The fragments of one template, one per column, joined as the document asks.
+fn per_column(hole: &str, entry: impl Fn(&Column) -> String) -> String {
+    let between = separator(DOCUMENT, hole);
+    let mut out = String::new();
+    for column in &COLUMNS {
+        if !out.is_empty() {
+            out.push_str(&between);
+        }
+        out.push_str(&entry(column));
+    }
+    out
 }
 
 /// What each column holds, spelled out above the table.
-fn write_legend(out: &mut String) {
-    out.push_str("    <section class=\"legend\" aria-label=\"Column legend\">\n");
-    out.push_str("      <p class=\"legend-title\">Columns</p>\n");
-    out.push_str("      <ul class=\"legend-list\">\n");
-    for column in &COLUMNS {
-        let _ = writeln!(
-            out,
-            "        <li><span class=\"k\">{}</span><span class=\"d\">{}</span></li>",
-            column.head, column.legend
-        );
-    }
-    out.push_str("      </ul>\n");
-    out.push_str("    </section>\n");
+fn legend() -> String {
+    per_column("LEGEND", |column| {
+        filled(
+            trimmed(LEGEND_ENTRY),
+            &[("HEAD", column.head), ("LEGEND", column.legend)],
+        )
+    })
 }
 
-/// The table around the rows: column widths, headings, body.
-fn write_table(out: &mut String, body_rows: &str) {
-    out.push_str("    <table id=\"inv\">\n");
-    out.push_str("      <colgroup>\n");
-    // Three to a line, as they would be written by hand.
-    for line in COLUMNS.chunks(3) {
-        out.push_str("        ");
-        for column in line {
-            let _ = write!(out, "<col class=\"{}\" />", column.class);
-        }
-        out.push('\n');
-    }
-    out.push_str("      </colgroup>\n");
-    out.push_str("      <thead>\n");
-    out.push_str("        <tr>\n");
-    for column in &COLUMNS {
-        let _ = writeln!(out, "          <th scope=\"col\">{}</th>", column.head);
-    }
-    out.push_str("        </tr>\n");
-    out.push_str("      </thead>\n");
-    out.push_str("      <tbody>\n");
-    out.push_str(body_rows);
-    out.push_str("      </tbody>\n");
-    out.push_str("    </table>\n");
+/// The column widths.
+fn colgroup() -> String {
+    per_column("COLGROUP", |column| {
+        filled(trimmed(COLUMN_WIDTH), &[("CLASSNAME", column.class)])
+    })
 }
 
-/// The client script the inventory carries: the search box and the folding.
-///
-/// A build product, and the only one in the crate. Vite bundles
-/// `frontend/src/inventory/main.ts` into it — see `docs/FRONTEND-CONTRACT.md`,
-/// *The target state*. It is committed rather than built by `build.rs` so that
-/// `cargo build` never needs Node, which is the premise of the `.app` and the
-/// DMG; `frontend/tests/inventory-artifact.test.ts` fails if what is committed
-/// is not what the sources now produce.
-const INVENTORY_SCRIPT: &str = include_str!("generated/inventory_filter.js");
-
-/// Everything before the stylesheet.
-const DOCUMENT_HEAD: &str = r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Thesaurus Linguarum Hethaeorum Digitalis</title>
-  <style>
-"#;
-
-/// From the end of the stylesheet to the page title.
-const HEAD_TO_BODY: &str = r#"  </style>
-</head>
-<body>
-  <main>
-    <h1>Thesaurus Linguarum Hethaeorum Digitalis</h1>
-"#;
-
-/// The search box and the fold-everything control. Both act through
-/// [`INVENTORY_SCRIPT`]; without it the document is a plain, fully expanded
-/// table.
-const TOOLBAR: &str = r#"    <div class="toolbar">
-      <input type="search" id="q" aria-label="Поиск по описи" placeholder="Search CTH, siglum, lang, corpus, editor, year…" autocomplete="off" spellcheck="false" />
-      <button type="button" id="fold-all" class="fold-all" aria-expanded="true">Collapse fragments</button>
-      <span class="hint" id="hint"></span>
-    </div>
-"#;
-
-/// From the end of the table to the start of the script.
-const BODY_TO_SCRIPT: &str = r#"  </main>
-  <script>
-"#;
-
-/// Everything after the script.
-const DOCUMENT_TAIL: &str = r#"  </script>
-</body>
-</html>
-"#;
+/// The column headings.
+fn thead() -> String {
+    per_column("THEAD", |column| {
+        filled(trimmed(COLUMN_HEADING), &[("HEAD", column.head)])
+    })
+}
 
 #[cfg(test)]
 mod tests {
@@ -470,6 +551,12 @@ mod tests {
             html.contains("id=\"fold-all\""),
             "the toolbar carries the fold-everything control"
         );
+        assert_eq!(
+            html.matches(&format!("colspan=\"{}\"", COLUMNS.len()))
+                .count(),
+            2,
+            "a heading spans the table, however many columns it has"
+        );
     }
 
     /// The legend, the column widths and the headings are generated from one
@@ -485,7 +572,7 @@ mod tests {
                 column.head
             );
             assert!(
-                html.contains(&format!("<col class=\"{}\" />", column.class)),
+                html.contains(&format!("<col class=\"{}\"/>", column.class)),
                 "no colgroup entry for {}",
                 column.class
             );
@@ -495,5 +582,42 @@ mod tests {
                 column.head
             );
         }
+    }
+
+    /// Every hole the frontend left is one this file fills.
+    ///
+    /// The templates and the substitutions are two lists of names that have to
+    /// agree, kept apart by a language boundary and by a build; nothing but this
+    /// notices when one of them is renamed. What it would otherwise cost is a
+    /// document that is valid, opens, and has a sentence missing from it.
+    #[test]
+    fn no_placeholder_survives_into_a_document() {
+        let records = vec![rec("KBo 1", Some("CTH 1"), 1, "A", "2020")];
+        for generated in ["", "2026-08-10 12:00:00"] {
+            let html = render_html(&records, "src", generated);
+            assert!(
+                !html.contains(FENCE),
+                "an unfilled placeholder reached the document: {:?}",
+                html.split(FENCE).nth(1)
+            );
+        }
+    }
+
+    /// The document decides how its own lists are laid out, and this reads that
+    /// decision off it rather than repeating it.
+    #[test]
+    fn a_list_is_joined_the_way_the_document_asks() {
+        assert_eq!(separator("<tbody>@@ROWS@@</tbody>", "ROWS"), "");
+        assert_eq!(separator("  <p>\n    @@ROWS@@\n  </p>", "ROWS"), "\n    ");
+        assert_eq!(separator("<p>@@OTHER@@</p>", "ROWS"), "");
+    }
+
+    /// A value is written out as it stands. The corpus is other people's text,
+    /// and text that happens to look like a placeholder is still text.
+    #[test]
+    fn a_value_that_looks_like_a_placeholder_is_not_one() {
+        let mut out = String::new();
+        fill(&mut out, "<td>@@TITLE@@</td>", &[("TITLE", "@@ROWS@@")]);
+        assert_eq!(out, "<td>@@ROWS@@</td>");
     }
 }
