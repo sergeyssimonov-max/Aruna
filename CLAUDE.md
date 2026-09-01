@@ -64,12 +64,14 @@
 ## Тесты и проверки
 
 - Фронтенд: Vitest, два проекта – node для tests/, jsdom для компонентных в src/.
-- Rust: `cargo nextest run --no-tests=pass`.
+- Rust: `cargo nextest run --locked --no-tests=pass`.
 - E2E: WebdriverIO внутри собранного приложения, сборка через
   `VITE_E2E=1 cargo tauri build --debug --no-bundle --features e2e`.
 - Перед коммитом обязательны: `pnpm check`, `pnpm lint`, `pnpm format:check`, `pnpm test:unit`,
-  `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`,
-  `cargo nextest run --no-tests=pass`.
+  `cargo fmt --check`, `cargo clippy --locked --all-targets --all-features -- -D warnings`,
+  `cargo nextest run --locked --no-tests=pass`.
+- Флаг `--locked` обязателен во всех командах Cargo, включая локальные (спецификация §6.3):
+  он запрещает молчаливое изменение lock-файла и делает проверку той же, что получит выпуск.
 - Отключать линтер, тест или проверку безопасности без записанной причины запрещено.
 
 ## Коммиты
