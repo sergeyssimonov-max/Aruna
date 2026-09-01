@@ -8,18 +8,30 @@
  * byte-for-byte what these sources produce. They have to be the same build or
  * the test proves nothing, so neither of them states these options itself.
  *
- * One `vite build` produces all four artifacts: the script is the entry, and a
- * plugin runs the three stylesheet sections after it. Separate builds rather
- * than one bundle on purpose — the three sections stay three files, because the
- * order they are emitted in *is* the cascade and that decision belongs to
- * `cli/src/style.rs`, which is the one place that makes it.
+ * One `vite build` produces every artifact: the script is the entry, and two
+ * plugins run after it — one for the three stylesheet sections, one for the
+ * document and the fragments of markup. Separate builds rather than one bundle
+ * on purpose — the three sections stay three files, because the order they are
+ * emitted in *is* the cascade and that decision belongs to `cli/src/style.rs`,
+ * which is the one place that makes it.
+ *
+ * **What the markup step is.** `src/inventory/*.svelte` is rendered once here,
+ * by `render()` from `svelte/server`, with every prop set to a placeholder; the
+ * HTML that comes out is the shape of the exported inventory with holes in it,
+ * and `cli/src/html.rs` fills the holes when a corpus is exported. Nothing in
+ * those components is ever mounted or hydrated: this is a template engine whose
+ * templates happen to be type-checked, formatted and linted like the rest of
+ * the frontend, which is the whole reason for authoring them in Svelte.
  */
 import type { InlineConfig, Plugin } from 'vite'
+import type { Component } from 'svelte'
 import { build } from 'vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { render } from 'svelte/server'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 /** The script the exported inventory carries. */
 export const SCRIPT = 'inventory_filter.js'
@@ -33,8 +45,112 @@ export const SCRIPT = 'inventory_filter.js'
  */
 export const SECTIONS = ['canonical', 'screen', 'print'] as const
 
+/**
+ * A placeholder the Rust side finds and replaces when it exports a corpus.
+ *
+ * The name is the component's own prop name, upper-cased, so that a prop and
+ * the hole it leaves in the artifact cannot be given different names. What the
+ * hole is filled with is `cli/src/html.rs`'s business; that the hole is there
+ * at all is checked below, before the artifact is written.
+ */
+const placeholder = (prop: string) => `@@${prop.toUpperCase()}@@`
+
+/** Every named prop rendered as its own placeholder. */
+const placeholders = (...props: readonly string[]): Record<string, string> =>
+  Object.fromEntries(props.map((prop) => [prop, placeholder(prop)]))
+
+/**
+ * The stylesheet and the script are thousands of lines each.
+ *
+ * A document that opened either of them halfway along the line that carries the
+ * `<style>` tag would be unreadable in a way the hand-written one never was, so
+ * the break before and the indent after belong to the placeholder's value. That
+ * keeps the shape of the page a decision of this build rather than of Rust,
+ * which only ever hands over the text.
+ */
+const inOwnBlock = (prop: string) => `\n${placeholder(prop)}\n    `
+
+/**
+ * What is rendered, into what, and with which props.
+ *
+ * `Document.svelte` is the whole page and everything else is a fragment the
+ * crate repeats — a row per manuscript, a heading per CTH group, a `<col>`,
+ * `<th>` and legend line per column. They are separate components rather than
+ * `{#each}` blocks inside the document because how many of each there are is
+ * only known when a corpus is exported, and because the crate's `COLUMNS` is
+ * the one declaration of the columns: a Svelte template that listed them again
+ * would be the second, and the two would drift.
+ */
+const MARKUP: readonly {
+  /** The component, in `src/inventory/`. */
+  component: string
+  /** The artifact it becomes, in `cli/src/generated/`. */
+  artifact: string
+  /** What it is rendered with — a placeholder per prop. */
+  props: Record<string, string>
+}[] = [
+  {
+    component: 'Document.svelte',
+    artifact: 'document.html',
+    props: {
+      ...placeholders(
+        'source',
+        'authors',
+        'generated',
+        'manuscripts',
+        'groups',
+        'legend',
+        'colgroup',
+        'thead',
+        'rows',
+      ),
+      style: inOwnBlock('style'),
+      script: inOwnBlock('script'),
+    },
+  },
+  {
+    component: 'GroupHeading.svelte',
+    artifact: 'group_heading.html',
+    props: placeholders('span', 'label', 'count'),
+  },
+  {
+    component: 'ManuscriptRow.svelte',
+    artifact: 'manuscript_row.html',
+    props: placeholders('number', 'title', 'lang', 'corpus', 'editor', 'year'),
+  },
+  {
+    component: 'ManuscriptLink.svelte',
+    artifact: 'manuscript_link.html',
+    props: placeholders('href', 'title'),
+  },
+  {
+    component: 'ColumnWidth.svelte',
+    artifact: 'column_width.html',
+    props: placeholders('className'),
+  },
+  {
+    component: 'ColumnHeading.svelte',
+    artifact: 'column_heading.html',
+    props: placeholders('head'),
+  },
+  {
+    component: 'LegendEntry.svelte',
+    artifact: 'legend_entry.html',
+    props: placeholders('head', 'legend'),
+  },
+  {
+    component: 'GeneratedLine.svelte',
+    artifact: 'generated_line.html',
+    props: placeholders('generated'),
+  },
+]
+
 /** Every file the build writes, which is what the agreement test compares. */
-export const ARTIFACTS = [SCRIPT, ...SECTIONS.map((name) => `${name}.css`)]
+export const ARTIFACTS = [
+  SCRIPT,
+  ...SECTIONS.map((name) => `${name}.css`),
+  ...MARKUP.map(({ artifact }) => artifact),
+]
 
 /** Where the committed artifacts live: `cli/src/generated/`, next to the crate. */
 export const CRATE_OUT = fileURLToPath(new URL('../../cli/src/generated/', import.meta.url))
@@ -200,6 +316,120 @@ async function buildSections(outDir: string): Promise<void> {
 }
 
 /**
+ * The markers Svelte leaves for a client that is going to hydrate the page.
+ *
+ * `render()` brackets a component with `<!--[-->` and `<!--]-->` and fences each
+ * `{@html}`, so that the runtime can find its own work later. Nothing hydrates
+ * this document — it carries `filter.ts` and no Svelte at all — and comments in
+ * it were deliberately taken out along with the stylesheet's, so they go the
+ * same way the `$vite$` marker above does.
+ *
+ * **Every comment, not a list of the ones seen so far.** A component's own HTML
+ * comments never reach `render()`'s output — the compiler drops them unless
+ * `preserveComments` is set, and it is not — so any comment here is the
+ * renderer's. Matching them by shape was tried and is wrong: the fence around
+ * `{@html}` came out `<!---->` from `pnpm build:inventory` and `<!--12ftosl-->`
+ * from the same build under Vitest, and an artifact that depends on which
+ * command asked for it is not one the agreement test can compare.
+ */
+const HYDRATION_MARKERS = /<!--[\s\S]*?-->/g
+
+/** The chunk an entry produces: the artifact's name without its extension. */
+const chunkName = (artifact: string) => artifact.replace(/\.html$/, '')
+
+/**
+ * The components, compiled for the server and left as modules to be rendered.
+ *
+ * Not the document's engine floor and not the window's: this output is imported
+ * by the Node that runs the build and never reaches a browser, so it is built
+ * for the Node that is running. What travels to the corpus is the HTML these
+ * modules produce.
+ *
+ * **`mode` and `dev` are stated rather than inherited, and that is the whole
+ * reason the agreement test works.** Vite takes the mode from whoever is
+ * running it: `pnpm build:inventory` builds in production, and
+ * `tests/inventory-artifact.test.ts` runs under Vitest, which does not. Left to
+ * itself the second one compiles the components in development mode, where the
+ * server runtime keeps a validation context the components are not rendered
+ * inside — it fails on the first element with `Cannot read properties of null`.
+ * Even had it rendered, an artifact that depends on who asked for it is not an
+ * artifact anyone can check.
+ */
+function markupBuild(outDir: string): InlineConfig {
+  return {
+    root: ROOT,
+    configFile: false,
+    logLevel: 'warn',
+    mode: 'production',
+    publicDir: false,
+    plugins: [svelte({ configFile: false, compilerOptions: { css: 'external', dev: false } })],
+    build: {
+      ssr: true,
+      outDir,
+      emptyOutDir: false,
+      minify: false,
+      reportCompressedSize: false,
+      rollupOptions: {
+        input: Object.fromEntries(
+          MARKUP.map(({ artifact, component }) => [chunkName(artifact), source(component)]),
+        ),
+        output: { entryFileNames: '[name].js', format: 'esm' },
+      },
+    },
+  }
+}
+
+/**
+ * An artifact is only worth committing if it still has its holes.
+ *
+ * A renamed prop would otherwise produce a perfectly valid document with a
+ * sentence missing from it, discovered by a reader of the corpus rather than
+ * here. The second check is the one that catches a `{#if}` or an `{#each}`
+ * added to a component later: either would leave a marker behind.
+ */
+function guard(artifact: string, props: Record<string, string>, html: string): void {
+  for (const prop of Object.keys(props)) {
+    if (!html.includes(placeholder(prop))) {
+      throw new Error(`${artifact} has no ${placeholder(prop)}: the ${prop} prop reached nothing.`)
+    }
+  }
+  const comment = html.indexOf('<!--')
+  if (comment >= 0) {
+    throw new Error(
+      `${artifact} carries ${JSON.stringify(html.slice(comment, comment + 40))}; ` +
+        `HYDRATION_MARKERS in build/inventory.ts did not reach it.`,
+    )
+  }
+}
+
+/** The document and its fragments: built, rendered, checked, written. */
+async function buildMarkup(outDir: string): Promise<void> {
+  const modules = await mkdtemp(join(tmpdir(), 'aruna-markup-'))
+  try {
+    await build(markupBuild(modules))
+    for (const { artifact, props } of MARKUP) {
+      const url = pathToFileURL(join(modules, `${chunkName(artifact)}.js`)).href
+      const module = (await import(url)) as { default: Component<Record<string, string>> }
+      const html = render(module.default, { props }).body.replace(HYDRATION_MARKERS, '').trim()
+      guard(artifact, props, html)
+      await writeFile(join(outDir, artifact), `${html}\n`)
+    }
+  } finally {
+    await rm(modules, { recursive: true, force: true })
+  }
+}
+
+/** Renders the markup after the script, the way the stylesheets are rendered. */
+function markup(outDir: string): Plugin {
+  return {
+    name: 'aruna-inventory-markup',
+    async closeBundle() {
+      await buildMarkup(outDir)
+    },
+  }
+}
+
+/**
  * The build, aimed at `outDir`.
  *
  * Everything that would make two builds differ is turned off. File names are
@@ -214,7 +444,7 @@ export function inventoryBuild(outDir: string): InlineConfig {
     configFile: false,
     logLevel: 'warn',
     publicDir: false,
-    plugins: [stylesheets(outDir)],
+    plugins: [stylesheets(outDir), markup(outDir)],
     build: {
       outDir,
       emptyOutDir: false,

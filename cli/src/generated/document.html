@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Thesaurus Linguarum Hethaeorum Digitalis</title>
+    <style>
+@@STYLE@@
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Thesaurus Linguarum Hethaeorum Digitalis</h1>
+      <p class="meta">
+        <span>Source: @@SOURCE@@</span>
+        <span>Corpus authors: @@AUTHORS@@</span>
+        @@GENERATED@@
+        <span class="counts"><span class="count">Manuscripts: @@MANUSCRIPTS@@</span><span class="count">Groups (CTH): @@GROUPS@@</span></span>
+      </p>
+      <section class="legend" aria-label="Column legend">
+        <p class="legend-title">Columns</p>
+        <ul class="legend-list">
+          @@LEGEND@@
+        </ul>
+      </section>
+      <div class="toolbar">
+        <input type="search" id="q" aria-label="Поиск по описи" placeholder="Search CTH, siglum, lang, corpus, editor, year…" autocomplete="off" spellcheck="false"/>
+        <button type="button" id="fold-all" class="fold-all" aria-expanded="true">Collapse fragments</button>
+        <span class="hint" id="hint"></span>
+      </div>
+      <table id="inv">
+        <colgroup>@@COLGROUP@@</colgroup>
+        <thead>
+          <tr>@@THEAD@@</tr>
+        </thead>
+        <tbody>
+          @@ROWS@@
+        </tbody>
+      </table>
+    </main>
+    <script>
+@@SCRIPT@@
+    </script>
+  </body>
+</html>

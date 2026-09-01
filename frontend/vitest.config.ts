@@ -10,6 +10,11 @@ export default defineConfig({
   resolve: {
     conditions: ['browser'],
   },
+  // `cli/src/generated/` is above this root, and `filter.test.ts` reads the
+  // artifacts out of it: the document and the fragments the crate compiles in
+  // are the shape the renderer writes, and a fixture that described that shape
+  // in its own words was a second description of one table.
+  server: { fs: { allow: ['..'] } },
   test: {
     projects: [
       {

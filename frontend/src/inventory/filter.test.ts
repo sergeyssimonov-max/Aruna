@@ -10,6 +10,9 @@
  * one has a test here now.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import documentHtml from '../../../cli/src/generated/document.html?raw'
+import groupHeadingHtml from '../../../cli/src/generated/group_heading.html?raw'
+import manuscriptRowHtml from '../../../cli/src/generated/manuscript_row.html?raw'
 import { attachInventoryFilter } from './filter'
 
 interface Row {
@@ -20,25 +23,73 @@ interface Row {
   year?: string
 }
 
+/**
+ * The document is built from the very artifacts the crate compiles in.
+ *
+ * This file used to write the markup out by hand, which made it a second
+ * description of a table that already had one — the thing this project keeps
+ * paying for. Since the markup moved to `Document.svelte` and its fragments,
+ * the artifacts in `cli/src/generated/` are the shape the renderer writes, and
+ * a test that says it drives "a document in the shape the renderer writes" can
+ * simply use them. A fragment renamed, a cell reordered or a class dropped now
+ * shows up here as a failing test rather than as a fixture quietly describing a
+ * page that no longer exists.
+ */
+const artifact = (text: string) => text.replace(/\n+$/, '')
+
+/**
+ * `cli/src/html.rs`'s substitution, in the ten characters of it this needs.
+ *
+ * A callback rather than a replacement string: `$&` and its relatives mean
+ * something to `String.replace`, and a siglum is allowed to contain them.
+ */
+const fill = (template: string, values: Record<string, string>) =>
+  template.replace(/@@(\w+)@@/g, (hole: string, name: string) => values[name] ?? hole)
+
 /** The document the renderer writes, with the rows a test asks for. */
 function inventory(groups: { label: string; rows: Row[] }[]): void {
   let n = 0
   const body = groups
     .map((group) => {
-      const head = `<tr class="group"><td colspan="6"><button type="button" class="group-toggle" aria-expanded="true"><span class="chevron"></span><span class="group-label">${group.label}</span><span class="group-count">${group.rows.length}</span></button></td></tr>`
-      const rows = group.rows
-        .map((row) => {
-          n += 1
-          return `<tr><td class="num">${n}</td><td>${row.siglum}</td><td>${row.lang ?? 'Hit'}</td><td>${row.corpus ?? 'HFR'}</td><td>${row.editor ?? '—'}</td><td class="year">${row.year ?? '2020'}</td></tr>`
+      const head = fill(artifact(groupHeadingHtml), {
+        SPAN: '6',
+        LABEL: group.label,
+        COUNT: String(group.rows.length),
+      })
+      const rows = group.rows.map((row) => {
+        n += 1
+        return fill(artifact(manuscriptRowHtml), {
+          NUMBER: String(n),
+          TITLE: row.siglum,
+          LANG: row.lang ?? 'Hit',
+          CORPUS: row.corpus ?? 'HFR',
+          EDITOR: row.editor ?? '—',
+          YEAR: row.year ?? '2020',
         })
-        .join('')
-      return head + rows
+      })
+      return [head, ...rows].join('\n')
     })
-    .join('')
+    .join('\n')
 
-  document.body.innerHTML =
-    `<div class="toolbar"><input type="search" id="q" aria-label="Поиск по описи" /><button type="button" id="fold-all" aria-expanded="true">Collapse fragments</button><span class="hint" id="hint"></span></div>` +
-    `<table id="inv"><tbody>${body}</tbody></table>`
+  // The whole page, then the part of it a script sees. The stylesheet and the
+  // script are left out — one is not read by anything here and the other is the
+  // module under test, reached directly.
+  const page = fill(artifact(documentHtml), {
+    STYLE: '',
+    SCRIPT: '',
+    SOURCE: 'test',
+    AUTHORS: '—',
+    GENERATED: '',
+    MANUSCRIPTS: String(n),
+    GROUPS: String(groups.length),
+    LEGEND: '',
+    COLGROUP: '',
+    THEAD: '',
+    ROWS: body,
+  })
+  const main = page.slice(page.indexOf('<main>'), page.indexOf('</main>') + '</main>'.length)
+
+  document.body.innerHTML = main
   document.body.className = ''
 }
 
