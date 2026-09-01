@@ -2,3 +2,6 @@ allowBuilds:
   edgedriver: false
   esbuild: false
   geckodriver: false
+
+overrides:
+  '@puppeteer/browsers': '3.2.1'
