@@ -198,7 +198,9 @@ pnpm test:unit      # 57
 
 `vitest` runs two projects. **`component`** is jsdom: the 14 tests of
 `src/inventory/filter.test.ts`, which drive the search box and the fold controls
-against a document built in the shape `cli/src/html.rs` writes, and the 4 tests
+against a document built out of the artifacts the crate compiles in —
+`document.html` and the row fragments beside it, filled the way `html.rs` fills
+them, so the fixture cannot drift from the page — and the 4 tests
 of `src/App.test.ts`, which render the window against a mocked `invoke`. The
 second file arrived on 2026-08-30 with the screen it tests: before that the
 window held a prototype nobody intended to keep, so a jsdom test of its markup

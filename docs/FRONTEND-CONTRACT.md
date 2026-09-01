@@ -69,8 +69,8 @@ appears in either manifest, in a lock file, in `node_modules`, in a source file
 or in an artifact the crate carries, and fails on SvelteKit in the same breath. So this is not a removal. It is a
 replacement of hand-written generation — `cli/src/html.rs` (markup assembled
 with `write!`), four embedded stylesheets, and 216 lines of vanilla
-`html_filter.js` — with output from the new stack. **The script and the styles
-are done**; the markup is not.
+`html_filter.js` — with output from the new stack. **All three parts are done**:
+the script and the styles on 2026-08-23, the markup on 2026-09-01.
 
 **What the replacement has to keep, because the current generator guarantees it
 and the tests hold it to that:**
@@ -96,8 +96,8 @@ anything.
 **Done — two of the three parts.** The 216 lines of vanilla JavaScript that sat
 in `cli/src/html_filter.js` and the four hand-written stylesheets are now
 sources under `frontend/src/inventory/`, built by Vite, and compiled into the
-binary out of `cli/src/generated/`. What is left is the markup of
-`cli/src/html.rs`.
+binary out of `cli/src/generated/`. The markup followed on 2026-09-01 — see
+*The markup*, below.
 
 | | |
 |---|---|
@@ -105,7 +105,7 @@ binary out of `cli/src/generated/`. What is left is the markup of
 | build | `pnpm build:inventory` in `frontend/`, options in `build/inventory.ts` |
 | artifacts | `cli/src/generated/{inventory_filter.js,canonical.css,screen.css,print.css}`, **committed**, never edited by hand |
 | compiled in by | `html::INVENTORY_SCRIPT`, `style::{SHARED,INVENTORY,PRINT}` |
-| behaviour | `frontend/src/inventory/filter.test.ts`, 14 tests against a document in the shape `html.rs` writes |
+| behaviour | `frontend/src/inventory/filter.test.ts`, 14 tests against the document the artifacts describe |
 | the artifacts are current | `frontend/tests/inventory-artifact.test.ts` |
 
 **The three sections stay three files.** The order they are emitted in *is* the
@@ -172,6 +172,82 @@ folded → 23 927. Identical, query for query, old script and new.
 One comment was corrected on the way: the alias table said an agreement test
 held it level with the website's search index. Both went with the React site on
 2026-08-23, and this is now the only list of editor spellings in the repository.
+
+### The markup — built by Vite, 2026-09-01
+
+**The third and last part.** `cli/src/html.rs` assembled the document with
+`write!` — 499 lines of it, and every tag in the exported inventory was a Rust
+string literal. The page is now authored in `frontend/src/inventory/` as Svelte
+components, rendered once at build time by `render()` from `svelte/server`, and
+compiled into the binary out of `cli/src/generated/` on exactly the terms the
+script and the stylesheet already had. Nothing in those components is ever
+mounted or hydrated: this is a template engine whose templates happen to be
+type-checked, formatted and linted like the rest of the frontend, and that is
+the whole reason for authoring them in Svelte rather than in a string.
+
+| | |
+|---|---|
+| sources | `Document.svelte` and seven fragments — `GroupHeading`, `ManuscriptRow`, `ManuscriptLink`, `ColumnWidth`, `ColumnHeading`, `LegendEntry`, `GeneratedLine` |
+| build | the same `pnpm build:inventory`, a second plugin beside the stylesheets' |
+| artifacts | `cli/src/generated/{document,group_heading,manuscript_row,manuscript_link,column_width,column_heading,legend_entry,generated_line}.html` |
+| compiled in by | `html::{DOCUMENT, GROUP_HEADING, …}` |
+| what Rust does now | substitution, repetition and escaping — `html::fill` and the callers around it |
+
+**`Document.svelte` is the whole page, `<html>` to `</html>`.** Svelte renders
+`<html>`, `<head>` and `<body>` as ordinary elements, and a `<style>` or
+`<script>` element written inside the body comes out verbatim, with the
+component's own `<script lang="ts">` still recognised as its instance script.
+The one thing it cannot say is the doctype — a literal `<!DOCTYPE html>` is
+parsed as an element named `!DOCTYPE` with an attribute `html` and rendered back
+as `<!doctype html=""/>` — so the component emits it through `{@html}`, which is
+the only way, and the artifact still begins at the doctype.
+
+**A hole is a prop, and its name is the prop's name upper-cased.** The build
+renders each component with every prop set to `@@PROPNAME@@` and checks, before
+writing, that each one reached the output; `html.rs` fills them by the same
+names, and `no_placeholder_survives_into_a_document` checks that none is left.
+That is two lists across a language boundary, and those two tests are what keep
+them level — the alternative was a rename producing a valid document with a
+sentence missing from it.
+
+**Markup slots are `{@html}`, text slots are `{expr}`, and that is not a
+preference.** Svelte rejects a text expression as a child of `<colgroup>`,
+`<thead>`'s `<tr>` or `<tbody>` — `node_invalid_placement`, because a browser
+would repair the HTML — and those are exactly the slots that receive markup the
+crate assembled. Text slots stay expressions so Svelte escapes them; markup
+slots carry text that went through `escape_html` before it got there.
+`eslint.config.js` turns off `svelte/no-at-html-tags` and
+`svelte/no-raw-special-elements` for this directory alone, with the reason
+written where the override is.
+
+**No `{#if}` and no `{#each}` anywhere.** How many rows, groups and columns
+there are is known when a corpus is exported, not when the components are built,
+so repetition is the crate's; and the crate's `COLUMNS` stays the one
+declaration of the six columns, which a Svelte template listing them again would
+quietly become the second of. Control flow would also leave Svelte's hydration
+markers in the artifact, and the build strips every comment on the way out
+precisely because those markers are not stable: the fence around `{@html}` came
+out `<!---->` from `pnpm build:inventory` and `<!--12ftosl-->` from the same
+build under Vitest until `mode` and `dev` were pinned.
+
+**Where a list breaks lines is the document's decision, read off the document.**
+`html::separator` looks at what precedes a placeholder: one that stands on a line
+of its own — the rows, the legend — gets one fragment per line indented to match,
+and one inside a line — `<colgroup>@@COLGROUP@@</colgroup>` — gets its fragments
+run together, because that is what the markup asked for. Nothing about the shape
+of the page is decided in Rust.
+
+**Evidence that the document did not change.** The real corpus was exported by
+the binary before the change and after it, from one archive, and the two were
+compared as documents rather than as bytes: 24 599 rows — 23 936 manuscripts in
+663 groups — identical row for row, cell for cell, href for href, along with the
+title, the summary line, the legend, the `<colgroup>`, the `<thead>` and every
+control in the toolbar. The only difference is three bytes of whitespace at the
+end of the `<style>` and `<script>` blocks. Both documents were then opened in
+jsdom and driven through their own script: `schwemer` → 91, `ds` → 1 150,
+`CTH 16` → 65, `fuscagni` → 27, fold-all → 0, one heading folded → 23 930,
+identical throughout. The file is 19 % smaller, because a row is one line now
+rather than eight.
 
 ### CI does not build the application, and that is the decision
 
@@ -284,7 +360,9 @@ app's, holding `@tauri-apps/cli`, the pnpm pin and four scripts.
    the TLH2 format in TypeScript, so the two languages could drift. The Svelte
    application declares none of them — grepping `frontend/src` for columns,
    editors, corpus or TLH2 returns nothing but the font comment in `app.css`.
-   `COLUMNS` in `cli/src/html.rs` is the single declaration.
+   `COLUMNS` in `cli/src/html.rs` is the single declaration — and stayed one when
+the markup moved to Svelte on 2026-09-01: the `<col>`, the `<th>` and the legend
+line are fragments the crate repeats per column, not a list a template restates.
 
    So the obligation is conditional, and the condition is worth stating: it
    returns only if the desktop application **re-declares** one of these facts. If
