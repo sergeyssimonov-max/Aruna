@@ -11,6 +11,6 @@
     "opener:default",
     "window-state:default",
     "store:default",
-    "core:window:allow-close"
+    "opener:allow-open-path"
   ]
 }

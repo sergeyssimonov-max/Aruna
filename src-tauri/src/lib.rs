@@ -29,7 +29,7 @@ fn wdio_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
 /// `aruna::paths`, имя пакета и имя описи объявлены там же константами.
 /// Оболочка ничего не вычисляет сама, иначе одно поведение имело бы две
 /// реализации, расходящиеся при первой же правке ядра.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct CorpusLocation {
     downloads: String,
     package: String,
@@ -44,20 +44,14 @@ pub enum CommandError {
     Downloads,
 }
 
-impl serde::Serialize for CommandError {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
 /// Сколько в собранном пакете рукописей и групп.
 ///
 /// Числа окно показывает как есть, поэтому здесь они уже такие, какими их надо
 /// показать: пересчета на стороне окна нет.
-#[derive(Debug, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct CorpusStats {
-    manuscripts: usize,
-    groups: usize,
+    manuscripts: u32,
+    groups: u32,
     source: StatsSource,
     /// Как фрагменты разложены по группам, а не только сколько их всего.
     spread: Spread,
@@ -76,39 +70,39 @@ pub struct CorpusStats {
 /// как одно распределено по другому, а распределение здесь крайне неровное:
 /// в самой большой группе больше фрагментов, чем в четырех сотнях самых
 /// маленьких вместе.
-#[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct Spread {
     /// Самая большая группа. `None` – в пакете нет ни одной.
     largest: Option<GroupSize>,
     /// Групп ровно с одним фрагментом.
-    singletons: usize,
+    singletons: u32,
     /// Фрагменты, у которых CTH нет.
     ///
     /// Экспорт кладет их в группу с меткой `aruna::parse::MISSING`, и метка
     /// берется у ядра, а не пишется здесь строкой: она принадлежит разбору, и
     /// вторая ее копия разошлась бы с первой молча.
-    without_cth: usize,
+    without_cth: u32,
 }
 
 /// Группа и ее размер.
-#[derive(Debug, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct GroupSize {
     label: String,
-    fragments: usize,
+    fragments: u32,
 }
 
 /// Что манифест насчитал о письме корпуса при разборе.
-#[derive(Debug, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct Fonts {
     /// Документы, чей текст пришел не в нормальной форме C.
-    not_in_nfc: usize,
+    not_in_nfc: u32,
     /// Документы, где встречаются кодовые точки из области частного
     /// использования.
-    with_private_use: usize,
+    with_private_use: u32,
     /// Сколько таких точек различают во всем корпусе.
-    private_use_points: usize,
+    private_use_points: u32,
     /// Аномалии письма – все шесть счетчиков манифеста одним числом.
-    anomalies: usize,
+    anomalies: u32,
 }
 
 /// Откуда взяты числа.
@@ -118,7 +112,7 @@ pub struct Fonts {
 /// считает то, что на диске лежит сейчас. Разойтись они могут только если
 /// пакет после сборки правили руками, и тогда важно знать, какой из двух
 /// ответов получен.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum StatsSource {
     Manifest,
@@ -137,15 +131,38 @@ pub enum StatsError {
     Read(String),
 }
 
-impl serde::Serialize for StatsError {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
-    }
+/// Счетчик на проводе — тридцать два бита, и это не сужение, а точное
+/// объявление.
+///
+/// JSON несет числа как double, поэтому целое, способное перевалить за 2^53,
+/// пересекает границу с потерей; specta по этой причине отказывается
+/// экспортировать `usize` и `u64` вовсе, и правильный ответ на отказ — назвать
+/// тот тип, которым число на самом деле является. Все числа этого окна
+/// ограничены заведомо ниже: документов в архиве не бывает больше
+/// `archive::MAX_ENTRIES`, то есть 500 000, групп — не больше, чем документов,
+/// а байт загрузки — больше гигабайта их не примет сам загрузчик.
+///
+/// Насыщение, а не усечение: показать предел честнее, чем показать остаток от
+/// деления.
+fn counted<T: TryInto<u32>>(value: T) -> u32 {
+    value.try_into().unwrap_or(u32::MAX)
+}
+
+/// Ошибка команды — предложение, а не структура.
+///
+/// У обеих читающих команд отказ ровно один, и сказать о нем больше, чем
+/// сказано в тексте, нечего: разбирать в окне нечего, показывать надо целиком.
+/// Тегированная структура появляется там, где ветвление есть, — у сборки, где
+/// кодов двадцать и от них зависит, предлагать ли повтор (`BuildFailure`).
+/// Проводной вид при этом тот же, что был до specta: голая строка.
+fn said(error: impl std::fmt::Display) -> String {
+    error.to_string()
 }
 
 #[tauri::command]
-fn corpus_location() -> Result<CorpusLocation, CommandError> {
-    let downloads = aruna::paths::downloads_dir().map_err(|_| CommandError::Downloads)?;
+#[specta::specta]
+fn corpus_location() -> Result<CorpusLocation, String> {
+    let downloads = aruna::paths::downloads_dir().map_err(|_| said(CommandError::Downloads))?;
     let package = downloads.join(aruna::export::PACKAGE);
     let inventory = package.join(aruna::paths::OUTPUT_FILE_NAME);
     Ok(CorpusLocation {
@@ -162,8 +179,9 @@ fn corpus_location() -> Result<CorpusLocation, CommandError> {
 /// Путь приходит от окна, а окно берет его из [`corpus_location`], – своей
 /// второй догадки о том, где лежит пакет, здесь нет.
 #[tauri::command]
-fn corpus_stats(path: String) -> Result<CorpusStats, StatsError> {
-    read_stats(std::path::Path::new(&path))
+#[specta::specta]
+fn corpus_stats(path: String) -> Result<CorpusStats, String> {
+    read_stats(std::path::Path::new(&path)).map_err(said)
 }
 
 /// Команда без Tauri, чтобы обе ветки проверялись тестом.
@@ -236,8 +254,8 @@ fn counts_from_manifest(package: &std::path::Path) -> Option<CorpusStats> {
     let text = std::fs::read_to_string(package.join(aruna::export::MANIFEST)).ok()?;
     let manifest: Manifest = serde_json::from_str(&text).ok()?;
     Some(CorpusStats {
-        manuscripts: manifest.counts.documents,
-        groups: manifest.counts.groups,
+        manuscripts: counted(manifest.counts.documents),
+        groups: counted(manifest.counts.groups),
         source: StatsSource::Manifest,
         spread: spread_of(
             manifest
@@ -246,10 +264,10 @@ fn counts_from_manifest(package: &std::path::Path) -> Option<CorpusStats> {
                 .map(|group| (group.label, group.documents.len())),
         ),
         fonts: manifest.fonts.map(|fonts| Fonts {
-            not_in_nfc: fonts.documents_not_in_nfc,
-            with_private_use: fonts.documents_with_private_use,
-            private_use_points: fonts.private_use_points.len(),
-            anomalies: fonts.anomalies.values().sum(),
+            not_in_nfc: counted(fonts.documents_not_in_nfc),
+            with_private_use: counted(fonts.documents_with_private_use),
+            private_use_points: counted(fonts.private_use_points.len()),
+            anomalies: counted(fonts.anomalies.values().sum::<usize>()),
         }),
     })
 }
@@ -270,15 +288,18 @@ fn spread_of(groups: impl IntoIterator<Item = (String, usize)>) -> Spread {
             singletons += 1;
         }
         if label == aruna::parse::MISSING {
-            without_cth += fragments;
+            without_cth += counted(fragments);
         }
         // Строго больше: при равенстве остается первая встреченная, а порядок
         // здесь – тот, в котором группы перечисляет опись.
         if largest
             .as_ref()
-            .is_none_or(|biggest| fragments > biggest.fragments)
+            .is_none_or(|biggest| counted(fragments) > biggest.fragments)
         {
-            largest = Some(GroupSize { label, fragments });
+            largest = Some(GroupSize {
+                label,
+                fragments: counted(fragments),
+            });
         }
     }
 
@@ -326,8 +347,8 @@ fn count_by_walking(package: &std::path::Path) -> Result<CorpusStats, StatsError
     }
 
     Ok(CorpusStats {
-        manuscripts,
-        groups: sizes.len(),
+        manuscripts: counted(manuscripts),
+        groups: counted(sizes.len()),
         source: StatsSource::Walk,
         spread: spread_of(sizes),
         // Обход считает файлы, а не читает документы: как написан их текст, он
@@ -336,8 +357,429 @@ fn count_by_walking(package: &std::path::Path) -> Result<CorpusStats, StatsError
     })
 }
 
+// ---------------------------------------------------------------------------
+// Сборка корпуса: то, ради чего окно и заводилось
+// ---------------------------------------------------------------------------
+
+/// Что сборка дала.
+///
+/// Числа не пересчитываются: это то, что вернул сам прогон, — `CorpusReport`
+/// ядра, переложенный во владеющий вид. Пересчет после сборки уже однажды
+/// разошелся с манифестом в этом проекте, и это отдельная строка в комментарии
+/// `app::PackageReport`.
+///
+/// Пути здесь есть, и это не то же самое, что путь в сообщении об ошибке
+/// (правило рядом, у [`StatsError`]): показать, что собрано и где оно лежит, —
+/// и есть работа этого окна.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct BuildReport {
+    /// Идентификатор прогона. Им же помечены события прогресса, так что окно
+    /// может отличить отчет своей сборки от чужой.
+    pub job: u32,
+    pub package: String,
+    pub inventory: String,
+    /// Архив, из которого собрано, когда его выбрал человек; `null`, когда
+    /// архив пришел с Zenodo через кеш.
+    pub archive: Option<String>,
+    pub documents: u32,
+    pub groups: u32,
+    /// Документы, которым пришлось дать суффикс: их сиглум был уже занят.
+    pub disambiguated: u32,
+    /// Документы, из которых убрана ссылка на таблицу стилей, которой в пакете
+    /// нет.
+    pub stylesheet_dropped: u32,
+}
+
+/// Почему сборка не дошла до конца.
+///
+/// Тегированная структура, как требует §3 `docs/FRONTEND-CONTRACT.md`: вид,
+/// предложение для человека, фаза и — отдельно от всего — стоит ли предлагать
+/// повтор. Строкой это быть не может: у отказа двадцать видов, и от вида
+/// зависит, что окну делать дальше.
+///
+/// Поля один в один повторяют `app::Failure` ядра, включая `retryable`, который
+/// там не переписан заново, а делегирован клиенту загрузки: две независимые
+/// формулировки того же правила в этом проекте уже расходились.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct BuildFailure {
+    /// Устойчивый машинный вид: `cancelled`, `network`, `checksum`, …
+    pub code: String,
+    /// Фаза, на которой это случилось, — `Phase::code` ядра. `null` там, где
+    /// отказ возможен на любой.
+    pub phase: Option<String>,
+    /// Одно предложение для человека. Пути файловой системы из него убраны
+    /// ядром.
+    pub message: String,
+    pub retryable: bool,
+    /// Единственный исход, который не является неисправностью.
+    pub cancelled: bool,
+}
+
+impl BuildFailure {
+    /// Отказ ядра, как его видит окно.
+    fn of(failure: &aruna::app::Failure) -> BuildFailure {
+        BuildFailure {
+            code: failure.code.to_string(),
+            phase: failure.phase.map(|phase| phase.code().to_string()),
+            message: failure.message.clone(),
+            retryable: failure.retryable,
+            cancelled: failure.cancelled,
+        }
+    }
+
+    /// Отказ самой оболочки: у ядра такого вида нет, потому что это не о
+    /// корпусе, а о том, что окно попросило невозможное.
+    fn shell(code: &str, message: &str, retryable: bool) -> BuildFailure {
+        BuildFailure {
+            code: code.to_string(),
+            phase: None,
+            message: message.to_string(),
+            retryable,
+            cancelled: false,
+        }
+    }
+}
+
+/// Стадия прогона, как ее называет провод.
+///
+/// Перечислением, а не строкой, и это не украшение: specta выводит из него
+/// объединение литералов, а `svelte-check` по объединению проверяет, что окно
+/// разобрало все стадии. Строка позволила бы забыть одну и показать читателю
+/// пустое место — ровно тот отказ, ради которого `progress::Event` в ядре не
+/// `#[non_exhaustive]`.
+///
+/// Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
+/// собственность, а не ядра. Их семнадцать против девятнадцати вариантов
+/// события, потому что две пары — объявление стадии и ее тик — это одна стадия.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "kebab-case")]
+pub enum Stage {
+    CacheUnusable,
+    CachedArchiveRejected,
+    ArchiveFromCache,
+    ZenodoNotice,
+    ZenodoUnreachable,
+    Downloading,
+    DownloadRetrying,
+    ArchiveKept,
+    Parsing,
+    EntriesSkipped,
+    Indexed,
+    ReadingHeaders,
+    HeadersRead,
+    Writing,
+    CheckingPackage,
+    CheckingPublished,
+    PreviousPackageLeft,
+}
+
+/// Насколько далеко зашла сборка.
+///
+/// Одно событие на все стадии, а не по типу на каждую: окну нужно имя стадии и,
+/// где она их знает, две половины дроби. Новый показатель — поле здесь, и
+/// старое окно, которое о нем не знает, продолжает работать.
+///
+/// **Путей не носит.** Пять вариантов `progress::Event` несут `&Path`, и по
+/// правилу рядом со [`StatsError`] им сюда нельзя: окно показывают через плечо.
+/// Из таких событий сюда доходит только имя стадии.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type, tauri_specta::Event)]
+pub struct BuildProgress {
+    /// Чей это прогресс. Тот же номер приходит в [`BuildReport::job`].
+    pub job: u32,
+    /// На чем прогон сейчас.
+    pub stage: Stage,
+    /// Числитель и знаменатель, когда стадия умеет их назвать. У загрузки
+    /// знаменателя может не быть: сервер не обязан объявлять длину.
+    pub done: Option<u32>,
+    pub total: Option<u32>,
+    /// Сколько нашлось, когда это уже известно, — окно говорит числа до того,
+    /// как появится отчет.
+    pub manuscripts: Option<u32>,
+    pub groups: Option<u32>,
+    /// Предложение, когда событие несет то, что стоит показать словами.
+    pub note: Option<String>,
+}
+
+impl BuildProgress {
+    /// Событие ядра, переложенное на провод.
+    ///
+    /// Разбор исчерпывающий и без `_`: `progress::Event` намеренно не
+    /// `#[non_exhaustive]`, чтобы новая стадия ядра ломала сборку здесь, а не
+    /// молча пропадала из окна.
+    fn of(job: u32, event: &aruna::progress::Event<'_>) -> BuildProgress {
+        use aruna::progress::Event as Core;
+
+        let mut progress = BuildProgress {
+            job,
+            stage: Stage::Parsing,
+            done: None,
+            total: None,
+            manuscripts: None,
+            groups: None,
+            note: None,
+        };
+        progress.stage = match event {
+            Core::CacheUnusable { .. } => Stage::CacheUnusable,
+            Core::CachedArchiveRejected => Stage::CachedArchiveRejected,
+            Core::ArchiveFromCache { .. } => Stage::ArchiveFromCache,
+            Core::ZenodoNotice { message } => {
+                progress.note = Some((*message).to_string());
+                Stage::ZenodoNotice
+            }
+            Core::ZenodoUnreachable { cause } => {
+                progress.note = Some((*cause).to_string());
+                Stage::ZenodoUnreachable
+            }
+            // Стадия объявляет знаменатель, тик заполняет числитель. Ноль в
+            // начале — чтобы полоса появилась сразу, а не после первой четверти
+            // секунды.
+            Core::DownloadStarted => {
+                progress.done = Some(0);
+                Stage::Downloading
+            }
+            Core::Downloading { bytes, total } => {
+                progress.done = Some(counted(*bytes));
+                // Длина, которую этот загрузчик все равно откажется принять
+                // (потолок — гигабайт), знаменателем не является: лучше
+                // показать движение без доли, чем долю от неправды.
+                progress.total = total.and_then(|total| u32::try_from(total).ok());
+                Stage::Downloading
+            }
+            // Сообщение берется у `Failure`, а не у самой ошибки: только там из
+            // него убран путь.
+            Core::DownloadRetrying { error, .. } => {
+                progress.note = Some(aruna::app::Failure::of(error).message);
+                Stage::DownloadRetrying
+            }
+            Core::ArchiveKept { .. } => Stage::ArchiveKept,
+            Core::ParsingArchive => Stage::Parsing,
+            Core::EntriesSkipped { .. } => Stage::EntriesSkipped,
+            Core::Indexed { manuscripts } => {
+                progress.manuscripts = Some(counted(*manuscripts));
+                Stage::Indexed
+            }
+            Core::ReadingHeaders => Stage::ReadingHeaders,
+            Core::HeadersRead {
+                manuscripts,
+                groups,
+            } => {
+                progress.manuscripts = Some(counted(*manuscripts));
+                progress.groups = Some(counted(*groups));
+                Stage::HeadersRead
+            }
+            Core::WritingDocuments { documents } => {
+                progress.done = Some(0);
+                progress.total = Some(counted(*documents));
+                Stage::Writing
+            }
+            Core::DocumentsWritten { done, total } => {
+                progress.done = Some(counted(*done));
+                progress.total = Some(counted(*total));
+                Stage::Writing
+            }
+            Core::CheckingPackage => Stage::CheckingPackage,
+            Core::CheckingPublished => Stage::CheckingPublished,
+            Core::PreviousPackageLeft { .. } => Stage::PreviousPackageLeft,
+        };
+        progress
+    }
+}
+
+/// Синк прогресса, который шлет события в окно.
+///
+/// `report` обязан не паниковать: `catch_unwind` в проекте нет нигде, а паника
+/// отсюда прошла бы сквозь `export::build` и вернулась бы обломком задания без
+/// объяснения. Поэтому отказ отправки проглатывается: окно, которое закрыли на
+/// середине сборки, — это не сбой сборки.
+struct WindowProgress {
+    app: tauri::AppHandle,
+    job: u32,
+}
+
+impl aruna::progress::Progress for WindowProgress {
+    fn report(&self, event: aruna::progress::Event<'_>) {
+        use tauri_specta::Event as _;
+        let _ = BuildProgress::of(self.job, &event).emit(&self.app);
+    }
+}
+
+/// Идет ли сборка, и чем ее остановить.
+///
+/// Флаг живет здесь, а не в команде: `cancel_build` приходит вторым вызовом,
+/// когда кадр первого еще не вернулся, — и `Job::with_id` написан ровно для
+/// этого случая. `Cancel` клонируется поверх `Arc`, поэтому останавливает не тот
+/// поток, который работает.
+#[derive(Default)]
+pub struct Building(std::sync::Mutex<Option<aruna::job::Cancel>>);
+
+impl Building {
+    /// Занять место под сборку, если оно свободно.
+    ///
+    /// Отдельной функцией, а не строками внутри команды, по одной причине: это
+    /// и есть правило «одна сборка за раз», и проверить его должно быть можно
+    /// без Tauri вокруг.
+    fn claim(&self, cancel: aruna::job::Cancel) -> Result<(), BuildFailure> {
+        let mut slot = self.0.lock().map_err(|_| {
+            BuildFailure::shell("interrupted", "предыдущая сборка оборвалась", true)
+        })?;
+        if slot.is_some() {
+            return Err(BuildFailure::shell(
+                "busy",
+                "сборка уже идет",
+                // Повторить имеет смысл — но после того, как закончится та.
+                true,
+            ));
+        }
+        *slot = Some(cancel);
+        Ok(())
+    }
+
+    /// Освободить место, чем бы прогон ни кончился.
+    fn release(&self) {
+        if let Ok(mut slot) = self.0.lock() {
+            *slot = None;
+        }
+    }
+
+    /// Попросить текущую сборку остановиться. Молча, если ее нет.
+    fn stop(&self) {
+        if let Ok(slot) = self.0.lock() {
+            if let Some(cancel) = slot.as_ref() {
+                cancel.cancel();
+            }
+        }
+    }
+}
+
+/// Архив, выбранный человеком, — проверенный здесь, а не там, где он читается.
+///
+/// Окно файловых ручек не получает и путей не толкует: строка приходит с той
+/// стороны, и первое, что с ней делается, — проверка, что за ней есть файл.
+/// Отказ на этом месте — предложение выбрать другой, а не ошибка сборки,
+/// которой не было.
+fn chosen_archive(
+    local_archive: Option<String>,
+) -> Result<Option<std::path::PathBuf>, BuildFailure> {
+    match local_archive {
+        Some(given) => {
+            let path = std::path::PathBuf::from(given);
+            if !path.is_file() {
+                return Err(BuildFailure::shell(
+                    "archive_missing",
+                    "выбранного архива нет на месте",
+                    false,
+                ));
+            }
+            Ok(Some(path))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Собрать корпус и сказать, что вышло.
+///
+/// `local_archive` — архив, выбранный человеком; `null` означает закрепленную
+/// запись Zenodo через кеш, то есть ровно то, что делает консольный бинарь.
+/// Путь приходит строкой и проверяется здесь: окно файловых ручек не получает
+/// (§3 контракта).
+///
+/// Работа идет не в главном потоке. Сборка — это от шести секунд до минуты с
+/// лишним, а команда на главном потоке заморозила бы webview и заодно все
+/// последующие вызовы, включая отмену.
+#[tauri::command]
+#[specta::specta]
+async fn build_corpus(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Building>,
+    local_archive: Option<String>,
+) -> Result<BuildReport, BuildFailure> {
+    let archive = chosen_archive(local_archive)?;
+    let cancel = aruna::job::Cancel::new();
+    state.claim(cancel.clone())?;
+
+    let handle = app.clone();
+    let chosen = archive.clone();
+    // Задание строится внутри замыкания, и иначе нельзя: `Job<'a>` заимствует
+    // и синк, и флаг, поэтому оно не может жить дольше вызова, который его
+    // создал. Через границу потока переходят владеющие половины.
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let id = aruna::job::JobId::next();
+        let sink = WindowProgress {
+            app: handle,
+            job: counted(id.get()),
+        };
+        let job = aruna::job::Job::with_id(id, &sink, &cancel);
+        let request = aruna::app::CorpusRequest {
+            local_archive: chosen.clone(),
+        };
+        aruna::app::build_corpus(&request, &job)
+            .map(|report| BuildReport {
+                job: counted(report.job.get()),
+                package: report.package.root.display().to_string(),
+                inventory: report.inventory.display().to_string(),
+                archive: chosen.as_ref().map(|path| path.display().to_string()),
+                documents: counted(report.package.documents),
+                groups: counted(report.package.groups),
+                disambiguated: counted(report.package.disambiguated),
+                stylesheet_dropped: counted(report.package.stylesheet_dropped),
+            })
+            .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
+    })
+    .await;
+
+    // Место освобождается чем бы прогон ни кончился, иначе окно осталось бы
+    // навсегда занятым сборкой, которой уже нет.
+    state.release();
+
+    match outcome {
+        Ok(result) => result,
+        // Задание не вернулось: рабочий поток снят или сорван паникой изнутри
+        // зависимости — в собственном коде паник нет, это правило проекта.
+        Err(_) => Err(BuildFailure::shell(
+            "interrupted",
+            "сборка оборвалась, не сказав почему",
+            true,
+        )),
+    }
+}
+
+/// Попросить текущую сборку остановиться.
+///
+/// Именно попросить: отмена в ядре кооперативная и проверяется в безопасных
+/// местах — между документами, между чанками загрузки, — а запрос метаданных
+/// Zenodo (до десяти секунд), пересчет MD5 архива и все, что идет после начала
+/// публикации, не прерываются вовсе. Поэтому окно после нажатия говорит
+/// «останавливаю» и меняет это на «остановлено» только по отказу с
+/// `cancelled` — подтверждение приходит дважды, как требует §3 контракта.
+///
+/// Ничего не делает, если сборки нет: нажатие по уже закончившемуся прогону —
+/// не ошибка.
+#[tauri::command]
+#[specta::specta]
+fn cancel_build(state: tauri::State<'_, Building>) {
+    state.stop();
+}
+
+/// Команды и события, объявленные один раз.
+///
+/// Отсюда и рантайм (`invoke_handler`, `mount_events`), и типы для окна: то же
+/// объявление порождает `frontend/src/bindings.ts`, поэтому имя команды,
+/// написание ее аргумента и форма ответа не могут разойтись между Rust и
+/// TypeScript — раньше их держала внимательность и один файл образцов.
+fn contract() -> tauri_specta::Builder<tauri::Wry> {
+    tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(tauri_specta::collect_commands![
+            corpus_location,
+            corpus_stats,
+            build_corpus,
+            cancel_build
+        ])
+        .events(tauri_specta::collect_events![BuildProgress])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let contract = contract();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -370,8 +812,16 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(wdio_webdriver_plugin())
         .plugin(wdio_plugin())
-        .invoke_handler(tauri::generate_handler![corpus_location, corpus_stats])
-        .setup(|app| {
+        // Состояние заводится здесь, до `setup`: `spec-guard.test.ts` находит
+        // защиту логгера ниже текстовым поиском относительно `tauri_plugin_log`,
+        // и вставка в `setup` сдвинула бы то, что он ищет.
+        .manage(Building::default())
+        .invoke_handler(contract.invoke_handler())
+        .setup(move |app| {
+            // Первой строкой: пока события не смонтированы, ни одно из них не
+            // дойдет до окна, а сборку окно может начать сразу.
+            contract.mount_events(app);
+
             #[cfg(feature = "e2e")]
             app.handle()
                 .add_capability(include_str!("../capabilities-e2e/e2e.json"))?;
@@ -388,6 +838,229 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Провод: типы, которые окно получает, и обещания о том, что по нему не ходит.
+///
+/// Как и `counting` ниже, модуль закрыт только `test`, без привязки к фиче:
+/// договор между Rust и окном один и тот же в обеих сборках.
+#[cfg(test)]
+mod wire {
+    use super::*;
+
+    /// Порожденные типы, как они лежат в дереве.
+    fn committed() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/src/bindings.ts")
+    }
+
+    /// Порожденные типы, как их производит нынешнее объявление команд.
+    fn exported() -> String {
+        let dir = tempfile::tempdir().expect("временный каталог");
+        let file = dir.path().join("bindings.ts");
+        contract()
+            .export(specta_typescript::Typescript::default(), &file)
+            .expect("экспорт типов");
+        std::fs::read_to_string(&file).expect("прочитать порожденное")
+    }
+
+    /// **Закоммиченные типы – это то, что производят эти команды.**
+    ///
+    /// Та же дисциплина, что у артефактов описи в `cli/src/generated/`: продукт
+    /// лежит в дереве, а тест пересобирает его и падает, если байт разошелся.
+    /// Порождать при старте приложения нельзя – отладочный запуск и прогон E2E
+    /// писали бы в рабочее дерево.
+    ///
+    /// Обновить: `cargo test -p aruna-desktop -- --ignored regenerate`.
+    #[test]
+    fn the_bindings_are_what_these_commands_produce() {
+        let file = committed();
+        let on_disk = std::fs::read_to_string(&file).unwrap_or_default();
+        assert_eq!(
+            on_disk,
+            exported(),
+            "frontend/src/bindings.ts разошелся с объявлением команд; \
+             обновить: cargo test -p aruna-desktop -- --ignored regenerate"
+        );
+    }
+
+    /// Не проверка, а способ обновить продукт выше.
+    #[test]
+    #[ignore = "пишет frontend/src/bindings.ts; запускается, когда договор изменился"]
+    fn regenerate_the_bindings() {
+        contract()
+            .export(specta_typescript::Typescript::default(), committed())
+            .expect("записать порожденное");
+    }
+
+    /// **Ни одно событие прогресса не несет пути файловой системы.**
+    ///
+    /// То же правило, по которому живет `app::Failure` ядра
+    /// (`a_failure_never_carries_a_filesystem_path`), и та же причина: окно
+    /// показывают через плечо. Пять вариантов `progress::Event` носят `&Path`,
+    /// и здесь проверяются все пять – по имени, а не по представителю.
+    #[test]
+    fn a_progress_event_never_carries_a_filesystem_path() {
+        use aruna::progress::Event as Core;
+
+        let secret = std::path::PathBuf::from("/Users/someone/Secrets/aruna");
+        let carriers = [
+            Core::CacheUnusable { dir: &secret },
+            Core::ArchiveFromCache { path: &secret },
+            Core::ArchiveKept { path: &secret },
+            Core::PreviousPackageLeft { path: &secret },
+        ];
+
+        for event in carriers {
+            let wire = serde_json::to_string(&BuildProgress::of(1, &event)).expect("сериализуется");
+            assert!(
+                !wire.contains("Secrets"),
+                "в событии прогресса оказался путь: {wire}"
+            );
+        }
+    }
+
+    /// Ошибка, которую ядро отдает вместе с путем, доходит до окна без него.
+    ///
+    /// Пятый носитель пути – `DownloadRetrying`, и он единственный, чей текст
+    /// до окна доходит: сообщение берется у `app::Failure`, где путь уже убран.
+    #[test]
+    fn a_retry_says_why_without_saying_where() {
+        use aruna::progress::Event as Core;
+
+        let error = aruna::error::ArunaError::Io {
+            path: std::path::PathBuf::from("/Users/someone/Secrets/aruna.zip"),
+            source: std::io::Error::other("диск отвалился"),
+        };
+        let event = Core::DownloadRetrying {
+            attempt: 2,
+            delay: std::time::Duration::from_secs(4),
+            error: &error,
+        };
+
+        let progress = BuildProgress::of(7, &event);
+        let note = progress.note.expect("повтор объясняет себя");
+        assert!(!note.contains("Secrets"), "в тексте повтора оказался путь");
+        assert!(!note.is_empty());
+    }
+
+    /// Стадия объявляет знаменатель, тик заполняет числитель.
+    ///
+    /// Обе половины дроби приходят из ядра как есть; окно ничего не считает
+    /// само, и полоса не может показать долю, знаменатель которой разошелся с
+    /// объявленным.
+    #[test]
+    fn the_stage_names_the_whole_and_the_tick_fills_it_in() {
+        use aruna::progress::Event as Core;
+
+        let announced = BuildProgress::of(1, &Core::WritingDocuments { documents: 23_936 });
+        assert_eq!(announced.stage, Stage::Writing);
+        assert_eq!((announced.done, announced.total), (Some(0), Some(23_936)));
+
+        let tick = BuildProgress::of(
+            1,
+            &Core::DocumentsWritten {
+                done: 500,
+                total: 23_936,
+            },
+        );
+        assert_eq!(tick.stage, Stage::Writing);
+        assert_eq!((tick.done, tick.total), (Some(500), Some(23_936)));
+
+        // У загрузки знаменателя может не быть вовсе, и тогда его нет.
+        let unknown = BuildProgress::of(
+            1,
+            &Core::Downloading {
+                bytes: 4096,
+                total: None,
+            },
+        );
+        assert_eq!((unknown.done, unknown.total), (Some(4096), None));
+    }
+
+    /// **Одна сборка за раз, и вторая получает не панику, а отказ.**
+    ///
+    /// Две сборки в одном каталоге назначения — это два экспорта, спорящих за
+    /// одну публикацию; ядро в этом случае отвечает `publish_busy`, но узнать
+    /// об этом через минуту загрузки было бы поздно. Окно узнает сразу.
+    #[test]
+    fn a_second_build_is_refused_while_the_first_is_running() {
+        let building = Building::default();
+
+        building
+            .claim(aruna::job::Cancel::new())
+            .expect("место свободно");
+        let refused = building
+            .claim(aruna::job::Cancel::new())
+            .expect_err("вторая сборка не начинается");
+
+        assert_eq!(refused.code, "busy");
+        assert!(refused.retryable, "повторить можно — после первой");
+        assert!(!refused.cancelled);
+
+        building.release();
+        building
+            .claim(aruna::job::Cancel::new())
+            .expect("после прогона место снова свободно");
+    }
+
+    /// Отмена доходит до флага, который держит идущая сборка.
+    ///
+    /// Тот самый случай, ради которого флаг лежит в состоянии приложения:
+    /// `cancel_build` — второй вызов, приходящий, пока кадр первого еще не
+    /// вернулся.
+    #[test]
+    fn a_stop_reaches_the_flag_the_running_build_holds() {
+        let building = Building::default();
+        let cancel = aruna::job::Cancel::new();
+        building.claim(cancel.clone()).expect("место свободно");
+
+        assert!(!cancel.is_cancelled());
+        building.stop();
+        assert!(cancel.is_cancelled(), "отмена не дошла до прогона");
+    }
+
+    /// Нажатие по сборке, которой нет, — не ошибка.
+    #[test]
+    fn a_stop_with_nothing_running_says_nothing() {
+        Building::default().stop();
+    }
+
+    /// Архив проверяется там, где строка пересекает границу.
+    #[test]
+    fn an_archive_that_is_not_there_is_refused_before_anything_starts() {
+        let dir = tempfile::tempdir().expect("временный каталог");
+        let missing = dir.path().join("нет-такого.zip");
+
+        let refused = chosen_archive(Some(missing.display().to_string()))
+            .expect_err("несуществующий архив не принимается");
+        assert_eq!(refused.code, "archive_missing");
+        assert!(
+            !refused.retryable,
+            "повторять нечего: надо выбрать другой файл"
+        );
+
+        // Каталог — не архив.
+        let refused = chosen_archive(Some(dir.path().display().to_string()))
+            .expect_err("каталог не принимается за архив");
+        assert_eq!(refused.code, "archive_missing");
+
+        // А `null` — это Zenodo через кеш, то есть поведение консоли.
+        assert_eq!(chosen_archive(None).expect("без архива"), None);
+    }
+
+    /// Отказ ядра переходит на провод целиком, включая то, от чего зависит
+    /// поведение окна.
+    #[test]
+    fn a_failure_crosses_with_its_kind_and_its_advice() {
+        let cancelled = aruna::app::Failure::of(&aruna::error::ArunaError::Cancelled {
+            phase: aruna::job::Phase::Exporting,
+        });
+        let wire = BuildFailure::of(&cancelled);
+
+        assert_eq!(wire.code, "cancelled");
+        assert_eq!(wire.phase.as_deref(), Some("exporting"));
+        assert!(wire.cancelled);
+    }
 }
 
 // Счет по пакету к фиче отношения не имеет, поэтому модуль закрыт только
@@ -503,8 +1176,8 @@ mod counting {
         let failure = read_stats(&missing).unwrap_err();
 
         assert!(matches!(failure, StatsError::Missing));
-        let message = serde_json::to_string(&failure).unwrap();
-        assert_eq!(message, r#""пакет по этому пути не найден""#);
+        let message = said(&failure);
+        assert_eq!(message, "пакет по этому пути не найден");
         assert!(
             !message.contains("nothing-here"),
             "в сообщении об ошибке оказался путь: {message}"

@@ -64,5 +64,14 @@ export default ts.config(
       'svelte/no-raw-special-elements': 'off',
     },
   },
-  { ignores: ['dist/', 'node_modules/', 'coverage/'] },
+  /*
+   * `src/bindings.ts` is written by tauri-specta from the command declarations
+   * in `src-tauri/src/lib.rs` and committed as a product, the way the
+   * inventory's artifacts are. Its trailing runtime helper is the exporter's
+   * own code — a few `any`s in the event plumbing — and linting a file nobody
+   * may edit produces findings nobody may fix: the only honest change would be
+   * to the exporter. The types above it are still checked by `svelte-check`,
+   * which is what the file exists for.
+   */
+  { ignores: ['dist/', 'node_modules/', 'coverage/', 'src/bindings.ts'] },
 )

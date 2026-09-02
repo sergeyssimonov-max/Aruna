@@ -2,3 +2,10 @@ dist/
 node_modules/
 pnpm-lock.yaml
 coverage/
+
+# Порождается tauri-specta из объявления команд в src-tauri/src/lib.rs и
+# коммитится как продукт; форма — экспортера, а не наша. Прогон prettier по
+# нему сделал бы файл отличным от того, что производит тест свежести
+# `the_bindings_are_what_these_commands_produce`, и продукт перестал бы
+# сходиться со своим источником.
+src/bindings.ts

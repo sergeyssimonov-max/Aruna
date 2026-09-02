@@ -164,6 +164,21 @@ describe('every registered plugin has permissions', () => {
     expect(DEFAULT_CAPABILITY.permissions).toContain('core:default')
   })
 
+  /**
+   * **`opener:default` is not enough to open a file, and that is the whole
+   * reason this is a line of its own.**
+   *
+   * The set behind `opener:default` is `allow-open-url`,
+   * `allow-reveal-item-in-dir` and `allow-default-urls` — a URL and a Finder
+   * reveal. `openPath`, which is how the window opens the inventory it has just
+   * built, is a fourth permission the default does not carry. Granted
+   * separately on 2026-09-02, and named here because a permission removed by
+   * tidying would fail at the click rather than at the build.
+   */
+  it('grants the opener the one permission its default set leaves out', () => {
+    expect(DEFAULT_CAPABILITY.permissions).toContain('opener:allow-open-path')
+  })
+
   /** `tauri-plugin-shell` was replaced by opener on 21.08.2026 and stays out. */
   it('does not bring back the shell plugin', () => {
     expect(CARGO).not.toMatch(/tauri-plugin-shell/)
