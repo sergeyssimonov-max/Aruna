@@ -47,7 +47,6 @@ allow = [
     # `zopfli` (via `zip`) is Apache-2.0 alone, and `Apache-2.0 AND ISC` needs
     # both halves.
     "Apache-2.0",
-    "Apache-2.0 WITH LLVM-exception",
     # `rustls-webpki` and `untrusted`, under `ureq` in the core.
     "ISC",
     # The ICU stack, reached through URL parsing. `unicode-ident` is
@@ -60,6 +59,11 @@ allow = [
     # `alloc-no-stdlib` and `alloc-stdlib`, under `brotli`, which reaches the
     # shell through `reqwest`.
     "BSD-3-Clause",
+    # `Inflector`, the string-case helper under `specta-macros`. Two-clause BSD
+    # is three-clause without the no-endorsement sentence — permissive, OSI
+    # approved, FSF free, and compatible with the MIT this project ships under.
+    # Reached on 2026-09-02 with specta.
+    "BSD-2-Clause",
     # `foldhash`, the default hasher of `hashbrown`.
     "Zlib",
     # `cssparser`, `cssparser-macros`, `dtoa-short` and `selectors` — the CSS
