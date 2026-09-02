@@ -8,20 +8,22 @@ over them, in `~/Downloads`. That program is [`cli/`](cli/), it is what the
 releases ship, and it is the whole of the product.
 
 **A desktop application is being built and is not finished.**
-[`frontend/`](frontend/) and [`src-tauri/`](src-tauri/) hold the stack it will
-be built on — the toolchain is installed and pinned, and the frontend half is
+[`frontend/`](frontend/) and [`src-tauri/`](src-tauri/) hold the stack it is
+built on — the toolchain is installed and pinned, and the frontend half is
 checked and built by CI; `src-tauri` is not, and is kept buildable by the
-pre-commit battery and by CI on macOS. Since 2026-08-30 the shell is wired to
-the core: it declares the dependency, and its first command asks the program
-where the package it built went, which the window then shows. Read those two
-directories as work in progress, not as a second program you can run.
+pre-commit battery and by CI on macOS. Since 2026-09-02 the window builds the
+corpus itself: it calls the same `app::build_corpus` the console binary calls,
+shows the run as it goes, can stop it, and ends on the report of that run. What
+is not settled is what a reader is given — the image is still built from the
+core (`docs/PROJECT-SPEC.ru.md` §7.3). Read those two directories as work in
+progress, not as a second program you can run.
 
 ## Layout
 
 | Path | Description |
 |------|-------------|
 | [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → a folder of documents with an HTML inventory over them. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
-| [`frontend/`](frontend/) | **The window** — Svelte 5, Vite, TypeScript, no SvelteKit. One screen: the corpus is ready, what the built package holds — the manuscript and CTH-group counts, how they are spread across the groups, and what the manifest counted about the corpus's writing — and a button that closes the window |
+| [`frontend/`](frontend/) | **The window** — Svelte 5, Vite, TypeScript, no SvelteKit. One screen with seven states: what is on disk, an offer to build from Zenodo or from an archive you pick, the stage and the fraction while it builds, and the report of that run with the inventory a click away. Its types are generated from the Rust commands into `src/bindings.ts` |
 | [`src-tauri/`](src-tauri/) | **The Tauri 2 shell** that hosts it. Two commands: `corpus_location` says where the package is, `corpus_stats` counts what is in it — both answered by the `cli` crate's own paths and its own manifest |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
 
@@ -118,26 +120,27 @@ appears after the first refusal.
 
 ## Desktop application — a status window, not yet a product
 
-**What exists is one screen, and it is honest about being one.** The stack under
-it is wired end to end and kept green: `pnpm dev` opens a window,
-and since 2026-08-30 that window says something true about the machine it runs
-on. It reads the package the CLI built — how many manuscripts, how many CTH
-groups, how unevenly the one is spread across the other, and what the manifest
-counted about the corpus's writing — through two Tauri commands, and closes on
-the one button it carries.
+**What exists is one screen, and it does the work.** The stack under it is
+wired end to end and kept green: `pnpm dev` opens a window, and since
+2026-09-02 that window is the program's front door rather than a view of its
+output. It reads what is on disk — how many manuscripts, how many CTH groups,
+how unevenly the one is spread across the other, and what the manifest counted
+about the corpus's writing — and it builds: `build_corpus` runs the core off the
+main thread, `build-progress` events carry the stage and the fraction, and
+`cancel_build` stops a run that is not wanted. The report it ends on is the
+run's own, not a second count taken afterwards.
 The screen was drawn through `/design` once and rebuilt by hand in `App.svelte`
-and `app.css`. It is not redrawn on a schedule: what it carries — the two
-commands, the readiness heading, the counts, and the button the end-to-end test
-clicks to prove that a state change reaches the DOM in the WKWebView this system
-ships — is a contract, and replacing it is a decision rather than a routine. The
-design tool is still checked against this stack, on a mockup built beside the
-repository and never carried into it.
+and `app.css`. It is not redrawn on a schedule: what it carries — the four
+commands, the states it can be in, and the counts — is a contract, written out
+in [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) §3, and replacing it
+is a decision rather than a routine. The design tool is still checked against
+this stack, on a mockup built beside the repository and never carried into it.
 
-What the window cannot do is build anything: it reads a package the CLI has
-already produced. The first command that does work — `build_corpus` with its
-progress events — is the next piece, and
-[`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what the Rust
-core still owes it. The commands below build and check the shell; since
+What the window still cannot do is be the thing a reader installs: the image is
+built from the core, and whether that changes is an open position in the
+specification rather than an oversight.
+[`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records the contract
+between the two halves. The commands below build and check the shell; since
 2026-08-29 a `desktop` job on macOS runs the same battery in CI, so a break
 surfaces on the push that caused it rather than on the next person to run them
 by hand.

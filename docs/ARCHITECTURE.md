@@ -163,15 +163,19 @@ names from the constants declared beside it, and does nothing else but join the
 path and ask whether it is there. No second answer to where the corpus goes, and
 no path logic in the shell — that is the whole point of §4.9.6.
 
-**One rule about the wire, because nothing checks it.** Tauri 2 expects a
+**One rule about the wire, and something checks it now.** Tauri 2 expects a
 command's arguments in camelCase on the JavaScript side unless the command
 declares `#[tauri::command(rename_all = "snake_case")]` — confirmed against the
 pinned version's documentation on 2026-08-31 (`tauri.app/develop/calling-rust`).
 `corpus_stats(path: String)` is a single word and reads the same either way, so
-the call site is right by accident rather than by care. The next argument with
-two words is where that stops being true, and without `specta` nothing in the
-build will say so: the mismatch surfaces as a command that fails at run time
-with an argument it never received.
+the call site was right by accident rather than by care. This paragraph then
+said that the next argument with two words is where that stops being true, and
+that without `specta` nothing in the build would say so.
+
+That argument arrived on 2026-09-02 — `build_corpus(local_archive)` — and specta
+arrived with it. The call sites are no longer written: `frontend/src/bindings.ts`
+is generated from these declarations, spells the argument `localArchive`, and a
+Rust test fails if the committed file is not what the declarations now produce.
 
 **The second one shows what "held to" means.** `corpus_stats` counts the
 manuscripts and the CTH groups in a package — and takes the path to it as an
@@ -205,10 +209,21 @@ renamed to package `aruna-desktop`, library `aruna_desktop_lib`, which removes
 the collision at its source: the dependency is now an ordinary one, and there
 is no second name for a reader to keep in their head.
 
-What that adapter will own, and the core will not: job identifiers, IPC events,
-the dialog and opener plugins, the store, the window. What it will need from
-the core is already there — a typed request, a progress sink, a cancel flag, a
-typed report.
+What that adapter owns, and the core does not: job identifiers, IPC events, the
+dialog and opener plugins, the store, the window. What it needed from the core
+was already there — a typed request, a progress sink, a cancel flag, a typed
+report — and on 2026-09-02 it was connected: `build_corpus` and `cancel_build`
+are commands, `Progress` is implemented by a sink that emits `build-progress`
+into the window, and `Job` is built inside the worker thread because it borrows
+both halves and cannot outlive the call that made it. The contract those four
+commands make is written out in `docs/FRONTEND-CONTRACT.md` §3.
+
+The core gained exactly one thing in the process, and it is not serde: two
+progress variants. `Downloading` and `DocumentsWritten` refine the two stages
+that take time, because a stage that announces itself and then goes quiet for a
+minute cannot drive a bar. They are refinements rather than milestones —
+`Event::is_tick` — and `progress::Stderr` drops them, so the terminal says what
+it always said.
 
 **One constraint on the remaining markup work, checked before it starts:**
 Svelte 5 renders a component to static HTML through `render()` from
@@ -220,9 +235,12 @@ window, and this document's stylesheet is already three separately built
 sections that `style::join` orders. Render markup; leave the CSS where it is.
 
 **DTOs are a separate layer from all of these.** `CorpusPresentation` borrows
-(`<'a>`) and is not a serialisation format; an IPC type will be an owned
-projection of it, with `serde`, when there is a command to carry it. Specta or
-ts-rs is a decision for that day, not before.
+(`<'a>`) and is not a serialisation format; an IPC type is an owned projection of
+it, with `serde`, in the shell. That day came on 2026-09-02 and the decision went
+to specta: `BuildReport`, `BuildFailure` and `BuildProgress` are declared in
+`src-tauri/src/lib.rs`, and the TypeScript that reads them is generated from
+those declarations. ts-rs was the alternative and would have generated the types
+without the command wrappers, which is the half that was going wrong.
 
 ## 8. The two rules that outrank the architecture
 

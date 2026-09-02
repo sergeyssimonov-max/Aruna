@@ -2,11 +2,14 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **410 tests** across seventeen integration binaries plus the library
+The suite is **415 tests** across seventeen integration binaries plus the library
 and the binary's own tests. Since the crates were joined into one workspace on
 2026-08-30, `cargo nextest run` from the repository root runs both of them —
-**419**, the other nine being the desktop shell's — and `-p aruna` narrows it
-back to the console crate. It runs in about ten seconds and needs no network.
+**433** as of 2026-09-02, the other eighteen being the desktop shell's — and
+`-p aruna` narrows it back to the console crate. It runs in about ten seconds and
+needs no network. Two are skipped by design: the core's whole-package round trip,
+which is expensive, and the shell's `regenerate_the_bindings`, which is not a
+check but the way `frontend/src/bindings.ts` is refreshed.
 Beside it, and in a language of its own, are the **63 `vitest` tests** in
 `frontend/` — see *Frontend* below. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.

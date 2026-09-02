@@ -573,31 +573,77 @@ to need parallelism, the limit must be explicit from the first line.
 
 ---
 
-## 3. The IPC contract, when it is written
+## 3. The IPC contract, as it was written
 
-Commands, as a first cut — names are part of the contract and must be versioned:
+Written on 2026-09-02, when the window stopped being a viewer over
+`~/Downloads` and became the program's front door. Four commands and one event,
+and the names are part of the contract:
 
 | command | in | out |
 |---|---|---|
-| `inventory` | archive or directory path | document count, groups, warnings |
-| `preflight` | the same | per-document readiness, malformed list |
-| `convert` | source, destination, options | run id |
-| `cancel` | run id | acknowledgement |
-| `report` | run id | per-document outcome, summary |
-| `open_result` | path | acknowledgement |
+| `corpus_location` | — | where the package and the inventory go, and whether they are there |
+| `corpus_stats` | package path | counts, the CTH spread, the writing counters, and which of the two answered |
+| `build_corpus` | an archive path, or nothing for the pinned Zenodo record | `BuildReport`, or `BuildFailure` |
+| `cancel_build` | — | nothing; the confirmation arrives as the failure |
 
-Rules:
+| event | payload |
+|---|---|
+| `build-progress` | `{ job, stage, done, total, manuscripts, groups, note }` |
 
-- The frontend never gets a raw filesystem handle. Paths cross as strings and
-  are validated in Rust against a root the user chose through the system picker.
-- Progress is an event stream, **aggregated**: one event per document across
-  23 936 documents is 23 936 IPC round trips. Batch by count or by interval and
-  say which.
-- Errors cross as a tagged structure — kind, message, path, whether retrying is
-  worthwhile — not as a rendered string.
-- Nothing long-running touches the main thread.
-- Cancellation is acknowledged and then confirmed, so the interface can
-  distinguish "asked" from "stopped".
+**The types are generated, not written twice.** `frontend/src/bindings.ts` comes
+out of the same declarations that register the commands — specta 2.0.0-rc.25,
+tauri-specta 2.0.0-rc.25, specta-typescript 0.0.12, pinned exactly because that
+family has no stable release for Tauri 2 and §3.5 of the specification
+anticipated it. The file is committed and a Rust test rebuilds it and fails on
+any difference, the same discipline the inventory's artifacts live under; it is
+not written at start-up, because a debug run would then edit the working tree.
+`cargo test -p aruna-desktop -- --ignored regenerate` refreshes it.
+
+This closed a hazard that was named here in advance and had no test behind it:
+Tauri expects a command's arguments in camelCase, and the first two-word
+argument is where a hand-written call site silently stops matching. The first
+two-word argument is `local_archive`, and it arrived with the generator that
+spells it.
+
+**The rules, and how each is kept:**
+
+- *The frontend never gets a raw filesystem handle.* Paths cross as strings.
+  `chosen_archive` is where one becomes a path, and a string with no file behind
+  it is refused there — `archive_missing`, before anything starts.
+- *Progress is an event stream, aggregated.* One event per document across
+  23 936 documents would be 23 936 round trips; the core batches instead, and
+  says which way: the transfer by interval (a quarter-second), the write by
+  count (every five hundred documents, forty-eight messages for this corpus).
+  The stage announces the denominator, the ticks fill the numerator in.
+- *Errors cross as a tagged structure.* `BuildFailure` carries `code`, `phase`,
+  `message`, `retryable` and `cancelled` — `app::Failure`'s five fields, one for
+  one. The two reading commands keep a bare sentence, because each has exactly
+  one failure and there is nothing to branch on; the build has twenty codes and
+  the window's next move depends on which.
+- *Nothing long-running touches the main thread.* `build_corpus` is `async` and
+  the work is on `spawn_blocking`. `Job<'a>` borrows its sink and its flag, so
+  it is built inside the worker; `Cancel` is `Clone` over an `Arc`, so the
+  thread that stops the run is not the thread doing it.
+- *Cancellation is acknowledged and then confirmed.* The click shows
+  «Останавливаю…»; the state becomes stopped only when the failure with
+  `cancelled: true` comes back. It is not instant and the window says so: the
+  core cannot interrupt the Zenodo metadata request (up to 10 s), the archive's
+  digest, or anything after the publish begins.
+
+**Two things the wire refuses to carry.** No filesystem path reaches a message —
+five `progress::Event` variants hold a `&Path` and none of it crosses, held by
+`a_progress_event_never_carries_a_filesystem_path`; the one message that does
+cross, a retry's, is taken from `app::Failure`, where the core has already
+stripped it. And no count crosses as a 64-bit integer: specta refuses `usize` and
+`u64` outright, because JSON carries numbers as doubles, so the wire declares
+`u32` — which is what these counts are. Documents are bounded by
+`archive::MAX_ENTRIES` (500 000), a download by the gibibyte the client will
+accept, and a length above that is not shown as a denominator at all.
+
+**`Stage` is a union, not a string.** Seventeen literals generated from a Rust
+enum, so `svelte-check` fails when the core gains a stage and the window forgets
+it — the same guarantee, one language further on, that `progress::Event` gets
+from not being `#[non_exhaustive]`.
 
 ---
 
