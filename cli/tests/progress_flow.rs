@@ -442,3 +442,77 @@ fn the_binary_reports_the_same_run_on_stderr() {
     );
     assert!(!stderr.contains("panicked"), "the run panicked:\n{stderr}");
 }
+
+/// What a bar drawn from the write pass may assume, on a corpus long enough to
+/// tick more than twice.
+///
+/// [`the_write_is_refined_in_batches_and_ends_on_the_whole`] pins the exact
+/// sequence for six hundred documents, which is the batching. This pins the
+/// four properties a window reads off any run, whatever the batching becomes:
+/// the denominator never moves, the numerator never goes back, no fraction
+/// exceeds one, and the whole arrives exactly once. A bar that may go backwards
+/// or past its end is a bar that has to be written defensively, and the
+/// defensive version hides the day the numbers are wrong.
+///
+/// The archive is deliberately larger than one batch by more than one batch:
+/// with six hundred documents a numerator that reset would still be
+/// non-decreasing by accident.
+#[test]
+fn the_write_pass_ticks_are_a_fraction_that_only_grows() {
+    let dir = tempdir().expect("tempdir");
+    let entries: Vec<(String, String)> = (0..1700)
+        .map(|i| {
+            (
+                format!("root/CTH {}_XML_HFR/doc {i}.xml", i % 11),
+                manuscript(&format!("KBo {i}"), "FB", "2017-03-28"),
+            )
+        })
+        .collect();
+    let borrowed: Vec<(&str, String)> = entries
+        .iter()
+        .map(|(path, body)| (path.as_str(), body.clone()))
+        .collect();
+    let zip = archive(
+        &dir.path().join("one-thousand-seven-hundred.zip"),
+        &borrowed,
+    );
+    let (built, sink) = build_recording(&zip);
+    assert_eq!(built.documents, 1700);
+
+    let ticks = sink.ticks();
+    assert!(
+        ticks.len() > 2,
+        "too few ticks to prove anything: {ticks:?}"
+    );
+
+    for (done, total) in &ticks {
+        assert_eq!(
+            *total, built.documents,
+            "the denominator is not the number the build returned: {ticks:?}"
+        );
+        assert!(
+            done <= total,
+            "a fraction above one reached the caller: {ticks:?}"
+        );
+    }
+
+    let numerators: Vec<usize> = ticks.iter().map(|(done, _)| *done).collect();
+    let mut sorted = numerators.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(
+        numerators, sorted,
+        "the numerator went back or repeated itself: {ticks:?}"
+    );
+
+    let whole = ticks.iter().filter(|(done, total)| done == total).count();
+    assert_eq!(
+        whole, 1,
+        "the finished fraction must arrive exactly once: {ticks:?}"
+    );
+    assert_eq!(
+        ticks.last().copied(),
+        Some((built.documents, built.documents)),
+        "the run did not end on the whole: {ticks:?}"
+    );
+}

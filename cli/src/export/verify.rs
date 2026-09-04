@@ -249,3 +249,121 @@ fn distortion(source: &[u8], normalised: &[u8]) -> String {
         window(normalised)
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The canonical output for a document that carried no prologue.
+    fn declared(body: &[u8]) -> Vec<u8> {
+        let mut out = DECLARATION.to_vec();
+        out.extend_from_slice(body);
+        out
+    }
+
+    /// The refusals below are the whole reason this module exists, and until
+    /// now not one of them had been seen to fire. Every test in the suite fed
+    /// [`compare`] a document and the normaliser's own output for it, so the
+    /// checker was only ever observed agreeing. A checker that has never said
+    /// no is not known to be able to: the branches are reached by handing it
+    /// output a *broken* normaliser would have produced, which is the only
+    /// state in which they are supposed to be reached at all.
+    ///
+    /// What is asserted is the refusal, not its wording — except where the
+    /// message is the deliverable, which is [`distortion`]: a byte offset in a
+    /// corpus of cuneiform is not something anyone can act on alone.
+    #[test]
+    fn a_body_that_changed_is_refused_and_the_message_says_where() {
+        let source = b"<AOxml><w>ta-ba-ar-na</w></AOxml>";
+        let broken = declared(b"<AOxml><w>ta-ba-ar-NA</w></AOxml>");
+
+        let why = compare(source, &broken).expect_err("a changed body must not pass");
+
+        assert!(
+            why.contains("content differs at byte 19"),
+            "the offset of the first differing byte is missing: {why}"
+        );
+        assert!(
+            why.contains("source: ") && why.contains("output: "),
+            "both sides of the difference must be shown: {why}"
+        );
+    }
+
+    /// The lengths are printed because a truncation differs from a substitution
+    /// in no other visible way when the tail is what went missing.
+    #[test]
+    fn a_body_that_was_cut_short_is_refused_and_the_message_says_both_lengths() {
+        let source = b"<AOxml><w>ta-ba-ar-na</w></AOxml>";
+        let broken = declared(b"<AOxml><w>ta-ba-ar-na</w>");
+
+        let why = compare(source, &broken).expect_err("a truncated body must not pass");
+
+        assert!(
+            why.contains("source 33 bytes, output 25 bytes"),
+            "the two lengths are what name a truncation: {why}"
+        );
+    }
+
+    /// The declaration is written by the normaliser on every document, so its
+    /// absence means the output did not come from the normaliser this checks.
+    #[test]
+    fn output_that_does_not_open_with_the_canonical_declaration_is_refused() {
+        let source = b"<AOxml/>";
+
+        let why = compare(source, source).expect_err("an undeclared output must not pass");
+
+        assert!(
+            why.contains("canonical declaration"),
+            "the refusal must name what is missing: {why}"
+        );
+    }
+
+    /// The permit list names two instructions. An instruction that vanished and
+    /// is neither of them was deleted by something that had no permission to,
+    /// and the document is short a piece of itself that nobody looked at.
+    #[test]
+    fn an_instruction_dropped_from_outside_the_permit_list_is_refused() {
+        let source = b"<?some-tool note=\"keep me\"?><AOxml/>";
+        let broken = declared(b"<AOxml/>");
+
+        let why = compare(source, &broken).expect_err("an unpermitted removal must not pass");
+
+        assert!(
+            why.contains("some-tool") && why.contains("permit list"),
+            "the refusal must name the instruction it lost: {why}"
+        );
+    }
+
+    /// The other direction, and the one a byte comparison of bodies cannot see:
+    /// the prologue is the one region where the output is allowed to differ, so
+    /// something invented there travels with the document unchallenged.
+    #[test]
+    fn an_instruction_invented_in_the_output_is_refused() {
+        let source = b"<AOxml/>";
+        let mut broken = DECLARATION.to_vec();
+        broken.extend_from_slice(b"<?invented?>\n<AOxml/>");
+
+        let why = compare(source, &broken).expect_err("an invented instruction must not pass");
+
+        assert!(
+            why.contains("was not in the source"),
+            "the refusal must say the output gained something: {why}"
+        );
+    }
+
+    /// An unterminated `<?` is not an instruction, and the permit list has
+    /// nothing to say about it: the prologue ends where it begins, and the
+    /// bytes are body from there on. Both walks agree on that, so the document
+    /// carries its broken opening into the package untouched — which is the
+    /// right answer for a corpus in which 210 documents are not well-formed.
+    #[test]
+    fn an_unterminated_instruction_is_body_rather_than_prologue() {
+        let source = b"<?truncated<AOxml/>";
+        let out = declared(source);
+
+        let report = compare(source, &out).expect("a malformed prologue is not a distortion");
+
+        assert!(report.dropped.is_empty(), "nothing was dropped");
+        assert!(report.added_declaration, "the source declared nothing");
+    }
+}

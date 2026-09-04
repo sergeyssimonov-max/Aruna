@@ -588,3 +588,60 @@ fn an_archive_that_changes_between_the_two_passes_stops_the_build() {
         Err(other) => panic!("wrong error: {other}"),
     }
 }
+
+/// A siglum longer than a filesystem component allows.
+///
+/// The real corpus's longest file name is 108 bytes and its longest relative
+/// path 118, against the 255 a component may be on APFS — better than twice the
+/// headroom. Nothing in the export bounds the name before it is written, so what
+/// happens on an archive that does not respect that headroom is a question the
+/// filesystem answers, and the answer has to be the same bar as every other
+/// hostile input: the package is either correct or it is not built, and nothing
+/// is left behind.
+#[test]
+fn a_siglum_longer_than_a_filesystem_component_leaves_nothing_behind() {
+    let dir = tempdir().expect("tempdir");
+    let long = "K".repeat(300);
+    let zip = archive(
+        dir.path(),
+        &[
+            text("root/CTH 5_XML_HFR/a.xml", "KBo 1.1"),
+            text("root/CTH 5_XML_HFR/b.xml", &long),
+        ],
+    );
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+
+    let outcome = export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    );
+
+    match outcome {
+        Ok(built) => {
+            // The filesystem accepted it. Then the package must be whole and
+            // the long name must have survived intact rather than been cut.
+            assert_eq!(built.documents, 2, "a document went missing");
+            let names = files(&destination.join(PACKAGE));
+            assert!(
+                names.iter().any(|p| p
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with(&long))),
+                "the long name was silently shortened: {names:?}"
+            );
+        }
+        Err(ArunaError::Io { .. }) => {
+            // The filesystem refused it. Then nothing may remain: no staging
+            // directory, no half package under the final name.
+            assert_eq!(
+                files(&destination),
+                Vec::<PathBuf>::new(),
+                "a refused build left something behind"
+            );
+        }
+        Err(other) => panic!("neither built nor an I/O refusal: {other}"),
+    }
+}

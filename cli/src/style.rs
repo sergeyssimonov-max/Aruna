@@ -56,12 +56,22 @@ const INVENTORY: &str = include_str!("generated/screen.css");
 /// The trim is the whole difference from [`SHARED`]: the sections are joined
 /// with exactly one newline between them, and a built file that ends in a blank
 /// line would put two there.
-pub fn shared_section() -> String {
+///
+/// Private and built only for tests since 2026-09-03, for the reason the module
+/// note already gives about [`SHARED`]: the only callers are the assertions
+/// below, `join` reads the constants directly, and nothing outside the crate
+/// ever named it. `cfg(test)` rather than a bare `fn`, because a private
+/// function no release build calls is dead code, and silencing that would say
+/// less than this line does.
+#[cfg(test)]
+fn shared_section() -> String {
     SHARED.trim_matches('\n').to_string()
 }
 
-/// The print section exactly as a document carries it.
-pub fn print_section() -> String {
+/// The print section exactly as a document carries it. Private and test-only
+/// for the same reason as [`shared_section`].
+#[cfg(test)]
+fn print_section() -> String {
     PRINT.trim_matches('\n').to_string()
 }
 

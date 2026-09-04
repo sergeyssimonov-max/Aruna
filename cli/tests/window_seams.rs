@@ -424,3 +424,90 @@ fn a_run_with_a_sink_reports_its_stages_and_changes_nothing() {
         "опись, собранная с приемником, отличается от собранной без него"
     );
 }
+
+/// The work divides by CTH group, and a group's part is the whole's part.
+///
+/// A second output — a PDF per group rather than one document for the corpus —
+/// needs the run to be addressable by group, and needs that address to mean the
+/// same thing the full run means. The seam for it exists:
+/// `export::group_slices` cuts the ordered records and their placements into
+/// runs, and the manifest is its one caller today.
+///
+/// What nothing checked is that the cut is lossless. The doc comment on
+/// `group_slices` says slicing panics if records and placements stop being
+/// parallel, which covers the shapes; it does not cover the arithmetic. A run
+/// that dropped the last group, or one that overlapped two, would still be
+/// parallel and would still be wrong — and the manifest would describe a
+/// package that is not the one on disk.
+///
+/// So: the groups concatenate back to exactly what was placed, in order, with
+/// no document in two groups and none in none. No second pass over the archive
+/// and no second copy of the selection rule — the same `place` result the build
+/// writes from is the one cut here.
+#[test]
+fn a_group_is_the_part_of_the_whole_that_belongs_to_it() {
+    let dir = tempdir().expect("tempdir");
+    let zip = corpus(dir.path(), 60);
+
+    let mut fragments = export::collect_fragments(&zip).expect("headers read");
+    aruna::order::sort_by_display_order(&mut fragments, |f| &f.record);
+    let records: Vec<_> = fragments.iter().map(|f| f.record.clone()).collect();
+    let placed = export::place(&fragments).expect("placed");
+
+    let mut labels = Vec::new();
+    let mut records_again = Vec::new();
+    let mut placed_again = Vec::new();
+    for (label, run, slice) in export::group_slices(&records, &placed) {
+        assert_eq!(
+            run.len(),
+            slice.len(),
+            "a group's two halves differ in size"
+        );
+        assert!(!run.is_empty(), "an empty group was cut out of the whole");
+        labels.push(label.to_string());
+        records_again.extend(run.iter().map(|r| r.sigla.clone()));
+        placed_again.extend(slice.iter().map(|p| p.relative.clone()));
+    }
+
+    let mut distinct = labels.clone();
+    distinct.sort();
+    distinct.dedup();
+    assert_eq!(
+        labels.len(),
+        distinct.len(),
+        "one group was cut twice: {labels:?}"
+    );
+
+    assert_eq!(
+        records_again,
+        records.iter().map(|r| r.sigla.clone()).collect::<Vec<_>>(),
+        "the groups do not add up to the records the build placed"
+    );
+    assert_eq!(
+        placed_again,
+        placed
+            .iter()
+            .map(|p| p.relative.clone())
+            .collect::<Vec<_>>(),
+        "the groups do not add up to the placements the build writes"
+    );
+
+    // And the whole is what the build actually wrote: the same corpus, built,
+    // holds one file per placement and nothing else besides the two root files.
+    let destination = dir.path().join("out");
+    std::fs::create_dir(&destination).expect("destination");
+    export::build(&zip, &destination, "seams", &Job::unattended()).expect("builds");
+    let written = files(&destination.join(PACKAGE));
+    assert_eq!(
+        written.len(),
+        placed.len() + 2,
+        "the package holds something other than the placements plus inventory and manifest"
+    );
+    for placement in &placed {
+        assert!(
+            written.contains(&placement.relative),
+            "a placed document is not in the package: {:?}",
+            placement.relative
+        );
+    }
+}
