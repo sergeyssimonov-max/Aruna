@@ -11,20 +11,21 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.1 is the",
-    "current release, made a reference on 2026-09-01 by the owner's decision. A release",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.2 is the",
+    "current release, made a reference on 2026-09-04 by the owner's decision. A release",
     "cannot record itself — the commit it names is the commit that carries it, and no file",
     "can contain its own hash — so each entry here is added by the commit after the release",
     "it describes.",
     "",
-    "They used to be spread across the project rather than clustered at its end, and v2.1.0",
-    "was the third. It was withdrawn with v2.2.0, v2.3.0 and v2.4.0 on 2026-08-30, and v2.5.0",
-    "followed on 2026-09-01 when v2.5.1 replaced it — so the 2.x line is still represented by",
-    "its head alone. What that costs is named rather than hidden: a fault introduced this week",
-    "is no longer bracketed from below by anything nearer than v1.0.9. The list is kept at",
-    "three deliberately; the next reference worth adding is the first 2.x state after this one",
-    "that is worth falling back to, and adding it is a decision rather than a consequence of",
-    "publishing.",
+    "v2.5.2 replaced v2.5.1, which was withdrawn on 2026-09-04 — release, tag and DMG. A",
+    "reference cannot be re-cut, so the work that followed it took a number of its own, and",
+    "keeping the list at three meant retiring the release it replaced rather than letting",
+    "both stand. The same happened to v2.5.0 on 2026-09-01 and to v2.1.0 through v2.4.0 on",
+    "2026-08-30, so the 2.x line is still represented by its head alone. What that costs is",
+    "named rather than hidden: a fault introduced this week is no longer bracketed from",
+    "below by anything nearer than v1.0.9. The list is kept at three deliberately; the next",
+    "reference worth adding is the first 2.x state after this one that is worth falling back",
+    "to, and adding it is a decision rather than a consequence of publishing.",
     "",
     "Adding or changing any value below is a deliberate act and shows up in the diff as one."
   ],
@@ -44,11 +45,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.5.1",
-      "commit": "64e36daddcd5811a63ffc249275d2cef38476170",
-      "published": "2026-08-31T21:11:50Z",
-      "dmg_sha256": "01a4bd77d410fc28dfc028524a892e5cc836a2e232d002688196b531879325bd",
-      "why": "The current release and the third reference: `-h` and `-V` answer instead of starting a 71 MiB corpus build, an archive that names one entry twice is refused by name rather than surfacing as a bare AlreadyExists on a path, and a cancellation is heard by the header scan — a quarter of the run that could not be stopped before. The window that reads the package became a real screen with it. It replaced v2.5.0, withdrawn on 2026-09-01: that release was the reference this one is cut from, and a reference cannot be re-cut, so the work took a number of its own and the old reference was retired rather than left standing beside it."
+      "tag": "v2.5.2",
+      "commit": "cfa9a29870634dc04e171eaa9198243238130386",
+      "published": "2026-09-04T05:41:15Z",
+      "dmg_sha256": "6ea6d64e8115076141b73c0e703e9dbf47fc89906de28e91a2994af63c03c7b7",
+      "why": "The current release and the third reference: the first version in which what a reader installs is the application with a window rather than an image built from the console crate. The bundle is `Aruna.app`, the identifier is the product's rather than a shell suffix, the shell's version equals the core's and a test compares the two manifests, the signature is ad hoc stated in the configuration itself, and the minimum system version is the macOS 13 the program actually targets instead of Tauri's 10.13 default. It replaced v2.5.1, withdrawn the same day: that release was the reference this one is cut from, and a reference cannot be re-cut, so the work took a number of its own and the old reference was retired rather than left standing beside it."
     }
   ]
 }
