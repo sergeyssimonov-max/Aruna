@@ -204,7 +204,7 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 ## Releases
 
-**[v2.5.1](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
+**[v2.5.2](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
 current release — the one to download.** It is what `Releases` marks *Latest*,
 and it is the only version this project asks anyone to install.
 
@@ -218,16 +218,18 @@ release above, the one to install.
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.5.1](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.1) is the third: the release named at the top of this section.
+[v2.5.2](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.2) is the third: the release named at the top of this section.
 
 **What that costs, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
 withdrawn on 2026-08-30 — tags and DMGs both — and v2.5.0 followed on
-2026-09-01, when v2.5.1 replaced it as the third reference. A reference cannot
+2026-09-01, when v2.5.1 replaced it as the third reference, and v2.5.1 itself on
+2026-09-04, when v2.5.2 replaced it in turn — the release that carries the
+window as the thing a reader installs. A reference cannot
 be re-cut, so work that lands after one takes a number of its own; keeping the
 list at three then means retiring the release it replaces rather than letting
 both stand. Until 2026-08-30 the three references were deliberately spread
 across the project, and v2.1.0 was what bracketed a fault introduced recently
-from below; nothing between v1.0.9 and v2.5.1 does that now. The floor still holds, and the history of what changed when is in the
+from below; nothing between v1.0.9 and v2.5.2 does that now. The floor still holds, and the history of what changed when is in the
 commits, which were not touched. The next reference worth adding is the first
 2.x state after this one that is worth falling back to.
 

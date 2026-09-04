@@ -47,7 +47,7 @@ reach this: the inventory's behaviour *already is* 1.0.9's — the columns are t
 same six, and the client script was **byte-for-byte identical** to the file at
 that tag until it was rebuilt in the new stack on 2026-08-23, behaviour
 unchanged and checked against the whole corpus (see *The client script*, below).
-(There is no build "1.9.0"; the tags are `v1.0.5`, `v1.0.9`, `v2.5.1`, and
+(There is no build "1.9.0"; the tags are `v1.0.5`, `v1.0.9`, `v2.5.2`, and
 `v1.0.9`'s manifest reads `version = "1.0.9"`.)
 
 **Svelte 5 · Vite · TypeScript is the only frontend technology in the

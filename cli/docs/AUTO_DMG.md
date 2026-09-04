@@ -30,8 +30,8 @@
 gh workflow run release-dmg.yml
 
 # релиз: тег обязан совпадать с version в cli/Cargo.toml — CI это проверяет
-git tag v2.5.1
-git push origin v2.5.1
+git tag v2.5.2
+git push origin v2.5.2
 ```
 
 ## Локально

@@ -17,7 +17,7 @@ document is about the Rust that runs underneath it.
 
 | | |
 |---|---|
-| `cli/` | package `aruna` 2.5.1 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
+| `cli/` | package `aruna` 2.5.2 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
 | `src-tauri/` | package `aruna-desktop` 0.2.0, library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its two commands ask the core where the package went and count what is in it; the logic stays in `cli/`. |
 
 They were independent crates with a `Cargo.lock` each until 2026-08-30, when
