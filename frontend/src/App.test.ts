@@ -603,8 +603,8 @@ describe('кончилось', () => {
  * среди того, что фронтенд обязан проверять.
  */
 it('снимает подписку на прогресс при размонтировании', async () => {
-  const { unmount } = render(App)
   corpusLocation.mockResolvedValue(location(false))
+  const { unmount } = render(App)
 
   await vi.waitFor(() => expect(listen).toHaveBeenCalledTimes(1))
   unmount()

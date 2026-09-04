@@ -1,6 +1,6 @@
 [package]
 name = "aruna-desktop"
-version = "0.2.0"
+version = "2.5.1"
 description = "Aruna — the TLHdig Hittite cuneiform corpus, as a desktop application"
 authors = ["Sergey Simonov"]
 license = "MIT"
@@ -14,26 +14,26 @@ name = "aruna_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.3", features = [] }
+tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
 aruna = { path = "../cli" }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "=1.0.229", features = ["derive"] }
 # Читает `counts` из манифеста пакета для команды `corpus_stats`. Новой строкой
 # в графе зависимостей это не становится: serde_json уже приходит сюда через
 # tauri (json-patch → tauri-utils), и версия у него та же, что записана в
 # lock-файле. Прямое объявление добавляет ребро, а не пакет.
-serde_json = "1"
-thiserror = "2"
+serde_json = "=1.0.151"
+thiserror = "=2.0.20"
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
-tauri-plugin-log = "2"
-tauri-plugin-dialog = "2.7.2"
-tauri-plugin-opener = "2.5.4"
-tauri-plugin-window-state = "2.4.1"
-tauri-plugin-store = "2.4.4"
-tauri-plugin-wdio-webdriver = { version = "1.3.0", optional = true }
-tauri-plugin-wdio = { version = "1.3.0", optional = true }
+tauri = { version = "=2.11.5", features = [] }
+tauri-plugin-log = "=2.9.0"
+tauri-plugin-dialog = "=2.7.2"
+tauri-plugin-opener = "=2.5.4"
+tauri-plugin-window-state = "=2.4.1"
+tauri-plugin-store = "=2.4.4"
+tauri-plugin-wdio-webdriver = { version = "=1.3.0", optional = true }
+tauri-plugin-wdio = { version = "=1.3.0", optional = true }
 # Типы команд и событий, порожденные из Rust вместо объявленных вторично от руки.
 # Версии закреплены точным равенством, а не кареткой: под Tauri 2 у этого
 # семейства стабильного выпуска нет — старший стабильный tauri-specta это 1.0.2

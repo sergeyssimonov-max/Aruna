@@ -5,3 +5,5 @@ allowBuilds:
 
 overrides:
   '@puppeteer/browsers': '3.2.1'
+  deepmerge-ts: '8.0.2'
+  serialize-javascript: '7.0.5'

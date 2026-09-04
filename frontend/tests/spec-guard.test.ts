@@ -2,7 +2,7 @@
  * The decisions the specification fixed, checked against the files that hold
  * them.
  *
- * `docs/PROJECT-SPEC.ru.md` (редакция 15, 2026-08-30) settles a long list of
+ * `docs/PROJECT-SPEC.ru.md` (редакция 28, 2026-09-04) settles a long list of
  * things by name — a package manager, an engine floor, a bundle identifier,
  * which Tauri plugins are registered and under which permissions, and the whole
  * mechanism by which the end-to-end contour is kept out of a release build. Its
@@ -37,6 +37,7 @@ const FRONTEND_PKG = json('../package.json')
 const ROOT_PKG = json('../../package.json')
 const TAURI_CONF = json('../../src-tauri/tauri.conf.json')
 const CARGO = text('../../src-tauri/Cargo.toml')
+const CORE_CARGO = text('../../cli/Cargo.toml')
 const TAURI_LIB = text('../../src-tauri/src/lib.rs')
 const VITE_CONFIG = text('../vite.config.ts')
 const INDEX_HTML = text('../index.html')
@@ -45,7 +46,7 @@ const WDIO_CONF = text('../wdio.conf.ts')
 
 describe('the package manager is pnpm, pinned, and alone', () => {
   it('is pinned by the root manifest, which corepack reads', () => {
-    expect(ROOT_PKG.packageManager).toMatch(/^pnpm@11\.22\.0(\+|$)/)
+    expect(ROOT_PKG.packageManager).toMatch(/^pnpm@11\.25\.0(\+|$)/)
   })
 
   it('leaves no trace of npm as a project manager', () => {
@@ -93,34 +94,72 @@ describe('the engine floor of the window', () => {
 
 describe('the Tauri application is configured as agreed', () => {
   /**
-   * **The shell may not be named or identified like the product.**
+   * **The application is the product, and is named and identified as one.**
    *
-   * There is one thing this project distributes: `Aruna.app`, built by
-   * `cli/build_app.sh` from the console crate, `com.sergeyssimonov.aruna`,
-   * version 2.5.0. The Tauri bundle is not a second product — it is the
-   * environment the window is built in, and the owner said so on 2026-08-30.
+   * Until 2026-09-04 the opposite was asserted here, and the reason was sound
+   * while it lasted: what this project distributed was `Aruna.app`, packed by
+   * `cli/build_app.sh` from the console crate, and the Tauri bundle beside it
+   * was the environment the window was built in rather than a second product.
+   * Two things called `Aruna.app` on a case-insensitive filesystem are one
+   * file, so the shell was held to a name that could not collide with the
+   * thing a reader installs.
    *
-   * Until that day it was called `aruna`, and on macOS's case-insensitive
-   * filesystem `aruna.app` and `Aruna.app` are one name: dragging the shell
-   * into `/Applications` would have replaced the shipped program with a window
-   * that cannot build anything, and the only prompt would have been the
-   * ordinary "an item named Aruna already exists". Verified rather than
-   * assumed — `ls -di /Applications/Aruna.app /Applications/aruna.app` returns
-   * the same inode for both spellings.
+   * The release moved to the window on 2026-09-04 and the collision moved with
+   * it: there is one bundle now, built by Tauri, and `cli/build_app.sh` no
+   * longer produces the other one. So the shell takes the product's name and
+   * the product's identifier — the `.shell` suffix existed only to keep two
+   * bundles apart, and there is no second bundle to keep it apart from.
    *
-   * So the name says what the thing is (`aruna-desktop`, the crate's own
-   * name), and the identifier is a child of the product's rather than a second
-   * root: `com.sergeyssimonov.aruna.shell`. LaunchServices treats it as
-   * unrelated, which is the point, while a reader can see whose it is.
+   * What has not changed is that the name is a decision rather than a default:
+   * the Cargo binary stays `aruna-desktop`, because `wdio.conf.ts` launches it
+   * by that path, and the bundle is `Aruna` because that is what a reader sees
+   * in Finder.
    */
-  it('names the shell as a shell, not as the product', () => {
-    expect(TAURI_CONF.identifier).toBe('com.sergeyssimonov.aruna.shell')
-    expect(TAURI_CONF.productName).toBe('aruna-desktop')
+  it('is named and identified as the product it now is', () => {
+    expect(TAURI_CONF.identifier).toBe('com.sergeyssimonov.aruna')
+    expect(TAURI_CONF.productName).toBe('Aruna')
     expect(TAURI_CONF.bundle.targets).toEqual(['app', 'dmg'])
+  })
 
-    // The one that would undo all of it: a bundle whose name differs from the
-    // product's only by case is the same file on this filesystem.
-    expect(TAURI_CONF.productName.toLowerCase()).not.toBe('aruna')
+  /**
+   * **The application says the version the core says.**
+   *
+   * The shell kept its own numbering while it was the environment rather than
+   * the product — §3.5 said so, and said the condition for ending it: the day
+   * a reader receives the shell itself. That day arrived, and two numbers for
+   * one download is one too many. `cli/Cargo.toml` stays the source of truth,
+   * because the release contour reads it when it checks a tag and the release
+   * script reads it when it writes the bundle.
+   *
+   * Compared rather than restated: this test names no version at all, so a
+   * release bumps two manifests and nothing else.
+   */
+  it('carries the version of the core it is built on', () => {
+    const version = (manifest: string, which: string) => {
+      const found = manifest.match(/^\s*version\s*=\s*"([^"]+)"/m)
+      expect(found, `${which} declares no version`).not.toBeNull()
+      return found![1]
+    }
+    expect(version(CARGO, 'src-tauri/Cargo.toml')).toBe(version(CORE_CARGO, 'cli/Cargo.toml'))
+  })
+
+  /**
+   * **Ad hoc, and stated in the configuration rather than done to the bundle.**
+   *
+   * There is no Developer ID: the project has no paid Apple membership, and
+   * §6.7 records what that costs a reader. What it must not cost is a second
+   * mechanism — a `codesign` call after the fact would sign whatever Tauri last
+   * produced, and nothing would say when it stopped matching. Tauri's own
+   * pseudo-identity is one line and travels with the bundle definition.
+   *
+   * The minimum system version travels beside it for the same reason. Tauri's
+   * default is macOS 10.13; this program targets macOS 13 and nothing older
+   * (§2.1), and the bundle built on 2026-09-03 declared 10.13 because nobody
+   * had said otherwise.
+   */
+  it('signs ad hoc and admits no system older than the one it targets', () => {
+    expect(TAURI_CONF.bundle.macOS.signingIdentity).toBe('-')
+    expect(TAURI_CONF.bundle.macOS.minimumSystemVersion).toBe('13.0')
   })
 
   /** The E2E service finds the window by the document's title, not by config. */
