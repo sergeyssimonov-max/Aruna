@@ -1,12 +1,14 @@
 # The shape of the Rust side
 
-What each module is for, which way the dependencies point, and where the two
-things that do not exist yet — a Tauri interface and a PDF renderer — attach
-without the layers below them changing.
+What each module is for, which way the dependencies point, and where the thing
+that does not exist yet — a PDF renderer — attaches without the layers below it
+changing. The Tauri interface used to be named here as the second of two; it was
+attached at `app` on 2026-08-30 and started building the corpus on 2026-09-02,
+and §7 is where it is described.
 
 The environment, the frontend stack, the pinned versions and the checks that
 guard them are **not** described here. They are fixed by
-[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 15, 2026-08-30), which is normative; this
+[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 28, 2026-09-04), which is normative; this
 document is about the Rust that runs underneath it.
 
 ---
@@ -15,7 +17,7 @@ document is about the Rust that runs underneath it.
 
 | | |
 |---|---|
-| `cli/` | package `aruna` 2.5.0 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
+| `cli/` | package `aruna` 2.5.1 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
 | `src-tauri/` | package `aruna-desktop` 0.2.0, library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its two commands ask the core where the package went and count what is in it; the logic stays in `cli/`. |
 
 They were independent crates with a `Cargo.lock` each until 2026-08-30, when

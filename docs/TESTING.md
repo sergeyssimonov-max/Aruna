@@ -10,7 +10,7 @@ and the binary's own tests. Since the crates were joined into one workspace on
 needs no network. Two are skipped by design: the core's whole-package round trip,
 which is expensive, and the shell's `regenerate_the_bindings`, which is not a
 check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **63 `vitest` tests** in
+Beside it, and in a language of its own, are the **80 `vitest` tests** in
 `frontend/` — see *Frontend* below. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
 

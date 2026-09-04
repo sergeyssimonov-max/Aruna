@@ -174,9 +174,11 @@ jobs:
   # The desktop crate, held to the same battery `docs/PROJECT-SPEC.ru.md` §6.1
   # prescribes for it locally. Until now nothing here touched `src-tauri` at
   # all: five jobs, none of them naming the crate, so its formatting, its
-  # lints, its one test and `src-tauri/deny.toml` — a policy file written on
-  # 2026-08-23 and never executed — were held by whoever remembered to run them
-  # by hand.
+  # lints, its one test and the dependency policy were held by whoever
+  # remembered to run them by hand. That policy lived in `src-tauri/deny.toml`
+  # then — written on 2026-08-23 and never executed — and was removed when the
+  # crates were joined into one workspace on 2026-08-30. One graph is judged by
+  # one file now, the `deny.toml` at the root, and the `check` job reads it.
   #
   # **On macOS, not on Ubuntu.** The only platform this project targets is
   # macOS 13 (CLAUDE.md, «Платформа»), and a Tauri crate on Linux needs the
@@ -469,16 +471,38 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     steps:
-      # Full history, and `build_app.sh` is why: it takes the bundle's
-      # `CFBundleVersion` from `git rev-list --count HEAD`, so that LaunchServices
-      # — which caches an application by that number — can tell two releases
-      # apart. A shallow checkout has one commit, so the published DMG carried
-      # build 1 while the same commit built locally carried 168. Nothing failed
-      # loudly; it was found by mounting the published image and reading its
-      # Info.plist.
+      # The build number that needed full history is gone with the script that
+      # computed it: Tauri takes both `CFBundleShortVersionString` and
+      # `CFBundleVersion` from the crate manifest, and neither is derived from
+      # the commit count. The depth is left as it is until the owner decides
+      # whether a monotonic build number is worth keeping at all — see the
+      # release report of 2026-09-04 — because restoring history is a change to
+      # this file and losing it quietly is how the published DMG once carried
+      # build 1 while the same commit built locally carried 168.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+
+      # The frontend is inside the bundle now, so this job needs the Node half
+      # of the stack that the `frontend` job above has always had. Same pins,
+      # same source of the pnpm version — `packageManager` in the root manifest.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      # Two installs because there are two lock files: the root one carries the
+      # Tauri CLI that `pnpm build` invokes, and the frontend one carries Vite,
+      # which `beforeBuildCommand` runs before the bundle is packed.
+      - name: Install dependencies (root)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies (frontend)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
 
       # As above: the pin in rust-toolchain.toml decides, and the DMG is the
       # artifact where a surprise compiler is least welcome.
@@ -506,9 +530,41 @@ jobs:
         with:
           workspaces: . -> target
 
+      # `pnpm build` in the root is `tauri build --target universal-apple-darwin`
+      # — the same command a developer runs, so what CI publishes is what the
+      # machine that made it produced. It builds the frontend first through
+      # `beforeBuildCommand`, packs `Aruna.app`, and writes the DMG beside it.
+      # Signing is ad hoc and declared in `tauri.conf.json`; no `codesign` call
+      # belongs here, because a second mechanism is a second thing to keep in
+      # step.
       - name: Build .app + DMG
-        working-directory: cli
-        run: bash scripts/make_release.sh
+        run: pnpm build
+
+      # The published asset keeps the name readers and `reference-release.json`
+      # already know. Tauri names the image after the product and its version;
+      # renaming it here rather than teaching every reader a new name is the
+      # smaller change, and the digest is taken after the rename so it describes
+      # the file that is actually attached to the release.
+      - name: Collect the release artifacts
+        run: |
+          set -euo pipefail
+          bundle="target/universal-apple-darwin/release/bundle"
+          test -d "$bundle/macos/Aruna.app" || { echo "::error::Aruna.app was not built"; exit 1; }
+          mkdir -p releases
+          # Named rather than globbed loosely: a failed run can leave a
+          # read-write `rw.*.dmg` beside the finished one, and `ls *.dmg` would
+          # then hand `cp` two paths and fail on the second.
+          shopt -s nullglob
+          dmgs=("$bundle"/dmg/Aruna_*_universal.dmg)
+          test "${#dmgs[@]}" -eq 1 || { echo "::error::expected one DMG, found ${#dmgs[@]}"; exit 1; }
+          dmg="${dmgs[0]}"
+          cp "$dmg" releases/Aruna-macos-universal.dmg
+          ( cd releases && shasum -a 256 Aruna-macos-universal.dmg | tee SHA256SUMS )
+          # Both architectures, asserted rather than assumed: a universal build
+          # that quietly produced one is a release nobody can run on the other.
+          lipo -info "$bundle/macos/Aruna.app/Contents/MacOS/aruna-desktop"
+          lipo -info "$bundle/macos/Aruna.app/Contents/MacOS/aruna-desktop" | grep -q x86_64
+          lipo -info "$bundle/macos/Aruna.app/Contents/MacOS/aruna-desktop" | grep -q arm64
 
       # Handed to the publish job below and wanted by nothing afterwards: what a
       # release keeps is the DMG attached to it, not this. At the default
@@ -519,11 +575,12 @@ jobs:
         with:
           name: aruna-macos-universal
           path: |
-            cli/Aruna.app
-            cli/releases/Aruna-macos-universal.dmg
-            cli/releases/SHA256SUMS
+            target/universal-apple-darwin/release/bundle/macos/Aruna.app
+            releases/Aruna-macos-universal.dmg
+            releases/SHA256SUMS
           if-no-files-found: error
           retention-days: 1
+
 
   publish:
     name: GitHub Release

@@ -47,39 +47,47 @@ The first run downloads 71 MiB from Zenodo and keeps it in the OS cache director
 Packaging, on macOS 13+ only:
 
 ```bash
-cd cli
-bash scripts/make_release.sh   # Aruna.app + releases/Aruna-macos-universal.dmg
-./build_app.sh                 # .app only
+pnpm build                     # → target/universal-apple-darwin/release/bundle/{macos/Aruna.app,dmg/*.dmg}
 ```
+
+That is `tauri build --target universal-apple-darwin`: it builds the frontend,
+packs it into `Aruna.app` for both architectures and writes the DMG beside it.
+The console binary above is unaffected — `cargo build -p aruna` still produces
+it, and that is still what a developer runs.
 
 Prebuilt DMG: [Releases](https://github.com/sergeyssimonov-max/Aruna/releases) (Universal Binary).
 
 ### What the DMG contains, and what double-clicking it does
 
-`Aruna.app` is a command-line program in an application bundle. It has no
-window, no progress bar and no dialogs. Double-clicked from Finder it runs to
-completion and quits: on a good run it leaves `~/Downloads/TLHdig_Beta_0.3/`
-behind and says nothing, and on a bad one — no network, a corrupt archive, a
-full disk — **it says nothing either**. Everything the program prints, including
-the sentence that tells you what to do about the failure, goes to a terminal
-that Finder never gave it.
+`Aruna.app` is an application with a window. Double-clicked from Finder, opened
+from Launchpad or started with `open Aruna.app`, it comes up 800 by 600 in the
+middle of the screen and says what is on disk: whether the package is already
+built, how large it is and how uneven the corpus is. From there it builds the
+corpus itself — from Zenodo or from an archive you pick — showing the stage and
+the fraction while it works, and it can be stopped mid-run. When it finishes it
+reports that run and offers the inventory it wrote.
 
-So run it from a terminal, where those messages reach you:
+Until 2026-09-04 what this DMG carried was the console program in an application
+bundle: no window, no progress, no dialogs, and a double click that ran to
+completion and said nothing — on a good run and on a bad one alike, because
+everything it printed went to a terminal Finder never gave it. That is what the
+window replaces.
+
+**The console form has not gone anywhere.** It is the same core, and it is still
+the shorter path when you want the package and not a screen:
 
 ```bash
-/Applications/Aruna.app/Contents/MacOS/Aruna
+cargo build --release -p aruna && ./target/release/aruna
 ```
-
-A launcher that opens Terminal, or a real window with a progress bar, is the
-desktop application above — it is not built yet, and until it is, this is the
-honest instruction rather than a workaround.
 
 ### If a run is killed
 
-Ctrl-C stops the program the way the terminal stops any program: there is no
-signal handler. The machinery for a clean stop exists and is exercised — work
-checks a cancellation flag between documents — but nothing presses it from a
-terminal, and the window that would is not built yet.
+Ctrl-C stops the console form the way the terminal stops any program: there is
+no signal handler. The machinery for a clean stop exists and is exercised — work
+checks a cancellation flag between documents — and the window is what presses
+it: its «Остановить» reaches the same flag, and a run stopped that way publishes
+nothing and leaves nothing behind. From a terminal, Ctrl-C is still the blunt
+version.
 
 What a killed run leaves in `~/Downloads` is one hidden directory,
 `.TLHdig_Beta_0.3.build.<pid>.<n>`: its unfinished package. Nothing is published
@@ -91,11 +99,19 @@ and checked.
 
 ### Gatekeeper
 
-The `.app` is signed ad hoc: enough for macOS to run it locally, not a
+**Read this before the first launch, because there will be nothing else to
+read.** The `.app` is signed ad hoc: enough for macOS to run it locally, not a
 Developer ID, and it is not notarized — this project has no paid Apple
 membership. macOS will therefore refuse it on first open, with *"Aruna cannot
 be opened because the developer cannot be verified"* or *"is damaged and can't
 be opened"*, the second being what a quarantined download usually produces.
+
+What that refusal costs changed on 2026-09-04, and it is worse than it was.
+While this bundle held the console program, a blocked launch was one more
+silence among others — the program said nothing from Finder anyway. Now the
+application has a window, and a person who double-clicks it expects one: the
+refusal is the whole of what they get, and nothing appears at all. So the steps
+below are not a footnote.
 
 **Check what you are letting through before you let it through.** Every release
 publishes the digest of its DMG, and `shasum -a 256 -c SHA256SUMS` beside the
@@ -152,7 +168,7 @@ pnpm --dir frontend install
 pnpm dev             # Tauri window, frontend on Vite's dev server
 pnpm build           # → Universal .app + DMG (macOS, both architectures)
 pnpm build:host      # → .app + DMG for this machine's architecture only
-pnpm check           # svelte-check + tsc over both tsconfigs
+pnpm check           # svelte-check + tsc over all three tsconfigs
 pnpm test            # vitest — including the font-stack agreement check
 ```
 
