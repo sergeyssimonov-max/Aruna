@@ -13,6 +13,11 @@ categories = ["command-line-utilities", "text-processing"]
 [dependencies]
 dirs = "5"
 memchr = "2"
+# Pinned exactly, and without default features: the XML parser candidate of
+# specification 4.13, here for the classification step and nothing else. The
+# rule that nothing is ever expanded — entities, DTDs, XInclude — is kept by
+# not calling anything that expands, not by a setting that can be forgotten.
+quick-xml = { version = "=0.42.0", default-features = false }
 thiserror = "2"
 ureq = { version = "2.12", default-features = true, features = ["tls"] }
 # Floor at 2.3, not 2.2: RUSTSEC-2025-0168 (CVE-2025-29787) is patched there,
