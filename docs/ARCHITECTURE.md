@@ -8,7 +8,7 @@ and §7 is where it is described.
 
 The environment, the frontend stack, the pinned versions and the checks that
 guard them are **not** described here. They are fixed by
-[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 28, 2026-09-04), which is normative; this
+[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 39, 2026-09-06), which is normative; this
 document is about the Rust that runs underneath it.
 
 ---
@@ -175,9 +175,15 @@ said that the next argument with two words is where that stops being true, and
 that without `specta` nothing in the build would say so.
 
 That argument arrived on 2026-09-02 — `build_corpus(local_archive)` — and specta
-arrived with it. The call sites are no longer written: `frontend/src/bindings.ts`
-is generated from these declarations, spells the argument `localArchive`, and a
-Rust test fails if the committed file is not what the declarations now produce.
+arrived with it. It left on 2026-09-06 with the archive picker, and a different
+one took its place the same day: `build_corpus(destination)`, the folder the
+package goes into. `destination` is a single word, so the project is once again
+without a two-word argument — and specta stays, which is the point. The call
+sites are no longer written: `frontend/src/bindings.ts` is generated from these
+declarations, and a Rust test fails if the committed file is not what the
+declarations now produce. The hazard has no instance today;
+the guard is in place for the next one, which is the only arrangement under
+which it will be there when that argument arrives.
 
 **The second one shows what "held to" means.** `corpus_stats` counts the
 manuscripts and the CTH groups in a package — and takes the path to it as an

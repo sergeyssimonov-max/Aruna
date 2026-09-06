@@ -583,7 +583,8 @@ and the names are part of the contract:
 |---|---|---|
 | `corpus_location` | — | where the package and the inventory go, and whether they are there |
 | `corpus_stats` | package path | counts, the CTH spread, the writing counters, and which of the two answered |
-| `build_corpus` | an archive path, or nothing for the pinned Zenodo record | `BuildReport`, or `BuildFailure` |
+| `corpus_xml` | package path | how many documents are well-formed XML, the breakdown by reason, and the name, reason and position of each that is not |
+| `build_corpus` | a destination folder, or nothing for the downloads folder | `BuildReport`, or `BuildFailure` |
 | `cancel_build` | — | nothing; the confirmation arrives as the failure |
 
 | event | payload |
@@ -602,14 +603,43 @@ not written at start-up, because a debug run would then edit the working tree.
 This closed a hazard that was named here in advance and had no test behind it:
 Tauri expects a command's arguments in camelCase, and the first two-word
 argument is where a hand-written call site silently stops matching. The first
-two-word argument is `local_archive`, and it arrived with the generator that
-spells it.
+two-word argument was `local_archive`, and it arrived with the generator that
+spells it — then left on 2026-09-06 with the archive picker, so no command takes
+a two-word argument today. The generator stays: a guard removed the day its
+instance disappears is a guard that will not be there when the next one arrives,
+and this one has already been the difference between a typo caught at build time
+and a call that fails only when someone clicks.
+
+**`corpus_xml` reads the manifest and nothing else, and that is deliberate.**
+`corpus_stats` has a second answer — walking the directory — because a package
+can be on disk with its manifest gone, and two counts are better than none.
+This command has no such fallback: the numbers were produced by the pass that
+laid the files out, and a second count written in different code is a second
+behaviour that drifts from the first at the next edit. A package built before
+2026-09-06 carries no `xml` section and gets a refusal of its own rather than
+zeros — no document being unreadable and nobody having looked are different
+facts, and on a screen they render identically.
+
+**What the window may not say about those documents.** They are in the package.
+Every one of them: the package is a byte mirror of the corpus, copying needs no
+parser, and nothing is dropped for failing to parse. The property belongs to the
+source data and it stops a document from being converted, not from being kept.
+So the window says *not well-formed XML* and says in the same breath that they
+are shipped alongside the rest; it does not say broken, corrupt, invalid,
+rejected, discarded or excluded, and a test in `tests/reasons.test.ts` holds
+every reason label to that. The window also drops reasons whose count is zero,
+where the manifest keeps them — the manifest distinguishes "looked and found
+none" from "did not look", and a screen line reading zero is read as a fault
+that is not there.
 
 **The rules, and how each is kept:**
 
-- *The frontend never gets a raw filesystem handle.* Paths cross as strings.
-  `chosen_archive` is where one becomes a path, and a string with no file behind
-  it is refused there — `archive_missing`, before anything starts.
+- *The frontend never gets a raw filesystem handle.* Paths cross as strings, and
+  the shell turns exactly one of them into a path: `chosen_destination`, where a
+  string with no directory behind it is refused — `destination_missing`, before
+  anything starts. The window names where the package goes and nothing else; it
+  cannot name where the corpus comes from, because `build_corpus` has no
+  argument for that. One axis is a choice, the other is settled.
 - *Progress is an event stream, aggregated.* One event per document across
   23 936 documents would be 23 936 round trips; the core batches instead, and
   says which way: the transfer by interval (a quarter-second), the write by
