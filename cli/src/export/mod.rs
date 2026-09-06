@@ -25,7 +25,7 @@ pub mod validate;
 pub mod verify;
 
 pub use inventory::{hrefs, render_inventory};
-pub use manifest::{render_manifest, FontContract};
+pub use manifest::{render_manifest, FontContract, XmlReport};
 pub use naming::{
     dir_component, href, output_path, path_component, pdf_path, percent_decode, resolve,
 };
@@ -315,17 +315,9 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // The archive this package was built from, named in the manifest so a
     // reader can tell which edition of the corpus they are looking at.
     let archive_digest = digest_of(zip)?;
-    let mut applied: std::collections::BTreeMap<String, usize> = Default::default();
-    let mut fonts = manifest::FontContract::default();
-    let stylesheet_dropped = write_documents(
-        zip,
-        &fragments,
-        &placed,
-        staging.path(),
-        &mut applied,
-        &mut fonts,
-        job,
-    )?;
+    let mut tallies = Tallies::default();
+    let stylesheet_dropped =
+        write_documents(zip, &fragments, &placed, staging.path(), &mut tallies, job)?;
 
     // Moved out of the fragments rather than copied out of them: the archive
     // paths are what a fragment carries beyond its record, and the last thing
@@ -348,8 +340,9 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         &placed,
         source_label,
         &archive_digest,
-        &applied,
-        &fonts,
+        &tallies.applied,
+        &tallies.fonts,
+        &tallies.xml,
     );
     let manifest_path = staging.path().join(MANIFEST);
     fs::write(&manifest_path, &manifest_json).map_err(ArunaError::io(manifest_path))?;
@@ -652,14 +645,33 @@ pub fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>
 /// Pass 2: read each document whole, normalise it, write it where it belongs.
 ///
 /// Returns how many carried a stylesheet instruction, which is the one thing
+/// What one pass over the archive counts, in one place.
+///
+/// Everything here is filled while the documents are written and read again
+/// only by the manifest. Kept together because they share that life exactly:
+/// separately they were three `&mut` arguments and the next one would have been
+/// a fourth.
+#[derive(Default)]
+struct Tallies {
+    /// Which normalisation rules fired, and on how many documents.
+    applied: std::collections::BTreeMap<String, usize>,
+    /// What the corpus asks of a typesetter.
+    fonts: manifest::FontContract,
+    /// Which documents are not well-formed XML, and why.
+    xml: manifest::XmlReport,
+}
+
 /// the normaliser removes that is worth counting.
+///
+/// Three of those counts travel together in [`Tallies`] rather than as three
+/// out-parameters: they are filled by the same pass, read by the same manifest,
+/// and adding a fourth should not widen every signature between here and there.
 fn write_documents(
     zip: &Path,
     fragments: &[Fragment],
     placed: &[Placed],
     staging: &Path,
-    applied: &mut std::collections::BTreeMap<String, usize>,
-    fonts: &mut manifest::FontContract,
+    tallies: &mut Tallies,
     job: &Job<'_>,
 ) -> Result<usize> {
     // **One slot per entry name, and the archive is held to it here.**
@@ -742,15 +754,17 @@ fn write_documents(
                 // what is permitted. One list, so a change cannot be counted
                 // under a name the manifest never advertises.
                 for rule in report.dropped {
-                    *applied.entry(verify::drop_pi(&rule)).or_default() += 1;
+                    *tallies.applied.entry(verify::drop_pi(&rule)).or_default() += 1;
                 }
                 if report.added_declaration {
-                    *applied
+                    *tallies
+                        .applied
                         .entry(verify::ADD_DECLARATION.to_string())
                         .or_default() += 1;
                 }
                 if report.reflowed {
-                    *applied
+                    *tallies
+                        .applied
                         .entry(verify::REFLOW_PROLOGUE.to_string())
                         .or_default() += 1;
                 }
@@ -764,7 +778,17 @@ fn write_documents(
         }
 
         // The font contract is counted from what is actually shipped.
-        fonts.observe(&String::from_utf8_lossy(&normalised));
+        tallies.fonts.observe(&String::from_utf8_lossy(&normalised));
+
+        // And so is the parser's verdict: the normalised bytes, because those
+        // are the ones the package holds and the ones whose line numbers the
+        // manifest quotes. **Nothing here can stop a document being written** —
+        // the finding is recorded and the loop goes on. A parser that decided
+        // membership would make the package a filtered view of the corpus
+        // rather than a copy of it.
+        tallies
+            .xml
+            .observe(relative, crate::xml_wellformed::classify(&normalised));
 
         let out = staging.join(relative);
         if let Some(parent) = out.parent() {
@@ -891,16 +915,14 @@ mod tests {
             fragment("KBo 2.2", "CTH 5", "xml/KBo 1.1.xml"),
         ];
         let placed = place(&fragments).expect("two distinct sigla take two places");
-        let mut applied = std::collections::BTreeMap::new();
-        let mut fonts = manifest::FontContract::default();
+        let mut tallies = Tallies::default();
 
         let failure = write_documents(
             Path::new("/nowhere/there-is-no-archive.zip"),
             &fragments,
             &placed,
             Path::new("/nowhere/staging"),
-            &mut applied,
-            &mut fonts,
+            &mut tallies,
             &Job::unattended(),
         )
         .expect_err("a duplicated entry name must not be written");

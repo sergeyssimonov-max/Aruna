@@ -30,6 +30,7 @@ pub mod presentation;
 pub mod progress;
 pub mod style;
 pub mod xml_scan;
+pub mod xml_wellformed;
 pub mod zenodo;
 
 use error::{ArunaError, Result};

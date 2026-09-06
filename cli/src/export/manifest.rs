@@ -22,6 +22,10 @@
 //! carries no serialisation dependency, and one field order written out is
 //! cheaper than one more crate.
 
+#[cfg(test)]
+use crate::xml_wellformed::classify;
+use crate::xml_wellformed::{Finding, Reason};
+
 use super::naming::{href, pdf_path};
 use super::verify::{self, ADD_DECLARATION, DROP_BOM, REFLOW_PROLOGUE};
 use super::{Placed, PACKAGE};
@@ -317,6 +321,57 @@ impl FontContract {
     }
 }
 
+/// What the parser found, counted over the whole package.
+///
+/// **Not a verdict on any document's place in the package.** Every document the
+/// archive holds is shipped; this says which of them a strict XML parser
+/// refuses, and why. The distinction is the whole point of the section: the
+/// refusal belongs to the conversion path, which cannot typeset markup it
+/// cannot read, and a mirror of the corpus that quietly dropped 206 documents
+/// would be a worse mirror for no gain.
+#[derive(Default, Clone)]
+pub struct XmlReport {
+    /// Documents examined — every document written, well-formed or not.
+    pub documents: usize,
+    /// The ones a strict parser refuses, in the order they were written.
+    pub findings: Vec<(String, Finding)>,
+}
+
+impl XmlReport {
+    /// Record one document's verdict.
+    pub fn observe(&mut self, file: &std::path::Path, finding: Option<Finding>) {
+        self.documents += 1;
+        if let Some(finding) = finding {
+            self.findings
+                .push((file.to_string_lossy().into_owned(), finding));
+        }
+    }
+
+    /// How many documents fall under each reason, every reason listed.
+    ///
+    /// Reasons with a count of zero are kept: a breakdown that omits them
+    /// cannot be told from one where the classifier never tried them.
+    pub fn by_reason(&self) -> Vec<(&'static str, usize)> {
+        Reason::ALL
+            .iter()
+            .map(|reason| {
+                (
+                    reason.key(),
+                    self.findings
+                        .iter()
+                        .filter(|(_, f)| f.reason == *reason)
+                        .count(),
+                )
+            })
+            .collect()
+    }
+
+    /// Documents the parser accepts.
+    pub fn well_formed(&self) -> usize {
+        self.documents - self.findings.len()
+    }
+}
+
 /// Write the package manifest.
 ///
 /// `records` and `placed` are the same two slices the inventory is written
@@ -329,6 +384,7 @@ pub fn render_manifest(
     archive_md5: &str,
     normalisation: &BTreeMap<String, usize>,
     fonts: &FontContract,
+    xml: &XmlReport,
 ) -> String {
     // The real manifest averages about 350 bytes per document; 1 MiB for an
     // 8.3 MB result meant four reallocations and settling at 16 MiB.
@@ -424,6 +480,59 @@ pub fn render_manifest(
         );
     }
     out.push_str("    }\n  },\n");
+
+    // Which documents are not well-formed XML, and why. Placed above the
+    // groups because it is a summary and the groups are eight megabytes of
+    // list; a reader opening this file sees the counts without scrolling.
+    //
+    // Only the documents with a finding are listed. Naming the 23 730 that are
+    // fine would triple the file to say nothing.
+    out.push_str("  \"xml\": {\n");
+    let _ = writeln!(
+        out,
+        "    \"note\": {},",
+        string(
+            "Whether each document is well-formed XML, checked with a strict parser: nothing is \
+             repaired and nothing is excluded. Every document listed here is present in the \
+             package; the property described is the source data's, and it is what stops a \
+             document from being converted, not from being copied."
+        )
+    );
+    let _ = writeln!(out, "    \"documents\": {},", xml.documents);
+    let _ = writeln!(out, "    \"well_formed\": {},", xml.well_formed());
+    let _ = writeln!(out, "    \"not_well_formed\": {},", xml.findings.len());
+    // The one thing this parser is known to miss, said in the file rather than
+    // only in the source: a reader counting documents against `xmllint` will
+    // otherwise find four they cannot account for.
+    let _ = writeln!(
+        out,
+        "    \"known_limit\": {},",
+        string(
+            "A raw '<' inside an attribute value is accepted, which XML forbids; four documents \
+             of this corpus are counted well-formed here that xmllint refuses."
+        )
+    );
+    out.push_str("    \"by_reason\": {\n");
+    let reasons = xml.by_reason();
+    for (i, (key, count)) in reasons.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "      {}: {count}{}",
+            string(key),
+            comma(i, reasons.len())
+        );
+    }
+    out.push_str("    },\n");
+    out.push_str("    \"not_well_formed_documents\": [\n");
+    for (i, (file, finding)) in xml.findings.iter().enumerate() {
+        let _ = writeln!(out, "      {{");
+        let _ = writeln!(out, "        \"file\": {},", string(file));
+        let _ = writeln!(out, "        \"reason\": {},", string(finding.reason.key()));
+        let _ = writeln!(out, "        \"line\": {},", finding.line);
+        let _ = writeln!(out, "        \"column\": {}", finding.column);
+        let _ = writeln!(out, "      }}{}", comma(i, xml.findings.len()));
+    }
+    out.push_str("    ]\n  },\n");
 
     // The groups, in the order the inventory lists them — which is the order a
     // table of contents wants.
@@ -616,7 +725,18 @@ mod tests {
         applied.insert("DROP_PI xml-stylesheet".to_string(), 2usize);
         let mut fonts = FontContract::default();
         fonts.observe("KBo 1.1 šarrum 𒀀");
-        render_manifest(&records, &placed, "test", "abc123", &applied, &fonts)
+        let mut xml = XmlReport::default();
+        for (i, place) in placed.iter().enumerate() {
+            // One of the three is not well-formed, so the section under test is
+            // not the empty case.
+            let bytes: &[u8] = if i == 1 {
+                br#"<a><t><w>nu</t></a>"#
+            } else {
+                br#"<a><t><w>nu</w></t></a>"#
+            };
+            xml.observe(&place.relative, classify(bytes));
+        }
+        render_manifest(&records, &placed, "test", "abc123", &applied, &fonts, &xml)
     }
 
     /// The manifest has to be JSON before it has to be anything else.
@@ -657,7 +777,15 @@ mod tests {
         let mut fonts = FontContract::default();
         fonts.observe("𒀀 šarrum");
         let (records, placed) = built();
-        let text = render_manifest(&records, &placed, "𒀀 source", "x", &BTreeMap::new(), &fonts);
+        let text = render_manifest(
+            &records,
+            &placed,
+            "𒀀 source",
+            "x",
+            &BTreeMap::new(),
+            &fonts,
+            &XmlReport::default(),
+        );
         assert!(text.contains("𒀀 source"));
         assert!(!text.contains("\\u12000"));
     }
@@ -725,11 +853,86 @@ mod tests {
         assert!(values_of(&json, "absent").is_empty());
     }
 
+    /// The breakdown adds up, and it adds up to the whole package.
+    ///
+    /// Two sums rather than one, because they can fail apart: the reasons could
+    /// account for every finding while the findings account for the wrong
+    /// number of documents. The second is what holds the package to being
+    /// complete — a document that stopped being written would leave here.
+    #[test]
+    fn the_counts_account_for_every_document() {
+        let (_, placed) = built();
+        let mut xml = XmlReport::default();
+        for (i, place) in placed.iter().enumerate() {
+            let bytes: &[u8] = if i == 1 {
+                br#"<a><t><w>nu</t></a>"#
+            } else {
+                br#"<a><t><w>nu</w></t></a>"#
+            };
+            xml.observe(&place.relative, classify(bytes));
+        }
+
+        assert_eq!(xml.documents, placed.len(), "every document is examined");
+        assert_eq!(
+            xml.well_formed() + xml.findings.len(),
+            xml.documents,
+            "well-formed and not well-formed are all of them"
+        );
+        let summed: usize = xml.by_reason().iter().map(|(_, count)| count).sum();
+        assert_eq!(
+            summed,
+            xml.findings.len(),
+            "the breakdown accounts for every finding"
+        );
+        assert_eq!(
+            xml.by_reason().len(),
+            Reason::ALL.len(),
+            "every reason is listed, including the ones with no documents"
+        );
+    }
+
+    /// The section says what it is for, and says it in the file.
+    ///
+    /// A manifest that recorded "not well formed" without saying that the
+    /// document is nonetheless present would be read as a list of what is
+    /// missing. It is the opposite of that, and the file has to say so itself:
+    /// nobody reading a manifest in three years will have this commit.
+    #[test]
+    fn the_xml_section_says_nothing_was_excluded() {
+        let json = manifest();
+        let (_, placed) = built();
+
+        assert!(json.contains("\"xml\""), "the section is written");
+        assert!(
+            json.contains(&format!("\"documents\": {}", placed.len())),
+            "it examined every document in the package"
+        );
+        assert!(
+            json.contains("present in the package"),
+            "and says the documents it names are still shipped"
+        );
+        assert!(
+            json.contains("\"known_limit\""),
+            "the parser's blind spot is stated in the file, not only in the source"
+        );
+        // The reason keys are published names; a rename is a schema change and
+        // has to be a deliberate one.
+        assert!(json.contains("\"element-never-closed\": 1"));
+        assert!(json.contains("\"crossing-elements\": 0"));
+    }
+
     #[test]
     fn every_document_in_the_manifest_can_be_read_back_as_a_path() {
         let (records, placed) = built();
         let json = manifest();
-        let files = values_of(&json, "file");
+        // Scoped to the group list on purpose. Since 2026-09-06 the `xml`
+        // section names files too — deliberately under the same key, so a
+        // reader can join the two — and counting both would count some
+        // documents twice.
+        let groups_from = json
+            .find("\"groups\": [")
+            .expect("the manifest lists groups");
+        let files = values_of(&json[groups_from..], "file");
         assert_eq!(files.len(), placed.len(), "one entry per document");
         for (file, place) in files.iter().zip(&placed) {
             assert_eq!(

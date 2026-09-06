@@ -176,7 +176,15 @@ fn main() {
         applied.insert(text(&mut rng), 1usize);
         let mut fonts = FontContract::default();
         fonts.observe(&text(&mut rng));
-        let json = render_manifest(&recs, &placed, &text(&mut rng), "abc", &applied, &fonts);
+        let json = render_manifest(
+            &recs,
+            &placed,
+            &text(&mut rng),
+            "abc",
+            &applied,
+            &fonts,
+            &Default::default(),
+        );
         if let Err(why) = check_json(&json) {
             json_bad += 1;
             if json_bad <= 3 {

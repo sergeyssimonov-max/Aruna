@@ -404,6 +404,7 @@ mod tests {
                 "0",
                 &Default::default(),
                 &Default::default(),
+                &Default::default(),
             ),
         )
         .expect("manifest");
