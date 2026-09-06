@@ -508,8 +508,9 @@ pub fn render_manifest(
         out,
         "    \"known_limit\": {},",
         string(
-            "A raw '<' inside an attribute value is accepted, which XML forbids; four documents \
-             of this corpus are counted well-formed here that xmllint refuses."
+            "Two things XML forbids are accepted by this parser: a raw '<' inside an attribute \
+             value, and an empty local name. Four documents of this corpus are counted \
+             well-formed here that xmllint refuses."
         )
     );
     out.push_str("    \"by_reason\": {\n");

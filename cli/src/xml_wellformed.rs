@@ -34,13 +34,18 @@
 //! deliberate.** Widening a reason until everything falls into one is how a
 //! classification stops carrying information.
 //!
-//! **The parser has a blind spot, and it is recorded rather than worked around.**
-//! `quick-xml` accepts a raw `<` inside an attribute value, which XML forbids;
-//! four documents of the corpus are called well-formed here that `xmllint`
-//! refuses. Closing it would take a second parser, and the one measured for the
-//! purpose was rejected on 2026-09-06 for damaging the transliteration in
-//! silence. Four documents named wrongly in a manifest is the smaller cost, and
-//! naming it here is what keeps it a known limit rather than a surprise.
+//! **The parser has blind spots, and they are recorded rather than worked
+//! around.** `quick-xml` accepts a raw `<` inside an attribute value and an
+//! empty local name (`<AO:>`), both of which XML forbids; four documents of the
+//! corpus are called well-formed here that `xmllint` refuses. Closing them
+//! would take a second parser, and the one measured for the purpose was
+//! rejected on 2026-09-06 for damaging the transliteration in silence. Four
+//! documents named wrongly in a manifest is the smaller cost, and naming the
+//! limits here is what keeps them known rather than surprising.
+//!
+//! What is *not* left to the parser: an input that ends with elements still
+//! open, and a double hyphen inside a comment. `quick-xml` is silent on the
+//! first and, until asked, on the second; both are checked here.
 
 use quick_xml::errors::{Error, IllFormedError, SyntaxError};
 use quick_xml::events::attributes::AttrError;
@@ -175,6 +180,7 @@ pub fn classify(bytes: &[u8]) -> Option<Finding> {
         _ if unterminated_start_tag(bytes, at).is_some() => Reason::UnterminatedStartTag,
         Refusal::NotSeparated => Reason::AttributeNotSeparated,
         Refusal::NeverClosed => Reason::ElementNeverClosed,
+        Refusal::Unterminated => Reason::UnterminatedStartTag,
         Refusal::Duplicated => Reason::AttributeGivenTwice,
         Refusal::Mismatched { end, open } => mismatch_reason(bytes, at, &end, &open),
         Refusal::Other => Reason::Unclassified,
@@ -343,6 +349,7 @@ fn find_start_tag(bytes: &[u8], name: &str, before: usize) -> bool {
 enum Refusal {
     NotSeparated,
     NeverClosed,
+    Unterminated,
     UnclosedValue,
     Duplicated,
     Mismatched { end: String, open: Vec<String> },
@@ -359,6 +366,11 @@ enum Refusal {
 /// the parser walking through wreckage.
 fn first_refusal(bytes: &[u8]) -> Option<(Refusal, usize)> {
     let mut reader = Reader::from_reader(bytes);
+    // Строже, чем по умолчанию: двойной дефис внутри комментария XML запрещает,
+    // а `quick-xml` его пропускает, пока не попросят. Разбор здесь обязан быть
+    // строгим – это записано решением 4.13, – и настройка, которую можно
+    // забыть, ставится один раз рядом с разборщиком.
+    reader.config_mut().check_comments = true;
     let mut buf = Vec::new();
     let mut open: Vec<String> = Vec::new();
 
@@ -366,6 +378,11 @@ fn first_refusal(bytes: &[u8]) -> Option<(Refusal, usize)> {
         let start = reader.buffer_position() as usize;
         buf.clear();
         match reader.read_event_into(&mut buf) {
+            // Вход кончился, а элементы остались открыты. `quick-xml` об этом
+            // молчит, и молчал бы и здесь: стек знает только вызывающий, и
+            // спросить его – его же обязанность. Без этой ветки документ,
+            // обрезанный посередине, назывался бы корректным.
+            Ok(Event::Eof) if !open.is_empty() => return Some((Refusal::NeverClosed, bytes.len())),
             Ok(Event::Eof) => return None,
             Ok(event) => {
                 if let Event::Start(ref tag) | Event::Empty(ref tag) = event {
@@ -413,6 +430,11 @@ fn first_refusal(bytes: &[u8]) -> Option<(Refusal, usize)> {
                     // At end of input with elements still open, which is what
                     // "never closed" means when nothing later contradicts it.
                     Error::IllFormed(IllFormedError::MissingEndTag(_)) => Refusal::NeverClosed,
+                    // Тег начат и кончился вход. Тот же дефект, что ловит
+                    // `unterminated_start_tag`, только сканеру его не найти:
+                    // там признак – следующий `<`, а здесь за тегом нет
+                    // ничего.
+                    Error::Syntax(SyntaxError::UnclosedTag) => Refusal::Unterminated,
                     Error::IllFormed(IllFormedError::UnmatchedEndTag(found)) => {
                         Refusal::Mismatched {
                             end: found,
@@ -540,6 +562,95 @@ mod tests {
 
     /// Every reason has a distinct key, and the keys are what the manifest
     /// publishes.
+    /// **Каждый образец из `cli/fixtures/xml/` получает тот ответ, что ему
+    /// положен, и ответ этот записан здесь именем причины.**
+    ///
+    /// Образцы лежат в дереве с 20.08 и до сих пор никем не разбирались – их
+    /// заводили под будущий разборщик. Тест привязывает классификатор к ним, а
+    /// не к литералам, написанным рядом с ним же: литерал подгоняют под код,
+    /// файл в фикстурах – нет.
+    ///
+    /// `not-utf8.xml` и `empty.xml` не названы: первый не текст, второй пуст, и
+    /// оба отвечают на вопрос «корректный ли это XML» раньше разбора.
+    #[test]
+    fn the_fixtures_get_the_answers_they_were_written_for() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/xml");
+        let cases: [(&str, Option<Reason>); 6] = [
+            (
+                "malformed/tag-mismatch.xml",
+                Some(Reason::ElementNeverClosed),
+            ),
+            (
+                "malformed/bad-attribute-name.xml",
+                Some(Reason::AttributeNotSeparated),
+            ),
+            (
+                "malformed/truncated-in-tag.xml",
+                Some(Reason::UnterminatedStartTag),
+            ),
+            ("malformed/truncated.xml", Some(Reason::ElementNeverClosed)),
+            // Две слепые зоны разборщика, обе на файлах дерева. XML запрещает
+            // и голый `<` в значении атрибута, и пустое локальное имя; этот
+            // разборщик принимает оба. Ожидание записано таким, каково оно
+            // есть: тест обязан ломаться, если зона закроется, – это событие,
+            // а не молчаливое улучшение.
+            ("malformed/unescaped-lt-in-attribute.xml", None),
+            ("malformed/empty-qname.xml", None),
+        ];
+        for (name, want) in cases {
+            let bytes = std::fs::read(dir.join(name)).expect("образец на месте");
+            assert_eq!(classify(&bytes).map(|f| f.reason), want, "образец {name}");
+        }
+
+        // Объявленная latin-1 – единственный образец каталога `valid`, который
+        // этот разборщик не берет, и берет он его не потому, что документ
+        // неправильный. Документ корректен, он просто не в UTF-8, а крейт
+        // собран без поддержки перекодировки: фича отключена нарочно, корпус
+        // весь в UTF-8, и тянуть таблицы кодировок ради ноля документов
+        // незачем. Названо здесь, потому что `unclassified` в этом одном
+        // случае значит «не та кодировка», а не «неправильная разметка».
+        let latin1 = std::fs::read(dir.join("valid/declared-latin1.xml")).expect("образец");
+        assert_eq!(
+            classify(&latin1).map(|f| f.reason),
+            Some(Reason::Unclassified),
+            "документ корректен, но не в UTF-8"
+        );
+
+        // И ни одного слова обо всех остальных корректных: разборщик,
+        // находящий беду там, где ее нет, хуже молчащего.
+        for entry in std::fs::read_dir(dir.join("valid")).expect("каталог образцов")
+        {
+            let path = entry.expect("запись").path();
+            if path.extension().is_none_or(|e| e != "xml")
+                || path.file_name().is_some_and(|n| n == "declared-latin1.xml")
+            {
+                continue;
+            }
+            let bytes = std::fs::read(&path).expect("образец читается");
+            assert_eq!(
+                classify(&bytes),
+                None,
+                "корректный образец {} назван некорректным",
+                path.display()
+            );
+        }
+    }
+
+    /// Каждая причина умеет назвать себя, и имя у нее не пустое.
+    #[test]
+    fn every_reason_names_itself() {
+        for reason in Reason::ALL {
+            assert!(!reason.key().is_empty(), "{reason:?}");
+            assert!(
+                reason
+                    .key()
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c == '-'),
+                "ключ {reason:?} попадет в JSON и в разметку окна"
+            );
+        }
+    }
+
     #[test]
     fn the_keys_are_distinct_and_all_reasons_are_listed() {
         let mut keys: Vec<&str> = Reason::ALL.iter().map(|r| r.key()).collect();
