@@ -367,6 +367,22 @@ fn write_item_row(
 /// accident. The leading space keeps the hidden name from running into the
 /// visible one in the row's text, where `DS` and `Daniel Schwemer` would
 /// otherwise read as one word.
+///
+/// **The name is escaped, and that is the whole of why the cell may carry
+/// markup at all.** `ManuscriptRow.svelte` renders this hole with
+/// `{@html editor}`, so whatever leaves here is written into the document as
+/// markup rather than as text. Two kinds of string meet in this function and
+/// they are not equally trustworthy: the `<span>` is written here, and the
+/// name comes out of an archive. The archive's half goes through
+/// [`escape_html`] first — as does the spelling, though that one is this
+/// crate's own constant and could not be anything else.
+///
+/// The danger is not theoretical. 206 documents of this corpus carry markup
+/// where none belongs (specification 4.13), and a bare `<` inside an attribute
+/// value occurs in documents the parser accepts without a word. An editor
+/// field is read out of such a document like any other. Anything added to this
+/// cell later is trusted by the renderer the same way, so it has to earn it
+/// the same way.
 fn editor_cell(editor: &str) -> String {
     let mut cell = escape_html(editor);
     for spelling in crate::presentation::other_spellings(editor) {
@@ -526,6 +542,62 @@ mod tests {
         assert!(html.contains("Manuscripts: 2"));
         assert!(html.contains("Zenodo 20328284"));
         assert!(html.contains("class=\"num\">1</td>"));
+    }
+
+    /// **The editor's name is corpus text, and it is escaped like any other.**
+    ///
+    /// This cell is the one place where the crate puts markup of its own beside
+    /// a field read out of an archive, so the two have to be told apart here
+    /// rather than assumed apart. The `<span>` is written by
+    /// [`editor_cell`]; everything that came from a document goes through
+    /// [`escape_html`] first, including the name that a hidden spelling would
+    /// be attached to.
+    ///
+    /// Not a hypothetical class. 206 documents of this corpus carry markup
+    /// where none belongs, and a bare `<` inside an attribute value occurs in
+    /// documents the parser accepts without a word — see specification 4.13.
+    /// The inventory renders the field with `{@html editor}` on the Svelte side,
+    /// so a raw `<` reaching it would be executed rather than shown.
+    #[test]
+    fn an_editor_name_out_of_the_archive_is_escaped_like_any_other_field() {
+        let hostile = "<script>alert(1)</script>";
+        let records = vec![rec("KBo 1", Some("CTH 1"), 1, hostile, "2020")];
+
+        let html = render_html(&records, "src", "now");
+
+        assert!(
+            !html.contains("<script>alert"),
+            "markup out of the archive reached the document unescaped"
+        );
+        assert!(
+            html.contains("<td>&lt;script&gt;alert(1)&lt;/script&gt;</td>"),
+            "the editor cell is not the escaped name and nothing else"
+        );
+    }
+
+    /// A hostile name is not an editor the corpus spells two ways, and it gets
+    /// no hidden spelling — but the escaping does not depend on that, and the
+    /// spellings themselves are the crate's own constants rather than archive
+    /// text.
+    #[test]
+    fn a_hidden_spelling_is_added_to_an_escaped_name_and_nowhere_else() {
+        let ds = render_html(
+            &[rec("KBo 1", Some("CTH 1"), 1, "DS", "2020")],
+            "src",
+            "now",
+        );
+        assert!(ds.contains("<td>DS<span hidden> Daniel Schwemer</span></td>"));
+
+        let hostile = render_html(
+            &[rec("KBo 1", Some("CTH 1"), 1, "DS<b>", "2020")],
+            "src",
+            "now",
+        );
+        assert!(
+            hostile.contains("<td>DS&lt;b&gt;</td>"),
+            "a name that only starts like a known spelling is not that editor"
+        );
+        assert!(!hostile.contains("<span hidden>"));
     }
 
     /// The credit belongs to the corpus, not to the rows, so it is there for an
