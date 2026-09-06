@@ -129,12 +129,23 @@ describe('the controls only appear once the script has run', () => {
 describe('search', () => {
   beforeEach(() => {
     inventory([
-      { label: 'CTH 1', rows: [{ siglum: 'KBo 1.1', editor: 'DS', year: '2019' }] },
+      {
+        label: 'CTH 1',
+        // The editor cell as the crate renders it: the name the document
+        // wrote, and after it — hidden — the corpus's other spelling of the
+        // same person. Which spellings those are is
+        // `presentation::EDITOR_ALIASES`, and it is checked in Rust; what is
+        // checked here is that a spelling written into the row is a spelling
+        // the search reaches.
+        rows: [
+          { siglum: 'KBo 1.1', editor: 'DS<span hidden> Daniel Schwemer</span>', year: '2019' },
+        ],
+      },
       {
         label: 'CTH 16',
         rows: [
-          { siglum: 'KUB 2.1', editor: 'Daniel Schwemer', year: '2021' },
-          { siglum: 'KUB 2.2', editor: 'FF', year: '2021' },
+          { siglum: 'KUB 2.1', editor: 'Daniel Schwemer<span hidden> DS</span>', year: '2021' },
+          { siglum: 'KUB 2.2', editor: 'FF<span hidden> Francesco Fuscagni</span>', year: '2021' },
         ],
       },
     ])
@@ -179,18 +190,22 @@ describe('search', () => {
     expect(shown()).toHaveLength(0)
   })
 
-  it('finds an editor under either of the spellings the corpus uses', () => {
+  it('reads a spelling the crate hid in the row, and finds the editor by it', () => {
     type('schwemer')
     expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KBo 1.1', 'KUB 2.1'])
     type('ds')
     expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KBo 1.1', 'KUB 2.1'])
   })
 
-  it('matches an alias against the editor cell in full, not as a substring', () => {
+  it('invents no spelling of its own', () => {
     inventory([{ label: 'CTH 5', rows: [{ siglum: 'CHDS 1.1', editor: 'AB' }] }])
     attachInventoryFilter(document)
     type('daniel schwemer')
-    // The siglum contains `ds`; the person has nothing to do with it.
+    // The siglum contains `ds`, and this row credits somebody else. The script
+    // knows nothing about editors: it searches what the row says, and the row
+    // says nothing about that person. Until 2026-09-06 it carried the list
+    // itself and had to match it against the editor cell in full to keep `ds`
+    // from catching all 1 059 `CHDS` sigla in the corpus.
     expect(shown()).toHaveLength(0)
   })
 })

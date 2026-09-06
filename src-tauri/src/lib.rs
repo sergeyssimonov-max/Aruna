@@ -342,14 +342,30 @@ fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryE
 /// Обход каталога – ответ на случай, когда манифеста нет или он не тот:
 /// испорченный JSON и манифест без `counts` ведут туда же, куда его отсутствие,
 /// потому что для окна это одно и то же положение – числа надо взять с диска.
+///
+/// **Обход делает ядро.** До 06.09.2026 он был написан здесь и выводил
+/// раскладку пакета второй раз – группа есть подкаталог, рукопись есть `.xml`
+/// внутри, – хотя задает ее экспорт. Спецификация 4.9.6 такого не разрешает:
+/// оболочка не заводит собственных путей к данным корпуса. Выбор между двумя
+/// источниками остался здесь, потому что это и есть работа обертки; сами числа
+/// считает `aruna::export::count_package`.
 fn read_stats(package: &std::path::Path) -> Result<CorpusStats, StatsError> {
-    if !package.is_dir() {
-        return Err(StatsError::Missing);
+    if let Some(stats) = counts_from_manifest(package) {
+        return Ok(stats);
     }
-    match counts_from_manifest(package) {
-        Some(stats) => Ok(stats),
-        None => count_by_walking(package),
-    }
+    let walked = aruna::export::count_package(package).map_err(|err| match err {
+        aruna::export::CountError::NotAPackage => StatsError::Missing,
+        aruna::export::CountError::Read(err) => StatsError::Read(err.to_string()),
+    })?;
+    Ok(CorpusStats {
+        manuscripts: counted(walked.documents),
+        groups: counted(walked.groups),
+        source: StatsSource::Walk,
+        spread: wire_spread(walked.spread),
+        // Обход считает файлы, а не читает документы: как написан их текст, он
+        // не знает и знать не может.
+        fonts: None,
+    })
 }
 
 /// Что манифест пакета говорит о его содержимом, если он там есть и читается.
@@ -408,12 +424,12 @@ fn counts_from_manifest(package: &std::path::Path) -> Option<CorpusStats> {
         manuscripts: counted(manifest.counts.documents),
         groups: counted(manifest.counts.groups),
         source: StatsSource::Manifest,
-        spread: spread_of(
+        spread: wire_spread(aruna::export::spread(
             manifest
                 .groups
                 .into_iter()
                 .map(|group| (group.label, group.documents.len())),
-        ),
+        )),
         fonts: manifest.fonts.map(|fonts| Fonts {
             not_in_nfc: counted(fonts.documents_not_in_nfc),
             with_private_use: counted(fonts.documents_with_private_use),
@@ -423,89 +439,22 @@ fn counts_from_manifest(package: &std::path::Path) -> Option<CorpusStats> {
     })
 }
 
-/// Разбивка по группам – из того, как они названы и сколько в них фрагментов.
+/// Разбивка ядра, переложенная в то, что уходит в окно.
 ///
-/// Одна функция на оба источника: манифест перечисляет группы с их
-/// документами, обход – каталоги с их файлами, а вопросы к этому перечню
-/// одинаковые. Второй экземпляр этой арифметики разошелся бы с первым ровно
-/// тогда, когда числа с двух источников сравнят.
-fn spread_of(groups: impl IntoIterator<Item = (String, usize)>) -> Spread {
-    let mut singletons = 0;
-    let mut without_cth = 0;
-    let mut largest: Option<GroupSize> = None;
-
-    for (label, fragments) in groups {
-        if fragments == 1 {
-            singletons += 1;
-        }
-        if label == aruna::parse::MISSING {
-            without_cth += counted(fragments);
-        }
-        // Строго больше: при равенстве остается первая встреченная, а порядок
-        // здесь – тот, в котором группы перечисляет опись.
-        if largest
-            .as_ref()
-            .is_none_or(|biggest| counted(fragments) > biggest.fragments)
-        {
-            largest = Some(GroupSize {
-                label,
-                fragments: counted(fragments),
-            });
-        }
-    }
-
+/// Считает ее `aruna::export::spread` – одна функция на оба источника, потому
+/// что вопросы к перечню групп не зависят от того, кто этот перечень составил:
+/// манифест списком своих групп или обход каталогами на диске. Здесь остается
+/// приведение к объявленной на проводе форме – `u32` вместо `usize`, – и
+/// больше ничего: арифметики в оболочке нет.
+fn wire_spread(spread: aruna::export::Spread) -> Spread {
     Spread {
-        largest,
-        singletons,
-        without_cth,
+        largest: spread.largest.map(|group| GroupSize {
+            label: group.label,
+            fragments: counted(group.fragments),
+        }),
+        singletons: counted(spread.singletons),
+        without_cth: counted(spread.without_cth),
     }
-}
-
-/// Пересчет по разложенному пакету: группы – подкаталоги, рукописи – файлы XML
-/// внутри них.
-///
-/// Ровно та раскладка, которую делает экспорт: каталог на группу CTH, документ
-/// на рукопись. Файлы в корне пакета – манифест и опись – группами не считаются
-/// потому, что каталогами не являются.
-fn count_by_walking(package: &std::path::Path) -> Result<CorpusStats, StatsError> {
-    let failed = |err: std::io::Error| StatsError::Read(err.to_string());
-
-    let mut sizes: Vec<(String, usize)> = Vec::new();
-    let mut manuscripts = 0;
-    for group in std::fs::read_dir(package).map_err(failed)? {
-        let group = group.map_err(failed)?;
-        if !group.file_type().map_err(failed)?.is_dir() {
-            continue;
-        }
-        let mut fragments = 0;
-        for document in std::fs::read_dir(group.path()).map_err(failed)? {
-            let document = document.map_err(failed)?;
-            let path = document.path();
-            let is_xml = path
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"));
-            if is_xml {
-                fragments += 1;
-            }
-        }
-        manuscripts += fragments;
-        // Имя каталога, а не метка группы: экспорт получает первое из второго
-        // через `dir_component`, и для группы без CTH они совпадают – метка
-        // `—` проходит правило имени неизменной. Там, где они разойдутся –
-        // сигла со слешем внутри метки, – расходится и то, что показывает
-        // обход: он видит каталог и честно называет его так, как тот назван.
-        sizes.push((group.file_name().to_string_lossy().into_owned(), fragments));
-    }
-
-    Ok(CorpusStats {
-        manuscripts: counted(manuscripts),
-        groups: counted(sizes.len()),
-        source: StatsSource::Walk,
-        spread: spread_of(sizes),
-        // Обход считает файлы, а не читает документы: как написан их текст, он
-        // не знает и знать не может.
-        fonts: None,
-    })
 }
 
 // ---------------------------------------------------------------------------
@@ -1417,7 +1366,12 @@ mod counting {
         );
     }
 
-    /// **Без манифеста считается то, что на диске.**
+    /// **Без манифеста числа берутся обходом, и обход делает ядро.**
+    ///
+    /// Что именно считается группой и что рукописью, проверено там, где это
+    /// написано, – `aruna::export::counts`. Здесь проверяется работа обертки:
+    /// без манифеста она уходит к ядру, отвечает его числами и говорит, откуда
+    /// они взяты.
     #[test]
     fn a_package_without_a_manifest_is_counted_by_walking() {
         let dir = tempfile::tempdir().unwrap();
@@ -1428,22 +1382,18 @@ mod counting {
         assert_eq!(stats.manuscripts, 20);
         assert_eq!(stats.groups, 4);
         assert_eq!(stats.source, StatsSource::Walk);
-        assert_eq!(stats.spread.singletons, 0);
-        assert_eq!(stats.spread.without_cth, 0);
+        assert_eq!(
+            stats
+                .spread
+                .largest
+                .expect("в пакете есть группы")
+                .fragments,
+            5,
+            "разбивка обхода доехала до окна"
+        );
         assert_eq!(
             stats.fonts, None,
             "обход не читает документы и не может знать, как написан их текст"
-        );
-
-        // Все четыре группы одного размера, поэтому проверяется размер, а имя
-        // – только тем, что оно вообще из пакета: порядок, в котором файловая
-        // система отдает каталоги, здесь не обещан никем.
-        let largest = stats.spread.largest.expect("в пакете есть группы");
-        assert_eq!(largest.fragments, 5);
-        assert!(
-            largest.label.starts_with("CTH "),
-            "самой большой названа не группа пакета: {}",
-            largest.label
         );
     }
 
@@ -1539,36 +1489,6 @@ mod counting {
                 with_private_use: 4,
                 private_use_points: 2,
                 anomalies: 6,
-            })
-        );
-    }
-
-    /// **Группу без CTH называет ядро, а не эта программа.**
-    ///
-    /// Метка берется из `aruna::parse::MISSING` – в тесте тоже, потому что
-    /// написать здесь `—` значило бы проверять, что две копии одной строки
-    /// совпадают, а не что программа берет ее у разбора.
-    #[test]
-    fn a_group_without_a_cth_is_recognised_by_the_label_the_core_gives_it() {
-        let dir = tempfile::tempdir().unwrap();
-        for (group, documents) in [(aruna::parse::MISSING, 3), ("CTH 1", 1)] {
-            let path = dir.path().join(group);
-            fs::create_dir_all(&path).unwrap();
-            for document in 0..documents {
-                fs::write(path.join(format!("KBo {document}.xml")), b"<doc/>").unwrap();
-            }
-        }
-
-        let stats = read_stats(dir.path()).unwrap();
-
-        assert_eq!(stats.source, StatsSource::Walk);
-        assert_eq!(stats.spread.without_cth, 3);
-        assert_eq!(stats.spread.singletons, 1, "это группа CTH 1, а не вторая");
-        assert_eq!(
-            stats.spread.largest,
-            Some(GroupSize {
-                label: aruna::parse::MISSING.to_owned(),
-                fragments: 3,
             })
         );
     }

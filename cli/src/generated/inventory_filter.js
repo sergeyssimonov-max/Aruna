@@ -17,45 +17,18 @@
 	* button folds nothing — which is why the controls are only admitted to the
 	* page (`filter-on`) once this has run.
 	*/
-	/** Which cell of a manuscript row names the editor. */
-	var EDITOR_CELL = 4;
-	/** Which cell carries the row's position in the table rather than its data. */
-	var ROW_NUMBER_CELL = 0;
+	/**
+	* The cell that carries the row's position in the table rather than its data.
+	*
+	* Asked for by the class the crate puts on it, not by its index. The order of
+	* the columns is declared once, in `cli/src/html.rs`, and an index written here
+	* was a second copy of that order with nothing holding the two together: a
+	* column inserted before this one would have sent the search quietly looking at
+	* the wrong cell.
+	*/
+	var ROW_NUMBER_CELL = ".num";
 	var COLLAPSE = "Collapse fragments";
 	var EXPAND = "Expand fragments";
-	/**
-	* Spellings the corpus uses for one and the same editor, lowercased.
-	*
-	* TLHdig records who made an edition in whatever form the file's author typed:
-	* initials in most documents, a full name in the newer ones. A search for a
-	* surname would otherwise miss every row that carries only initials —
-	* `schwemer` found 84 manuscripts and not the 7 that say `DS`.
-	*
-	* It was one of two lists while the website existed and an agreement test held
-	* the pair together; the site is gone and this is now the only one. What an
-	* alias changes is which rows a query reaches — never what a row displays,
-	* which stays as the document wrote it.
-	*/
-	var EDITOR_ALIASES = [["ds", "daniel schwemer"], ["ff", "francesco fuscagni"]];
-	/**
-	* The other spellings of whoever this row credits, ready to append to the text
-	* it is searched by.
-	*
-	* Matched against the Editor cell alone, and in full: `ds` as a substring of
-	* the whole row would catch every `CHDS` siglum in the corpus, which is 1 059
-	* manuscripts having nothing to do with the person.
-	*/
-	function aliasesOf(tr) {
-		var _cell$textContent;
-		const cell = tr.cells[EDITOR_CELL];
-		const editor = cell ? ((_cell$textContent = cell.textContent) !== null && _cell$textContent !== void 0 ? _cell$textContent : "").trim().toLowerCase() : "";
-		if (!editor) return "";
-		for (const group of EDITOR_ALIASES) {
-			if (!group.includes(editor)) continue;
-			return "\n" + group.filter((spelling) => spelling !== editor).join("\n");
-		}
-		return "";
-	}
 	/**
 	* The text a manuscript row is searched by: what it says, not where it sits.
 	*
@@ -67,13 +40,20 @@
 	*
 	* Cells are joined with a newline rather than a space, so a query cannot run
 	* from the end of one column into the start of the next.
+	*
+	* The other spellings of an editor are in the text already: the crate writes
+	* them into the row after the visible name, out of sight, and `textContent`
+	* reads a hidden element like any other. Which spellings name one and the same
+	* person is a fact about the corpus, and it was stated here until 2026-09-06 —
+	* see `presentation::EDITOR_ALIASES`, where the crate that renders the cell now
+	* says it once.
 	*/
 	function rowText(tr) {
 		const parts = [];
-		for (let c = 0; c < tr.cells.length; c++) {
-			var _tr$cells$c$textConte;
-			if (c === ROW_NUMBER_CELL) continue;
-			parts.push((_tr$cells$c$textConte = tr.cells[c].textContent) !== null && _tr$cells$c$textConte !== void 0 ? _tr$cells$c$textConte : "");
+		for (const cell of tr.cells) {
+			var _cell$textContent;
+			if (cell.matches(ROW_NUMBER_CELL)) continue;
+			parts.push((_cell$textContent = cell.textContent) !== null && _cell$textContent !== void 0 ? _cell$textContent : "");
 		}
 		return parts.join("\n").toLowerCase();
 	}
@@ -124,7 +104,7 @@
 			groups.push(current);
 		} else if (current) {
 			current.items.push(tr);
-			current.texts.push(rowText(tr) + aliasesOf(tr));
+			current.texts.push(rowText(tr));
 		}
 		/** The toolbar button folds everything, or opens everything back up. */
 		function syncFoldAll() {
