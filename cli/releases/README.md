@@ -13,9 +13,10 @@ publishes a new release removes the previous one. Everything else a build
 produces is still ignored: that copy did go stale the moment the next build
 ran, which is why the rule exists.
 
-| Committed image | Digest |
+| Committed | Digest |
 |---|---|
-| `Aruna_2.5.3_universal.dmg` | `5968e756bb282e6b035ca34dfee28496e649da95165840020b4706c6ad304629` |
+| `Aruna-macos-universal.dmg` | `5d0ee42b2e2344e0096ebfb964d820c197452d788fad50ff3af75c6f331e9f11` |
+| `SHA256SUMS` | the line above, as the contour wrote it |
 
 Download them from [Releases](https://github.com/sergeyssimonov-max/Aruna/releases):
 

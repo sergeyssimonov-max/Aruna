@@ -14,5 +14,6 @@ releases/*.dmg
 # опубликованного DMG хранится в репозитории наравне с ассетом релиза. Хранится
 # ровно один – образ той версии, что названа в `cli/Cargo.toml`; предыдущий
 # снимается тем же коммитом, что и выпуск, который его заменил.
-!releases/Aruna_*_universal.dmg
 releases/SHA256SUMS
+!releases/Aruna-macos-universal.dmg
+!releases/SHA256SUMS

@@ -48,7 +48,7 @@
       "tag": "v2.5.3",
       "commit": "91c4071fd77a46adb063fa6c98880c049e262ac3",
       "published": "2026-09-06T15:37:25Z",
-      "dmg_sha256": "5968e756bb282e6b035ca34dfee28496e649da95165840020b4706c6ad304629",
+      "dmg_sha256": "5d0ee42b2e2344e0096ebfb964d820c197452d788fad50ff3af75c6f331e9f11",
       "why": "The current release and the third reference. It replaced v2.5.2, withdrawn the same day: a reference cannot be re-cut, so the work that followed it took a number of its own and the list stays at three by retiring the release it replaces. What it carries over v2.5.2 is a boundary put back where the specification always said it was — the package's own layout and the corpus's editor spellings are stated by the crate that owns them rather than a second time by the shell and the inventory's script — and a window that says what came out of the archive in five figures and in Russian."
     }
   ]
