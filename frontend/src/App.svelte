@@ -3,7 +3,15 @@
   import { open } from '@tauri-apps/plugin-dialog'
   import { openPath } from '@tauri-apps/plugin-opener'
   import { commands, events } from './bindings'
-  import type { BuildFailure, BuildProgress, BuildReport, CorpusStats, Stage } from './bindings'
+  import type {
+    BuildFailure,
+    BuildProgress,
+    BuildReport,
+    CorpusStats,
+    Stage,
+    XmlSummary,
+  } from './bindings'
+  import { reasonName } from './reasons'
 
   const CORPUS = 'Thesaurus Linguarum Hethaeorum Digitalis'
 
@@ -49,7 +57,7 @@
   type Screen =
     | { kind: 'reading' }
     | { kind: 'absent' }
-    | { kind: 'present'; stats: CorpusStats; inventory: string }
+    | { kind: 'present'; stats: CorpusStats; inventory: string; markup: XmlSummary | null }
     | { kind: 'unreadable'; inventory: string | null }
     | { kind: 'building' }
     | { kind: 'built'; report: BuildReport }
@@ -64,15 +72,16 @@
   let stopping: boolean = $state(false)
 
   /**
-   * Номера прогонов и архив последнего запуска – намеренно не `$state`.
+   * Номера прогонов и папка назначения – намеренно не `$state`.
    *
-   * В разметку они не попадают, и реактивными им быть незачем: `$state` здесь
-   * объявлял бы зависимость, которой нет, а читателю обещал бы, что от этих
-   * трех что-то на экране меняется.
+   * В разметку не попадает ни одно из трех: номера нужны отсеву опоздавших
+   * событий, папка – повтору того же прогона. Реактивными им быть незачем:
+   * `$state` здесь объявлял бы зависимость, которой нет, а читателю обещал бы,
+   * что от этих трех что-то на экране меняется.
    */
   let job: number | null = null
   let finished: number | null = null
-  let archive: string | null = null
+  let destination: string | null = null
 
   /**
    * Разряды неразрывным пробелом, вручную.
@@ -187,7 +196,20 @@
         }
         return
       }
-      screen = { kind: 'present', stats: counted.data, inventory: located.data.inventory }
+      // Разметка – сведение необязательное, и ее отказ экран не роняет.
+      //
+      // Секцию `xml` манифест несет с 06.09.2026, и пакет, собранный раньше,
+      // ее не несет вовсе: отказ этой команды означает «сказать нечего», а не
+      // «что-то не так». Отказ `corpusStats` – другое дело и уводит на
+      // `unreadable` в ветке выше: без чисел окно не может сказать о пакете
+      // ничего. Здесь же оно теряет один блок и показывает остальное.
+      const parsed = await commands.corpusXml(located.data.package)
+      screen = {
+        kind: 'present',
+        stats: counted.data,
+        inventory: located.data.inventory,
+        markup: parsed.status === 'ok' ? parsed.data : null,
+      }
     } catch (error: unknown) {
       trouble = String(error)
       screen = { kind: 'unreadable', inventory: null }
@@ -204,7 +226,7 @@
    * в этот промежуток описывали бы не тот прогон.
    */
   async function build(chosen: string | null): Promise<void> {
-    archive = chosen
+    destination = chosen
     job = null
     progress = null
     manuscripts = null
@@ -241,14 +263,10 @@
     }
   }
 
-  /** Архив с диска. Отмененный выбор – не событие: окно остается как было. */
-  async function pick(): Promise<void> {
+  /** Папка для пакета. Отмененный выбор – не событие: окно остается как было. */
+  async function pickFolder(): Promise<void> {
     try {
-      const chosen = await open({
-        multiple: false,
-        directory: false,
-        filters: [{ name: 'Архив TLHdig', extensions: ['zip'] }],
-      })
+      const chosen = await open({ multiple: false, directory: true })
       if (chosen === null) {
         return
       }
@@ -390,6 +408,71 @@
           <span>Anomalies – <span class="count">{spaced(screen.stats.fonts.anomalies)}</span></span>
         </p>
       {/if}
+      <!--
+        Что разборщик сказал о документах – своей оберткой, а не четырьмя
+        соседями `.ready`: тот расставляет детей через 28 пикселей, которыми
+        на этом экране отделены друг от друга разные сообщения, а здесь строки
+        одного.
+
+        Блока нет вовсе, когда сведений нет: пакет, собранный до 06.09.2026,
+        секции `xml` в манифесте не несет, и отказ команды `corpus_xml` – это
+        он и есть, а не поломка.
+      -->
+      {#if screen.markup}
+        <div class="markup">
+          {#if screen.markup.not_well_formed === 0}
+            <p class="spread">
+              <span>
+                Well-formed XML –
+                <span class="count">all {spaced(screen.markup.documents)}</span> documents
+              </span>
+            </p>
+          {:else}
+            <p class="spread">
+              <span>
+                Not well-formed XML –
+                <span class="count">{spaced(screen.markup.not_well_formed)}</span>
+                of {spaced(screen.markup.documents)}
+              </span>
+            </p>
+            <p class="markup-about">
+              All of them are in the package alongside the rest: this is a property of the source
+              documents, and it affects turning them into PDF, not keeping them.
+            </p>
+            <!--
+              Причина с нулем на экран не попадает: строки читают глазами, и
+              десяток подписей, из которых половина ни о чем, отнимает у
+              оставшихся ровно то внимание, ради которого разбивка написана.
+              В манифесте нули стоят нарочно – это две разные вещи.
+            -->
+            <p class="spread reasons">
+              {#each screen.markup.reasons.filter((r) => r.documents > 0) as r (r.reason)}
+                <span
+                  >{reasonName(r.reason)} – <span class="count">{spaced(r.documents)}</span></span
+                >
+              {/each}
+            </p>
+            <!--
+              Имена – под раскрытием и по одному на строку: их две сотни, это
+              не сводка, а справка, и открывают ее тогда, когда имя нужно
+              найти. `<details>` стоит рядом с абзацами, а не внутри одного из
+              них: абзац его содержать не вправе.
+            -->
+            <details class="names">
+              <summary>File names ({spaced(screen.markup.not_well_formed)})</summary>
+              <ul>
+                {#each screen.markup.documents_not_well_formed as d (d.file)}
+                  <li>
+                    <span class="file">{d.file}</span><span class="place"
+                      >{reasonName(d.reason)} – line {d.line}, column {d.column}</span
+                    >
+                  </li>
+                {/each}
+              </ul>
+            </details>
+          {/if}
+        </div>
+      {/if}
     {:else if screen.kind === 'building'}
       <p class="stage">{stage}</p>
       <!--
@@ -448,9 +531,6 @@
         </p>
       {/if}
       <p class="where">Пакет – {screen.report.package}</p>
-      {#if screen.report.archive}
-        <p class="where">Собрано из архива – {screen.report.archive}</p>
-      {/if}
     {:else if screen.kind === 'failed'}
       <p class="about">{screen.failure.message}</p>
     {/if}
@@ -495,8 +575,8 @@
         <button type="button" class="control control-quiet" onclick={() => void build(null)}>
           Пересобрать
         </button>
-        <button type="button" class="control control-quiet" onclick={() => void pick()}>
-          Взять архив с диска…
+        <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
+          Собрать в папку…
         </button>
       {:else if screen.kind === 'built'}
         {@const inventory = screen.report.inventory}
@@ -511,34 +591,51 @@
         <button type="button" class="control control-quiet" onclick={() => void build(null)}>
           Пересобрать
         </button>
-        <button type="button" class="control control-quiet" onclick={() => void pick()}>
-          Взять архив с диска…
+        <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
+          Собрать в папку…
         </button>
       {:else if screen.kind === 'failed' && screen.failure.retryable}
         <!--
-          Повтор повторяет тот же прогон: тот же архив, если его выбирали, и ту
-          же запись Zenodo, если нет. Кнопка, которая после отказа делает не то
-          же самое, ответила бы не на тот вопрос.
+          Повтор повторяет тот же прогон: ту же закрепленную запись Zenodo – и
+          ту же папку, если ее выбирали. Кнопка, которая после отказа делает не
+          то же самое, ответила бы не на тот вопрос.
         -->
         <button
           type="button"
           class="control"
           data-testid="primary"
-          onclick={() => void build(archive)}
+          onclick={() => void build(destination)}
         >
           {screen.failure.cancelled ? 'Собрать' : 'Повторить'}
         </button>
-        <button type="button" class="control control-quiet" onclick={() => void pick()}>
-          Взять архив с диска…
+        <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
+          Собрать в папку…
         </button>
       {:else if screen.kind === 'failed'}
         <!--
-          Отказ, который не помечен `retryable`, повторять нечем: тот же прогон
-          кончится тем же. Главным действием остается другой архив – это
-          единственное, что здесь можно изменить.
+          Отказ, который не помечен `retryable`, второй попыткой обычно не
+          лечится: тот же прогон кончится тем же. Пока у окна был выбор архива,
+          он и стоял здесь главным действием – единственное, что можно было
+          изменить. Источник теперь один, и назвать другой окну нечем.
+
+          Кнопка все же стоит, и не для вида: переполненный диск, занятый
+          каталог вывода, столкновение имен в нем – это чинится снаружи окна, и
+          после починки нужно чем-то начать заново. Второе, что здесь можно
+          изменить, не выходя из окна, – папка: рядом стоит ее выбор, и занятый
+          каталог вывода обходится другим каталогом. Экран без единого действия
+          был бы тупиком. Обещания успеха кнопка не дает, поэтому названа
+          «Собрать по умолчанию», а не «Повторить».
         -->
-        <button type="button" class="control" data-testid="primary" onclick={() => void pick()}>
-          Взять архив с диска…
+        <button
+          type="button"
+          class="control"
+          data-testid="primary"
+          onclick={() => void build(null)}
+        >
+          Собрать по умолчанию
+        </button>
+        <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
+          Собрать в папку…
         </button>
       {:else if screen.kind === 'unreadable'}
         {@const inventory = screen.inventory}
@@ -548,7 +645,7 @@
           data-testid="primary"
           onclick={() => void build(null)}
         >
-          Собрать
+          Собрать по умолчанию
         </button>
         {#if inventory !== null}
           <button
@@ -559,8 +656,8 @@
             Открыть опись
           </button>
         {/if}
-        <button type="button" class="control control-quiet" onclick={() => void pick()}>
-          Взять архив с диска…
+        <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
+          Собрать в папку…
         </button>
       {:else if screen.kind === 'absent'}
         <button
@@ -569,10 +666,10 @@
           data-testid="primary"
           onclick={() => void build(null)}
         >
-          Собрать
+          Собрать по умолчанию
         </button>
-        <button type="button" class="control control-quiet" onclick={() => void pick()}>
-          Взять архив с диска…
+        <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
+          Собрать в папку…
         </button>
       {/if}
     </div>
@@ -584,3 +681,90 @@
     {/if}
   </div>
 </main>
+
+<!--
+  Стили этого блока – здесь, а не в `app.css`.
+
+  Верстка окна лежит в `app.css` целиком, и правило это не отменяется: там
+  палитра, шкала размеров и все, что делит между собой несколько экранов.
+  Здесь только то, что живет ровно в одной ветке одного состояния и нигде
+  больше, – и области видимости Svelte довольно, чтобы этого не объявлять
+  глобально. Плоские селекторы и вложенности нет по той же причине, что и
+  там: окно живет в WKWebView macOS 13, и вложенный CSS Safari 16 не понимает.
+  Цвета и размеры взяты токенами и ступенями `app.css`, своих здесь нет.
+-->
+<style>
+  /* Строки одного сообщения – в своей колонке: промежуток `.ready` в 28
+   * пикселей отделяет сообщения друг от друга, а не строки внутри одного. */
+  .markup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Фраза о том, где эти документы лежат, – по мерке прозаических строк
+   * экрана: та же ширина и выключка, что у заголовка, и младший размер.
+   * Класс свой, а не `.about`: тот объявлен глобально и принадлежит строкам,
+   * которые сменяют друг друга по состояниям, – эта стоит вместе с ними. */
+  .markup-about {
+    max-width: 480px;
+    margin: 0;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  /* Разбивка переносится по строкам, в отличие от соседних `.spread`: причин
+   * бывает десяток, а ширина окна не меняется. Промежуток между строками
+   * меньше, чем между подписями в строке, – иначе перенос читался бы как
+   * начало другого списка. */
+  .reasons {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 32px;
+  }
+
+  /* Ширина названа явно и равна ширине заголовка: без нее `align-items:
+   * center` сжал бы раскрытый список по самой длинной строке, и он ездил бы
+   * по горизонтали от того, какие имена попались. */
+  .names {
+    width: 480px;
+    font-size: 13px;
+  }
+
+  .names summary {
+    cursor: pointer;
+  }
+
+  /* Список прокручивается сам. Двести с лишним позиций вытолкнули бы низ окна
+   * за край: окно 800×600 и размер мышью не меняет, а прокрутки целиком у
+   * него нет. */
+  .names ul {
+    max-height: 96px;
+    overflow-y: auto;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .names li {
+    padding: 3px 0;
+  }
+
+  /* Имя ломается где придется, как и путь пакета в `.where`: это путь внутри
+   * пакета, и пробелов в нем не бывает. */
+  .names .file {
+    color: var(--text-h);
+    overflow-wrap: anywhere;
+  }
+
+  /* Причина и место – в той же строке, мельче имени и цветом подписи: имя
+   * здесь ищут, а это читают, найдя. Строка одна, а не две: раскрытый список
+   * ограничен по высоте, и вторая строка на документ вдвое сократила бы то,
+   * что видно без прокрутки. */
+  .names .place {
+    margin-left: 8px;
+    font-size: 12px;
+    color: var(--text);
+  }
+</style>

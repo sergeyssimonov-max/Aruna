@@ -4,7 +4,7 @@ import { tick } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.svelte'
 import { STATS_SAMPLE } from './stats'
-import type { BuildFailure, BuildProgress, BuildReport, CorpusStats } from './bindings'
+import type { BuildFailure, BuildProgress, BuildReport, CorpusStats, XmlSummary } from './bindings'
 
 /**
  * Мост в Tauri – один модуль, и заглушка тоже одна.
@@ -22,20 +22,30 @@ import type { BuildFailure, BuildProgress, BuildReport, CorpusStats } from './bi
  * `vi.hoisted` здесь не украшение: фабрику `vi.mock` поднимают выше импортов, и
  * обычная переменная в этот момент еще не создана.
  */
-const { corpusLocation, corpusStats, buildCorpus, cancelBuild, listen, unlisten, open, openPath } =
-  vi.hoisted(() => ({
-    corpusLocation: vi.fn(),
-    corpusStats: vi.fn(),
-    buildCorpus: vi.fn(),
-    cancelBuild: vi.fn(),
-    listen: vi.fn(),
-    unlisten: vi.fn(),
-    open: vi.fn(),
-    openPath: vi.fn(),
-  }))
+const {
+  corpusLocation,
+  corpusStats,
+  corpusXml,
+  buildCorpus,
+  cancelBuild,
+  listen,
+  unlisten,
+  open,
+  openPath,
+} = vi.hoisted(() => ({
+  corpusLocation: vi.fn(),
+  corpusStats: vi.fn(),
+  corpusXml: vi.fn(),
+  buildCorpus: vi.fn(),
+  cancelBuild: vi.fn(),
+  listen: vi.fn(),
+  unlisten: vi.fn(),
+  open: vi.fn(),
+  openPath: vi.fn(),
+}))
 
 vi.mock('./bindings', () => ({
-  commands: { corpusLocation, corpusStats, buildCorpus, cancelBuild },
+  commands: { corpusLocation, corpusStats, corpusXml, buildCorpus, cancelBuild },
   events: { buildProgress: { listen } },
 }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open }))
@@ -44,7 +54,7 @@ vi.mock('@tauri-apps/plugin-opener', () => ({ openPath }))
 const DOWNLOADS = '/Users/reader/Downloads'
 const PACKAGE = `${DOWNLOADS}/TLHdig_Beta_0.3`
 const INVENTORY = `${PACKAGE}/TLHdig_Beta_0.3.html`
-const ARCHIVE = `${DOWNLOADS}/tlhdig-0.3.zip`
+const FOLDER = '/Users/reader/Documents/Корпус'
 
 /** Событие прогресса, отправленное с той стороны провода. */
 let emit: (payload: BuildProgress) => void = () => {
@@ -102,7 +112,6 @@ function report(over: Partial<BuildReport> = {}): BuildReport {
     job: 7,
     package: PACKAGE,
     inventory: INVENTORY,
-    archive: null,
     documents: 23936,
     groups: 663,
     disambiguated: 0,
@@ -131,10 +140,35 @@ function deferred<T>(): { promise: Promise<T>; settle: (value: T) => void } {
   return { promise, settle }
 }
 
+/** Сводка о разметке, какой ее отдает манифест собранного пакета. */
+const markup: XmlSummary = {
+  documents: 23936,
+  well_formed: 23730,
+  not_well_formed: 206,
+  reasons: [
+    { reason: 'unterminated-start-tag', documents: 95 },
+    { reason: 'element-never-closed', documents: 33 },
+    // Причина с нулем приходит с провода и обязана не попасть на экран:
+    // строка «0 документов» читается как найденная беда, а не как ее
+    // отсутствие.
+    { reason: 'unclassified', documents: 0 },
+  ],
+  documents_not_well_formed: [
+    { file: 'CTH 341/KBo 22.91.xml', reason: 'element-never-closed', line: 12, column: 7 },
+    { file: 'CTH 448/KBo 15.15.xml', reason: 'crossing-elements', line: 3, column: 40 },
+  ],
+}
+
 /** Окно, открытое над собранным пакетом. */
-async function overPackage(stats: CorpusStats = bare): Promise<HTMLElement> {
+async function overPackage(
+  stats: CorpusStats = bare,
+  xml: XmlSummary | null = markup,
+): Promise<HTMLElement> {
   corpusLocation.mockResolvedValue(location(true))
   corpusStats.mockResolvedValue(ok(stats))
+  corpusXml.mockResolvedValue(
+    xml === null ? bad('манифест пакета не содержит сведений о разметке') : ok(xml),
+  )
   const { container } = render(App)
   await screen.findByRole('button', { name: 'Открыть опись' })
   return container
@@ -144,7 +178,7 @@ async function overPackage(stats: CorpusStats = bare): Promise<HTMLElement> {
 async function overNothing(): Promise<HTMLElement> {
   corpusLocation.mockResolvedValue(location(false))
   const { container } = render(App)
-  await screen.findByRole('button', { name: 'Собрать' })
+  await screen.findByRole('button', { name: 'Собрать по умолчанию' })
   return container
 }
 
@@ -184,7 +218,12 @@ describe('пакет есть', () => {
     // Прямо по узлам, а не через `getByText`: тот приводит пробелы к обычным
     // перед сравнением, и неразрывный разделитель – единственное, что здесь
     // легко потерять молча, – проверять было бы нечем.
-    const counts = Array.from(container.querySelectorAll('.count')).map((node) => node.textContent)
+    // Блок разметки исключен: с 06.09 у него свои счетчики, а этот тест про
+    // два числа заголовка. Селектор без оговорки собрал бы все подряд и
+    // ломался бы от любой новой строки на экране.
+    const counts = Array.from(container.querySelectorAll('.count'))
+      .filter((node) => !node.closest('.markup'))
+      .map((node) => node.textContent)
     expect(counts).toEqual(['23 936', '663'])
   })
 
@@ -212,9 +251,9 @@ describe('пакет есть', () => {
     const container = await overPackage(STATS_SAMPLE.manifest)
 
     await screen.findByText(/Largest group/)
-    const rows = Array.from(container.querySelectorAll('.spread')).map((node) =>
-      node.textContent?.replace(/\s+/g, ' ').trim(),
-    )
+    const rows = Array.from(container.querySelectorAll('.spread'))
+      .filter((node) => !node.closest('.markup'))
+      .map((node) => node.textContent?.replace(/\s+/g, ' ').trim())
 
     expect(rows).toEqual([
       'Largest group – CTH 832 (4 480) Groups of one – 116 Without CTH – 0',
@@ -233,7 +272,9 @@ describe('пакет есть', () => {
     const container = await overPackage({ ...STATS_SAMPLE.manifest, source: 'walk', fonts: null })
 
     await screen.findByText(/Largest group/)
-    expect(container.querySelectorAll('.spread')).toHaveLength(1)
+    expect(
+      Array.from(container.querySelectorAll('.spread')).filter((node) => !node.closest('.markup')),
+    ).toHaveLength(1)
     expect(screen.queryByText(/Not in NFC/)).toBeNull()
     expect(screen.queryByText(/Anomalies/)).toBeNull()
   })
@@ -256,6 +297,70 @@ describe('пакет есть', () => {
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
     expect(await primary()).toHaveTextContent('Собрать')
     expect(screen.queryByText(/Manuscripts/)).toBeNull()
+  })
+
+  /**
+   * **Сводка о разметке видна, и видно, что документы никуда не делись.**
+   *
+   * Числа – это половина дела. Вторая половина в том, что читатель не должен
+   * уйти с мыслью, будто 206 документов из пакета выброшены: они там, и экран
+   * обязан сказать это словами, а не умолчанием.
+   */
+  it('показывает, сколько документов не корректный XML, и что они в пакете', async () => {
+    await overPackage()
+
+    expect(corpusXml).toHaveBeenCalledWith(PACKAGE)
+    expect(await screen.findByText(/Not well-formed XML/)).toBeInTheDocument()
+    expect(screen.getByText('206')).toBeInTheDocument()
+    // Не только числа: экран обязан сказать словами, что документы на месте.
+    expect(screen.getByText(/in the package/i)).toBeInTheDocument()
+    // Ни одного слова, приписывающего документу то, чего с ним не делали.
+    const shown = document.body.textContent ?? ''
+    for (const word of ['rejected', 'excluded', 'discarded', 'corrupt', 'broken']) {
+      expect(shown.toLowerCase()).not.toContain(word)
+    }
+  })
+
+  /**
+   * **Разбивка показывает найденное, а не перечень всех мыслимых причин.**
+   *
+   * Причина с нулем приходит с провода намеренно – манифест перечисляет все,
+   * чтобы отличить «искали и не нашли» от «не искали». На экране она лишняя:
+   * строка «not classified – 0» читается как беда, которой нет.
+   */
+  it('в разбивке пропускает причины без документов', async () => {
+    await overPackage()
+
+    // Запрос сужен до самой разбивки: подпись причины стоит и там, и в
+    // списке имен, и общий поиск нашел бы две.
+    const container = document.querySelector('.reasons')
+    expect(container?.textContent).toContain('tag left open')
+    expect(container?.textContent).toContain('element never closed')
+    expect(container?.textContent).not.toContain('not classified')
+  })
+
+  /**
+   * **Имена читаются, а не свалены в строку.**
+   */
+  it('дает список имен некорректных документов', async () => {
+    await overPackage()
+
+    expect(await screen.findByText('CTH 341/KBo 22.91.xml')).toBeInTheDocument()
+    expect(screen.getByText('CTH 448/KBo 15.15.xml')).toBeInTheDocument()
+  })
+
+  /**
+   * **Пакет, собранный до 06.09.2026, открывается как обычно.**
+   *
+   * Его манифест сведений о разметке не несет, и это не поломка окна. Отказ
+   * `corpus_xml` не имеет права увести экран в `unreadable`: числа рукописей
+   * на месте, опись открывается, отсутствует только один раздел.
+   */
+  it('без сведений о разметке в манифесте показывает пакет как обычно', async () => {
+    await overPackage(bare, null)
+
+    expect(await primary()).toHaveTextContent('Открыть опись')
+    expect(screen.queryByText(/Not well-formed XML/)).toBeNull()
   })
 
   /** **Опись открывает система, и открывает ту, что назвал `corpus_location`.** */
@@ -281,8 +386,52 @@ describe('ничего не собрано', () => {
 
     expect(corpusStats).not.toHaveBeenCalled()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/здесь еще нет/)
-    expect(await primary()).toHaveTextContent('Собрать')
-    expect(screen.getByRole('button', { name: 'Взять архив с диска…' })).toBeInTheDocument()
+    expect(await primary()).toHaveTextContent('Собрать по умолчанию')
+    expect(screen.getByRole('button', { name: 'Собрать в папку…' })).toBeInTheDocument()
+  })
+
+  /**
+   * **Взять архив с диска окно не предлагает нигде.**
+   *
+   * Источник один – портал, решением владельца 06.09.2026. Держит это форма
+   * команды: единственный ее аргумент – папка назначения, назвать архив
+   * нечем. Проверка стоит на том, что видит человек: кнопка, которая
+   * вернулась бы вместе с выбором.
+   */
+  it('нигде не предлагает взять архив с диска', async () => {
+    await overNothing()
+
+    expect(screen.queryByRole('button', { name: /архив/i })).toBeNull()
+  })
+
+  /**
+   * **Папка выбирается, и выбранная уходит в команду.**
+   *
+   * Каталог, а не файл, и один: `build_corpus` проверяет путь у себя, но
+   * предлагать выбрать три папки сразу окно не должно. Источник при этом не
+   * трогается – аргумента, которым его можно назвать, у команды нет.
+   */
+  it('отдает выбранную папку в build_corpus', async () => {
+    open.mockResolvedValue(FOLDER)
+    buildCorpus.mockReturnValue(deferred<unknown>().promise)
+    await overNothing()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
+
+    expect(open).toHaveBeenCalledWith({ multiple: false, directory: true })
+    await vi.waitFor(() => expect(buildCorpus).toHaveBeenCalledWith(FOLDER))
+  })
+
+  /** **Закрытый без выбора диалог – не событие: окно остается как было.** */
+  it('на отмененном выборе папки ничего не делает', async () => {
+    open.mockResolvedValue(null)
+    await overNothing()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
+
+    await vi.waitFor(() => expect(open).toHaveBeenCalled())
+    expect(buildCorpus).not.toHaveBeenCalled()
+    expect(await primary()).toHaveTextContent('Собрать по умолчанию')
   })
 
   /**
@@ -305,39 +454,6 @@ describe('ничего не собрано', () => {
     await user.keyboard('{Enter}')
 
     expect(buildCorpus).toHaveBeenCalledWith(null)
-  })
-
-  /**
-   * **Архив с диска – выбор человека, и он же уходит в команду.**
-   *
-   * Фильтр по `zip` и один файл: `build_corpus` проверяет путь у себя, но
-   * предлагать выбрать папку или три архива сразу окно не должно.
-   */
-  it('отдает выбранный архив в build_corpus', async () => {
-    open.mockResolvedValue(ARCHIVE)
-    buildCorpus.mockReturnValue(deferred<unknown>().promise)
-    await overNothing()
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Взять архив с диска…' }))
-
-    expect(open).toHaveBeenCalledWith({
-      multiple: false,
-      directory: false,
-      filters: [{ name: 'Архив TLHdig', extensions: ['zip'] }],
-    })
-    await vi.waitFor(() => expect(buildCorpus).toHaveBeenCalledWith(ARCHIVE))
-  })
-
-  /** **Закрытый без выбора диалог – не событие.** */
-  it('на отмененном выборе архива ничего не делает', async () => {
-    open.mockResolvedValue(null)
-    await overNothing()
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Взять архив с диска…' }))
-
-    await vi.waitFor(() => expect(open).toHaveBeenCalled())
-    expect(buildCorpus).not.toHaveBeenCalled()
-    expect(await primary()).toHaveTextContent('Собрать')
   })
 })
 
@@ -500,16 +616,15 @@ describe('кончилось', () => {
   })
 
   /**
-   * **Отчет говорит и о том, где пакет и из чего он собран.**
+   * **Отчет говорит и о том, где пакет.**
    *
    * Два младших счетчика показываются только ненулевыми: ноль здесь означает
    * «ничего такого не случилось» и занимал бы строку, ничего не сообщая.
    */
-  it('называет пакет, архив и только ненулевые младшие счетчики', async () => {
-    await ran(ok(report({ archive: ARCHIVE, disambiguated: 4, stylesheet_dropped: 0 })))
+  it('называет пакет и только ненулевые младшие счетчики', async () => {
+    await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 0 })))
 
     expect(await screen.findByText(`Пакет – ${PACKAGE}`)).toBeInTheDocument()
-    expect(screen.getByText(`Собрано из архива – ${ARCHIVE}`)).toBeInTheDocument()
     expect(screen.getByText(/Disambiguated/)).toBeInTheDocument()
     expect(screen.queryByText(/Stylesheet dropped/)).toBeNull()
   })
@@ -546,15 +661,11 @@ describe('кончилось', () => {
   /**
    * **Отказ, который стоит повторить, предлагает повтор – и повторяет то же.**
    *
-   * Тот же архив, если его выбирали: кнопка, которая после отказа делает не то
-   * же самое, ответила бы не на тот вопрос.
+   * Ту же закрепленную запись: кнопка, которая после отказа делает не то же
+   * самое, ответила бы не на тот вопрос.
    */
   it('на retryable-отказе предлагает «Повторить» и повторяет тот же прогон', async () => {
-    open.mockResolvedValue(ARCHIVE)
-    buildCorpus.mockResolvedValue(bad(failure()))
-    await overNothing()
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Взять архив с диска…' }))
+    await ran(bad(failure()))
 
     expect(await screen.findByText('Zenodo не ответил')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Собрать не удалось')
@@ -562,21 +673,23 @@ describe('кончилось', () => {
     buildCorpus.mockClear()
     await fireEvent.click(await primary())
 
-    expect(buildCorpus).toHaveBeenCalledWith(ARCHIVE)
+    expect(buildCorpus).toHaveBeenCalledWith(null)
   })
 
   /**
-   * **Отказ, который повторять нечем, предлагает другой архив.**
+   * **Отказ, который повторять нечем, оставляет одно действие – собрать снова.**
    *
-   * `retryable: false` значит, что тот же прогон кончится тем же. Единственное,
-   * что здесь можно изменить, – какой архив собирать, и это и становится
-   * главным действием.
+   * `retryable: false` значит, что тот же прогон кончится тем же, и менять окну
+   * нечего: источник один. Кнопка все же есть – переполненный диск и занятый
+   * каталог вывода чинятся снаружи окна, а начать заново после починки нужно
+   * чем-то. Экран без единого действия был бы тупиком, и проверка сторожит
+   * именно это.
    */
-  it('на неповторимом отказе главным действием ставит выбор архива', async () => {
-    await ran(bad(failure({ code: 'archive_missing', retryable: false, message: 'архива нет' })))
+  it('на неповторимом отказе оставляет главным действием «Собрать»', async () => {
+    await ran(bad(failure({ code: 'distorted', retryable: false, message: 'пакет искажен' })))
 
-    expect(await screen.findByText('архива нет')).toBeInTheDocument()
-    expect(await primary()).toHaveTextContent('Взять архив с диска…')
+    expect(await screen.findByText('пакет искажен')).toBeInTheDocument()
+    expect(await primary()).toHaveTextContent('Собрать по умолчанию')
     expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull()
   })
 
@@ -585,6 +698,11 @@ describe('кончилось', () => {
    *
    * `cancelled` – единственный исход, который не является неисправностью, и
    * окно говорит о нем словом «Остановлено», а не «не удалось».
+   *
+   * Подпись здесь – «Собрать», а не «Собрать по умолчанию»: кнопка повторяет
+   * прогон с той же папкой, какую выбирали, и обещать умолчание она не
+   * вправе. Правило одно на все окно – подпись следует за поведением:
+   * «по умолчанию» стоит там и только там, где зовут `build(null)`.
    */
   it('на отмененном прогоне говорит «Остановлено», а не об ошибке', async () => {
     await ran(bad(failure({ code: 'cancelled', cancelled: true, message: 'сборка остановлена' })))

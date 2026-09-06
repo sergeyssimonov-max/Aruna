@@ -2,7 +2,7 @@
  * The decisions the specification fixed, checked against the files that hold
  * them.
  *
- * `docs/PROJECT-SPEC.ru.md` (редакция 28, 2026-09-04) settles a long list of
+ * `docs/PROJECT-SPEC.ru.md` (редакция 39, 2026-09-06) settles a long list of
  * things by name — a package manager, an engine floor, a bundle identifier,
  * which Tauri plugins are registered and under which permissions, and the whole
  * mechanism by which the end-to-end contour is kept out of a release build. Its

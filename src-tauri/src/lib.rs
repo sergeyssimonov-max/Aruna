@@ -105,6 +105,49 @@ pub struct Fonts {
     anomalies: u32,
 }
 
+/// Что разборщик сказал о документах пакета.
+///
+/// **Ни один документ по этим сведениям из пакета не исключен.** Пакет –
+/// побайтовое зеркало корпуса, копированию разборщик не нужен, и все 23 936
+/// документов в нем лежат. Некорректность разметки – свойство исходных данных,
+/// оно мешает превращению документа в PDF, а не его хранению.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct XmlSummary {
+    /// Документов в пакете – все, и корректные, и нет.
+    documents: u32,
+    /// Из них корректный XML.
+    well_formed: u32,
+    /// Из них не корректный XML.
+    not_well_formed: u32,
+    /// По причинам, включая те, у которых ноль.
+    ///
+    /// Ноль перечислен нарочно – он отличает «искали и не нашли» от «не
+    /// искали», и в манифесте это различие есть. На экран нулевые причины окно
+    /// не выносит: там строка «ноль документов» читается как найденная беда.
+    /// Провод несет полный список, показывать из него – решение окна.
+    reasons: Vec<XmlReasonCount>,
+    /// Имена некорректных, в порядке манифеста.
+    documents_not_well_formed: Vec<XmlDocument>,
+}
+
+/// Сколько документов у одной причины.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct XmlReasonCount {
+    /// Ключ причины, как его пишет манифест.
+    reason: String,
+    documents: u32,
+}
+
+/// Один некорректный документ и место первой ошибки.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct XmlDocument {
+    /// Путь внутри пакета.
+    file: String,
+    reason: String,
+    line: u32,
+    column: u32,
+}
+
 /// Откуда взяты числа.
 ///
 /// Поле нужно не окну, а тому, кто разбирается в расхождении: манифест пишет
@@ -129,6 +172,23 @@ pub enum StatsError {
     Missing,
     #[error("каталог пакета не читается: {0}")]
     Read(String),
+}
+
+/// Почему сводку о разметке взять не удалось.
+///
+/// Обхода каталога в запасе нет, и это не упущение: разбор 23 936 документов
+/// заново – работа на секунды, а числа уже сосчитаны тем же прогоном, который
+/// раскладывал файлы. Манифест здесь единственный источник, и когда его нет,
+/// честный ответ – сказать это, а не пересчитать чужую работу второй раз и
+/// другим кодом.
+#[derive(Debug, thiserror::Error)]
+pub enum XmlSummaryError {
+    #[error("пакет по этому пути не найден")]
+    Missing,
+    #[error("манифест пакета не читается")]
+    Unreadable,
+    #[error("манифест пакета не содержит сведений о разметке")]
+    Absent,
 }
 
 /// Счетчик на проводе — тридцать два бита, и это не сужение, а точное
@@ -192,6 +252,87 @@ fn corpus_location() -> Result<CorpusLocation, String> {
 #[specta::specta]
 fn corpus_stats(path: String) -> Result<CorpusStats, String> {
     read_stats(std::path::Path::new(&path)).map_err(said)
+}
+
+/// Что разборщик сказал о документах пакета, лежащего по этому пути.
+///
+/// Путь приходит от окна из [`corpus_location`], как и у [`corpus_stats`].
+// `async` по той же причине, что у `corpus_stats`: манифест – без малого
+// девять мегабайт разбора, и на главном потоке это подвешивает окно ровно на
+// свою длительность.
+#[tauri::command(async)]
+#[specta::specta]
+fn corpus_xml(path: String) -> Result<XmlSummary, String> {
+    read_xml_summary(std::path::Path::new(&path)).map_err(said)
+}
+
+/// Команда без Tauri, чтобы ветки проверялись тестом.
+///
+/// Один источник – манифест, и обхода в запасе нет намеренно: числа сосчитал
+/// тот же прогон, который раскладывал файлы, а второй счет другим кодом – это
+/// второе поведение, расходящееся с первым при первой же правке.
+fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryError> {
+    /// Из всего манифеста окну нужна одна секция; остальные поля serde
+    /// пропускает.
+    #[derive(serde::Deserialize)]
+    struct Manifest {
+        xml: Option<XmlSection>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct XmlSection {
+        documents: usize,
+        well_formed: usize,
+        not_well_formed: usize,
+        #[serde(default)]
+        by_reason: std::collections::BTreeMap<String, usize>,
+        #[serde(default)]
+        not_well_formed_documents: Vec<Entry>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Entry {
+        file: String,
+        reason: String,
+        line: usize,
+        column: usize,
+    }
+
+    if !package.is_dir() {
+        return Err(XmlSummaryError::Missing);
+    }
+    let text = std::fs::read_to_string(package.join(aruna::export::MANIFEST))
+        .map_err(|_| XmlSummaryError::Unreadable)?;
+    let manifest: Manifest =
+        serde_json::from_str(&text).map_err(|_| XmlSummaryError::Unreadable)?;
+    // Манифест старого пакета секции не несет, и это не поломка: собран он был
+    // до 06.09.2026. Отдельный отказ, а не нули, – ноль некорректных документов
+    // и «пакет об этом не знает» на экране выглядят одинаково, а значат разное.
+    let section = manifest.xml.ok_or(XmlSummaryError::Absent)?;
+
+    Ok(XmlSummary {
+        documents: counted(section.documents),
+        well_formed: counted(section.well_formed),
+        not_well_formed: counted(section.not_well_formed),
+        reasons: section
+            .by_reason
+            .into_iter()
+            .map(|(reason, documents)| XmlReasonCount {
+                reason,
+                documents: counted(documents),
+            })
+            .collect(),
+        documents_not_well_formed: section
+            .not_well_formed_documents
+            .into_iter()
+            .map(|entry| XmlDocument {
+                file: entry.file,
+                reason: entry.reason,
+                line: counted(entry.line),
+                column: counted(entry.column),
+            })
+            .collect(),
+    })
 }
 
 /// Команда без Tauri, чтобы обе ветки проверялись тестом.
@@ -388,9 +529,6 @@ pub struct BuildReport {
     pub job: u32,
     pub package: String,
     pub inventory: String,
-    /// Архив, из которого собрано, когда его выбрал человек; `null`, когда
-    /// архив пришел с Zenodo через кеш.
-    pub archive: Option<String>,
     pub documents: u32,
     pub groups: u32,
     /// Документы, которым пришлось дать суффикс: их сиглум был уже занят.
@@ -661,22 +799,22 @@ impl Building {
     }
 }
 
-/// Архив, выбранный человеком, — проверенный здесь, а не там, где он читается.
+/// Папка, выбранная человеком, — проверенная здесь, а не там, где в нее пишут.
 ///
 /// Окно файловых ручек не получает и путей не толкует: строка приходит с той
-/// стороны, и первое, что с ней делается, — проверка, что за ней есть файл.
-/// Отказ на этом месте — предложение выбрать другой, а не ошибка сборки,
-/// которой не было.
-fn chosen_archive(
-    local_archive: Option<String>,
+/// стороны, и первое, что с ней делается, — проверка, что за ней есть каталог.
+/// Отказ на этом месте — предложение выбрать другую папку, а не ошибка сборки,
+/// которой не было. `None` означает папку загрузок, то есть поведение консоли.
+fn chosen_destination(
+    destination: Option<String>,
 ) -> Result<Option<std::path::PathBuf>, BuildFailure> {
-    match local_archive {
+    match destination {
         Some(given) => {
             let path = std::path::PathBuf::from(given);
-            if !path.is_file() {
+            if !path.is_dir() {
                 return Err(BuildFailure::shell(
-                    "archive_missing",
-                    "выбранного архива нет на месте",
+                    "destination_missing",
+                    "выбранной папки нет на месте",
                     false,
                 ));
             }
@@ -688,10 +826,13 @@ fn chosen_archive(
 
 /// Собрать корпус и сказать, что вышло.
 ///
-/// `local_archive` — архив, выбранный человеком; `null` означает закрепленную
-/// запись Zenodo через кеш, то есть ровно то, что делает консольный бинарь.
-/// Путь приходит строкой и проверяется здесь: окно файловых ручек не получает
-/// (§3 контракта).
+/// Две оси, и они разные. **Источник один** — закрепленная запись Zenodo через
+/// кеш, то есть ровно то, что делает консольный бинарь: архива команда не
+/// принимает вовсе, решением владельца 06.09.2026. **Назначение выбирается:**
+/// `destination` — папка, названная человеком, `null` — папка загрузок. Ядро
+/// умело это с самого начала, `app::build_corpus_into`; окно до него не
+/// дотягивалось. Путь приходит строкой и проверяется здесь: окно файловых ручек
+/// не получает (§3 контракта).
 ///
 /// Работа идет не в главном потоке. Сборка — это от шести секунд до минуты с
 /// лишним, а команда на главном потоке заморозила бы webview и заодно все
@@ -701,14 +842,13 @@ fn chosen_archive(
 async fn build_corpus(
     app: tauri::AppHandle,
     state: tauri::State<'_, Building>,
-    local_archive: Option<String>,
+    destination: Option<String>,
 ) -> Result<BuildReport, BuildFailure> {
-    let archive = chosen_archive(local_archive)?;
+    let chosen = chosen_destination(destination)?;
     let cancel = aruna::job::Cancel::new();
     state.claim(cancel.clone())?;
 
     let handle = app.clone();
-    let chosen = archive.clone();
     // Задание строится внутри замыкания, и иначе нельзя: `Job<'a>` заимствует
     // и синк, и флаг, поэтому оно не может жить дольше вызова, который его
     // создал. Через границу потока переходят владеющие половины.
@@ -719,21 +859,28 @@ async fn build_corpus(
             job: counted(id.get()),
         };
         let job = aruna::job::Job::with_id(id, &sink, &cancel);
+        // Ядро умеет читать архив с диска, окно этой возможностью не
+        // пользуется: `None` — закрепленная запись Zenodo через кеш.
         let request = aruna::app::CorpusRequest {
-            local_archive: chosen.clone(),
+            local_archive: None,
         };
-        aruna::app::build_corpus(&request, &job)
-            .map(|report| BuildReport {
-                job: counted(report.job.get()),
-                package: report.package.root.display().to_string(),
-                inventory: report.inventory.display().to_string(),
-                archive: chosen.as_ref().map(|path| path.display().to_string()),
-                documents: counted(report.package.documents),
-                groups: counted(report.package.groups),
-                disambiguated: counted(report.package.disambiguated),
-                stylesheet_dropped: counted(report.package.stylesheet_dropped),
-            })
-            .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
+        // Две ветки, а не одна с подстановкой умолчания: место, где спрашивают
+        // у платформы про папку загрузок, обязано остаться единственным, и оно
+        // внутри `app::build_corpus`.
+        match &chosen {
+            Some(folder) => aruna::app::build_corpus_into(&request, folder, &job),
+            None => aruna::app::build_corpus(&request, &job),
+        }
+        .map(|report| BuildReport {
+            job: counted(report.job.get()),
+            package: report.package.root.display().to_string(),
+            inventory: report.inventory.display().to_string(),
+            documents: counted(report.package.documents),
+            groups: counted(report.package.groups),
+            disambiguated: counted(report.package.disambiguated),
+            stylesheet_dropped: counted(report.package.stylesheet_dropped),
+        })
+        .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
     })
     .await;
 
@@ -781,6 +928,7 @@ fn contract() -> tauri_specta::Builder<tauri::Wry> {
         .commands(tauri_specta::collect_commands![
             corpus_location,
             corpus_stats,
+            corpus_xml,
             build_corpus,
             cancel_build
         ])
@@ -1037,27 +1185,66 @@ mod wire {
         Building::default().stop();
     }
 
-    /// Архив проверяется там, где строка пересекает границу.
+    /// **Окно называет, куда класть пакет, и не называет, откуда его брать.**
+    ///
+    /// Две оси, и они разошлись 06.09.2026 решением владельца. Источник один –
+    /// закрепленная запись Zenodo: подать архив команде неоткуда, и это держит
+    /// форма команды, а не соглашение. Назначение, наоборот, выбирается: ядро
+    /// умело это с самого начала (`app::build_corpus_into`), а окно до него не
+    /// дотягивалось.
+    ///
+    /// Проверяется по порожденному договору, а не по коду: окно видит именно
+    /// его, и вернуть аргумент источника проще всего незаметно.
     #[test]
-    fn an_archive_that_is_not_there_is_refused_before_anything_starts() {
-        let dir = tempfile::tempdir().expect("временный каталог");
-        let missing = dir.path().join("нет-такого.zip");
+    fn the_build_command_names_a_destination_and_never_an_archive() {
+        let contract = exported();
+        assert!(
+            contract.contains("buildCorpus: (destination: string | null)"),
+            "у buildCorpus нет аргумента назначения: окно не может выбрать папку"
+        );
+        for gone in ["localArchive", "archive_missing"] {
+            assert!(
+                !contract.contains(gone),
+                "в договоре осталось упоминание источника: {gone}"
+            );
+        }
+    }
 
-        let refused = chosen_archive(Some(missing.display().to_string()))
-            .expect_err("несуществующий архив не принимается");
-        assert_eq!(refused.code, "archive_missing");
+    /// **Папка проверяется там, где строка пересекает границу.**
+    ///
+    /// Окно файловых ручек не получает и путей не толкует: строка приходит с
+    /// той стороны, и первое, что с ней делается, – проверка, что за ней есть
+    /// каталог. Отказ на этом месте – предложение выбрать другую папку, а не
+    /// ошибка сборки, которой не было; повторять его нечем, поэтому
+    /// `retryable` – ложь.
+    #[test]
+    fn a_destination_that_is_not_a_directory_is_refused_before_anything_starts() {
+        let dir = tempfile::tempdir().expect("временный каталог");
+
+        let missing = dir.path().join("нет-такой-папки");
+        let refused = chosen_destination(Some(missing.display().to_string()))
+            .expect_err("несуществующая папка не принимается");
+        assert_eq!(refused.code, "destination_missing");
         assert!(
             !refused.retryable,
-            "повторять нечего: надо выбрать другой файл"
+            "повторять нечего: надо выбрать другую папку"
         );
 
-        // Каталог — не архив.
-        let refused = chosen_archive(Some(dir.path().display().to_string()))
-            .expect_err("каталог не принимается за архив");
-        assert_eq!(refused.code, "archive_missing");
+        // Файл – не каталог.
+        let file = dir.path().join("файл.txt");
+        std::fs::write(&file, b"x").expect("записать файл");
+        let refused = chosen_destination(Some(file.display().to_string()))
+            .expect_err("файл не принимается за папку");
+        assert_eq!(refused.code, "destination_missing");
 
-        // А `null` — это Zenodo через кеш, то есть поведение консоли.
-        assert_eq!(chosen_archive(None).expect("без архива"), None);
+        // Каталог принимается как есть.
+        assert_eq!(
+            chosen_destination(Some(dir.path().display().to_string())).expect("каталог"),
+            Some(dir.path().to_path_buf())
+        );
+
+        // А `null` – это папка загрузок, то есть поведение консоли.
+        assert_eq!(chosen_destination(None).expect("без папки"), None);
     }
 
     /// Отказ ядра переходит на провод целиком, включая то, от чего зависит
@@ -1072,6 +1259,108 @@ mod wire {
         assert_eq!(wire.code, "cancelled");
         assert_eq!(wire.phase.as_deref(), Some("exporting"));
         assert!(wire.cancelled);
+    }
+}
+
+// Разбор манифеста к фиче отношения не имеет, поэтому модуль закрыт только
+// `test`: ветки проверяются и в сборке с `e2e`, и без нее.
+#[cfg(test)]
+mod markup {
+    use super::{read_xml_summary, XmlSummaryError};
+    use std::fs;
+
+    const SECTION: &str = r#"{"schema":1,"counts":{"documents":4,"groups":1},
+      "xml":{"documents":4,"well_formed":2,"not_well_formed":2,
+        "by_reason":{"crossing-elements":1,"element-never-closed":1,"unclassified":0},
+        "not_well_formed_documents":[
+          {"file":"CTH 1/KBo 1.1.xml","reason":"element-never-closed","line":7,"column":12},
+          {"file":"CTH 1/KBo 1.2.xml","reason":"crossing-elements","line":3,"column":4}]}}"#;
+
+    /// **Сводка читается из манифеста и ничего не пересчитывает.**
+    ///
+    /// Каталог при этом пуст: если бы команда считала обходом, она вернула бы
+    /// нули, и тест отличает одно от другого.
+    #[test]
+    fn the_summary_is_read_from_the_manifest_and_nothing_is_walked() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(aruna::export::MANIFEST), SECTION).unwrap();
+
+        let summary = read_xml_summary(dir.path()).expect("манифест несет секцию");
+
+        assert_eq!(summary.documents, 4);
+        assert_eq!(summary.well_formed, 2);
+        assert_eq!(summary.not_well_formed, 2);
+        assert_eq!(
+            summary.documents_not_well_formed.len(),
+            2,
+            "имена некорректных доезжают до окна"
+        );
+        assert_eq!(
+            summary.documents_not_well_formed[0].file,
+            "CTH 1/KBo 1.1.xml"
+        );
+        assert_eq!(summary.documents_not_well_formed[0].line, 7);
+        // Причина с нулем не выбрасывается: пустая строка на экране и
+        // отсутствие строки значат разное.
+        assert!(summary
+            .reasons
+            .iter()
+            .any(|r| r.reason == "unclassified" && r.documents == 0));
+    }
+
+    /// **Разбивка сходится с итогом.**
+    ///
+    /// То же равенство, что держит тест ядра, но проверенное на той стороне
+    /// провода: окно показывает сумму по причинам рядом с общим числом, и
+    /// разойтись им нельзя.
+    #[test]
+    fn the_breakdown_adds_up_to_the_total() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(aruna::export::MANIFEST), SECTION).unwrap();
+
+        let summary = read_xml_summary(dir.path()).unwrap();
+
+        let summed: u32 = summary.reasons.iter().map(|r| r.documents).sum();
+        assert_eq!(summed, summary.not_well_formed);
+        assert_eq!(
+            summary.well_formed + summary.not_well_formed,
+            summary.documents
+        );
+    }
+
+    /// **Пакет, собранный до 06.09.2026, получает отказ, а не нули.**
+    ///
+    /// Манифест без секции – это не пакет без некорректных документов, и
+    /// показать ноль было бы неправдой о корпусе.
+    #[test]
+    fn a_manifest_without_the_section_is_refused_rather_than_read_as_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join(aruna::export::MANIFEST),
+            br#"{"schema":1,"counts":{"documents":23936,"groups":663}}"#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            read_xml_summary(dir.path()),
+            Err(XmlSummaryError::Absent)
+        ));
+    }
+
+    /// Пакета нет и манифест не разбирается – два разных отказа.
+    #[test]
+    fn a_missing_package_and_a_broken_manifest_are_told_apart() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            read_xml_summary(&dir.path().join("нет-такого")),
+            Err(XmlSummaryError::Missing)
+        ));
+
+        fs::write(dir.path().join(aruna::export::MANIFEST), "{ не json").unwrap();
+        assert!(matches!(
+            read_xml_summary(dir.path()),
+            Err(XmlSummaryError::Unreadable)
+        ));
     }
 }
 

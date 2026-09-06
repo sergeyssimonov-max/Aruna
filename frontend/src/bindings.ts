@@ -14,18 +14,27 @@ export const commands = {
 	 */
 	corpusStats: (path: string) => typedError<CorpusStats, string>(__TAURI_INVOKE("corpus_stats", { path })),
 	/**
+	 *  Что разборщик сказал о документах пакета, лежащего по этому пути.
+	 * 
+	 *  Путь приходит от окна из [`corpus_location`], как и у [`corpus_stats`].
+	 */
+	corpusXml: (path: string) => typedError<XmlSummary, string>(__TAURI_INVOKE("corpus_xml", { path })),
+	/**
 	 *  Собрать корпус и сказать, что вышло.
 	 * 
-	 *  `local_archive` — архив, выбранный человеком; `null` означает закрепленную
-	 *  запись Zenodo через кеш, то есть ровно то, что делает консольный бинарь.
-	 *  Путь приходит строкой и проверяется здесь: окно файловых ручек не получает
-	 *  (§3 контракта).
+	 *  Две оси, и они разные. **Источник один** — закрепленная запись Zenodo через
+	 *  кеш, то есть ровно то, что делает консольный бинарь: архива команда не
+	 *  принимает вовсе, решением владельца 06.09.2026. **Назначение выбирается:**
+	 *  `destination` — папка, названная человеком, `null` — папка загрузок. Ядро
+	 *  умело это с самого начала, `app::build_corpus_into`; окно до него не
+	 *  дотягивалось. Путь приходит строкой и проверяется здесь: окно файловых ручек
+	 *  не получает (§3 контракта).
 	 * 
 	 *  Работа идет не в главном потоке. Сборка — это от шести секунд до минуты с
 	 *  лишним, а команда на главном потоке заморозила бы webview и заодно все
 	 *  последующие вызовы, включая отмену.
 	 */
-	buildCorpus: (localArchive: string | null) => typedError<BuildReport, BuildFailure>(__TAURI_INVOKE("build_corpus", { localArchive })),
+	buildCorpus: (destination: string | null) => typedError<BuildReport, BuildFailure>(__TAURI_INVOKE("build_corpus", { destination })),
 	/**
 	 *  Попросить текущую сборку остановиться.
 	 * 
@@ -130,11 +139,6 @@ export type BuildReport = {
 	job: number,
 	package: string,
 	inventory: string,
-	/**
-	 *  Архив, из которого собрано, когда его выбрал человек; `null`, когда
-	 *  архив пришел с Zenodo через кеш.
-	 */
-	archive: string | null,
 	documents: number,
 	groups: number,
 	/**  Документы, которым пришлось дать суффикс: их сиглум был уже занят. */
@@ -254,6 +258,50 @@ export type Stage = "cache-unusable" | "cached-archive-rejected" | "archive-from
  *  ответов получен.
  */
 export type StatsSource = "manifest" | "walk";
+
+/**  Один некорректный документ и место первой ошибки. */
+export type XmlDocument = {
+	/**  Путь внутри пакета. */
+	file: string,
+	reason: string,
+	line: number,
+	column: number,
+};
+
+/**  Сколько документов у одной причины. */
+export type XmlReasonCount = {
+	/**  Ключ причины, как его пишет манифест. */
+	reason: string,
+	documents: number,
+};
+
+/**
+ *  Что разборщик сказал о документах пакета.
+ * 
+ *  **Ни один документ по этим сведениям из пакета не исключен.** Пакет –
+ *  побайтовое зеркало корпуса, копированию разборщик не нужен, и все 23 936
+ *  документов в нем лежат. Некорректность разметки – свойство исходных данных,
+ *  оно мешает превращению документа в PDF, а не его хранению.
+ */
+export type XmlSummary = {
+	/**  Документов в пакете – все, и корректные, и нет. */
+	documents: number,
+	/**  Из них корректный XML. */
+	well_formed: number,
+	/**  Из них не корректный XML. */
+	not_well_formed: number,
+	/**
+	 *  По причинам, включая те, у которых ноль.
+	 * 
+	 *  Ноль перечислен нарочно – он отличает «искали и не нашли» от «не
+	 *  искали», и в манифесте это различие есть. На экран нулевые причины окно
+	 *  не выносит: там строка «ноль документов» читается как найденная беда.
+	 *  Провод несет полный список, показывать из него – решение окна.
+	 */
+	reasons: XmlReasonCount[],
+	/**  Имена некорректных, в порядке манифеста. */
+	documents_not_well_formed: XmlDocument[],
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
