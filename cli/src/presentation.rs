@@ -72,8 +72,25 @@ use crate::parse::{group_label, group_runs, ManuscriptRecord, MISSING};
 /// Written in the corpus's own casing. What a spelling changes is which rows a
 /// query reaches, never what a row displays: the cell keeps what the document
 /// wrote.
-pub const EDITOR_ALIASES: [&[&str]; 2] =
-    [&["DS", "Daniel Schwemer"], &["FF", "Francesco Fuscagni"]];
+///
+/// **How complete this is, measured rather than assumed.** The corpus's editor
+/// column holds 46 distinct values across 23 936 manuscripts (2026-09-06,
+/// counted off a built package). The three groups below reach 121 of them:
+/// `DS` 4, `ds` 3 and `Daniel Schwemer` 84; `FF` 9 and `Francesco Fuscagni` 18;
+/// `Andrey Shatskov` 28 and `Andrei Shatskov` 3 — one name, transliterated two
+/// ways, which a search for either spelling would otherwise miss.
+///
+/// What is left open, and deliberately not guessed: several sets of initials
+/// could belong to full names that are also in the column — `JB` beside
+/// `James Burgin`, `TS` beside `TurnaSomel`. Which initials stand for whom is a
+/// statement about people, not about strings, and this file has no way to check
+/// one. A wrong pair here would quietly merge two scholars, which is worse than
+/// a search that misses rows, so an addition wants someone who knows the field.
+pub const EDITOR_ALIASES: [&[&str]; 3] = [
+    &["DS", "Daniel Schwemer"],
+    &["FF", "Francesco Fuscagni"],
+    &["Andrey Shatskov", "Andrei Shatskov"],
+];
 
 /// The other ways this corpus spells the same editor, empty when there are none.
 ///
@@ -429,6 +446,18 @@ mod tests {
         assert_eq!(other_spellings("ds"), ["Daniel Schwemer"]);
         assert_eq!(other_spellings(" Daniel Schwemer "), ["DS"]);
         assert_eq!(other_spellings("FF"), ["Francesco Fuscagni"]);
+    }
+
+    /// **A pair may be two spellings of one name, not initials and a name.**
+    ///
+    /// `Andrey Shatskov` is written 28 times and `Andrei Shatskov` three; a
+    /// search for either missed the other until 2026-09-06. Nothing about the
+    /// list says a group has to pair initials with a name, and this group is
+    /// what stops a reader from assuming it does.
+    #[test]
+    fn a_name_transliterated_two_ways_is_one_editor() {
+        assert_eq!(other_spellings("Andrey Shatskov"), ["Andrei Shatskov"]);
+        assert_eq!(other_spellings("andrei shatskov"), ["Andrey Shatskov"]);
     }
 
     /// An editor the corpus spells one way only, and no editor at all, add
