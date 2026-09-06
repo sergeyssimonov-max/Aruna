@@ -600,6 +600,74 @@ mod tests {
         assert!(!hostile.contains("<span hidden>"));
     }
 
+    /// **Every hole a document fills is escaped, and each one is checked.**
+    ///
+    /// The editor's cell was asked first because it is the one the crate writes
+    /// markup into. The rest of the row is filled the same way and from the
+    /// same archive, so the same question belongs to all of them, and the
+    /// answer had been read out of the code rather than demanded of it.
+    ///
+    /// One record whose every field carries markup, and the assertions name the
+    /// cells one by one rather than scanning the page for something bad: a page
+    /// that lost a cell entirely would pass a scan and fail here.
+    ///
+    /// `<b>`, `<i>`, `<em>` and `<u>` are used rather than `<script>` because
+    /// the document has a script of its own, and an assertion that the page
+    /// holds no `<script` would be about the inventory rather than about the
+    /// corpus.
+    #[test]
+    fn every_field_of_a_record_reaches_the_document_escaped() {
+        let records = vec![ManuscriptRecord {
+            title: "KBo <b>1</b> · CTH 5".into(),
+            sigla: "KBo <b>1</b>".into(),
+            cth: Some("CTH 5<u>".into()),
+            cth_num: 5,
+            authorship: "AB<i>".into(),
+            year: "2020'<".into(),
+            lang: "Hit<em>".into(),
+            inv: "—".into(),
+            corpus: "HFR\"&".into(),
+        }];
+
+        let html = render_html(&records, "Zenodo 20328284 <b>", "2026-08-10 12:00:00 <b>");
+
+        // The row, cell by cell, in the order `COLUMNS` names them.
+        assert!(html.contains("<td class=\"num\">1</td>"), "the ordinal");
+        assert!(
+            html.contains("<td>KBo &lt;b&gt;1&lt;/b&gt;</td>"),
+            "the siglum"
+        );
+        assert!(html.contains("<td>Hit&lt;em&gt;</td>"), "the languages");
+        assert!(html.contains("<td>HFR&quot;&amp;</td>"), "the series");
+        assert!(html.contains("<td>AB&lt;i&gt;</td>"), "the editor");
+        assert!(
+            html.contains("<td class=\"year\">2020&#39;&lt;</td>"),
+            "the year"
+        );
+
+        // The heading above it, and the two lines the page says about itself.
+        assert!(
+            html.contains("<span class=\"group-label\">CTH 5&lt;u&gt;</span>"),
+            "the group label"
+        );
+        assert!(
+            html.contains("Zenodo 20328284 &lt;b&gt;"),
+            "the source line"
+        );
+        assert!(
+            html.contains("2026-08-10 12:00:00 &lt;b&gt;"),
+            "the generated line"
+        );
+
+        // And nothing of it arrived as markup.
+        for tag in ["<b>", "</b>", "<i>", "<em>", "<u>"] {
+            assert!(
+                !html.contains(tag),
+                "{tag} out of the archive reached the document as markup"
+            );
+        }
+    }
+
     /// The credit belongs to the corpus, not to the rows, so it is there for an
     /// inventory of nothing just as much as for a full one.
     #[test]

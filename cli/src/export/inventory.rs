@@ -132,6 +132,43 @@ mod tests {
         assert!(!plain.contains("<span hidden>"));
     }
 
+    /// **A hostile siglum reaches neither the link's text nor its address.**
+    ///
+    /// The package's inventory is the one document that writes an attribute out
+    /// of corpus text, and an attribute is where escaping is easiest to get
+    /// wrong: a quotation mark that survived would end `href="` early and leave
+    /// whatever followed sitting among the tag's own attributes.
+    ///
+    /// Two things stand between the archive and that, and the test asks both.
+    /// The address is built by `naming::href`, which percent-encodes everything
+    /// outside the unreserved set, so a quotation mark cannot be in it at all;
+    /// the text is escaped like any other cell.
+    #[test]
+    fn a_siglum_carrying_markup_reaches_neither_the_link_text_nor_its_address() {
+        let mut hostile = fragment("KBo \"1<b>", "CTH 5", "root/CTH 5_XML_HFR/a.xml");
+        hostile.record.title = "KBo \"1<b> · CTH 5".into();
+        let (html, _) = built(&[hostile]);
+
+        let addresses = hrefs(&html);
+        assert_eq!(addresses.len(), 1, "one manuscript, one link");
+        for forbidden in ['"', '<', '>', '\''] {
+            assert!(
+                !addresses[0].contains(forbidden),
+                "{forbidden} survived into the address: {}",
+                addresses[0]
+            );
+        }
+
+        assert!(
+            html.contains(">KBo &quot;1&lt;b&gt;</a>"),
+            "the link's text is the escaped siglum and nothing else"
+        );
+        assert!(
+            !html.contains("<b>"),
+            "markup out of the archive reached the document"
+        );
+    }
+
     /// A CTH heading is text inside its fold button, and carries no link.
     ///
     /// It was an anchor beside the button while the folders had pages. Now that
