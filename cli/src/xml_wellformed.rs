@@ -10,20 +10,23 @@
 //! refusal belongs, not here.
 //!
 //! The reasons below are the ones three measurements found, not a taxonomy
-//! invented for the occasion. Their counts on the corpus as of 2026-09-06:
+//! invented for the occasion.
 //!
-//! | Reason | Documents |
-//! |---|---|
-//! | [`Reason::AttributeNotSeparated`] | 33 |
-//! | [`Reason::UnterminatedStartTag`] | 88 |
-//! | [`Reason::ElementNeverClosed`] | 28 |
-//! | [`Reason::DuplicateEndTag`] | 22 |
-//! | [`Reason::CrossingElements`] | 10 |
-//! | [`Reason::NoSuchElement`] | 5 |
-//! | [`Reason::AttributeValueUnclosed`] | 19 |
-//! | [`Reason::AttributeGivenTwice`] | 1 |
+//! **How many documents fall to each of them is not written here.** It was,
+//! until 2026-09-06: a table of eight counts, headed "as of 2026-09-06", left
+//! over from the measurement of the evening before — 33 / 88 / 28 and so on,
+//! against the 21 / 95 / 33 this classifier now produces. The dispatch had
+//! changed underneath it (an unterminated start tag is asked about before
+//! nesting), the sum stayed 206, and nothing failed, because no test holds a
+//! table in a comment. A reader looking here to learn how the corpus is shaped
+//! would have learnt it wrong.
 //!
-//! Five of those eight — everything from `ElementNeverClosed` down to
+//! So the counts live in one place, `docs/PROJECT-SPEC.ru.md` §4.13, beside the
+//! date they were measured on; what belongs here is which reasons exist and why
+//! they are told apart. `the_breakdown_adds_up_to_the_total` holds the sum
+//! against the manifest, which is a property rather than a number.
+//!
+//! Five of the reasons — everything from `ElementNeverClosed` down to
 //! `NoSuchElement` — are one refusal as far as `quick-xml` is concerned: an end
 //! tag that closes the wrong element. They are separated here because a
 //! measurement on 2026-09-06 showed the single class is five different defects

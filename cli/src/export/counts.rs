@@ -113,12 +113,25 @@ where
 /// as groups because they are not directories, which is the same reason they
 /// never were.
 ///
-/// **The archive filter is deliberately not reused here.**
-/// [`crate::parse::is_manuscript_xml`] refuses hidden files and `__MACOSX`
-/// entries, because an archive from Zenodo carries a stranger's junk. A package
-/// is this program's own output; a dotted `.xml` inside a group would be a file
-/// someone put there, and calling it something other than a document is a
-/// decision this function has never made and does not start making now.
+/// **What counts is what the export would have written.** That is the whole
+/// standard here, because the only reason to walk a package is to say what its
+/// manifest would have said. Two rules follow from it, and both were added on
+/// 2026-09-06 after an audit pointed out that the walk and the manifest could
+/// disagree about the very same folder:
+///
+/// * a file whose name begins with a dot is not a document. Export names every
+///   file through [`super::naming::path_component`] and never produces one; a
+///   dotted `.xml` in a group is something else's — a resource fork, an editor's
+///   leftover — and counting it would make the fallback say one more manuscript
+///   than the manifest does.
+/// * a directory holding no documents is not a group. Export writes a directory
+///   only to put manuscripts in it, so an empty one is not a group that lost its
+///   documents; it is a folder somebody else left there.
+///
+/// [`crate::parse::is_manuscript_xml`] is still not reused, though it makes the
+/// first of those judgements too: it reads an archive path, refuses `__MACOSX`
+/// entries that cannot occur here, and taking a `&str` for what is a
+/// [`std::path::Path`] on this side would cost a lossy conversion per file.
 ///
 /// The label is the directory's name rather than the group's own label. Export
 /// derives the first from the second through [`super::dir_component`], and for
@@ -140,13 +153,18 @@ pub fn count_package(package: &Path) -> Result<PackageCounts, CountError> {
         let mut fragments = 0;
         for document in std::fs::read_dir(group.path()).map_err(CountError::Read)? {
             let document = document.map_err(CountError::Read)?;
-            let path = document.path();
-            let is_xml = path
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"));
-            if is_xml {
+            let name = document.file_name();
+            let name = name.to_string_lossy();
+            let is_document = !name.starts_with('.')
+                && std::path::Path::new(name.as_ref())
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"));
+            if is_document {
                 fragments += 1;
             }
+        }
+        if fragments == 0 {
+            continue;
         }
         documents += fragments;
         sizes.push((group.file_name().to_string_lossy().into_owned(), fragments));
@@ -258,6 +276,51 @@ mod tests {
         let failure = count_package(&dir.path().join("nothing-here")).expect_err("no package");
 
         assert!(matches!(failure, CountError::NotAPackage));
+    }
+
+    /// **A directory with no documents in it is not a group.**
+    ///
+    /// Export writes a directory only to put manuscripts in it. An empty one in
+    /// a package is somebody else's folder, and counting it would make the
+    /// fallback name one more group than the manifest of the same package does.
+    #[test]
+    fn a_directory_without_documents_is_not_a_group() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        package(dir.path(), 2, 3);
+        fs::create_dir_all(dir.path().join("CTH empty")).expect("an empty folder");
+        fs::create_dir_all(dir.path().join("CTH nothing but a readme")).expect("a folder");
+        fs::write(
+            dir.path()
+                .join("CTH nothing but a readme")
+                .join("README.txt"),
+            b"not a manuscript",
+        )
+        .expect("a file that is not one");
+
+        let counts = count_package(dir.path()).expect("counted");
+
+        assert_eq!(counts.groups, 2, "two groups have documents in them");
+        assert_eq!(counts.documents, 6);
+    }
+
+    /// **A file whose name begins with a dot is not a document.**
+    ///
+    /// Export names every file through `path_component` and never produces one,
+    /// so a dotted `.xml` inside a group came from somewhere else — a resource
+    /// fork beside a document, most often — and the manifest does not know it.
+    #[test]
+    fn a_dot_file_is_not_a_document_however_it_is_spelled() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let group = dir.path().join("CTH 5");
+        fs::create_dir_all(&group).expect("group directory");
+        fs::write(group.join("KBo 1.1.xml"), b"<doc/>").expect("document");
+        fs::write(group.join("._KBo 1.1.xml"), b"resource fork").expect("a fork");
+        fs::write(group.join(".hidden.xml"), b"<doc/>").expect("a hidden file");
+
+        let counts = count_package(dir.path()).expect("counted");
+
+        assert_eq!(counts.documents, 1, "one document, two strangers");
+        assert_eq!(counts.groups, 1);
     }
 
     /// An empty package counts to nothing and names no largest group.
