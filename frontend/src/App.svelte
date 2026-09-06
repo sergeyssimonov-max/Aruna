@@ -367,9 +367,17 @@
         Это занимает от нескольких секунд до минуты с небольшим.
       </p>
     {:else if screen.kind === 'present'}
+      <!--
+        Окно русское целиком – заголовок, стадии, кнопки, – и эти числа
+        оставались в нем последним английским. Оставались наследством описи,
+        документа англоязычного, который сам их нигде не показывает: общего
+        текста, с которым их пришлось бы держать в согласии, тут нет. Названия
+        причин, у которых такое согласие есть, лежат в `src/reasons.ts` и
+        взяты из спецификации, §4.13.
+      -->
       <p class="metrics">
-        <span>Manuscripts – <span class="count">{spaced(screen.stats.manuscripts)}</span></span>
-        <span>Groups (CTH) – <span class="count">{spaced(screen.stats.groups)}</span></span>
+        <span>Рукописей – <span class="count">{spaced(screen.stats.manuscripts)}</span></span>
+        <span>Групп CTH – <span class="count">{spaced(screen.stats.groups)}</span></span>
       </p>
       <!--
         Разбивка стоит отдельной строкой и мельче: два итога выше – это ответ
@@ -380,14 +388,15 @@
       {#if screen.stats.spread.largest}
         <p class="spread">
           <span>
-            Largest group – <span class="count">{screen.stats.spread.largest.label}</span>
+            Самая большая группа – <span class="count">{screen.stats.spread.largest.label}</span>
             ({spaced(screen.stats.spread.largest.fragments)})
           </span>
           <span>
-            Groups of one – <span class="count">{spaced(screen.stats.spread.singletons)}</span>
+            Групп из одной рукописи –
+            <span class="count">{spaced(screen.stats.spread.singletons)}</span>
           </span>
           <span>
-            Without CTH – <span class="count">{spaced(screen.stats.spread.without_cth)}</span>
+            Рукописей без CTH – <span class="count">{spaced(screen.stats.spread.without_cth)}</span>
           </span>
         </p>
       {/if}
@@ -398,14 +407,21 @@
       -->
       {#if screen.stats.fonts}
         <p class="spread">
-          <span
-            >Not in NFC – <span class="count">{spaced(screen.stats.fonts.not_in_nfc)}</span></span
-          >
           <span>
-            Private use – <span class="count">{spaced(screen.stats.fonts.with_private_use)}</span>
-            ({screen.stats.fonts.private_use_points} points)
+            Не в нормальной форме C –
+            <span class="count">{spaced(screen.stats.fonts.not_in_nfc)}</span>
           </span>
-          <span>Anomalies – <span class="count">{spaced(screen.stats.fonts.anomalies)}</span></span>
+          <span>
+            Со знаками частного использования –
+            <span class="count">{spaced(screen.stats.fonts.with_private_use)}</span>
+          </span>
+          <span>
+            Разных таких знаков –
+            <span class="count">{spaced(screen.stats.fonts.private_use_points)}</span>
+          </span>
+          <span>
+            Аномалий письма – <span class="count">{spaced(screen.stats.fonts.anomalies)}</span>
+          </span>
         </p>
       {/if}
       <!--
@@ -423,21 +439,21 @@
           {#if screen.markup.not_well_formed === 0}
             <p class="spread">
               <span>
-                Well-formed XML –
-                <span class="count">all {spaced(screen.markup.documents)}</span> documents
+                Некорректной разметки нет – проверено
+                <span class="count">{spaced(screen.markup.documents)}</span>
               </span>
             </p>
           {:else}
             <p class="spread">
               <span>
-                Not well-formed XML –
+                Не является корректным XML –
                 <span class="count">{spaced(screen.markup.not_well_formed)}</span>
-                of {spaced(screen.markup.documents)}
+                из {spaced(screen.markup.documents)}
               </span>
             </p>
             <p class="markup-about">
-              All of them are in the package alongside the rest: this is a property of the source
-              documents, and it affects turning them into PDF, not keeping them.
+              Все они лежат в пакете вместе с остальными: это свойство исходных документов, и
+              касается оно перевода в PDF, а не хранения.
             </p>
             <!--
               Причина с нулем на экран не попадает: строки читают глазами, и
@@ -459,12 +475,12 @@
               них: абзац его содержать не вправе.
             -->
             <details class="names">
-              <summary>File names ({spaced(screen.markup.not_well_formed)})</summary>
+              <summary>Имена файлов ({spaced(screen.markup.not_well_formed)})</summary>
               <ul>
                 {#each screen.markup.documents_not_well_formed as d (d.file)}
                   <li>
                     <span class="file">{d.file}</span><span class="place"
-                      >{reasonName(d.reason)} – line {d.line}, column {d.column}</span
+                      >{reasonName(d.reason)} – строка {d.line}, столбец {d.column}</span
                     >
                   </li>
                 {/each}
@@ -496,9 +512,9 @@
       </div>
       {#if manuscripts !== null}
         <p class="metrics">
-          <span>Manuscripts – <span class="count">{spaced(manuscripts)}</span></span>
+          <span>Рукописей – <span class="count">{spaced(manuscripts)}</span></span>
           {#if groups !== null}
-            <span>Groups (CTH) – <span class="count">{spaced(groups)}</span></span>
+            <span>Групп CTH – <span class="count">{spaced(groups)}</span></span>
           {/if}
         </p>
       {/if}
@@ -507,8 +523,8 @@
       {/if}
     {:else if screen.kind === 'built'}
       <p class="metrics">
-        <span>Documents – <span class="count">{spaced(screen.report.documents)}</span></span>
-        <span>Groups (CTH) – <span class="count">{spaced(screen.report.groups)}</span></span>
+        <span>Документов – <span class="count">{spaced(screen.report.documents)}</span></span>
+        <span>Групп CTH – <span class="count">{spaced(screen.report.groups)}</span></span>
       </p>
       <!--
         Два младших счетчика показываются только ненулевыми. Ноль здесь – это
@@ -519,12 +535,12 @@
         <p class="spread">
           {#if screen.report.disambiguated > 0}
             <span>
-              Disambiguated – <span class="count">{spaced(screen.report.disambiguated)}</span>
+              С повторной сиглой – <span class="count">{spaced(screen.report.disambiguated)}</span>
             </span>
           {/if}
           {#if screen.report.stylesheet_dropped > 0}
             <span>
-              Stylesheet dropped –
+              Снято инструкций стилей –
               <span class="count">{spaced(screen.report.stylesheet_dropped)}</span>
             </span>
           {/if}

@@ -54,7 +54,7 @@ vi.mock('@tauri-apps/plugin-opener', () => ({ openPath }))
 const DOWNLOADS = '/Users/reader/Downloads'
 const PACKAGE = `${DOWNLOADS}/TLHdig_Beta_0.3`
 const INVENTORY = `${PACKAGE}/TLHdig_Beta_0.3.html`
-const FOLDER = '/Users/reader/Documents/Корпус'
+const FOLDER = '/Users/reader/Документов/Корпус'
 
 /** Событие прогресса, отправленное с той стороны провода. */
 let emit: (payload: BuildProgress) => void = () => {
@@ -212,8 +212,8 @@ describe('пакет есть', () => {
   it('показывает рукописи и группы из corpus_stats', async () => {
     const container = await overPackage()
 
-    expect(screen.getByText(/Manuscripts/)).toBeInTheDocument()
-    expect(screen.getByText(/Groups \(CTH\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Рукописей/)).toBeInTheDocument()
+    expect(screen.getByText(/Групп CTH/)).toBeInTheDocument()
 
     // Прямо по узлам, а не через `getByText`: тот приводит пробелы к обычным
     // перед сравнением, и неразрывный разделитель – единственное, что здесь
@@ -250,14 +250,14 @@ describe('пакет есть', () => {
   it('показывает разбивку по CTH и счетчики письма', async () => {
     const container = await overPackage(STATS_SAMPLE.manifest)
 
-    await screen.findByText(/Largest group/)
+    await screen.findByText(/Самая большая группа/)
     const rows = Array.from(container.querySelectorAll('.spread'))
       .filter((node) => !node.closest('.markup'))
       .map((node) => node.textContent?.replace(/\s+/g, ' ').trim())
 
     expect(rows).toEqual([
-      'Largest group – CTH 832 (4 480) Groups of one – 116 Without CTH – 0',
-      'Not in NFC – 78 Private use – 1 269 (7 points) Anomalies – 0',
+      'Самая большая группа – CTH 832 (4 480) Групп из одной рукописи – 116 Рукописей без CTH – 0',
+      'Не в нормальной форме C – 78 Со знаками частного использования – 1 269 Разных таких знаков – 7 Аномалий письма – 0',
     ])
   })
 
@@ -271,12 +271,12 @@ describe('пакет есть', () => {
   it('без манифеста не показывает счетчиков письма, оставляя разбивку', async () => {
     const container = await overPackage({ ...STATS_SAMPLE.manifest, source: 'walk', fonts: null })
 
-    await screen.findByText(/Largest group/)
+    await screen.findByText(/Самая большая группа/)
     expect(
       Array.from(container.querySelectorAll('.spread')).filter((node) => !node.closest('.markup')),
     ).toHaveLength(1)
-    expect(screen.queryByText(/Not in NFC/)).toBeNull()
-    expect(screen.queryByText(/Anomalies/)).toBeNull()
+    expect(screen.queryByText(/Не в нормальной форме C/)).toBeNull()
+    expect(screen.queryByText(/Аномалий письма/)).toBeNull()
   })
 
   /**
@@ -296,7 +296,7 @@ describe('пакет есть', () => {
     expect(await screen.findByText('пакет по этому пути не найден')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
     expect(await primary()).toHaveTextContent('Собрать')
-    expect(screen.queryByText(/Manuscripts/)).toBeNull()
+    expect(screen.queryByText(/Рукописей/)).toBeNull()
   })
 
   /**
@@ -310,14 +310,18 @@ describe('пакет есть', () => {
     await overPackage()
 
     expect(corpusXml).toHaveBeenCalledWith(PACKAGE)
-    expect(await screen.findByText(/Not well-formed XML/)).toBeInTheDocument()
+    expect(await screen.findByText(/Не является корректным XML/)).toBeInTheDocument()
     expect(screen.getByText('206')).toBeInTheDocument()
     // Не только числа: экран обязан сказать словами, что документы на месте.
-    expect(screen.getByText(/in the package/i)).toBeInTheDocument()
+    expect(screen.getByText(/лежат в пакете вместе с остальными/i)).toBeInTheDocument()
     // Ни одного слова, приписывающего документу то, чего с ним не делали.
-    const shown = document.body.textContent ?? ''
-    for (const word of ['rejected', 'excluded', 'discarded', 'corrupt', 'broken']) {
-      expect(shown.toLowerCase()).not.toContain(word)
+    // Список русский с 06.09.2026, вместе с самим экраном: английские слова
+    // после перевода не встретились бы никогда и проверку обессмыслили бы.
+    // Основы, а не формы, и «некорректный» в список не входит – так эти
+    // документы называет спецификация.
+    const shown = (document.body.textContent ?? '').toLowerCase()
+    for (const word of ['отклон', 'отверг', 'исключ', 'испорч', 'поврежд', 'сломан', 'ошибк']) {
+      expect(shown).not.toContain(word)
     }
   })
 
@@ -334,9 +338,9 @@ describe('пакет есть', () => {
     // Запрос сужен до самой разбивки: подпись причины стоит и там, и в
     // списке имен, и общий поиск нашел бы две.
     const container = document.querySelector('.reasons')
-    expect(container?.textContent).toContain('tag left open')
-    expect(container?.textContent).toContain('element never closed')
-    expect(container?.textContent).not.toContain('not classified')
+    expect(container?.textContent).toContain('начатый тег без закрывающей скобки')
+    expect(container?.textContent).toContain('элемент не закрыт нигде')
+    expect(container?.textContent).not.toContain('не классифицирован')
   })
 
   /**
@@ -360,7 +364,7 @@ describe('пакет есть', () => {
     await overPackage(bare, null)
 
     expect(await primary()).toHaveTextContent('Открыть опись')
-    expect(screen.queryByText(/Not well-formed XML/)).toBeNull()
+    expect(screen.queryByText(/Не является корректным XML/)).toBeNull()
   })
 
   /** **Опись открывает система, и открывает ту, что назвал `corpus_location`.** */
@@ -529,7 +533,7 @@ describe('идет сборка', () => {
     await tick()
 
     expect(screen.getByText('запись перенесена')).toBeInTheDocument()
-    expect(screen.getByText(/Manuscripts/)).toBeInTheDocument()
+    expect(screen.getByText(/Рукописей/)).toBeInTheDocument()
     expect(screen.getByText('23 936')).toBeInTheDocument()
     expect(screen.getByText('663')).toBeInTheDocument()
     expect(screen.getByText('Записываю документы')).toBeInTheDocument()
@@ -607,10 +611,10 @@ describe('кончилось', () => {
   it('показывает отчет прогона, а не ответ corpus_stats', async () => {
     const container = await ran(ok(report({ documents: 24001, groups: 664 })))
 
-    await screen.findByText(/Documents/)
+    await screen.findByText(/Документов/)
     const counts = Array.from(container.querySelectorAll('.count')).map((node) => node.textContent)
     expect(counts).toEqual(['24 001', '664'])
-    expect(screen.queryByText(/Manuscripts/)).toBeNull()
+    expect(screen.queryByText(/Рукописей/)).toBeNull()
     // Один раз, при открытии окна: после сборки числа берутся у отчета.
     expect(corpusStats).toHaveBeenCalledTimes(1)
   })
@@ -625,8 +629,8 @@ describe('кончилось', () => {
     await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 0 })))
 
     expect(await screen.findByText(`Пакет – ${PACKAGE}`)).toBeInTheDocument()
-    expect(screen.getByText(/Disambiguated/)).toBeInTheDocument()
-    expect(screen.queryByText(/Stylesheet dropped/)).toBeNull()
+    expect(screen.getByText(/С повторной сиглой/)).toBeInTheDocument()
+    expect(screen.queryByText(/Снято инструкций стилей/)).toBeNull()
   })
 
   /** **Опись открывается та, что назвал отчет, а не та, что нашлась при старте.** */
@@ -634,7 +638,7 @@ describe('кончилось', () => {
     const built = `${DOWNLOADS}/TLHdig_Beta_0.4/TLHdig_Beta_0.4.html`
     await ran(ok(report({ inventory: built })))
 
-    await screen.findByText(/Documents/)
+    await screen.findByText(/Документов/)
     await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
 
     expect(openPath).toHaveBeenCalledWith(built)
@@ -649,11 +653,11 @@ describe('кончилось', () => {
   it('не дает опоздавшему событию стереть отчет', async () => {
     await ran(ok(report()))
 
-    await screen.findByText(/Documents/)
+    await screen.findByText(/Документов/)
     emit(tock({ stage: 'writing', done: 1, total: 23936 }))
     await tick()
 
-    expect(screen.getByText(/Documents/)).toBeInTheDocument()
+    expect(screen.getByText(/Документов/)).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).toBeNull()
     expect(screen.queryByText('Записываю документы')).toBeNull()
   })
