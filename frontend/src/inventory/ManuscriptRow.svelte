@@ -13,6 +13,12 @@
    * `editor` holds the name and, after it, a hidden span with the corpus's
    * other spellings of the same person, listed in the crate's
    * `presentation::EDITOR_ALIASES`.
+   * The editor's name comes out of the archive, so the crate escapes it and
+   * appends the span itself — `editor_cell` and `escape_html` in
+   * `cli/src/html.rs` — and it has to, because the corpus is known to carry
+   * markup where none belongs. Whatever is added to this cell later reaches
+   * the document as markup on the same terms and has to be escaped the same
+   * way.
    * The search in the exported inventory matches a row by its text, and hidden
    * text is still text, so `schwemer` reaches a row that prints only `DS`.
    * Everything else is text, so Svelte escapes it.
