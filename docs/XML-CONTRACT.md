@@ -49,9 +49,14 @@ cannot resolve stops the build rather than overwriting.
 
 ### The same input gives the same output
 
-Two builds of the archive produce the same package, byte for byte: **24 601
+Two builds of the archive produce the same package, byte for byte: **23 938
 files each time, 0 present in one and not the other, 0 with the same path and
-different bytes.**
+different bytes.** Measured again on 2026-09-06.
+
+The count was 24 601 here until then, and had been wrong since 2026-08-23: it
+included a page for each of the 663 CTH folders, and those pages were given up
+that day. The property never changed — two builds are identical — but the
+number stating it described a package this program had stopped producing.
 
 ```sh
 cd cli

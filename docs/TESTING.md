@@ -2,15 +2,15 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **415 tests** across seventeen integration binaries plus the library
+The suite is **449 tests** across seventeen integration binaries plus the library
 and the binary's own tests. Since the crates were joined into one workspace on
 2026-08-30, `cargo nextest run` from the repository root runs both of them —
-**433** as of 2026-09-02, the other eighteen being the desktop shell's — and
+**471** as of 2026-09-06, the other twenty-two being the desktop shell's — and
 `-p aruna` narrows it back to the console crate. It runs in about ten seconds and
 needs no network. Two are skipped by design: the core's whole-package round trip,
 which is expensive, and the shell's `regenerate_the_bindings`, which is not a
 check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **80 `vitest` tests** in
+Beside it, and in a language of its own, are the **91 `vitest` tests** in
 `frontend/` — see *Frontend* below. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
 
@@ -147,8 +147,10 @@ cd cli
 cargo run --release --example determinism -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 ```
 
-Observed: 24 601 files each time, 0 present in one build and not the other, 0
-with the same path and different bytes. `tests/reliability.rs` holds the same
+Observed on 2026-09-06: 23 938 files each time, 0 present in one build and not
+the other, 0 with the same path and different bytes. (It read 24 601 until then,
+from a run made while the package still carried a page per CTH folder; those
+went on 2026-08-23.) `tests/reliability.rs` holds the same
 property against a synthetic archive, so a regression is caught without the
 71 MiB.
 

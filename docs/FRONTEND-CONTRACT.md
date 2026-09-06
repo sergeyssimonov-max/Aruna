@@ -489,8 +489,10 @@ by copying, in its own module where `serde` is derived without spreading inward
 it is the layer the DTO will be built from.
 
 Verified behaviour-preserving rather than assumed: the package rebuilt after the
-refactor is byte-for-byte the one built before it — 24 601 files, zero
-differences.
+refactor is byte-for-byte the one built before it — zero differences. The file
+count read 24 601 here, from the era when the package carried a page per CTH
+folder; a package has held 23 938 files since those went on 2026-08-23, measured
+again on 2026-09-06.
 
 ### 2.3 Cancellation — done
 
