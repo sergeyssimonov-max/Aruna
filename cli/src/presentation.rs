@@ -53,6 +53,51 @@ use crate::export::naming::href;
 use crate::export::Placed;
 use crate::parse::{group_label, group_runs, ManuscriptRecord, MISSING};
 
+/// The spellings the corpus uses for one and the same editor.
+///
+/// TLHdig records who made an edition in whatever form the file's author typed:
+/// initials in most documents, a full name in the newer ones. A reader looking
+/// for a surname would otherwise miss every row that carries only initials —
+/// `schwemer` finds 84 manuscripts and not the 7 that say `DS`.
+///
+/// **This is a fact about the corpus, so it lives here.** It was written in the
+/// client script that searches the inventory, and in the website's copy beside
+/// it while the website existed; an agreement test held the pair together, and
+/// when the site went in 2.1.0 the pair became one copy in a `.ts` file with
+/// nothing holding it to anything. Which spellings name the same scholar is not
+/// a decision about how a table behaves, and the crate already knows the
+/// spelling — it renders the cell. So the crate says it, once, and a renderer
+/// carries it into the document for the search to find.
+///
+/// Written in the corpus's own casing. What a spelling changes is which rows a
+/// query reaches, never what a row displays: the cell keeps what the document
+/// wrote.
+pub const EDITOR_ALIASES: [&[&str]; 2] =
+    [&["DS", "Daniel Schwemer"], &["FF", "Francesco Fuscagni"]];
+
+/// The other ways this corpus spells the same editor, empty when there are none.
+///
+/// Matching ignores case and surrounding space, because the archive's spelling
+/// is what a document happened to type. The spelling given is never returned:
+/// the row already carries it.
+pub fn other_spellings(editor: &str) -> Vec<&'static str> {
+    let editor = editor.trim();
+    if editor.is_empty() {
+        return Vec::new();
+    }
+    EDITOR_ALIASES
+        .iter()
+        .find(|group| group.iter().any(|one| one.eq_ignore_ascii_case(editor)))
+        .map(|group| {
+            group
+                .iter()
+                .copied()
+                .filter(|one| !one.eq_ignore_ascii_case(editor))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// The corpus as a document shows it: groups, in the order they are listed.
 ///
 /// Built once per run and read by every renderer. The order is the records'
@@ -369,6 +414,43 @@ mod tests {
                     "{name} decides {decision} itself (`{marker}`); \
                      that belongs to the presentation both documents share"
                 );
+            }
+        }
+    }
+
+    /// **A spelling is matched however the document typed it.**
+    ///
+    /// The archive writes `DS` in most files and `Daniel Schwemer` in the newer
+    /// ones, and either of them has to reach the other. Case and surrounding
+    /// space are the document's business, not the list's.
+    #[test]
+    fn an_editor_is_found_by_any_spelling_the_corpus_uses() {
+        assert_eq!(other_spellings("DS"), ["Daniel Schwemer"]);
+        assert_eq!(other_spellings("ds"), ["Daniel Schwemer"]);
+        assert_eq!(other_spellings(" Daniel Schwemer "), ["DS"]);
+        assert_eq!(other_spellings("FF"), ["Francesco Fuscagni"]);
+    }
+
+    /// An editor the corpus spells one way only, and no editor at all, add
+    /// nothing: the list says which names are one person, not that every name
+    /// has a second form.
+    #[test]
+    fn an_editor_with_one_spelling_gets_nothing_added() {
+        assert!(other_spellings("AA").is_empty());
+        assert!(other_spellings("").is_empty());
+        assert!(other_spellings("   ").is_empty());
+    }
+
+    /// No spelling belongs to two people: a name that reached two groups would
+    /// make the answer depend on which was written first.
+    #[test]
+    fn no_spelling_names_two_editors() {
+        let mut seen: Vec<String> = Vec::new();
+        for group in EDITOR_ALIASES {
+            for one in group {
+                let one = one.to_ascii_lowercase();
+                assert!(!seen.contains(&one), "the spelling {one} is in two groups");
+                seen.push(one);
             }
         }
     }

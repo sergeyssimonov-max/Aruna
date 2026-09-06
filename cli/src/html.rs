@@ -346,10 +346,35 @@ fn write_item_row(
             ("TITLE", &title),
             ("LANG", &escape_html(&rec.lang)),
             ("CORPUS", &escape_html(&rec.corpus)),
-            ("EDITOR", &escape_html(&rec.authorship)),
+            ("EDITOR", &editor_cell(&rec.authorship)),
             ("YEAR", &escape_html(&rec.year)),
         ],
     );
+}
+
+/// The editor's name as the document wrote it, and after it — out of sight —
+/// the corpus's other spellings of the same person.
+///
+/// The search reads a row's text, so a spelling written into the row is a
+/// spelling the search finds, and the script needs to know nothing about
+/// editors. Which spellings name one scholar is
+/// [`crate::presentation::EDITOR_ALIASES`], a fact about the corpus and not
+/// about the table; it was in the client script until 2026-09-06, where the
+/// crate could neither state it nor check it.
+///
+/// `hidden` rather than a class: it costs no stylesheet rule, and the user
+/// agent's own rule is not something a later edit to the sheet can undo by
+/// accident. The leading space keeps the hidden name from running into the
+/// visible one in the row's text, where `DS` and `Daniel Schwemer` would
+/// otherwise read as one word.
+fn editor_cell(editor: &str) -> String {
+    let mut cell = escape_html(editor);
+    for spelling in crate::presentation::other_spellings(editor) {
+        cell.push_str("<span hidden> ");
+        cell.push_str(&escape_html(spelling));
+        cell.push_str("</span>");
+    }
+    cell
 }
 
 /// The line under the title that says when the document was written.

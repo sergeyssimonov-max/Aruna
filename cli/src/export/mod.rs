@@ -7,6 +7,7 @@
 //!
 //! The work divides by what it touches, and the files follow the division:
 //!
+//! * [`counts`] reads a finished package back — how many, and how spread;
 //! * [`naming`] decides where a document goes — strings in, paths out;
 //! * [`normalize`] turns one archive document into the one that ships;
 //! * [`inventory`] writes the page and reads its links back;
@@ -16,6 +17,7 @@
 //! Everything above that line is pure, which is what lets a synthetic archive
 //! of four documents exercise the same code the 24 000-manuscript corpus does.
 
+pub mod counts;
 pub mod inventory;
 mod lock;
 pub mod manifest;
@@ -24,6 +26,7 @@ pub mod normalize;
 pub mod validate;
 pub mod verify;
 
+pub use counts::{count_package, spread, CountError, GroupSize, PackageCounts, Spread};
 pub use inventory::{hrefs, render_inventory};
 pub use manifest::{render_manifest, FontContract, XmlReport};
 pub use naming::{

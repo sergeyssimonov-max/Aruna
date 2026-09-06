@@ -101,9 +101,35 @@ mod tests {
         assert!(html.contains("Manuscripts:"), "the counts");
         assert!(html.contains("legend"), "the column legend");
         assert!(
-            html.contains("EDITOR_ALIASES"),
-            "the search knows the editors"
+            html.contains("filter-on"),
+            "the client script that searches"
         );
+    }
+
+    /// **A row carries the corpus's other spellings of its editor.**
+    ///
+    /// The search reads a row's text and nothing else, so this is the whole of
+    /// what makes `schwemer` reach the seven manuscripts that say `DS`. It used
+    /// to be a list inside the client script, which the crate could state
+    /// nowhere and check with `html.contains("EDITOR_ALIASES")` — that the word
+    /// appeared in the bundle, not that the search would find anything.
+    #[test]
+    fn a_row_carries_the_other_spellings_of_its_editor() {
+        let mut ds = fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/a.xml");
+        ds.record.authorship = "DS".into();
+        let (html, _) = built(&[ds]);
+
+        assert!(
+            html.contains("<td>DS<span hidden> Daniel Schwemer</span></td>"),
+            "the spelling is written into the row, out of sight"
+        );
+
+        // An editor the corpus spells one way only gets nothing added: the
+        // list says which names are the same person, not that every name has a
+        // second form.
+        let (plain, _) = built(&[fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/a.xml")]);
+        assert!(plain.contains("<td>AA</td>"), "no spelling, no span");
+        assert!(!plain.contains("<span hidden>"));
     }
 
     /// A CTH heading is text inside its fold button, and carries no link.
