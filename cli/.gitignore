@@ -10,4 +10,9 @@ Aruna.app/
 # assets, not committed. A copy in the tree went stale immediately — the one
 # that used to live here did not match the artifact of any release.
 releases/*.dmg
+# …кроме образа действующего выпуска. Решение владельца 06.09.2026: копия
+# опубликованного DMG хранится в репозитории наравне с ассетом релиза. Хранится
+# ровно один – образ той версии, что названа в `cli/Cargo.toml`; предыдущий
+# снимается тем же коммитом, что и выпуск, который его заменил.
+!releases/Aruna_*_universal.dmg
 releases/SHA256SUMS

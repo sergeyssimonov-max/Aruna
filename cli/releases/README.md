@@ -1,8 +1,21 @@
 # Aruna — macOS releases only
 
-Build output lands here and is **not committed**: the packages are published as
-GitHub Release assets, and a copy kept in the tree goes stale the moment the next
-build runs.
+Build output lands here and is **not committed** — with one exception, taken
+deliberately on 2026-09-06 by the owner's decision: **the published image of the
+current release is kept here as well as on the Releases page.**
+
+The exception is narrow, and the rule around it is what keeps it from going
+stale. What is committed is the file downloaded back from the release, not the
+one the build left behind, and it is verified against the digest recorded in
+`.github/reference-release.json` before it goes in. Exactly one image lives
+here — the one whose version `cli/Cargo.toml` declares — and the commit that
+publishes a new release removes the previous one. Everything else a build
+produces is still ignored: that copy did go stale the moment the next build
+ran, which is why the rule exists.
+
+| Committed image | Digest |
+|---|---|
+| `Aruna_2.5.3_universal.dmg` | `5968e756bb282e6b035ca34dfee28496e649da95165840020b4706c6ad304629` |
 
 Download them from [Releases](https://github.com/sergeyssimonov-max/Aruna/releases):
 
