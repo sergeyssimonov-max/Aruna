@@ -606,28 +606,32 @@ describe('кончилось', () => {
 
     await screen.findByText(/Документов/)
     const counts = Array.from(container.querySelectorAll('.count')).map((node) => node.textContent)
-    expect(counts).toEqual(['24 001', '664', '0', '0'])
+    expect(counts).toEqual(['24 001', '664'])
     expect(screen.queryByText(/Рукописей/)).toBeNull()
     // Один раз, при открытии окна: после сборки числа берутся у отчета.
     expect(corpusStats).toHaveBeenCalledTimes(1)
   })
 
   /**
-   * **Отчет говорит и о том, где пакет, и об обоих младших счетчиках.**
+   * **Отчет говорит, где пакет, и двумя числами кончается.**
    *
-   * Нулевыми тоже, решением владельца 07.09.2026: ноль сообщает, что такого не
-   * случилось, а спрятанная строка не сообщает и того, что это считается. Тест
-   * держит именно нулевой случай – при ненулевом он прошел бы и со старым
-   * правилом.
+   * Проверка перевернута 08.09.2026, а не удалена: до того дня она требовала,
+   * чтобы оба младших счетчика стояли на экране, – теперь требует, чтобы их
+   * там не было, и держит границу с той же стороны, с какой ее сдвинули.
+   *
+   * Числа поданы ненулевыми нарочно. Нулями тест прошел бы и на старом коде –
+   * до 07.09.2026 ноль прятал строку сам, – и о снятии не сказал бы ничего.
+   * По проводу они идут по-прежнему: сняты с экрана, как счетчики письма
+   * 06.09.2026, а не из отчета.
    */
-  it('называет пакет и оба младших счетчика, включая нулевой', async () => {
-    const container = await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 0 })))
+  it('называет пакет, и младших счетчиков на экране нет', async () => {
+    const container = await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 7 })))
 
     expect(await screen.findByText(`Пакет – ${PACKAGE}`)).toBeInTheDocument()
-    expect(screen.getByText(/Переименовано из-за совпадения/)).toBeInTheDocument()
-    expect(screen.getByText(/С лишней ссылкой на оформление/)).toBeInTheDocument()
+    expect(screen.queryByText(/Переименовано из-за совпадения/)).toBeNull()
+    expect(screen.queryByText(/С лишней ссылкой на оформление/)).toBeNull()
     const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
-    expect(counts).toEqual(['23 936', '663', '4', '0'])
+    expect(counts).toEqual(['23 936', '663'])
   })
 
   /**
