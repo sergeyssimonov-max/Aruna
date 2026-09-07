@@ -204,7 +204,7 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 ## Releases
 
-**[v2.5.3](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
+**[v2.5.4](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
 current release — the one to download.** It is what `Releases` marks *Latest*,
 and it is the only version this project asks anyone to install.
 
@@ -218,7 +218,7 @@ release above, the one to install.
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.5.3](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.3) is the third: the release named at the top of this section.
+[v2.5.3](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.3) is the third, and it is being replaced by the release named at the top of this section.
 
 **What that costs, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
 withdrawn on 2026-08-30 — tags and DMGs both — and v2.5.0 followed on

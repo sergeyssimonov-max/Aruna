@@ -624,7 +624,7 @@ describe('кончилось', () => {
     const container = await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 0 })))
 
     expect(await screen.findByText(`Пакет – ${PACKAGE}`)).toBeInTheDocument()
-    expect(screen.getByText(/С занятым именем/)).toBeInTheDocument()
+    expect(screen.getByText(/Переименовано из-за совпадения/)).toBeInTheDocument()
     expect(screen.getByText(/С лишней ссылкой на оформление/)).toBeInTheDocument()
     const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
     expect(counts).toEqual(['23 936', '663', '4', '0'])

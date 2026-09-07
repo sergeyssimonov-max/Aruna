@@ -1,6 +1,6 @@
 [package]
 name = "aruna"
-version = "2.5.3"
+version = "2.5.4"
 edition = "2021"
 description = "Aruna — generates a Scandinavian-style HTML inventory of TLHdig (Zenodo) Hittite cuneiform transliterations"
 authors = ["Sergey Simonov"]

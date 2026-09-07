@@ -1,6 +1,6 @@
 [package]
 name = "aruna-desktop"
-version = "2.5.3"
+version = "2.5.4"
 description = "Aruna — the TLHdig Hittite cuneiform corpus, as a desktop application"
 authors = ["Sergey Simonov"]
 license = "MIT"

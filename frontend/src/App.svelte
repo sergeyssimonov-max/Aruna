@@ -494,7 +494,8 @@
       -->
       <p class="spread">
         <span>
-          С занятым именем – <span class="count">{spaced(screen.report.disambiguated)}</span>
+          Переименовано из-за совпадения –
+          <span class="count">{spaced(screen.report.disambiguated)}</span>
         </span>
         <span>
           С лишней ссылкой на оформление –
