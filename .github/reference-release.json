@@ -11,13 +11,14 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.3 is the",
-    "current release, published on 2026-09-06. A release cannot record itself — the commit",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.4 is the",
+    "current release, published on 2026-09-07. A release cannot record itself — the commit",
     "it names is the commit that carries it, and no file can contain its own hash — so each",
     "entry here is added by the commit after the release it describes.",
     "",
-    "v2.5.3 replaced v2.5.2, withdrawn on 2026-09-06 — release, tag and DMG. The same",
-    "happened to v2.5.1 on 2026-09-04, to v2.5.0 on 2026-09-01 and to v2.1.0 through v2.4.0",
+    "v2.5.4 replaced v2.5.3, withdrawn on 2026-09-07 — release, tag and DMG. The same",
+    "happened to v2.5.2 on 2026-09-06, to v2.5.1 on 2026-09-04, to v2.5.0 on 2026-09-01 and",
+    "to v2.1.0 through v2.4.0",
     "on 2026-08-30, so the 2.x line is still represented by its head alone. A reference",
     "cannot be re-cut, so the work that follows one takes a number of its own, and keeping",
     "the list at three means retiring the release it replaces rather than letting both",
@@ -45,11 +46,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.5.3",
-      "commit": "91c4071fd77a46adb063fa6c98880c049e262ac3",
-      "published": "2026-09-06T15:37:25Z",
-      "dmg_sha256": "5d0ee42b2e2344e0096ebfb964d820c197452d788fad50ff3af75c6f331e9f11",
-      "why": "The current release and the third reference. It replaced v2.5.2, withdrawn the same day: a reference cannot be re-cut, so the work that followed it took a number of its own and the list stays at three by retiring the release it replaces. What it carries over v2.5.2 is a boundary put back where the specification always said it was — the package's own layout and the corpus's editor spellings are stated by the crate that owns them rather than a second time by the shell and the inventory's script — and a window that says what came out of the archive in five figures and in Russian."
+      "tag": "v2.5.4",
+      "commit": "ba5f771590005d5fd27731c90ff342502600e765",
+      "published": "2026-09-07T05:07:10Z",
+      "dmg_sha256": "668cf141675d010f613230151d4ecb3923166c71d40b11c0f84ce8b7bec9b0fa",
+      "why": "The current release and the third reference. It replaced v2.5.3, withdrawn the same day: a reference cannot be re-cut, so the work that followed it took a number of its own and the list stays at three by retiring the release it replaces. What it carries over v2.5.3 is a button that works. «Открыть опись» called the opener plugin from the window, and the plugin refused every path because the permission granted to it carries no scope — so the inventory had never opened in a released build. The shell opens it now, through a command whose boundary is one file, and whose refusals are Russian and carry no path. The two minor counters on the finished-build screen say what they count in words a reader has, and stand there at zero as well."
     }
   ]
 }
