@@ -482,25 +482,25 @@
         <span>Групп CTH – <span class="count">{spaced(screen.report.groups)}</span></span>
       </p>
       <!--
-        Два младших счетчика показываются только ненулевыми. Ноль здесь – это
-        «ничего такого не случилось», и строка о нем занимала бы место, ничего
-        не сообщая; ненулевой – редкость, о которой стоит знать.
+        Оба младших счетчика стоят на экране всегда, нулевыми тоже, – решением
+        владельца 07.09.2026. До него ноль прятал строку: «ничего такого не
+        случилось» заняло бы место, ничего не сообщив. Прятал он, однако, не
+        строку, а самый факт, что это считается: увидеть счет можно было только
+        в тот прогон, когда он сработал.
+
+        Подписи в тот же день переписаны для читателя, а не для филолога:
+        «С повторной сиглой» и «Снято инструкций стилей» называли предмет
+        верно и никому за пределами проекта ничего не говорили.
       -->
-      {#if screen.report.disambiguated > 0 || screen.report.stylesheet_dropped > 0}
-        <p class="spread">
-          {#if screen.report.disambiguated > 0}
-            <span>
-              С повторной сиглой – <span class="count">{spaced(screen.report.disambiguated)}</span>
-            </span>
-          {/if}
-          {#if screen.report.stylesheet_dropped > 0}
-            <span>
-              Снято инструкций стилей –
-              <span class="count">{spaced(screen.report.stylesheet_dropped)}</span>
-            </span>
-          {/if}
-        </p>
-      {/if}
+      <p class="spread">
+        <span>
+          С занятым именем – <span class="count">{spaced(screen.report.disambiguated)}</span>
+        </span>
+        <span>
+          С лишней ссылкой на оформление –
+          <span class="count">{spaced(screen.report.stylesheet_dropped)}</span>
+        </span>
+      </p>
       <p class="where">Пакет – {screen.report.package}</p>
     {:else if screen.kind === 'failed'}
       <p class="about">{screen.failure.message}</p>

@@ -606,24 +606,28 @@ describe('кончилось', () => {
 
     await screen.findByText(/Документов/)
     const counts = Array.from(container.querySelectorAll('.count')).map((node) => node.textContent)
-    expect(counts).toEqual(['24 001', '664'])
+    expect(counts).toEqual(['24 001', '664', '0', '0'])
     expect(screen.queryByText(/Рукописей/)).toBeNull()
     // Один раз, при открытии окна: после сборки числа берутся у отчета.
     expect(corpusStats).toHaveBeenCalledTimes(1)
   })
 
   /**
-   * **Отчет говорит и о том, где пакет.**
+   * **Отчет говорит и о том, где пакет, и об обоих младших счетчиках.**
    *
-   * Два младших счетчика показываются только ненулевыми: ноль здесь означает
-   * «ничего такого не случилось» и занимал бы строку, ничего не сообщая.
+   * Нулевыми тоже, решением владельца 07.09.2026: ноль сообщает, что такого не
+   * случилось, а спрятанная строка не сообщает и того, что это считается. Тест
+   * держит именно нулевой случай – при ненулевом он прошел бы и со старым
+   * правилом.
    */
-  it('называет пакет и только ненулевые младшие счетчики', async () => {
-    await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 0 })))
+  it('называет пакет и оба младших счетчика, включая нулевой', async () => {
+    const container = await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 0 })))
 
     expect(await screen.findByText(`Пакет – ${PACKAGE}`)).toBeInTheDocument()
-    expect(screen.getByText(/С повторной сиглой/)).toBeInTheDocument()
-    expect(screen.queryByText(/Снято инструкций стилей/)).toBeNull()
+    expect(screen.getByText(/С занятым именем/)).toBeInTheDocument()
+    expect(screen.getByText(/С лишней ссылкой на оформление/)).toBeInTheDocument()
+    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    expect(counts).toEqual(['23 936', '663', '4', '0'])
   })
 
   /**
