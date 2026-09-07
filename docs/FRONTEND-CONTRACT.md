@@ -578,7 +578,7 @@ to need parallelism, the limit must be explicit from the first line.
 ## 3. The IPC contract, as it was written
 
 Written on 2026-09-02, when the window stopped being a viewer over
-`~/Downloads` and became the program's front door. Four commands and one event,
+`~/Downloads` and became the program's front door. Six commands and one event,
 and the names are part of the contract:
 
 | command | in | out |
@@ -586,8 +586,20 @@ and the names are part of the contract:
 | `corpus_location` | — | where the package and the inventory go, and whether they are there |
 | `corpus_stats` | package path | counts, the CTH spread, the writing counters, and which of the two answered |
 | `corpus_xml` | package path | how many documents are well-formed XML, the breakdown by reason, and the name, reason and position of each that is not |
+| `open_inventory` | inventory path | nothing, or one sentence saying why it did not open |
 | `build_corpus` | a destination folder, or nothing for the downloads folder | `BuildReport`, or `BuildFailure` |
 | `cancel_build` | — | nothing; the confirmation arrives as the failure |
+
+`open_inventory` is here rather than in the window because a permission is not
+a scope. `opener:allow-open-path` enables the plugin's `open_path` command and
+leaves its path scope empty — the plugin's own description says so — and an
+empty scope refuses every path, which is what the window got from 2026-09-02 to
+2026-09-07: `Not allowed to open path …`, in English and carrying a path, twice
+against §3. No scope could have been written, either: «Собрать в папку…» puts
+the inventory wherever a person chose, and a scope of `**` is not a scope. The
+boundary is narrower here — one file, the one `paths::OUTPUT_FILE_NAME` names,
+anywhere on disk — and the refusal comes back as a sentence the window can show
+as it stands.
 
 | event | payload |
 |---|---|

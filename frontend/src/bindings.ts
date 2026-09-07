@@ -20,6 +20,16 @@ export const commands = {
 	 */
 	corpusXml: (path: string) => typedError<XmlSummary, string>(__TAURI_INVOKE("corpus_xml", { path })),
 	/**
+	 *  Открыть опись тем, чем читатель обычно открывает HTML.
+	 * 
+	 *  Открыть можно ровно один файл — опись, чье имя объявлено ядром; лежать она
+	 *  при этом может где угодно, потому что «Собрать в папку…» кладет ее туда,
+	 *  куда указал человек. Путь приходит от окна, как у [`corpus_stats`] и
+	 *  [`corpus_xml`]: из [`corpus_location`] или из `BuildReport` той сборки,
+	 *  которая его и написала.
+	 */
+	openInventory: (path: string) => typedError<null, string>(__TAURI_INVOKE("open_inventory", { path })),
+	/**
 	 *  Собрать корпус и сказать, что вышло.
 	 * 
 	 *  Две оси, и они разные. **Источник один** — закрепленная запись Zenodo через

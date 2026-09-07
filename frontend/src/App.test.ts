@@ -15,9 +15,12 @@ import type { BuildFailure, BuildProgress, BuildReport, CorpusStats, XmlSummary 
  * specta – два тегированных исхода, `makeEvent` и приведение полезной нагрузки,
  * – ничего из чего окно не выбирает.
  *
- * Два плагина остаются отдельно: их окно зовет само, минуя `bindings.ts`, и в
- * этом весь смысл их подмены – проверить, что зовет именно их и именно с тем
- * путем.
+ * Отдельно остается один плагин – `dialog`: его окно зовет само, минуя
+ * `bindings.ts`, и в этом весь смысл его подмены – проверить, что зовет именно
+ * его. `opener` из этого списка ушел 07.09.2026: опись открывает команда ядра,
+ * и подменять здесь больше нечего. Подмена и была той слепотой, из-за которой
+ * кнопка «Открыть опись» не работала ни в одной выпущенной сборке, а 88 тестов
+ * этого не видели: за `openPath` стояла область путей, которой заглушка нет.
  *
  * `vi.hoisted` здесь не украшение: фабрику `vi.mock` поднимают выше импортов, и
  * обычная переменная в этот момент еще не создана.
@@ -31,7 +34,7 @@ const {
   listen,
   unlisten,
   open,
-  openPath,
+  openInventory,
 } = vi.hoisted(() => ({
   corpusLocation: vi.fn(),
   corpusStats: vi.fn(),
@@ -41,15 +44,14 @@ const {
   listen: vi.fn(),
   unlisten: vi.fn(),
   open: vi.fn(),
-  openPath: vi.fn(),
+  openInventory: vi.fn(),
 }))
 
 vi.mock('./bindings', () => ({
-  commands: { corpusLocation, corpusStats, corpusXml, buildCorpus, cancelBuild },
+  commands: { corpusLocation, corpusStats, corpusXml, openInventory, buildCorpus, cancelBuild },
   events: { buildProgress: { listen } },
 }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open }))
-vi.mock('@tauri-apps/plugin-opener', () => ({ openPath }))
 
 const DOWNLOADS = '/Users/reader/Downloads'
 const PACKAGE = `${DOWNLOADS}/TLHdig_Beta_0.3`
@@ -196,7 +198,7 @@ beforeEach(() => {
     return Promise.resolve(unlisten)
   })
   cancelBuild.mockResolvedValue(undefined)
-  openPath.mockResolvedValue(undefined)
+  openInventory.mockResolvedValue(ok(null))
 })
 
 afterEach(cleanup)
@@ -364,7 +366,7 @@ describe('пакет есть', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
 
-    expect(openPath).toHaveBeenCalledWith(INVENTORY)
+    expect(openInventory).toHaveBeenCalledWith(INVENTORY)
   })
 })
 
@@ -624,6 +626,25 @@ describe('кончилось', () => {
     expect(screen.queryByText(/Снято инструкций стилей/)).toBeNull()
   })
 
+  /**
+   * **Отказ открытия виден в окне, и он на русском языке.**
+   *
+   * До 07.09.2026 сюда попадало `Not allowed to open path /Users/…` – язык не
+   * тот и путь внутри, вопреки §3 контракта. Проверка держит оба обещания, а не
+   * текст сообщения: текст принадлежит `CommandError` и проверяется у него.
+   */
+  it('показывает отказ открытия по-русски и без пути', async () => {
+    openInventory.mockResolvedValue(bad('описи нет на месте – соберите корпус заново'))
+    await ran(ok(report()))
+
+    await screen.findByText(/Документов/)
+    await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
+
+    const said = await screen.findByText(/описи нет на месте/)
+    expect(said).toBeInTheDocument()
+    expect(said.textContent ?? '').not.toContain('/')
+  })
+
   /** **Опись открывается та, что назвал отчет, а не та, что нашлась при старте.** */
   it('открывает опись, названную отчетом', async () => {
     const built = `${DOWNLOADS}/TLHdig_Beta_0.4/TLHdig_Beta_0.4.html`
@@ -632,7 +653,7 @@ describe('кончилось', () => {
     await screen.findByText(/Документов/)
     await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
 
-    expect(openPath).toHaveBeenCalledWith(built)
+    expect(openInventory).toHaveBeenCalledWith(built)
   })
 
   /**

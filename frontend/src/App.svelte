@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import { open } from '@tauri-apps/plugin-dialog'
-  import { openPath } from '@tauri-apps/plugin-opener'
   import { commands, events } from './bindings'
   import type {
     BuildFailure,
@@ -297,10 +296,25 @@
     }
   }
 
-  /** Опись – документ, и открывает его система, а не окно. */
+  /**
+   * Опись – документ, и открывает его система, а не окно.
+   *
+   * Просит об этом ядро, а не плагин из окна: до 07.09.2026 здесь стоял
+   * `openPath`, и он отказывал всегда. Разрешение включает команду, но области
+   * путей ей не дает, а наполнить область было нечем – опись лежит там, куда
+   * выбрали собирать. Граница переехала в `open_inventory`, где она уже: один
+   * файл с именем, объявленным ядром, где бы он ни лежал.
+   *
+   * Удачное открытие `trouble` не гасит: там может стоять сообщение о другом –
+   * например, о числах, которые не сошлись при чтении папки, – и оно остается
+   * верным.
+   */
   async function reveal(path: string): Promise<void> {
     try {
-      await openPath(path)
+      const opened = await commands.openInventory(path)
+      if (opened.status === 'error') {
+        trouble = opened.error
+      }
     } catch (error: unknown) {
       trouble = String(error)
     }

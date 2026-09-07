@@ -38,10 +38,26 @@ pub struct CorpusLocation {
     inventory_exists: bool,
 }
 
+/// Чем команда окна может отказать.
+///
+/// Ни в одном тексте нет пути файловой системы, и это правило, а не случайность
+/// формулировок: §3 контракта запрещает пускать пути в сообщения для человека,
+/// и до 07.09.2026 его нарушал не наш код, а плагин — `open_path` возвращал
+/// `Not allowed to open path /Users/…/TLHdig_Beta_0.3.html`, по-английски и с
+/// путем. Теперь опись открывает [`open_inventory`], и отказ приходит отсюда.
 #[derive(Debug, thiserror::Error)]
 pub enum CommandError {
     #[error("не удалось определить папку загрузок")]
     Downloads,
+    /// Окну назвали файл, который описью не является.
+    #[error("это не опись корпуса")]
+    NotInventory,
+    /// Опись была на месте, когда окно узнало о ней, и исчезла до нажатия.
+    #[error("описи нет на месте – соберите корпус заново")]
+    InventoryGone,
+    /// Система отказалась открывать документ, и почему — знает только она.
+    #[error("система не открыла опись")]
+    Opening,
 }
 
 /// Сколько в собранном пакете рукописей и групп.
@@ -210,8 +226,8 @@ fn counted<T: TryInto<u32>>(value: T) -> u32 {
 
 /// Ошибка команды — предложение, а не структура.
 ///
-/// У обеих читающих команд отказ ровно один, и сказать о нем больше, чем
-/// сказано в тексте, нечего: разбирать в окне нечего, показывать надо целиком.
+/// Разбирать в окне нечего ни у читающих команд, ни у открытия описи: отказ
+/// показывается целиком, как он написан, и ветвиться по нему окну незачем.
 /// Тегированная структура появляется там, где ветвление есть, — у сборки, где
 /// кодов двадцать и от них зависит, предлагать ли повтор (`BuildFailure`).
 /// Проводной вид при этом тот же, что был до specta: голая строка.
@@ -232,6 +248,57 @@ fn corpus_location() -> Result<CorpusLocation, String> {
         package_exists: package.is_dir(),
         inventory_exists: inventory.is_file(),
     })
+}
+
+/// Открыть опись тем, чем читатель обычно открывает HTML.
+///
+/// Открыть можно ровно один файл — опись, чье имя объявлено ядром; лежать она
+/// при этом может где угодно, потому что «Собрать в папку…» кладет ее туда,
+/// куда указал человек. Путь приходит от окна, как у [`corpus_stats`] и
+/// [`corpus_xml`]: из [`corpus_location`] или из `BuildReport` той сборки,
+/// которая его и написала.
+// Комментарии ниже намеренно обычные, а не доксрока: доксроки команд specta
+// переносит в `bindings.ts`, и объяснение, адресованное этому файлу, уехало бы
+// в продукт — то же правило, что у `corpus_stats` про поток.
+//
+// **Почему это команда оболочки, а не вызов плагина из окна.** До 07.09.2026
+// окно звало `openPath` плагина `opener` напрямую, и кнопка не работала ни в
+// одной выпущенной сборке. Разрешение `opener:allow-open-path` включает
+// команду, но не наполняет ее область путей — так и написано в самом плагине:
+// «enables the open_path command without any pre-configured scope». Область
+// осталась пустой, `is_path_allowed` вернул `false` обоими своими условиями, и
+// на экран легло `Not allowed to open path …`. Наполнить область было нечем:
+// область, разрешающая любой путь, — это отмена области, а не ее настройка.
+//
+// Граница, которую область должна была дать, стоит здесь и уже. Rust-сторона
+// плагина области не строит вовсе: `Scope::new` во всем плагине встречается
+// только в `commands.rs`.
+//
+// `async` по той же причине, что у соседей: открытие запускает стороннюю
+// программу, а синхронная команда осталась бы на главном потоке и подвесила бы
+// окно на ее запуск, что запрещает 4.9.7.
+#[tauri::command(async)]
+#[specta::specta]
+fn open_inventory(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let inventory = named_inventory(std::path::Path::new(&path)).map_err(said)?;
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .open_path(inventory.to_string_lossy().into_owned(), None::<&str>)
+        .map_err(|_| said(CommandError::Opening))
+}
+
+/// Проверка без Tauri, чтобы обе отказные ветки проверялись тестом.
+///
+/// Два условия, и второе не лишнее: окно узнает об описи заранее — при чтении
+/// папки или из отчета сборки, — а нажимают на кнопку позже, и между тем и
+/// другим файл могли убрать.
+fn named_inventory(path: &std::path::Path) -> Result<&std::path::Path, CommandError> {
+    if path.file_name() != Some(std::ffi::OsStr::new(aruna::paths::OUTPUT_FILE_NAME)) {
+        return Err(CommandError::NotInventory);
+    }
+    if !path.is_file() {
+        return Err(CommandError::InventoryGone);
+    }
+    Ok(path)
 }
 
 /// Числа о пакете, который лежит по этому пути.
@@ -878,6 +945,7 @@ fn contract() -> tauri_specta::Builder<tauri::Wry> {
             corpus_location,
             corpus_stats,
             corpus_xml,
+            open_inventory,
             build_corpus,
             cancel_build
         ])
@@ -1208,6 +1276,76 @@ mod wire {
         assert_eq!(wire.code, "cancelled");
         assert_eq!(wire.phase.as_deref(), Some("exporting"));
         assert!(wire.cancelled);
+    }
+}
+
+// Проверка имени описи к фиче отношения не имеет, поэтому модуль закрыт только
+// `test`: обе отказные ветки проверяются и в сборке с `e2e`, и без нее.
+#[cfg(test)]
+mod opening {
+    use super::{named_inventory, CommandError};
+    use std::fs;
+
+    /// Опись — это файл с тем именем, которое объявило ядро, и лежать он может
+    /// где угодно: «Собрать в папку…» кладет его в папку, названную человеком.
+    #[test]
+    fn the_inventory_is_the_file_the_core_names_wherever_it_lies() {
+        let dir = tempfile::tempdir().unwrap();
+        let inventory = dir.path().join(aruna::paths::OUTPUT_FILE_NAME);
+        fs::write(&inventory, b"<html></html>").unwrap();
+
+        assert_eq!(named_inventory(&inventory).unwrap(), inventory);
+    }
+
+    /// **Ничего, кроме описи, эта команда не открывает.**
+    ///
+    /// Та граница, которую должна была дать область путей плагина и не дала:
+    /// сосед описи по каталогу — уже не опись.
+    #[test]
+    fn nothing_but_the_inventory_is_opened() {
+        let dir = tempfile::tempdir().unwrap();
+        let other = dir.path().join("TLHdig_Beta_0.3.zip");
+        fs::write(&other, b"not the inventory").unwrap();
+
+        assert!(matches!(
+            named_inventory(&other),
+            Err(CommandError::NotInventory)
+        ));
+    }
+
+    /// Окно узнает об описи заранее, а нажимают позже: между тем и другим файл
+    /// могли убрать, и это отдельный отказ, а не «не опись».
+    #[test]
+    fn an_inventory_that_left_between_the_reading_and_the_click_says_so() {
+        let dir = tempfile::tempdir().unwrap();
+        let gone = dir.path().join(aruna::paths::OUTPUT_FILE_NAME);
+
+        assert!(matches!(
+            named_inventory(&gone),
+            Err(CommandError::InventoryGone)
+        ));
+    }
+
+    /// **Ни в одном отказе команды нет пути файловой системы.**
+    ///
+    /// Правило §3 контракта, и до 07.09.2026 его нарушал плагин, а не наш код:
+    /// `Not allowed to open path /Users/…/TLHdig_Beta_0.3.html` — по-английски
+    /// и с путем. Проверка держит уже свои тексты, чтобы правило не ушло вместе
+    /// с тем, кто его нарушал.
+    #[test]
+    fn no_command_failure_carries_a_path() {
+        for failure in [
+            CommandError::Downloads,
+            CommandError::NotInventory,
+            CommandError::InventoryGone,
+            CommandError::Opening,
+        ] {
+            let said = failure.to_string();
+            assert!(
+                !said.contains(std::path::MAIN_SEPARATOR) && !said.contains(':'),
+                "отказ «{said}» несет путь"
+            );
+        }
     }
 }
 
