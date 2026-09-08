@@ -10,6 +10,12 @@
    *
    * Two props carry markup. `title` holds either a link or a bare name, and
    * which of the two is decided in the crate — see `ManuscriptLink.svelte`.
+   * Both of its halves are escaped there before they arrive: the name by
+   * `escape_html`, the address by `escape_html` on top of the percent-encoding
+   * `naming::href` already did. Asked by removal on 2026-09-08 rather than read
+   * off the code — dropping the name's escaping fails five tests in four files,
+   * and the address has a test of its own since that day, because dropping its
+   * escaping had failed none.
    * `editor` holds the name and, after it, a hidden span with the corpus's
    * other spellings of the same person, listed in the crate's
    * `presentation::EDITOR_ALIASES`.

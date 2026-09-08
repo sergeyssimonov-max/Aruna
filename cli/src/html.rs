@@ -668,6 +668,49 @@ mod tests {
         }
     }
 
+    /// **The renderer escapes the address too, and not only whoever built it.**
+    ///
+    /// Every href in the package today comes from `naming::href`, which
+    /// percent-encodes everything outside the unreserved set — a quotation mark
+    /// cannot survive it, and `a_siglum_carrying_markup_reaches_neither_the_link_text_nor_its_address`
+    /// proves that end to end. That makes the `escape_html` this renderer puts
+    /// on the address a second belt, and a second belt nothing pulls is one
+    /// nobody would notice losing: removed on 2026-09-08, all 452 tests stayed
+    /// green. The title's own escaping, asked the same way, took five of them
+    /// down.
+    ///
+    /// So the belt is asked for directly. `FragmentPresentation::href` is a
+    /// plain `String` on a public struct, and a caller may one day fill it from
+    /// somewhere other than `naming::href`; what this renderer promises is that
+    /// whatever arrives there cannot end the attribute early. The address here
+    /// is deliberately one that percent-encoding would never produce.
+    #[test]
+    fn an_address_that_was_not_percent_encoded_cannot_end_its_attribute() {
+        let record = rec("KBo 1", Some("CTH 5"), 5, "AA", "2020");
+        let corpus = CorpusPresentation {
+            source: "Zenodo 20328284",
+            groups: vec![crate::presentation::GroupPresentation {
+                label: "CTH 5",
+                fragments: vec![FragmentPresentation {
+                    display_name: "KBo 1",
+                    href: Some("./a.xml\" onload=\"boom".into()),
+                    record: &record,
+                }],
+            }],
+        };
+
+        let html = render_linked_html(&corpus, "2026-09-08 00:00:00");
+
+        assert!(
+            !html.contains("onload=\"boom"),
+            "the address ended its attribute early and left an event handler behind"
+        );
+        assert!(
+            html.contains("&quot; onload=&quot;boom"),
+            "the address is escaped where it stands"
+        );
+    }
+
     /// The credit belongs to the corpus, not to the rows, so it is there for an
     /// inventory of nothing just as much as for a full one.
     #[test]
