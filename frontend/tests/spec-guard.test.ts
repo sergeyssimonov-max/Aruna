@@ -183,6 +183,52 @@ describe('the Tauri application is configured as agreed', () => {
   })
 })
 
+describe('the shell declares its dependencies exactly', () => {
+  /**
+   * **A range is a decision deferred to whoever next runs `cargo update`.**
+   *
+   * The window's manifest states every version it ships with `=`. That was
+   * true of all but one line for weeks — `log = "0.4"` — and §7.3 carried the
+   * pairing as a single item: pin the line, and add the check that keeps it
+   * pinned. Both were done on 2026-09-08.
+   *
+   * The check reads the tables whose contents reach a user — `[dependencies]`
+   * and `[build-dependencies]` — and stops at the first table that does not.
+   * `[dev-dependencies]` is deliberately outside it: `tempfile = "3"` there
+   * repeats the core's own declaration on purpose, and the core states ranges
+   * throughout. Pinning the shell's copy would make the two disagree in order
+   * to satisfy a rule about what ships, which that crate does not.
+   *
+   * A path dependency carries no version and is not a range; `aruna` is the
+   * core, and it is not fetched from anywhere.
+   */
+  it('states every shipped dependency as an exact version', () => {
+    const tables = ['[dependencies]', '[build-dependencies]']
+    const lines = CARGO.split('\n')
+    const declarations: string[] = []
+    let inside = false
+    for (const line of lines) {
+      if (line.startsWith('[')) {
+        inside = tables.includes(line.trim())
+        continue
+      }
+      if (inside && /^[A-Za-z][A-Za-z0-9_-]*\s*=/.test(line)) declarations.push(line)
+    }
+
+    // Дешевая страховка от опечатки в самом тесте: строк там больше десятка, и
+    // пустой список прошел бы молча.
+    expect(declarations.length).toBeGreaterThan(10)
+
+    for (const line of declarations) {
+      const name = line.slice(0, line.indexOf('=')).trim()
+      if (/path\s*=/.test(line)) continue
+      const version = line.match(/version\s*=\s*"([^"]+)"/) ?? line.match(/=\s*"([^"]+)"/)
+      expect(version, `${name} declares no version`).not.toBeNull()
+      expect(version![1], `${name} is declared as a range`).toMatch(/^=\d+\.\d+\.\d+/)
+    }
+  })
+})
+
 describe('every registered plugin has permissions', () => {
   const DEFAULT_CAPABILITY = json('../../src-tauri/capabilities/default.json')
 
