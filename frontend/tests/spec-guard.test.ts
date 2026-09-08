@@ -147,11 +147,14 @@ describe('the Tauri application is configured as agreed', () => {
   /**
    * **Ad hoc, and stated in the configuration rather than done to the bundle.**
    *
-   * There is no Developer ID: the project has no paid Apple membership, and
-   * §6.7 records what that costs a reader. What it must not cost is a second
-   * mechanism — a `codesign` call after the fact would sign whatever Tauri last
-   * produced, and nothing would say when it stopped matching. Tauri's own
-   * pseudo-identity is one line and travels with the bundle definition.
+   * There is no Developer ID, and as of 2026-09-08 there will not be one: the
+   * owner settled it — no Apple developer account, none planned — so this is a
+   * boundary the project keeps rather than a gap it is closing. §6.7 records
+   * what it costs a reader, and the cost is permanent. What it must not cost is
+   * a second mechanism — a `codesign` call after the fact would sign whatever
+   * Tauri last produced, and nothing would say when it stopped matching.
+   * Tauri's own pseudo-identity is one line and travels with the bundle
+   * definition.
    *
    * The minimum system version travels beside it for the same reason. Tauri's
    * default is macOS 10.13; this program targets macOS 13 and nothing older
