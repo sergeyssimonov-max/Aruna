@@ -37,7 +37,31 @@
 # specification lists as installed. Declaring them here means rustup installs
 # both before the first build, on any machine, and the next time the channel is
 # raised it does not have to be remembered.
+#
+# `rust-analyzer` is here for the same reason, added 2026-09-08. Until then the
+# project had no working language server at all: `~/.cargo/bin/rust-analyzer` is
+# a rustup shim, and inside this directory the shim reads this file and answers
+# `Unknown binary 'rust-analyzer' in official toolchain '1.97.1-…'`. A binary
+# did exist under the `stable` toolchain, and that it worked at all was a
+# coincidence — `stable` happens to be 1.97.1 today and stops being it when
+# 1.98 lands. The Claude Code plugin brings no binary of its own; its README
+# points at `rustup component add`.
+#
+# **This costs the contour nothing, and that took an experiment rather than an
+# argument.** rustup installs whatever this file names on the first `cargo` in
+# the directory, so a component listed here would be fetched by every CI job —
+# measured cold, 6.48 s and 40 MB unpacked. The workflow therefore sets
+# `RUSTUP_AUTO_INSTALL=0`, which stops rustup installing what it was not asked
+# for while still letting this file select the toolchain; an explicit
+# `rustup toolchain install`, which is what `dtolnay/rust-toolchain` runs, is
+# unaffected. Both halves were checked by running them, not by reading docs.
+#
+# The contour never read this file's components in any case: it greps out
+# `channel` with `sed` and names `clippy, rustfmt` itself. `targets` is the
+# standing precedent — declared here, provided separately by CI — and this is
+# the same shape. What CI needs, CI asks for; what a developer's machine needs
+# is stated here.
 [toolchain]
 channel = "1.97.1"
-components = ["rustfmt", "clippy"]
+components = ["rustfmt", "clippy", "rust-analyzer"]
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]

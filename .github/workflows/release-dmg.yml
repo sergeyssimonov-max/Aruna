@@ -15,6 +15,21 @@ on:
 permissions:
   contents: read
 
+# rustup installs whatever `rust-toolchain.toml` names the moment a job runs its
+# first `cargo` in the checkout. Since 2026-09-08 that file names `rust-analyzer`
+# — a language server, useful on a developer's machine and useless here — and
+# without this every job would fetch it: measured cold on the machine that added
+# it, 6.48 s and 40 MB unpacked, paid on every run and cached by nothing, since
+# `Swatinem/rust-cache` keeps `~/.cargo` and `target/` rather than `~/.rustup`.
+#
+# `0` stops rustup installing what it was not asked for. It still lets the file
+# select the toolchain, and it does not touch an explicit `rustup toolchain
+# install` — which is exactly what the `dtolnay/rust-toolchain` step below runs,
+# naming the components this contour actually needs. Verified by running both
+# with the variable set, not by reading the manual.
+env:
+  RUSTUP_AUTO_INSTALL: "0"
+
 jobs:
   check:
     name: Tests + clippy
