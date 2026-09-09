@@ -100,9 +100,9 @@ coverage.
 | covers | 1 sign — `U+100000`, in 927 places across 913 lines |
 | CSS family | `UllikummiA` |
 | file | `UllikummiA.ttf`, version 1.003 |
-| where | **not a system font** — see *Installing* below |
-| author | Sylvie Vanséveren, 2007 |
-| licence | free for academic and scholarly use; may not be modified, redistributed in modified form, or distributed commercially |
+| where | **not a system font** — it ships in this repository, `cli/resources/fonts/UllikummiA.ttf`, since 2026-09-09 |
+| author | Sylvie Vanséveren, 2007; the font's own `name` table says "All rights reserved" and carries no licence field |
+| licence | Hethitologie-Portal Mainz terms, quoted verbatim in `cli/resources/fonts/UllikummiA-TERMS.txt`: **may not** be modified, distributed in modified form, or distributed commercially; **may** be used for academic and research purposes, in scientific publications and in websites for scholarly purposes, with a credit |
 | `fsType` | `0x0008` — Editable: the font permits embedding in a document, and permits subsetting |
 
 `U+100000` is a cuneiform sign with no Unicode code point. Vanséveren allocated
@@ -164,14 +164,22 @@ above do not.
 ## Installing — reproducing this environment on another machine
 
 Three of the four faces ship with macOS 13 and need nothing. Only `UllikummiA`
-has to be obtained.
+has to be installed, and since 2026-09-09 it comes with the checkout:
 
 ```sh
-curl -LO https://www.hethport.uni-wuerzburg.de/cuneifont/download/Ullikummi.zip
+cp cli/resources/fonts/UllikummiA.ttf ~/Library/Fonts/
+```
+
+That is the whole of it on a fresh machine. The upstream route below is no
+longer the install path; it is the cross-check — how to confirm that what this
+repository carries is what the portal publishes.
+
+```sh
+curl -LO https://hethport.net/cuneifont/download/Ullikummi.zip
 shasum -a 256 Ullikummi.zip
 # 28f8bb7ebc572009760066373edbf730c5bbcc2e974ec85109a6a44e5a2e55c7
 unzip Ullikummi.zip
-cp UllikummiA.ttf ~/Library/Fonts/
+shasum -a 256 UllikummiA.ttf cli/resources/fonts/UllikummiA.ttf   # must agree
 ```
 
 Verify what you installed:
@@ -194,10 +202,36 @@ cargo run --release --example font_coverage -- fixtures/…zip
 Anything below 642 means a face is missing, and the program names which code
 points went with it.
 
-**The fonts are not committed to this repository.** The licence permits use, not
-redistribution, and a font in a git history is redistributed to everyone who
-clones it. The checksums above are what makes the environment reproducible
-without redistributing anything.
+**`UllikummiA.ttf` is committed to this repository as of 2026-09-09, and the
+sentence that stood here said the opposite.** It read: "the licence permits use,
+not redistribution". That was an overreading of the terms rather than a reading
+of them. The portal's Terms of Use — quoted verbatim in
+`cli/resources/fonts/UllikummiA-TERMS.txt`, read at `hethport.net/cuneifont/` on
+2026-09-09 — prohibit three things: modification, distribution in any modified
+form, and commercial distribution. They grant four: academic purposes, research
+purposes, scientific publications, and websites for scholarly purposes.
+Distribution of the *unmodified* font for a non-commercial scholarly purpose is
+in neither list.
+
+The owner decided on 2026-09-09 that this copy falls inside the terms: the use
+is academic and scholarly, this repository is non-commercial, the file is
+unmodified — SHA-256 `2ca4357d…41cf`, the same digest as the upstream package
+and as the copy installed on the machine that recorded it — and the required
+credit travels with it, in `README.md`, in the terms file and in this document.
+That is the owner's reading, recorded with its date and reasons, not a legal
+finding and not a permission granted to us in writing. If the author or the
+portal says otherwise, the file goes and the `curl` route below is again the
+only route.
+
+`cli/tests/fonts.rs` holds the file to its length and digest on every run: the
+terms forbid modifying it, and an edited font would breach them in silence.
+
+The other three faces — `UllikummiB`, `UllikummiC`, `Semiramis Unicode 3` — are
+still not here, for the reason given above: they cover nothing this corpus uses.
+
+The credit the terms require:
+
+> Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal Mainz
 
 **Network note.** `hethport.uni-wuerzburg.de` refuses the TLS handshake from
 this machine (LibreSSL 3.3.6, macOS 13). Two routes work and serve the same

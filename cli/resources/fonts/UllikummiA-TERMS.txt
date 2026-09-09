@@ -1,0 +1,90 @@
+UllikummiA.ttf — terms, provenance and digests
+==============================================
+
+This file is NOT covered by the repository's MIT licence. Everything else in
+this repository is; this font is not ours to relicense.
+
+    Copyright (c) 2007 by Sylvie Vanseveren. All rights reserved.
+    (the font's own `name` table, ID 0; it carries no licence field of its own)
+
+
+Terms of Use, as published by the Hethitologie-Portal Mainz
+-----------------------------------------------------------
+
+Quoted verbatim from https://hethport.net/cuneifont/ , read 2026-09-09. The
+page cites itself as: S. Vanséveren, hethiter.net/: Unicode Cuneiform
+(2021-09-10).
+
+    Terms of Use
+
+    The fonts are available free of charge. They are copyrighted and may not
+    be modified or distributed in any modified form, nor may they be
+    distributed commercially. The fonts may be used for academic and research
+    purposes. They may be used in scientific publications and websites for
+    scholarly purposes.
+
+    The user agrees to mention the following credits:
+
+    Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal
+    Mainz
+
+That credit is carried in `README.md` and in `docs/FONTS.md`, and is repeated
+here so it travels with the file.
+
+
+What the text says, and what it does not
+----------------------------------------
+
+Three things are prohibited: modification, distribution in any modified form,
+and commercial distribution. Four uses are granted: academic purposes, research
+purposes, scientific publications, and websites for scholarly purposes.
+
+Distribution of the **unmodified** font for a non-commercial, scholarly purpose
+is neither forbidden by the first list nor named in the second. The owner of
+this repository decided on 2026-09-09 that this copy falls within the terms:
+the use is academic and scholarly, the repository is non-commercial, the file
+is unmodified, and the credit is carried. That is a reading of the terms
+recorded with its date and its reasons — not a legal finding, and not a
+permission anyone granted us in writing.
+
+If the author or the portal states otherwise, the file goes and the `curl`
+route in `docs/FONTS.md` — which was the only route before this date — comes
+back unchanged.
+
+
+Provenance
+----------
+
+The upstream package is `Ullikummi.zip`, three faces (A, B, C) of which only
+A is used here: neither B nor C covers a code point this corpus uses that A
+does not.
+
+    https://hethport.net/cuneifont/download/Ullikummi.zip
+    https://smaw.de.dariah.eu/cuneifont/download/Ullikummi.zip   (DARIAH mirror)
+
+`hethport.uni-wuerzburg.de`, the portal's other name, refuses the TLS handshake
+from macOS 13 / LibreSSL 3.3.6. Both routes above served packages with the same
+SHA-256.
+
+    Ullikummi.zip     28f8bb7ebc572009760066373edbf730c5bbcc2e974ec85109a6a44e5a2e55c7
+    UllikummiA.ttf    2ca4357d66d7cde6b0785be22f4c3ed3427289fdb0330eceabe89da24c4041cf
+
+The copy in this directory has that SHA-256. `cli/tests/fonts.rs` holds it to
+its MD5 and its length on every test run, because the terms forbid modification
+and a modified file here would breach them silently.
+
+
+Why this font is here at all
+----------------------------
+
+`U+100000` is a cuneiform sign with no Unicode code point. Vanséveren allocated
+it in the Supplementary Private Use Area and documented it in the Hittite Sign
+List that accompanies the fonts. It occurs 927 times across 913 lines in 370 of
+the corpus's 23 936 documents, and no other face on a stock macOS machine draws
+it — not Semiramis, not Noto, none of the 366 system faces.
+
+For the PDF stage the font's `fsType` is `0x0008`, Editable Embedding, which
+permits embedding *and* subsetting. A scholarly, non-commercial PDF that embeds
+a subset of this face is within both that bit and the written terms above.
+
+Version 1.003. Full analysis in `docs/FONTS.md`.

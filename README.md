@@ -256,3 +256,7 @@ Measured numbers, and the rules for changing them, are in [`PERFORMANCE.md`](PER
 ## License
 
 MIT — [`LICENSE`](LICENSE), and declared in [`cli/Cargo.toml`](cli/Cargo.toml) and [`src-tauri/Cargo.toml`](src-tauri/Cargo.toml).
+
+**One file is not MIT and is not ours to relicense.** [`cli/resources/fonts/UllikummiA.ttf`](cli/resources/fonts/UllikummiA.ttf) is copyright © 2007 Sylvie Vanséveren, distributed under the terms of the Hethitologie-Portal Mainz, which are quoted verbatim beside it in [`UllikummiA-TERMS.txt`](cli/resources/fonts/UllikummiA-TERMS.txt): it may not be modified, distributed in modified form, or distributed commercially, and it may be used for academic and research purposes, in scientific publications and in scholarly websites. It is here unmodified so this repository can be deployed on another machine without a download; [`docs/FONTS.md`](docs/FONTS.md) records the reasoning and the digests.
+
+> Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal Mainz
