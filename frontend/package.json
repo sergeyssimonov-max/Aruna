@@ -23,7 +23,7 @@
     "@tauri-apps/cli": "2.11.4",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/svelte": "5.4.2",
-    "@testing-library/user-event": "14.6.6",
+    "@testing-library/user-event": "14.6.7",
     "@tsconfig/svelte": "5.0.8",
     "@types/mocha": "10.0.10",
     "@types/node": "22.20.1",
