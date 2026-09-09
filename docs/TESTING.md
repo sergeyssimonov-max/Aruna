@@ -355,6 +355,8 @@ Baselines are in `PERFORMANCE.md`.
   requirement whose only instrument cannot be had is a requirement nobody
   checks.
 - `xmllint` and `xsltproc` are in `/usr/bin`, signed `com.apple.*`, and are the
-  only implementations here this project did not write. They are named for the
-  future PDF acceptance — canonical comparison and an independent extraction —
-  and for examples and tests only; nothing on the working path calls either.
+  two macOS programs `docs/PDF-ACCEPTANCE.md` names for the XML side of that
+  acceptance — canonical comparison and an independent extraction. `sips`, for
+  rasterising a page, is the third. All three ship with the system, and all
+  three are for examples and tests; nothing on the working path calls any of
+  them.
