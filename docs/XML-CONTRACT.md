@@ -263,9 +263,21 @@ the completeness check.
 
 Open questions, each of which changes what the converter does:
 
-1. **The 210 documents that are not well-formed.** Refuse and report? Recover
+1. ~~**The 210 documents that are not well-formed.** Refuse and report? Recover
    with a lenient parser and mark the PDF as recovered? Produce a placeholder
-   page naming the fault? Not deciding means deciding by accident.
+   page naming the fault? Not deciding means deciding by accident.~~
+
+   **Decided by measurement, 2026-09-05 and 2026-09-06: refuse and report.**
+   Deterministic byte-level repair fixes none of the 206 this project's parser
+   sees; error recovery corrupts four documents provably and says nothing; and
+   the one class that looked local is five causes, of which exactly one repairs
+   unambiguously. So the parser is strict on the conversion path and never
+   recovers. The document itself stays in the package — a byte mirror needs no
+   parse — and its name, reason and position are written into the manifest, so
+   a reader sees what will not be converted and why. A lenient mode returns only
+   with a measurement showing it does not alter text in silence. The
+   measurements are in `PROJECT-SPEC.ru.md` §4.13; the requirement they replaced
+   is struck in `PDF-ACCEPTANCE.md` §0, requirement 3.
 2. **Entity expansion.** None appear today. When one does: expand and record,
    or refuse?
 3. **Comments.** Three documents carry them. Editorial or incidental?

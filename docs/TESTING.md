@@ -350,4 +350,11 @@ Baselines are in `PERFORMANCE.md`.
   repository again.
 - `cargo test --doc` reports 0 tests: the crate has no doc examples.
 - No PDF tool (`qpdf`, `pdfinfo`, `pdftotext`, `pdffonts`, `mutool`) is
-  installed. Nothing needs one yet.
+  installed. Nothing needs one yet, and `docs/PDF-ACCEPTANCE.md` stopped naming
+  them on 2026-09-08: with Homebrew unused and a Java runtime barred, a
+  requirement whose only instrument cannot be had is a requirement nobody
+  checks.
+- `xmllint` and `xsltproc` are in `/usr/bin`, signed `com.apple.*`, and are the
+  only implementations here this project did not write. They are named for the
+  future PDF acceptance — canonical comparison and an independent extraction —
+  and for examples and tests only; nothing on the working path calls either.
