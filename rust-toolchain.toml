@@ -61,7 +61,22 @@
 # standing precedent — declared here, provided separately by CI — and this is
 # the same shape. What CI needs, CI asks for; what a developer's machine needs
 # is stated here.
+#
+# `rust-src` joins them on 2026-09-09 by the owner's word, and it is the same
+# error one step further on. The specification called it installed, twice, and
+# it was not: `stable` has it, `stable` happens to be 1.97.1 today, and the
+# `default` profile that put it there applies to toolchains rustup installs on
+# its own — this one is named by this file with an explicit component list and
+# gets exactly what is written in it. Without the sources beside the compiler
+# they belong to, the language server added above cannot open a definition in
+# the standard library, which is most of what one is wanted for.
+#
+# Measured rather than estimated, on the machine that pays for it: declaring it
+# here made rustup fetch it on the next `cargo` in this directory — 5.4 s for
+# that invocation — and the toolchain went from 1237 MB to 1314 MB, the 77 MB
+# being `lib/rustlib/src`. Once, per toolchain. CI pays nothing, for the reason
+# in the paragraph above.
 [toolchain]
 channel = "1.97.1"
-components = ["rustfmt", "clippy", "rust-analyzer"]
+components = ["rustfmt", "clippy", "rust-analyzer", "rust-src"]
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
