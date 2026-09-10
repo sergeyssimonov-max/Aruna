@@ -210,6 +210,23 @@ mod tests {
     /// This is a source-level assertion because that is where the failure is
     /// visible. A missing family does not break a page, a build or a test: the
     /// document renders, on this machine, through a font nobody chose.
+    ///
+    /// **The order is part of what is asserted**, and it is the order a
+    /// renderer consults: the main face, cuneiform, the private-use sign, the
+    /// editorial marks, the Hebrew punctuation. `Noto Serif Hebrew` took the
+    /// last place from `Arial` on 2026-09-10 — same single code point, but a
+    /// commercial face cannot be embedded in a distributed PDF without a
+    /// licence, and one sign does not buy that. The decision is the owner's,
+    /// 2026-08-30, `docs/PROJECT-SPEC.ru.md` §3.9.
+    ///
+    /// **The main face is not in this list, and that is not an omission.** In
+    /// HTML it is the system one — `system-ui` and its platform aliases, which
+    /// the stack names ahead of everything here. In PDF it is `Noto Serif`,
+    /// which ships in `cli/resources/fonts/` and is declared in §3.9 of the
+    /// specification, not in this stylesheet: embedding a web font into a
+    /// package of 24 000 files was refused by the owner on the same day. The
+    /// two outputs are allowed to differ in the main face and in nothing below
+    /// it — what this test holds is the half they share.
     #[test]
     fn the_font_stack_names_what_the_corpus_needs() {
         let stack = SHARED
@@ -224,7 +241,7 @@ mod tests {
             "Noto Sans Cuneiform",
             "UllikummiA",
             "STIX Two Math",
-            "Arial",
+            "Noto Serif Hebrew",
         ] {
             assert!(
                 stack.contains(face),

@@ -39,7 +39,18 @@
    *                        `docs/FONTS.md` says where it comes from.
    *   STIX Two Math        6 signs — U+24F5–24F8 and U+27E8/27E9, the editorial
    *                        marks and angle brackets.
-   *   Arial                1 sign, U+05C3, Hebrew punctuation.
+   *   Noto Serif Hebrew    1 sign, U+05C3, Hebrew punctuation. Not a system
+   *                        font: it ships in `cli/resources/fonts/`, OFL 1.1,
+   *                        `fsType` 0. It replaced `Arial` on 2026-09-10 —
+   *                        Arial is commercial and embedding it in a
+   *                        distributed PDF needs a licence, which one code
+   *                        point does not justify (owner's decision
+   *                        2026-08-30, `docs/PROJECT-SPEC.ru.md` §3.9).
+   *
+   * The order below is the order a renderer consults: main face, cuneiform,
+   * the private-use sign, the editorial marks, the Hebrew punctuation. The main
+   * face of the window is the system one; the main face of the PDF stage is
+   * `Noto Serif`, which is deliberately not named here — see the same section.
    *
    * Noto before Ullikummi on purpose: both draw standard cuneiform, and Noto is
    * what the documents render with today. `Hiragino Sans GB` is deliberately
@@ -53,7 +64,7 @@
    * They go before the generic family in every stack, so text degrades to
    * fallback rather than refusing to render on a machine without them.
    */
-  --corpus: 'Noto Sans Cuneiform', UllikummiA, 'STIX Two Math', Arial;
+  --corpus: 'Noto Sans Cuneiform', UllikummiA, 'STIX Two Math', 'Noto Serif Hebrew';
 
   --sans: system-ui, 'Segoe UI', Roboto, var(--corpus), sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, var(--corpus), sans-serif;

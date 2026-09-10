@@ -49,11 +49,27 @@
    *   STIX Two Math          6 signs: U+24F5–24F8, the double-circled digits
    *                        the corpus uses as editorial marks, and U+27E8/27E9,
    *                        the angle brackets. A system font, `fsType` 0.
-   *   Arial                  1 sign, U+05C3, Hebrew punctuation, in at most 26
-   *                        documents. Named rather than left to the generic
-   *                        because `fsType` 0x0008 says the font permits
-   *                        embedding, so there is no reason to leave it to
-   *                        chance.
+   *   Noto Serif Hebrew    1 sign, U+05C3, Hebrew punctuation, in at most 26
+   *                        documents. Not a system font: it ships in this
+   *                        repository, `cli/resources/fonts/`, under OFL 1.1
+   *                        with `fsType` 0 — embeddable in a PDF without
+   *                        condition.
+   *
+   * `Arial` stood in that last place until 2026-09-10 and is gone. It drew the
+   * same single sign, but it is a commercial face whose embedding in a
+   * distributed PDF needs a licence, and one code point is not a reason to
+   * carry that. The decision is the owner's, 2026-08-30, and it is written in
+   * `docs/PROJECT-SPEC.ru.md` §3.9.
+   *
+   * The order is the order a renderer consults, and it is deliberate: the main
+   * face first, then cuneiform, then the private-use sign, then the editorial
+   * marks, then the Hebrew punctuation. Here the main face is the system one —
+   * `system-ui` and its platform aliases. **The main face for PDF is a
+   * different one and is not named here:** it is `Noto Serif`, it ships in
+   * `cli/resources/fonts/`, and it is declared in `docs/PROJECT-SPEC.ru.md`
+   * §3.9 and described in `docs/FONTS.md`. Embedding a web font in a package of
+   * 24 000 files was refused by the owner on 2026-08-30, so the two outputs
+   * differ in the main face on purpose and agree on everything below it.
    *
    * Noto comes before Ullikummi on purpose. Both draw standard cuneiform and
    * both may be embedded, but Noto is what the documents render with today;
@@ -77,7 +93,7 @@
    */
   --font-sans:
     system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Cuneiform', UllikummiA,
-    'STIX Two Math', Arial, sans-serif;
+    'STIX Two Math', 'Noto Serif Hebrew', sans-serif;
   --font-size: 15px;
   --line-height: 1.55;
   --h1-size: 1.35rem;
