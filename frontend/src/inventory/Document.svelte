@@ -83,10 +83,8 @@
         >
         <span class="cuneiform-note"
           >Cuneiform note: some of the documents linked here use U+100000 in their cuneiform lines —
-          a sign with no Unicode code point, drawn only by the font UllikummiA, which no operating
-          system installs. The file and its terms ship with the Aruna repository, in
-          cli/resources/fonts/. Fonts created by Sylvie Vanséveren, available on the Hethitologie
-          Portal Mainz, hethport.net/cuneifont.</span
+          a sign with no Unicode code point that is drawn only by the UllikummiA font, created by
+          Sylvie Vanséveren and available on the Hethitologie Portal Mainz (hethport.net/cuneifont).</span
         >
       </p>
       <section class="legend" aria-label="Column legend">
