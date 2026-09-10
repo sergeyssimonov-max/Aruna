@@ -380,7 +380,23 @@ Four faces close it, and all four are named in the stack now:
 | **Noto Sans Cuneiform** | 376 signs — every standard cuneiform character the corpus uses. System font, OFL, `fsType` 0. |
 | **UllikummiA** | 1 sign — `U+100000`, in 927 places. A cuneiform sign with no Unicode code point, allocated in the private use area by S. Vanséveren and published in the Hittite Sign List. Nothing else draws it. Not a system font; `docs/FONTS.md` says where to get it and how to check it. |
 | **STIX Two Math** | 6 signs: `U+24F5`–`U+24F8`, the double-circled digits used as editorial marks, and `U+27E8`/`U+27E9`, the angle brackets. System font, `fsType` 0. |
-| **Arial** | 1 sign — `U+05C3`, Hebrew punctuation, at most 26 documents. |
+| **Noto Serif Hebrew** | 1 sign — `U+05C3`, Hebrew punctuation, at most 26 documents. Not a system font; it ships in `cli/resources/fonts/`, OFL 1.1, `fsType` 0. |
+
+**`Arial` stood in that last row until 2026-09-10 and is not a face of this
+project any more.** It drew the same single sign, but it is commercial:
+embedding it in a PDF this project distributes needs a licence from its owner,
+and one code point out of 648 is not a reason to seek one. The replacement is
+free, embeddable without condition, and in the same family as the main face.
+Owner's decision 2026-08-30, `docs/PROJECT-SPEC.ru.md` §3.9; the code and this
+table caught up on 2026-09-10. Coverage did not move: 642 of 648 before and
+after, the same six left over.
+
+The four above are the stack **both outputs share**. The main face is not among
+them and is not the same on both sides: in HTML it is the system face, in PDF it
+is `Noto Serif`, which ships in `cli/resources/fonts/` and is declared in §3.9
+of the specification. Embedding a web font in a package of 24 000 files was
+refused on the same day, so the two outputs differ in the main face on purpose
+and agree on everything below it — see `docs/FONTS.md`.
 
 `cli/src/style.rs::the_font_stack_names_what_the_corpus_needs` holds the stack to
 this. It is a source-level assertion because that is where the failure is

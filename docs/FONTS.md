@@ -53,7 +53,11 @@ meaning *nothing can render this* rather than a rendering. The audit keeps that
 apart from coverage and says so for each gap — see *What a reader sees instead*
 below.
 
-## The four faces, and why each is there
+## The four faces of the shared stack, and why each is there
+
+These four are the stack both outputs share. The main face is not among them —
+it is the one thing HTML and PDF are allowed to differ in, and it has a section
+of its own below.
 
 The stack is declared in **two** places, and both must name the same four faces:
 
@@ -132,20 +136,87 @@ does not.
 | licence | SIL Open Font License 1.1 |
 | `fsType` | `0x0000` — Installable |
 
-### Arial
+### Noto Serif Hebrew
 
 | | |
 |---|---|
 | covers | 1 sign — `U+05C3`, Hebrew punctuation sof pasuq, in at most 26 documents |
-| CSS family | `Arial` |
-| file | `Arial.ttf` |
-| where | `/System/Library/Fonts/Supplemental/` — ships with macOS 13 |
-| licence | Monotype, licensed to Apple with the operating system |
-| `fsType` | `0x0008` — Editable: embedding and subsetting permitted |
+| CSS family | `Noto Serif Hebrew` |
+| file | `NotoSerifHebrew-Regular.ttf`, version 2.004 |
+| where | **not a system font** — it ships in this repository, `cli/resources/fonts/`, since 2026-09-10 |
+| SHA-256 | `dfd5a6aefe97a99f68fe43388342913d50bb9fbf6d3afc4d2c7725661bc4a2b1` |
+| copyright | The Noto Project Authors, 2022 |
+| licence | SIL Open Font License 1.1, text beside the file in `cli/resources/fonts/OFL-NotoSerifHebrew.txt` |
+| `fsType` | `0x0000` — Installable: embeddable in a PDF without condition |
+| origin | monthly release `noto-monthly-release-2026.05.01`; the licence text from `notofonts/hebrew`, the repository the font's own rights field names |
 
-Named rather than left to the generic `sans-serif`. The reason it was left out
-at first was an assumption that its embedding rights were unclear; reading the
-font's own `fsType` bit settled it.
+A narrow file — 146 code points — and that is the whole of what is wanted from
+it. Checked in its own `cmap` rather than assumed: `U+05C3` is there, and so are
+all 27 letters of the alphabet, so a Hebrew word appearing in editorial prose
+one day would render rather than half-render.
+
+**It replaced `Arial` on 2026-09-10, and `Arial` is gone rather than demoted.**
+Arial drew the same single sign and its `fsType` did permit embedding, but it is
+a commercial face: embedding it in a PDF this project distributes needs a
+licence from its owner, and one code point out of 648 does not buy that
+conversation. The replacement is in the same family as the main face below, is
+under OFL, and carries `fsType` 0. The decision is the owner's, 2026-08-30, and
+it is recorded in `docs/PROJECT-SPEC.ru.md` §3.9; the code caught up on
+2026-09-10.
+
+### Noto Serif — the main face, and only for PDF
+
+| | |
+|---|---|
+| covers | the running text: Cyrillic and the Latin diacritics of the transliteration |
+| CSS family | `Noto Serif` |
+| files | `NotoSerif-Regular.ttf`, `NotoSerif-Italic.ttf`, `NotoSerif-Bold.ttf`, all version 2.015 |
+| where | **not a system font** — `cli/resources/fonts/`, since 2026-09-10 |
+| SHA-256 | Regular `19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88` · Italic `749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f` · Bold `96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce` |
+| copyright | The Noto Project Authors, 2022 |
+| licence | SIL Open Font License 1.1, text in `cli/resources/fonts/OFL-NotoSerif.txt` |
+| `fsType` | `0x0000` — Installable, all three |
+| origin | monthly release `noto-monthly-release-2026.05.01`; the licence text from `notofonts/latin-greek-cyrillic` |
+
+**This face is not in the stack above, and its absence there is a decision, not
+an omission.** The stack above is the one both outputs share. The main face is
+the one they are allowed to differ in: in HTML it is the system face —
+`system-ui` and its platform aliases — and in PDF it is `Noto Serif`. Embedding
+a web font into a package of some 24 000 files was refused by the owner on
+2026-08-30, because it would add weight to every one of them for an appearance
+most machines already give.
+
+So the answer to "where is the PDF's main face declared, if not in the
+stylesheet" is: in `docs/PROJECT-SPEC.ru.md` §3.9, which states it, and in this
+table, which names the files, their sums and their licence. Not in
+`canonical.css`, and the test in `cli/src/style.rs` says so in as many words so
+that a reader of the code cannot conclude it was forgotten.
+
+Chosen for a reason rather than a taste: `Noto Serif` is related to
+`Noto Sans Cuneiform`, already in the stack, so the step from ordinary text into
+cuneiform does not jump in weight or x-height, and its coverage of Cyrillic and
+extended Latin diacritics is complete. Three cuts ship because a scholarly page
+needs italic for sigla and bold for headings; nothing else of the family is
+here.
+
+## The five files this repository carries
+
+Everything in `cli/resources/fonts/`, with what verifies it:
+
+| file | version | SHA-256 | licence, text beside it | `fsType` |
+|---|---|---|---|---|
+| `UllikummiA.ttf` | 1.003 | `2ca4357d66d7cde6b0785be22f4c3ed3427289fdb0330eceabe89da24c4041cf` | Hethitologie-Portal Mainz terms, `UllikummiA-TERMS.txt` | **`0x0008`** — Editable: embedding and subsetting permitted |
+| `NotoSerif-Regular.ttf` | 2.015 | `19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88` | OFL 1.1, `OFL-NotoSerif.txt` | `0x0000` |
+| `NotoSerif-Italic.ttf` | 2.015 | `749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f` | OFL 1.1, `OFL-NotoSerif.txt` | `0x0000` |
+| `NotoSerif-Bold.ttf` | 2.015 | `96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce` | OFL 1.1, `OFL-NotoSerif.txt` | `0x0000` |
+| `NotoSerifHebrew-Regular.ttf` | 2.004 | `dfd5a6aefe97a99f68fe43388342913d50bb9fbf6d3afc4d2c7725661bc4a2b1` | OFL 1.1, `OFL-NotoSerifHebrew.txt` | `0x0000` |
+
+**One of the five permits embedding conditionally and four without condition.**
+`UllikummiA` carries `0x0008`, Editable Embedding — embedding *and* subsetting
+are permitted, which is what a PDF needs, and the written terms beside it permit
+scholarly use with a credit. The four Noto files carry `0x0000`, Installable,
+which permits everything. Read out of each file's own `OS/2` table on
+2026-09-10, not taken from a catalogue.
 
 ## Deliberately not named
 
@@ -163,14 +234,26 @@ above do not.
 
 ## Installing — reproducing this environment on another machine
 
-Three of the four faces ship with macOS 13 and need nothing. Only `UllikummiA`
-has to be installed, and since 2026-09-09 it comes with the checkout:
+Two of the four faces ship with macOS 13 and need nothing. **Two have to be
+installed, and both come with the checkout:**
 
 ```sh
-cp cli/resources/fonts/UllikummiA.ttf ~/Library/Fonts/
+cp cli/resources/fonts/UllikummiA.ttf          ~/Library/Fonts/
+cp cli/resources/fonts/NotoSerifHebrew-Regular.ttf ~/Library/Fonts/
 ```
 
-That is the whole of it on a fresh machine. The upstream route below is no
+That is the whole of it on a fresh machine. The three `NotoSerif-*.ttf` are
+deliberately **not** on that list: they are the main face of the PDF stage, they
+are read from the repository by whatever renders, and nothing in the HTML path
+consults them — installing them would change nothing and would suggest they are
+part of the shared stack.
+
+Measured on 2026-09-10, and worth stating because it is the shape of the
+failure: with `NotoSerifHebrew-Regular.ttf` present in the repository but not
+copied into `~/Library/Fonts`, the audit reports **641 of 648** and names the
+missing face. The one point that goes with it is `U+05C3`. Copying the file
+restores 642 — the same 642 as before the face changed, and the same six left
+over. The upstream route below is no
 longer the install path; it is the cross-check — how to confirm that what this
 repository carries is what the portal publishes.
 
@@ -190,6 +273,7 @@ Verify what you installed:
 | `UllikummiA.ttf` | `2ca4357d66d7cde6b0785be22f4c3ed3427289fdb0330eceabe89da24c4041cf` |
 | `UllikummiB.ttf` | `1c9213f771712192dc2a121e128bfc32c5c5e1bc1c5ee1d2b16ce7120775d6e3` |
 | `UllikummiC.ttf` | `ee2ccaa1a1449e1f97af739a301e680fcd555b56b466f8e019488ca5b2c4506e` |
+| `NotoSerifHebrew-Regular.ttf` | `dfd5a6aefe97a99f68fe43388342913d50bb9fbf6d3afc4d2c7725661bc4a2b1` |
 
 Then confirm the machine is correct rather than trusting the copy:
 
@@ -348,3 +432,6 @@ font that would draw something there would draw the wrong thing.
 - [The same, DARIAH mirror](https://smaw.de.dariah.eu/cuneifont/) — reachable when the first is not
 - [TLHdig](https://www.hethport.uni-wuerzburg.de/TLHdig/) — the corpus this describes
 - `SignLists/HittiteSignList.pdf`, in the portal's `SignLists.zip` — where the private-use allocation is published
+- [notofonts/latin-greek-cyrillic](https://github.com/notofonts/latin-greek-cyrillic) — `Noto Serif` and its OFL text, named in the font's own rights field
+- [notofonts/hebrew](https://github.com/notofonts/hebrew) — `Noto Serif Hebrew` and its OFL text, likewise
+- `noto-monthly-release-2026.05.01` — the release the four files here were taken from
