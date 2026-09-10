@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "aruna"
-version = "2.5.4"
+version = "2.5.5"
 dependencies = [
  "dirs 5.0.1",
  "memchr",
@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "aruna-desktop"
-version = "2.5.4"
+version = "2.5.5"
 dependencies = [
  "aruna",
  "log",
