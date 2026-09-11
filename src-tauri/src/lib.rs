@@ -144,6 +144,25 @@ pub struct XmlSummary {
     reasons: Vec<XmlReasonCount>,
     /// Имена некорректных, в порядке манифеста.
     documents_not_well_formed: Vec<XmlDocument>,
+    /// Документов, которые этот разборщик принимает, а строгий – нет.
+    ///
+    /// Вторая половина того же вопроса, и до 10.09.2026 ее не считал никто.
+    /// Числа выше говорят, что отказал разборщик ядра; это – что он пропустил.
+    /// В пакете 2026-09-10 их семнадцать: четыре с голым `<` внутри значения
+    /// атрибута и тринадцать с именем вида `<AO:-…>`, у которого нет локальной
+    /// части.
+    beyond_this_parser: u32,
+    /// По классам предела, включая класс с нулем.
+    limits: Vec<XmlLimitCount>,
+    /// Имена этих документов, в порядке манифеста.
+    documents_beyond_this_parser: Vec<XmlLimitDocument>,
+    /// Некорректный XML как таковой: отказы ядра плюс голый `<`.
+    ///
+    /// То самое число, на котором `xmllint --noout` выходит с ненулевым кодом:
+    /// 210 в пакете 2026-09-10.
+    not_well_formed_xml: u32,
+    /// Все, к чему придирается строгий разборщик: 223 в том же пакете.
+    objected_to: u32,
 }
 
 /// Сколько документов у одной причины.
@@ -160,6 +179,28 @@ pub struct XmlDocument {
     /// Путь внутри пакета.
     file: String,
     reason: String,
+    line: u32,
+    column: u32,
+}
+
+/// Сколько документов у одного класса предела.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct XmlLimitCount {
+    /// Ключ класса, как его пишет манифест.
+    limit: String,
+    documents: u32,
+}
+
+/// Один документ, который разборщик ядра принял, а строгий – нет.
+///
+/// Отдельный тип, а не [`XmlDocument`] с переименованным полем: там `reason` –
+/// причина отказа, здесь `limit` – класс того, чего разборщик не увидел. Одно
+/// имя на двоих читалось бы как одно и то же событие, а это разные события.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct XmlLimitDocument {
+    /// Путь внутри пакета.
+    file: String,
+    limit: String,
     line: u32,
     column: u32,
 }
@@ -355,12 +396,53 @@ fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryE
         by_reason: std::collections::BTreeMap<String, usize>,
         #[serde(default)]
         not_well_formed_documents: Vec<Entry>,
+        /// Секцию манифест несет с 10.09.2026. Пакет, собранный раньше, ее не
+        /// имеет, и это не поломка: `default` дает нули и пустые списки, окно
+        /// показывает то, что есть. Отдельного отказа тут не нужно – в отличие
+        /// от секции `xml` целиком, отсутствие которой значит «пакет об этом
+        /// не знает», здесь известно все, кроме второй половины.
+        #[serde(default)]
+        beyond_this_parser: Option<BeyondSection>,
+        #[serde(default)]
+        totals: Option<Totals>,
+    }
+
+    #[derive(serde::Deserialize, Default)]
+    struct BeyondSection {
+        #[serde(default)]
+        documents: usize,
+        #[serde(default)]
+        by_limit: std::collections::BTreeMap<String, usize>,
+        #[serde(default)]
+        documents_beyond_this_parser: Vec<LimitEntry>,
+    }
+
+    #[derive(serde::Deserialize, Default)]
+    struct Totals {
+        #[serde(default)]
+        not_well_formed_xml: Total,
+        #[serde(default)]
+        objected_to_by_a_conforming_parser: Total,
+    }
+
+    #[derive(serde::Deserialize, Default)]
+    struct Total {
+        #[serde(default)]
+        documents: usize,
     }
 
     #[derive(serde::Deserialize)]
     struct Entry {
         file: String,
         reason: String,
+        line: usize,
+        column: usize,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct LimitEntry {
+        file: String,
+        limit: String,
         line: usize,
         column: usize,
     }
@@ -375,7 +457,9 @@ fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryE
     // Манифест старого пакета секции не несет, и это не поломка: собран он был
     // до 06.09.2026. Отдельный отказ, а не нули, – ноль некорректных документов
     // и «пакет об этом не знает» на экране выглядят одинаково, а значат разное.
-    let section = manifest.xml.ok_or(XmlSummaryError::Absent)?;
+    let mut section = manifest.xml.ok_or(XmlSummaryError::Absent)?;
+    let beyond = section.beyond_this_parser.take().unwrap_or_default();
+    let totals = section.totals.take().unwrap_or_default();
 
     Ok(XmlSummary {
         documents: counted(section.documents),
@@ -399,6 +483,31 @@ fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryE
                 column: counted(entry.column),
             })
             .collect(),
+        beyond_this_parser: counted(beyond.documents),
+        limits: beyond
+            .by_limit
+            .into_iter()
+            .map(|(limit, documents)| XmlLimitCount {
+                limit,
+                documents: counted(documents),
+            })
+            .collect(),
+        documents_beyond_this_parser: beyond
+            .documents_beyond_this_parser
+            .into_iter()
+            .map(|entry| XmlLimitDocument {
+                file: entry.file,
+                limit: entry.limit,
+                line: counted(entry.line),
+                column: counted(entry.column),
+            })
+            .collect(),
+        // Пакет старее 10.09.2026 итогов не несет, и складывать их здесь
+        // самим нельзя: 210 – это отказы плюс один из двух классов предела, а
+        // какой именно, знает ядро, а не окно. Ноль честнее выдуманного числа,
+        // и экран на нем ничего не печатает.
+        not_well_formed_xml: counted(totals.not_well_formed_xml.documents),
+        objected_to: counted(totals.objected_to_by_a_conforming_parser.documents),
     })
 }
 
@@ -549,8 +658,11 @@ pub struct BuildReport {
     pub groups: u32,
     /// Документы, которым пришлось дать суффикс: их сиглум был уже занят.
     pub disambiguated: u32,
-    /// Документы, из которых убрана ссылка на таблицу стилей, которой в пакете
-    /// нет.
+    /// Убранные ссылки на таблицу стилей, которой в пакете нет.
+    ///
+    /// Инструкции, а не документы: один документ корпуса несет две. До
+    /// 10.09.2026 число считалось по документам, а называлось инструкциями –
+    /// на корпусе это ровно единица разницы, 8 424 против 8 423.
     pub stylesheet_dropped: u32,
 }
 
@@ -1361,6 +1473,24 @@ mod markup {
         "by_reason":{"crossing-elements":1,"element-never-closed":1,"unclassified":0},
         "not_well_formed_documents":[
           {"file":"CTH 1/KBo 1.1.xml","reason":"element-never-closed","line":7,"column":12},
+          {"file":"CTH 1/KBo 1.2.xml","reason":"crossing-elements","line":3,"column":4}],
+        "beyond_this_parser":{"documents":1,
+          "by_limit":{"colon-without-local-name":0,"raw-less-than-in-attribute-value":1},
+          "documents_beyond_this_parser":[
+            {"file":"CTH 1/KBo 1.3.xml","limit":"raw-less-than-in-attribute-value",
+             "line":5,"column":41}]},
+        "totals":{
+          "refused_here":{"documents":2,"means":"…"},
+          "not_well_formed_xml":{"documents":3,"means":"…"},
+          "objected_to_by_a_conforming_parser":{"documents":3,"means":"…"}}}}"#;
+
+    /// Манифест пакета, собранного до 10.09.2026: секция `xml` есть, второй
+    /// половины в ней нет.
+    const SECTION_WITHOUT_LIMITS: &str = r#"{"schema":1,"counts":{"documents":4,"groups":1},
+      "xml":{"documents":4,"well_formed":2,"not_well_formed":2,
+        "by_reason":{"crossing-elements":1,"element-never-closed":1,"unclassified":0},
+        "not_well_formed_documents":[
+          {"file":"CTH 1/KBo 1.1.xml","reason":"element-never-closed","line":7,"column":12},
           {"file":"CTH 1/KBo 1.2.xml","reason":"crossing-elements","line":3,"column":4}]}}"#;
 
     /// **Сводка читается из манифеста и ничего не пересчитывает.**
@@ -1393,6 +1523,64 @@ mod markup {
             .reasons
             .iter()
             .any(|r| r.reason == "unclassified" && r.documents == 0));
+    }
+
+    /// **Вторая половина доезжает до окна так же, как первая.**
+    ///
+    /// Документы, которые разборщик ядра принял, а строгий – нет: их число, их
+    /// классы (включая класс с нулем – по той же причине, что и причина с
+    /// нулем) и их имена со строками. Два итога, 210 и 223, окно берет из
+    /// манифеста, а не складывает само: слагаемые знает ядро.
+    #[test]
+    fn the_documents_beyond_the_parser_reach_the_window_too() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(aruna::export::MANIFEST), SECTION).unwrap();
+
+        let summary = read_xml_summary(dir.path()).expect("манифест несет секцию");
+
+        assert_eq!(summary.beyond_this_parser, 1);
+        assert_eq!(summary.not_well_formed_xml, 3, "отказы плюс голый «<»");
+        assert_eq!(summary.objected_to, 3);
+        assert_eq!(summary.documents_beyond_this_parser.len(), 1);
+        assert_eq!(
+            summary.documents_beyond_this_parser[0].file,
+            "CTH 1/KBo 1.3.xml"
+        );
+        assert_eq!(summary.documents_beyond_this_parser[0].line, 5);
+        assert!(summary
+            .limits
+            .iter()
+            .any(|l| l.limit == "colon-without-local-name" && l.documents == 0));
+
+        let summed: u32 = summary.limits.iter().map(|l| l.documents).sum();
+        assert_eq!(summed, summary.beyond_this_parser);
+    }
+
+    /// **Пакет, собранный между 06.09 и 10.09.2026, читается, а не отвергается.**
+    ///
+    /// Отсутствие второй половины – не то же самое, что отсутствие секции: про
+    /// первую половину такой манифест знает все. Окно получает нули там, где
+    /// сведений нет, и ничего про них не печатает.
+    #[test]
+    fn a_manifest_from_before_the_limits_were_counted_is_still_read() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join(aruna::export::MANIFEST),
+            SECTION_WITHOUT_LIMITS,
+        )
+        .unwrap();
+
+        let summary = read_xml_summary(dir.path()).expect("первая половина на месте");
+
+        assert_eq!(summary.not_well_formed, 2, "она читается как раньше");
+        assert_eq!(summary.beyond_this_parser, 0);
+        assert!(summary.limits.is_empty());
+        assert!(summary.documents_beyond_this_parser.is_empty());
+        assert_eq!(
+            summary.not_well_formed_xml, 0,
+            "числа, которого манифест не несет, окно не выдумывает"
+        );
+        assert_eq!(summary.objected_to, 0);
     }
 
     /// **Разбивка сходится с итогом.**

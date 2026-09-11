@@ -86,6 +86,14 @@
           a sign with no Unicode code point that is drawn only by the UllikummiA font, created by
           Sylvie Vanséveren and available on the Hethitologie Portal Mainz (hethport.net/cuneifont).</span
         >
+        <span class="markup-note"
+          >Примечание о разметке: часть связанных здесь документов не проходит строгий разбор XML –
+          в них не сходятся теги, пропущен знак «=» в атрибуте, встречается голый знак «&lt;» внутри
+          значения атрибута или имя вида &lt;AO:-…&gt; без части после двоеточия. Это свойство
+          исходных документов, а не сборки пакета: все они лежат здесь без изменений и открываются
+          по ссылкам так же, как остальные. Поименный список с причинами и номерами строк – в файле
+          manifest.json, раздел xml.</span
+        >
       </p>
       <section class="legend" aria-label="Column legend">
         <p class="legend-title">Columns</p>
