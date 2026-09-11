@@ -18,16 +18,45 @@ copy, so the specification below and the documents cannot drift apart.
 
 ## Coverage
 
-648 distinct code points, 382 of them above the Basic Multilingual Plane.
+648 distinct code points, of which **645 need a glyph** and 382 are above the
+Basic Multiligual Plane. Measured 2026-09-11.
 
 | | |
 |---|---|
-| drawn by a face the stack names | **642 / 648** |
+| **drawn by a file of this repository** | **639 / 645** |
+| also drawn by one of the four faces the shared stack names | 632 / 645 |
 | drawn only by a font this machine happens to have | 0 |
-| drawn by no font that draws characters | 6 |
+| drawn by no font that draws characters | 5 |
+| drawn only by a face this project refuses to name | 1 |
 
-The six are the whole of the remaining problem and have a section of their own
-at the end. Everything else is settled.
+The six left over — the five and the one — are the whole of the remaining
+problem and have a section of their own at the end. Everything else is settled.
+
+**The number that matters is the first row, and it changed meaning on
+2026-09-11.** Until that day three of the faces came from macOS, and what the
+audit reported was what *this desk* could draw. Every face is now a file in
+`cli/resources/fonts/`, the audit counts those files and nothing else, and the
+row therefore answers the question the whole exercise is for: what will another
+machine draw.
+
+**Three code points left both sides of the ratio, and none of them is a
+character.** The corpus contains `U+0009`, `U+000A` and `U+000D` — tab, newline
+and carriage return. No font of this stack maps them and none should: they are
+instructions to a layout engine, not glyphs. They counted as covered until
+2026-09-11 because the stack resolved `system-ui` to macOS's own files, several
+of which — `Geneva.ttf` among them — map them to a blank. So the old **642 of
+648** and this **639 of 645** describe the same corpus: three non-characters
+left the numerator and the denominator together, and **the six that cannot be
+drawn are the same six as before.**
+
+**Seven characters are covered by the repository and not by the four faces the
+shared stack names**: `U+02FD`, `U+0341`, `U+206F`, `U+2093`, `U+2E17` and the
+half brackets `U+2E22`/`U+2E23`. They belong to the main face, which is
+`Noto Serif` in PDF and the system face in HTML — so in the exported page those
+seven are still drawn by whatever the reader's system provides. That is the
+residual and it is a consequence of the owner's decision of 2026-08-30 not to
+embed a web font in a package of 24 000 files, not an oversight. Named here
+because a residual nobody writes down stops being known.
 
 **How much of the corpus each touches**, counted over the 23 936 documents the
 package holds (2026-08-24):
@@ -59,6 +88,13 @@ These four are the stack both outputs share. The main face is not among them —
 it is the one thing HTML and PDF are allowed to differ in, and it has a section
 of its own below.
 
+**None of the four comes from the operating system any more.** Until 2026-09-11
+three of them did — the cuneiform, the editorial marks and, before it was
+replaced, `Arial` — and `docs/XML-CONTRACT.md` names that arrangement as the
+reason this work exists: "it looks right here" is not evidence about anybody
+else's machine. All four are files of this checkout now, and the audit counts
+nothing else.
+
 The stack is declared in **two** places, and both must name the same four faces:
 
 | where | what it covers |
@@ -86,10 +122,23 @@ faces. In the order a browser consults them:
 |---|---|
 | covers | 376 signs — every standard cuneiform character in the corpus, across 19 021 documents |
 | CSS family | `Noto Sans Cuneiform` |
-| file | `NotoSansCuneiform-Regular.ttf` |
-| where | `/System/Library/Fonts/Supplemental/` — ships with macOS 13 |
-| licence | SIL Open Font License 1.1 |
+| file | `NotoSansCuneiform-Regular.ttf`, version 2.001 |
+| where | **not a system font any more** — `cli/resources/fonts/`, since 2026-09-11 |
+| SHA-256 | `aad6f345a2f3150aeb51706ecf1d6f62eec299ee215cb77e76f0c33e1419bba2` |
+| copyright | The Noto Project Authors, 2022 |
+| licence | SIL Open Font License 1.1, text beside the file in `cli/resources/fonts/OFL-NotoSansCuneiform.txt` |
 | `fsType` | `0x0000` — Installable: embeddable in a PDF without condition |
+| origin | monthly release `noto-monthly-release-2026.05.01`; the licence text from `notofonts/cuneiform` |
+
+**Version 2.001 from the release, not the 2.000 macOS carries, and the choice
+was measured rather than assumed.** Both files were read and compared against
+the corpus on 2026-09-11: each covers 378 of its code points, of which 376 are
+cuneiform, and **the two sets are identical — no code point is in one and not
+the other.** So the choice costs nothing in coverage and buys two things. The
+release version is traceable to a tag, like the other three Noto files here, and
+it does not change when the operating system updates: `2.000;GOOG;noto-source:20181019`
+is what this Mac happens to ship in 2026, and the next `softwareupdate` is free
+to make it something else without telling anyone.
 
 Named first among the cuneiform faces deliberately. It is what these documents
 render with today, so naming it changes nothing about how they look; putting the
@@ -131,10 +180,21 @@ does not.
 |---|---|
 | covers | 6 signs — `U+24F5`–`U+24F8`, the double-circled digits used as editorial marks, and `U+27E8`/`U+27E9`, the angle brackets |
 | CSS family | `STIX Two Math` |
-| file | `STIXTwoMath.otf` |
-| where | `/System/Library/Fonts/Supplemental/` — ships with macOS 13 |
-| licence | SIL Open Font License 1.1 |
+| file | `STIXTwoMath-Regular.otf`, version 2.13 b171 |
+| where | **not a system font any more** — `cli/resources/fonts/`, since 2026-09-11 |
+| SHA-256 | `3a5f3f26f40d5698b3c62dd085d48d6663696a3f80825aab8b553d5097518e8c` |
+| copyright | The STIX Fonts Project Authors, 2001–2021; *STIX Fonts* is a trademark of the IEEE |
+| licence | SIL Open Font License 1.1, text beside the file in `cli/resources/fonts/OFL-STIXTwo.txt` |
 | `fsType` | `0x0000` — Installable |
+| origin | release `v2.13b171` of the STIX project |
+
+**The release file and the system file are the same bytes.** Both were hashed on
+2026-09-11 and both are
+`3a5f3f26f40d5698b3c62dd085d48d6663696a3f80825aab8b553d5097518e8c`: macOS ships
+the project's own file without rebuilding it. So moving this face into the tree
+changes nothing about what is drawn, and everything about what the claim rests
+on — a file with a release tag beside it rather than a file that arrives with an
+operating system and leaves with it.
 
 ### Noto Serif Hebrew
 
@@ -199,19 +259,25 @@ extended Latin diacritics is complete. Three cuts ship because a scholarly page
 needs italic for sigla and bold for headings; nothing else of the family is
 here.
 
-## The five files this repository carries
+## The seven files this repository carries
 
-Everything in `cli/resources/fonts/`, with what verifies it:
+Everything in `cli/resources/fonts/`, with what verifies it. **Since 2026-09-11
+the stack takes nothing from the operating system**: every face below is a file
+of this checkout, and `cli/src/style.rs::the_font_stack_names_what_the_corpus_needs`
+fails the build if any of them is absent or if the stack names a family no file
+here answers to.
 
 | file | version | SHA-256 | licence, text beside it | `fsType` |
 |---|---|---|---|---|
 | `UllikummiA.ttf` | 1.003 | `2ca4357d66d7cde6b0785be22f4c3ed3427289fdb0330eceabe89da24c4041cf` | Hethitologie-Portal Mainz terms, `UllikummiA-TERMS.txt` | **`0x0008`** — Editable: embedding and subsetting permitted |
+| `NotoSansCuneiform-Regular.ttf` | 2.001 | `aad6f345a2f3150aeb51706ecf1d6f62eec299ee215cb77e76f0c33e1419bba2` | OFL 1.1, `OFL-NotoSansCuneiform.txt` | `0x0000` |
+| `STIXTwoMath-Regular.otf` | 2.13 b171 | `3a5f3f26f40d5698b3c62dd085d48d6663696a3f80825aab8b553d5097518e8c` | OFL 1.1, `OFL-STIXTwo.txt` | `0x0000` |
 | `NotoSerif-Regular.ttf` | 2.015 | `19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88` | OFL 1.1, `OFL-NotoSerif.txt` | `0x0000` |
 | `NotoSerif-Italic.ttf` | 2.015 | `749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f` | OFL 1.1, `OFL-NotoSerif.txt` | `0x0000` |
 | `NotoSerif-Bold.ttf` | 2.015 | `96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce` | OFL 1.1, `OFL-NotoSerif.txt` | `0x0000` |
 | `NotoSerifHebrew-Regular.ttf` | 2.004 | `dfd5a6aefe97a99f68fe43388342913d50bb9fbf6d3afc4d2c7725661bc4a2b1` | OFL 1.1, `OFL-NotoSerifHebrew.txt` | `0x0000` |
 
-**One of the five permits embedding conditionally and four without condition.**
+**One of the seven permits embedding conditionally and six without condition.**
 `UllikummiA` carries `0x0008`, Editable Embedding — embedding *and* subsetting
 are permitted, which is what a PDF needs, and the written terms beside it permit
 scholarly use with a credit. The four Noto files carry `0x0000`, Installable,
@@ -234,28 +300,33 @@ above do not.
 
 ## Installing — reproducing this environment on another machine
 
-Two of the four faces ship with macOS 13 and need nothing. **Two have to be
-installed, and both come with the checkout:**
+**Nothing has to be installed, and that is the point of 2026-09-11.** All seven
+files come with the checkout, the audit reads them from `cli/resources/fonts/`,
+and a clone on a machine that has never heard of Hittitology reports the same
+639 of 645 as this one. Before that day three faces came from macOS and the
+audit's answer was a property of the desk it ran on.
+
+Installing remains useful for exactly one thing, and it is worth keeping the two
+apart:
 
 ```sh
-cp cli/resources/fonts/UllikummiA.ttf          ~/Library/Fonts/
+# only to read the exported HTML in a browser on this machine
+cp cli/resources/fonts/UllikummiA.ttf              ~/Library/Fonts/
+cp cli/resources/fonts/NotoSansCuneiform-Regular.ttf ~/Library/Fonts/
+cp cli/resources/fonts/STIXTwoMath-Regular.otf     ~/Library/Fonts/
 cp cli/resources/fonts/NotoSerifHebrew-Regular.ttf ~/Library/Fonts/
 ```
 
-That is the whole of it on a fresh machine. The three `NotoSerif-*.ttf` are
-deliberately **not** on that list: they are the main face of the PDF stage, they
-are read from the repository by whatever renders, and nothing in the HTML path
-consults them — installing them would change nothing and would suggest they are
-part of the shared stack.
+A browser resolves a CSS family against the fonts the system offers it; it has
+no idea this repository exists. So the four faces of the shared stack have to be
+installed for the exported page to look on this machine the way the stack says
+it should — and that is a statement about reading the page here, not about the
+package being complete. The three `NotoSerif-*.ttf` are deliberately not on that
+list: they are the main face of the PDF stage, nothing in the HTML path consults
+them, and installing them would suggest they belong to the shared stack.
 
-Measured on 2026-09-10, and worth stating because it is the shape of the
-failure: with `NotoSerifHebrew-Regular.ttf` present in the repository but not
-copied into `~/Library/Fonts`, the audit reports **641 of 648** and names the
-missing face. The one point that goes with it is `U+05C3`. Copying the file
-restores 642 — the same 642 as before the face changed, and the same six left
-over. The upstream route below is no
-longer the install path; it is the cross-check — how to confirm that what this
-repository carries is what the portal publishes.
+The upstream route below is not an install path either; it is the cross-check —
+how to confirm that what this repository carries is what the portal publishes.
 
 ```sh
 curl -LO https://hethport.net/cuneifont/download/Ullikummi.zip
@@ -280,11 +351,13 @@ Then confirm the machine is correct rather than trusting the copy:
 ```sh
 cd cli
 cargo run --release --example font_coverage -- fixtures/…zip
-# expect: "by the declared font stack   642 of 648"
+# expect: "BY THE REPOSITORY'S FILES     639 of 645"
 ```
 
-Anything below 642 means a face is missing, and the program names which code
-points went with it.
+Anything below 639 means a file is missing or has changed, and the program names
+which code points went with it. A face the stack names that resolves to a system
+file rather than to one of ours is reported as a failure with a non-zero exit,
+not as a pass: it is the state those files exist to end.
 
 **`UllikummiA.ttf` is committed to this repository as of 2026-09-09, and the
 sentence that stood here said the opposite.** It read: "the licence permits use,
