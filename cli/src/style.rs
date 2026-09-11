@@ -255,6 +255,67 @@ mod tests {
         // fallback rather than refusing to render.
         assert!(stack.trim_end().ends_with("sans-serif"));
 
+        // **A name without a file is a return to depending on the system, and
+        // it has to break the build rather than surface in a PDF.**
+        //
+        // Until 2026-09-11 three of the faces above came from macOS, and
+        // "it renders correctly here" was the whole of the evidence that the
+        // corpus would print. The files are in the tree now, and this is what
+        // keeps them there: every face the stack names, plus the main face of
+        // the PDF stage, which the stack deliberately does not name. Checked by
+        // file rather than by family, because a family is what a stylesheet
+        // says and a file is what a renderer opens.
+        let fonts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts");
+        for (file, why) in [
+            ("NotoSansCuneiform-Regular.ttf", "376 signs of cuneiform"),
+            ("UllikummiA.ttf", "U+100000, which nothing else draws"),
+            ("STIXTwoMath-Regular.otf", "six editorial marks"),
+            ("NotoSerifHebrew-Regular.ttf", "U+05C3"),
+            ("NotoSerif-Regular.ttf", "the main face of the PDF stage"),
+            ("NotoSerif-Italic.ttf", "the same, italic"),
+            ("NotoSerif-Bold.ttf", "the same, bold"),
+        ] {
+            assert!(
+                fonts.join(file).is_file(),
+                "cli/resources/fonts/{file} is missing — it covers {why}, and                  without it that falls back to whatever this machine happens to                  have. See docs/FONTS.md."
+            );
+        }
+
+        // And nothing the stack names may be satisfied from outside the tree.
+        // The families below are the platform's interface font, which is the
+        // main face of the HTML output by the owner's decision and is a
+        // platform instruction rather than a file; everything else the stack
+        // names has to be one of the files above.
+        for family in stack.split(',').map(str::trim) {
+            let name = family.trim_matches(['\'', '"']).trim();
+            let plain = name.to_lowercase();
+            if plain.is_empty()
+                || plain.starts_with('-')
+                || matches!(
+                    plain.as_str(),
+                    "system-ui" | "blinkmacsystemfont" | "segoe ui" | "sans-serif"
+                )
+            {
+                continue;
+            }
+            let flat = plain.replace(' ', "");
+            let shipped = std::fs::read_dir(&fonts)
+                .expect("the font directory is readable")
+                .flatten()
+                .any(|entry| {
+                    entry
+                        .file_name()
+                        .to_string_lossy()
+                        .to_lowercase()
+                        .replace(['-', '_'], "")
+                        .starts_with(&flat)
+                });
+            assert!(
+                shipped,
+                "the stack names {name}, and no file in cli/resources/fonts/                  answers to it — so it would be drawn by whatever the operating                  system provides, which is the dependency those files exist to                  remove"
+            );
+        }
+
         // And the one face that must never be named. `Hiragino Sans GB` covers
         // U+E83A only in the sense that its private-use area holds a Chinese
         // glyph at that number; naming it would make an unrelated sign the

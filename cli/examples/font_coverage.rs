@@ -38,16 +38,69 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// Where macOS keeps fonts, in the order that matters for the verdict.
+/// **The faces this project ships, and the only ones the verdict counts.**
 ///
-/// The first two are the system's and are on every Mac of this version. The
-/// last two are what somebody installed, and a corpus that depends on them
-/// depends on that person's machine.
+/// Compiled in as a path rather than looked for, so the audit cannot be run
+/// against some other directory that happens to hold fonts of the same names.
+/// Since 2026-09-11 every face of the stack lives here; before that three of
+/// them came from macOS, and the number this program printed was a statement
+/// about one desk.
+const REPOSITORY_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts");
+
+/// Where macOS keeps fonts. **Read, never counted as coverage.**
+///
+/// Kept in the scan for two facts that are about the corpus rather than about
+/// this machine, and that would be lost by ignoring the system outright:
+/// `LastResort.otf` marks five of the corpus's signs with a placeholder box,
+/// which is what a reader actually sees in their place; and `Hiragino Sans GB`
+/// "draws" `U+E83A` with an unrelated Chinese glyph, which is the trap this
+/// project refuses by name. A tool that stopped seeing either could no longer
+/// re-verify the sections of `docs/FONTS.md` that rest on them.
 const SYSTEM_DIRS: [&str; 2] = [
     "/System/Library/Fonts",
     "/System/Library/Fonts/Supplemental",
 ];
+
+/// What somebody installed on this desk. Read, never counted, and reported as
+/// a warning: a corpus that depends on these depends on that person's machine.
 const USER_DIRS: [&str; 2] = ["/Library/Fonts", "~/Library/Fonts"];
+
+/// Where a font file came from, and therefore what it is allowed to prove.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Origin {
+    /// `cli/resources/fonts` — ships with the checkout, present on every
+    /// machine that has the repository. The only origin the verdict counts.
+    Repository,
+    /// macOS. Present on this version of this operating system and nowhere
+    /// else that matters.
+    System,
+    /// `~/Library/Fonts` and its kin. Present on this desk.
+    User,
+}
+
+impl Origin {
+    fn label(self) -> &'static str {
+        match self {
+            Origin::Repository => "repository",
+            Origin::System => "system",
+            Origin::User => "installed",
+        }
+    }
+}
+
+/// Code points the corpus contains that no font is expected to draw.
+///
+/// Tab and newline are not characters a renderer draws; they are instructions
+/// to a layout engine, and no font of this stack maps them. Counting them
+/// among "what must be drawable" is a category error, and it went unnoticed
+/// while the declared stack still resolved `system-ui` to macOS's own files —
+/// several of which, `Geneva.ttf` among them, do map `U+0009` and `U+000A` to a
+/// blank glyph. That is how two control characters were counted as covered
+/// until 2026-09-11. They are still reported, on their own line, because a
+/// reader should be told what was set aside and why.
+fn needs_no_glyph(cp: u32) -> bool {
+    matches!(cp, 0x00..=0x1F | 0x7F)
+}
 
 /// The stack as the documents declare it, read out of the stylesheet.
 ///
@@ -83,14 +136,6 @@ fn declared_families() -> Vec<String> {
         .collect()
 }
 
-/// The file names the generic macOS families resolve to.
-///
-/// `system-ui` and `-apple-system` are not families a directory contains: they
-/// are instructions to use the platform's interface font, which on macOS 13 is
-/// San Francisco, in the files below. Named here because the mapping is a fact
-/// about the operating system rather than about this project.
-const PLATFORM_UI_FILES: [&str; 5] = ["sfns", "sfnsdisplay", "sfnstext", "helvetica", "geneva"];
-
 fn main() {
     let mut args = std::env::args_os().skip(1);
     let Some(zip) = args.next() else {
@@ -104,7 +149,7 @@ fn main() {
     eprintln!("  {} distinct code points", used.len());
 
     eprintln!("reading fonts…");
-    let fonts = installed_fonts();
+    let fonts = available_fonts();
     eprintln!("  {} font files", fonts.len());
 
     let families = declared_families();
@@ -178,7 +223,7 @@ fn code_points(zip: &Path) -> BTreeSet<u32> {
 /// One font file, and where it came from.
 struct Font {
     path: PathBuf,
-    system: bool,
+    origin: Origin,
     covers: BTreeSet<u32>,
     /// Whether this file draws characters or merely marks them as undrawable.
     ///
@@ -197,29 +242,50 @@ impl Font {
             .unwrap_or_default()
     }
 
-    /// Whether this file is one the declared stack resolves to.
+    /// Whether this file is one the declared stack resolves to **in the
+    /// repository**.
     ///
     /// Matched on the file name with its spaces and hyphens removed, because a
     /// family called `Noto Sans Cuneiform` lives in `NotoSansCuneiform-Regular.ttf`
     /// and neither spelling is wrong.
+    ///
+    /// **Origin is part of the question since 2026-09-11.** A system file whose
+    /// name matches a declared family used to satisfy it, and that is exactly
+    /// the dependency the files in the tree exist to remove: it made the
+    /// verdict a statement about macOS. The platform interface files are gone
+    /// from this test for the same reason — `system-ui` resolving to
+    /// `Geneva.ttf` is what let two control characters count as covered.
     fn declared(&self, families: &[String]) -> bool {
+        if self.origin != Origin::Repository {
+            return false;
+        }
         let name = self.name().to_lowercase().replace([' ', '-', '_'], "");
         families
             .iter()
             .any(|family| name.starts_with(&family.replace(' ', "")))
-            || PLATFORM_UI_FILES.iter().any(|file| name.starts_with(file))
+    }
+
+    /// Whether this file ships with the checkout.
+    fn shipped(&self) -> bool {
+        self.origin == Origin::Repository
     }
 }
 
-/// Every font file the system offers, with the code points each one covers.
-fn installed_fonts() -> Vec<Font> {
+/// Every font file this machine can offer, tagged with where it came from.
+///
+/// The repository first, because it is the only origin that proves anything
+/// about another machine; the rest are read for context and are never counted.
+fn available_fonts() -> Vec<Font> {
     let home = std::env::var("HOME").unwrap_or_default();
     let mut fonts = Vec::new();
 
-    for (dir, system) in SYSTEM_DIRS
-        .iter()
-        .map(|d| (d.to_string(), true))
-        .chain(USER_DIRS.iter().map(|d| (d.replace('~', &home), false)))
+    for (dir, origin) in std::iter::once((REPOSITORY_DIR.to_string(), Origin::Repository))
+        .chain(SYSTEM_DIRS.iter().map(|d| (d.to_string(), Origin::System)))
+        .chain(
+            USER_DIRS
+                .iter()
+                .map(|d| (d.replace('~', &home), Origin::User)),
+        )
     {
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
@@ -239,7 +305,7 @@ fn installed_fonts() -> Vec<Font> {
             if !covers.is_empty() {
                 fonts.push(Font {
                     path,
-                    system,
+                    origin,
                     covers,
                     last_resort,
                 });
@@ -418,7 +484,9 @@ fn read_format_13(bytes: &[u8], at: usize, found: &mut BTreeSet<u32>) {
 
 /// Which fonts cover each code point, split by where they came from.
 struct Coverage {
-    /// Code point → the system fonts that draw it.
+    /// Code point → the repository's fonts that draw it. **The verdict.**
+    repository: BTreeMap<u32, Vec<String>>,
+    /// Code point → the system fonts that draw it. Context, never coverage.
     system: BTreeMap<u32, Vec<String>>,
     /// Code point → the user-installed fonts that draw it.
     user: BTreeMap<u32, Vec<String>>,
@@ -433,6 +501,7 @@ struct Coverage {
 
 fn coverage(used: &BTreeSet<u32>, fonts: &[Font], families: &[String]) -> Coverage {
     let mut result = Coverage {
+        repository: BTreeMap::new(),
         system: BTreeMap::new(),
         user: BTreeMap::new(),
         declared: BTreeMap::new(),
@@ -451,10 +520,10 @@ fn coverage(used: &BTreeSet<u32>, fonts: &[Font], families: &[String]) -> Covera
         }
 
         for cp in used.intersection(&font.covers) {
-            if font.system {
-                result.system.entry(*cp).or_default().push(name.clone());
-            } else {
-                result.user.entry(*cp).or_default().push(name.clone());
+            match font.origin {
+                Origin::Repository => result.repository.entry(*cp).or_default().push(name.clone()),
+                Origin::System => result.system.entry(*cp).or_default().push(name.clone()),
+                Origin::User => result.user.entry(*cp).or_default().push(name.clone()),
             }
             if declared {
                 result.declared.entry(*cp).or_default().push(name.clone());
@@ -465,32 +534,96 @@ fn coverage(used: &BTreeSet<u32>, fonts: &[Font], families: &[String]) -> Covera
 }
 
 fn report(used: &BTreeSet<u32>, coverage: &Coverage) {
-    let above_bmp = used.iter().filter(|cp| **cp > 0xFFFF).count();
-    let uncovered: Vec<u32> = used
+    // The corpus contains tab and newline; nothing draws those and nothing
+    // should. They are set aside from the question and shown on their own line.
+    let control: Vec<u32> = used
         .iter()
         .copied()
-        .filter(|cp| !coverage.system.contains_key(cp) && !coverage.user.contains_key(cp))
+        .filter(|cp| needs_no_glyph(*cp))
         .collect();
-    let user_only: Vec<u32> = used
+    let drawable: BTreeSet<u32> = used
         .iter()
         .copied()
-        .filter(|cp| !coverage.system.contains_key(cp) && coverage.user.contains_key(cp))
+        .filter(|cp| !needs_no_glyph(*cp))
         .collect();
-    let outside_stack = used.len() - coverage.declared.len();
+
+    let above_bmp = drawable.iter().filter(|cp| **cp > 0xFFFF).count();
+    let uncovered: Vec<u32> = drawable
+        .iter()
+        .copied()
+        .filter(|cp| {
+            !coverage.repository.contains_key(cp)
+                && !coverage.system.contains_key(cp)
+                && !coverage.user.contains_key(cp)
+        })
+        .collect();
+    // Not in the repository, and therefore not shipped — whatever this desk
+    // happens to draw them with.
+    let outside_repository: Vec<u32> = drawable
+        .iter()
+        .copied()
+        .filter(|cp| !coverage.repository.contains_key(cp))
+        .collect();
+    let user_only: Vec<u32> = drawable
+        .iter()
+        .copied()
+        .filter(|cp| {
+            !coverage.repository.contains_key(cp)
+                && !coverage.system.contains_key(cp)
+                && coverage.user.contains_key(cp)
+        })
+        .collect();
 
     println!("\ncorpus");
     println!("  distinct code points          {}", used.len());
+    println!("  of them needing a glyph       {}", drawable.len());
+    println!(
+        "  control characters set aside  {}  ({})",
+        control.len(),
+        control
+            .iter()
+            .map(|cp| format!("U+{cp:04X}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     println!("  above the BMP                 {above_bmp}");
 
+    // Counted over the drawable set on both sides of the ratio. A font that
+    // happens to map `U+000D` would otherwise put a control character in the
+    // numerator of a question about glyphs.
+    let by_repository = drawable
+        .iter()
+        .filter(|cp| coverage.repository.contains_key(cp))
+        .count();
+    let by_stack = drawable
+        .iter()
+        .filter(|cp| coverage.declared.contains_key(cp))
+        .count();
+    let by_system = drawable
+        .iter()
+        .filter(|cp| coverage.system.contains_key(cp))
+        .count();
+
+    // **The number this program exists for.** Everything under it is context.
     println!("\ncoverage");
     println!(
-        "  by the declared font stack    {} of {}",
-        coverage.declared.len(),
-        used.len()
+        "  BY THE REPOSITORY'S FILES     {} of {}",
+        by_repository,
+        drawable.len()
     );
-    println!("  outside it, by system fallback {outside_stack}");
-    println!("  only by an installed font     {}", user_only.len());
-    println!("  by nothing at all             {}", uncovered.len());
+    println!(
+        "  not shipped, whatever draws them here {}",
+        outside_repository.len()
+    );
+    println!(
+        "  also named by the stack       {} of {}",
+        by_stack,
+        drawable.len()
+    );
+    println!("\n  context, never counted as coverage:");
+    println!("    drawn here by a system font {by_system}");
+    println!("    only by an installed font   {}", user_only.len());
+    println!("    by nothing at all           {}", uncovered.len());
 
     if !user_only.is_empty() {
         println!("\nonly on this machine — tofu on another:");
@@ -521,11 +654,12 @@ fn report(used: &BTreeSet<u32>, coverage: &Coverage) {
 
     // The verdict, said once and in the words the specification uses.
     println!();
-    if uncovered.is_empty() && user_only.is_empty() {
-        println!("critical uncovered glyphs: NONE");
+    if outside_repository.is_empty() {
+        println!("every character this corpus needs is drawn by a file of this repository");
     } else {
         println!(
-            "critical uncovered glyphs: {} uncovered, {} depending on an installed font",
+            "not shipped: {} — of them {} drawn by nothing at all, {} only by a font of this desk",
+            outside_repository.len(),
             uncovered.len(),
             user_only.len()
         );
@@ -552,9 +686,13 @@ fn verify_environment(fonts: &[Font], families: &[String]) -> bool {
             println!("  {family:24} platform default");
             continue;
         }
-        // The shortest matching file name, so `Arial` reports `Arial.ttf`
-        // rather than `ArialHB.ttc` — both begin with the family, and the one
-        // that is only the family is the one meant.
+        // The repository first, then the shortest matching file name. Both
+        // halves matter: the tree's `STIXTwoMath-Regular.otf` and the system's
+        // `STIXTwoMath.otf` both answer to the family, and taking the shorter
+        // name would report the system file for a face this repository ships —
+        // a true statement about this desk and a misleading one about the
+        // project. Within one origin the shorter name still wins, so a family
+        // reports the file that is only the family rather than a variant.
         let found = fonts
             .iter()
             .filter(|f| {
@@ -563,13 +701,23 @@ fn verify_environment(fonts: &[Font], families: &[String]) -> bool {
                     .replace([' ', '-', '_'], "")
                     .starts_with(&flat)
             })
-            .min_by_key(|f| f.name().len());
+            .min_by_key(|f| (!f.shipped(), f.name().len()));
         match found {
-            Some(font) => println!(
-                "  {family:24} {}  {}",
-                font.name(),
-                if font.system { "system" } else { "installed" }
-            ),
+            // **A declared family satisfied by anything but the repository is
+            // a failure, not a pass.** It is the state the files in the tree
+            // exist to end: the corpus rendering correctly because of what
+            // Apple shipped, which proves nothing about the next machine.
+            Some(font) if font.shipped() => {
+                println!("  {family:24} {}  repository", font.name())
+            }
+            Some(font) => {
+                missing = true;
+                println!(
+                    "  {family:24} {}  {} — NOT IN THE REPOSITORY, see docs/FONTS.md",
+                    font.name(),
+                    font.origin.label()
+                );
+            }
             None => {
                 missing = true;
                 println!("  {family:24} MISSING — see docs/FONTS.md");
@@ -588,25 +736,27 @@ fn verify_environment(fonts: &[Font], families: &[String]) -> bool {
 /// honest", and for a corpus whose gaps fall into two or three script ranges
 /// the greedy answer is the obvious one.
 ///
-/// System fonts are preferred over installed ones at equal coverage: a font
-/// under `/System/Library/Fonts` is on every Mac of this version, and one under
-/// `~/Library/Fonts` is on this desk.
+/// **Every candidate here is a font this repository does not carry**, and the
+/// answer to any of them is the same one the project already gave twice: put
+/// the file in the tree, or do without the character. Naming a system font
+/// would be a suggestion to depend on macOS again, so the origin is printed
+/// beside every line and none of them is a solution on its own.
 fn suggest(used: &BTreeSet<u32>, fonts: &[Font], coverage: &Coverage, families: &[String]) {
     let mut missing: BTreeSet<u32> = used
         .iter()
         .copied()
-        .filter(|cp| !coverage.declared.contains_key(cp))
+        .filter(|cp| !needs_no_glyph(*cp) && !coverage.repository.contains_key(cp))
         .collect();
     if missing.is_empty() {
-        println!("\nthe declared stack already covers the corpus.");
+        println!("\nthe repository's files already cover the corpus.");
         return;
     }
 
     println!(
-        "\nto cover the {} points the stack does not name:",
+        "\nwhat draws the {} the repository does not — none of it shipped:",
         missing.len()
     );
-    let mut chosen: Vec<(String, usize, Vec<u32>, bool)> = Vec::new();
+    let mut chosen: Vec<(String, usize, Vec<u32>, Origin)> = Vec::new();
 
     while !missing.is_empty() {
         let best = fonts
@@ -616,8 +766,9 @@ fn suggest(used: &BTreeSet<u32>, fonts: &[Font], coverage: &Coverage, families: 
             .filter(|f| !f.declared(families) && !f.last_resort)
             .map(|f| (f, f.covers.intersection(&missing).count()))
             .filter(|(_, n)| *n > 0)
-            // Most coverage wins; a system font wins a tie.
-            .max_by_key(|(f, n)| (*n, f.system));
+            // Most coverage wins; a system font wins a tie, because it is at
+            // least the same on every Mac of this version.
+            .max_by_key(|(f, n)| (*n, f.origin == Origin::System));
         let Some((font, gained)) = best else {
             break;
         };
@@ -625,18 +776,11 @@ fn suggest(used: &BTreeSet<u32>, fonts: &[Font], coverage: &Coverage, families: 
         for cp in &taken {
             missing.remove(cp);
         }
-        chosen.push((font.name(), gained, taken, font.system));
+        chosen.push((font.name(), gained, taken, font.origin));
     }
 
-    for (name, gained, points, system) in &chosen {
-        println!(
-            "  {name:34} +{gained:<4} {}",
-            if *system {
-                "system"
-            } else {
-                "INSTALLED HERE ONLY"
-            }
-        );
+    for (name, gained, points, origin) in &chosen {
+        println!("  {name:34} +{gained:<4} {}", origin.label());
         // A font carrying a handful of code points is one whose place in the
         // stack has to be argued a character at a time, so they are named. A
         // font carrying hundreds is a script, and the count says it.
