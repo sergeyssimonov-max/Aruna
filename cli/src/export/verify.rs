@@ -55,19 +55,38 @@ pub fn drop_pi(target: &str) -> String {
     format!("DROP_PI {target}")
 }
 
+/// The permit list's own name for `target`, if it is on the list.
+///
+/// Matching is without regard to case — a document may spell a target however
+/// it likes — but what comes back is the list's spelling, never the document's.
+/// That is the whole point of returning a name rather than a `bool`: the count
+/// this feeds is keyed by it, and a key taken from the document would be a key
+/// the manifest's `permitted` list never offers.
+pub fn dropped_name(target: &[u8]) -> Option<&'static str> {
+    DROPPED.iter().find_map(|(name, _)| {
+        target
+            .eq_ignore_ascii_case(name.as_bytes())
+            .then_some(*name)
+    })
+}
+
 /// Whether `target` names an instruction the normaliser may drop.
 ///
 /// Without regard to case, because that is how the normaliser decides.
 pub fn is_dropped(target: &[u8]) -> bool {
-    DROPPED
-        .iter()
-        .any(|(name, _)| target.eq_ignore_ascii_case(name.as_bytes()))
+    dropped_name(target).is_some()
 }
 
 /// Which permitted changes one document actually underwent.
 #[derive(Debug)]
 pub struct Report {
-    pub dropped: Vec<String>,
+    /// The permit list's names for the instructions that were removed, one
+    /// entry per instruction — a document carrying two identical stylesheet
+    /// instructions contributes two.
+    ///
+    /// `&'static str` rather than `String` so the type says what the values
+    /// are: entries of [`DROPPED`] and nothing else.
+    pub dropped: Vec<&'static str>,
     pub added_declaration: bool,
     pub reflowed: bool,
 }
@@ -120,8 +139,8 @@ pub fn compare(source: &[u8], normalised: &[u8]) -> Result<Report, String> {
             continue;
         }
         let target = target_of(pi);
-        if is_dropped(target) {
-            dropped.push(String::from_utf8_lossy(target).into_owned());
+        if let Some(name) = dropped_name(target) {
+            dropped.push(name);
             continue;
         }
         return Err(format!(
@@ -365,5 +384,40 @@ mod tests {
 
         assert!(report.dropped.is_empty(), "nothing was dropped");
         assert!(report.added_declaration, "the source declared nothing");
+    }
+
+    /// **A dropped instruction is counted under a name the manifest offers,
+    /// whatever spelling the document used.**
+    ///
+    /// The permit list is matched without regard to case — [`is_dropped`] says
+    /// so and the normaliser drops on that answer — but until 2026-09-10 the
+    /// count went in under the *source's* spelling. A document opening
+    /// `<?XML-STYLESHEET …?>` was therefore removed legitimately and tallied as
+    /// `DROP_PI XML-STYLESHEET`: a key this module's own header promises cannot
+    /// exist, absent from the manifest's `permitted` list, and invisible to
+    /// anyone reading the count — `Built::stylesheet_dropped` looks it up by
+    /// the canonical name and would have under-counted by one per document.
+    ///
+    /// TLHdig Beta 0.3 has none: all 8 424 are lower case, measured 2026-09-10.
+    /// The defect is held by a test rather than by that measurement, because
+    /// the next edition of the corpus is not this one.
+    #[test]
+    fn a_dropped_instruction_is_counted_under_the_permitted_name() {
+        for spelling in ["xml-stylesheet", "XML-STYLESHEET", "Xml-StyleSheet"] {
+            let source = format!(r#"<?{spelling} href="HPMxml.css"?><AOxml/>"#);
+            let out = declared(b"<AOxml/>");
+
+            let report = compare(source.as_bytes(), &out).expect("the stylesheet may be dropped");
+
+            assert_eq!(
+                report.dropped,
+                vec!["xml-stylesheet"],
+                "<?{spelling}…?> was counted under its own spelling"
+            );
+            assert!(
+                DROPPED.iter().any(|(name, _)| *name == report.dropped[0]),
+                "the name is one the manifest advertises"
+            );
+        }
     }
 }

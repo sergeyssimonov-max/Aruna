@@ -57,6 +57,31 @@ const WAIT: Duration = Duration::from_secs(600);
 /// of the first finishing; long enough that waiting costs nothing measurable.
 const POLL: Duration = Duration::from_millis(100);
 
+/// Дальше этого предела файл блокировки не читается.
+///
+/// Токен – одна короткая строка. Файл длиннее предела не может быть токеном
+/// этого прогона ни при каком содержимом, поэтому дочитывать его незачем: имя
+/// `.{PACKAGE}.publish.lock` лежит в каталоге назначения, положить туда файл
+/// произвольного размера может любой процесс, а цикл ожидания перечитывает это
+/// имя каждые сто миллисекунд до десяти минут и кладет прочитанное в текст
+/// отказа. Предел с большим запасом: настоящий токен – около сорока байт.
+const MAX_LOCK: u64 = 4096;
+
+/// Файл блокировки, прочитанный не дальше [`MAX_LOCK`].
+///
+/// `None` значит «это не токен»: файла нет, он длиннее предела, или он не
+/// текст. Все три случая ведут туда же, куда вело несовпадение содержимого до
+/// появления предела, – разница только в том, сколько памяти на это уходит.
+fn read_token(path: &Path) -> Option<String> {
+    use std::io::Read as _;
+    let file = fs::File::open(path).ok()?;
+    let mut text = String::new();
+    // На один байт больше предела: длину читаем, чтобы отличить «ровно предел»
+    // от «предел и еще сколько-то», а не чтобы вернуть лишнее.
+    file.take(MAX_LOCK + 1).read_to_string(&mut text).ok()?;
+    (text.len() as u64 <= MAX_LOCK).then_some(text)
+}
+
 /// The lock file's name, beside the package rather than inside it.
 ///
 /// Inside would be wrong twice over: the directory is renamed out from under
@@ -120,8 +145,8 @@ fn acquire_within(
                 // rare, but the check that closes it is one read of a file this
                 // run has just written: if it does not say what this run said,
                 // this run does not hold the lock.
-                match fs::read_to_string(&path) {
-                    Ok(found) if found == token => {
+                match read_token(&path) {
+                    Some(found) if found == token => {
                         return Ok(Publication { path, token });
                     }
                     _ => continue,
@@ -137,7 +162,7 @@ fn acquire_within(
                 // atomic compare-and-delete would — but it turns it from the
                 // whole staleness check into two adjacent syscalls, and a lock
                 // that was replaced in between survives.
-                let seen = fs::read_to_string(&path).ok();
+                let seen = read_token(&path);
                 if abandoned(&path, stale) {
                     // Not `?` in either arm: a removal that fails because
                     // someone else got there first is the normal outcome of two
@@ -235,7 +260,7 @@ fn write_token(path: &Path, token: &str) -> std::io::Result<()> {
 /// is the honest description and the reason it is a named function with a test
 /// rather than three lines inside the loop.
 fn remove_if_unchanged(path: &Path, seen: &str) {
-    if matches!(fs::read_to_string(path), Ok(found) if found == seen) {
+    if matches!(read_token(path), Some(found) if found == seen) {
         let _ = fs::remove_file(path);
     }
 }
@@ -256,8 +281,7 @@ fn abandoned(path: &Path, stale: Duration) -> bool {
 
 /// What the lock file says about who holds it, for the error message.
 fn holder(path: &Path) -> String {
-    fs::read_to_string(path)
-        .ok()
+    read_token(path)
         .map(|text| text.trim().to_string())
         .filter(|text| !text.is_empty())
         .unwrap_or_else(|| "an unnamed run".to_string())
@@ -287,7 +311,7 @@ impl Drop for Publication {
         // Only if it is still this run's lock. A stale lock this run's own file
         // replaced has the same name, and removing one that belongs to whoever
         // holds it now would hand the directory to a third run mid-publication.
-        if matches!(fs::read_to_string(&self.path), Ok(found) if found == self.token) {
+        if matches!(read_token(&self.path), Some(found) if found == self.token) {
             let _ = fs::remove_file(&self.path);
         }
     }
@@ -392,6 +416,50 @@ mod tests {
         drop(held);
         acquire_within(dir.path(), &Job::unattended(), stale, wait, poll)
             .expect("released when the first run is done");
+    }
+
+    /// **Файл под именем блокировки читается не дальше предела.**
+    ///
+    /// Имя `.TLHdig_Beta_0.3.publish.lock` лежит в пользовательском каталоге
+    /// назначения, и положить туда файл любого размера может что угодно –
+    /// чужая программа, распакованный архив, ошибка скрипта. Цикл ожидания
+    /// перечитывает это имя каждые сто миллисекунд до десяти минут, а `holder`
+    /// кладет прочитанное в текст отказа. Без предела это шесть тысяч чтений
+    /// файла произвольного размера и он же целиком в сообщении об ошибке:
+    /// прогон умирает не от того, что кто-то держит блокировку, а от памяти.
+    ///
+    /// Проверяется наблюдаемое следствие – длина того, что доехало до
+    /// вызывающего. Токен – одна строка; все, что длиннее предела, этим
+    /// прогоном не писалось.
+    #[test]
+    fn a_lock_file_of_any_size_is_read_no_further_than_the_limit() {
+        let dir = tempdir().expect("tempdir");
+        let (stale, wait, poll) = instant();
+        let path = lock_path(dir.path());
+
+        // Заметно больше предела и заметно больше любого токена. Свежий по
+        // времени изменения, потому что записан сейчас, – значит `abandoned`
+        // его не снимет и ожидание дойдет до отказа.
+        let huge = "x".repeat(2 * 1024 * 1024);
+        fs::write(&path, &huge).expect("write");
+
+        match acquire_within(dir.path(), &Job::unattended(), stale, wait, poll) {
+            Err(ArunaError::PublishBusy { holder, .. }) => {
+                assert!(
+                    holder.len() <= MAX_LOCK as usize,
+                    "в отказ уехало {} байт файла блокировки",
+                    holder.len()
+                );
+            }
+            other => panic!("ожидался занятый замок, получено {other:?}"),
+        }
+
+        // И сам файл не тронут: снимать чужое этот код не вправе.
+        assert_eq!(
+            fs::metadata(&path).expect("metadata").len(),
+            huge.len() as u64,
+            "файл под именем блокировки изменен"
+        );
     }
 
     /// A run killed mid-publication leaves its lock behind, and the next run

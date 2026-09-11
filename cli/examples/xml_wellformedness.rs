@@ -45,6 +45,12 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 /// What `docs/XML-CONTRACT.md` recorded with `xmllint --noout`.
+///
+/// Documents that are not well-formed XML, which is what `xmllint` exits
+/// non-zero on. It is not the widest figure: thirteen more are objected to as a
+/// namespace error, which `libxml2` exits zero on, and 206 + 4 + 13 = 223 is
+/// what a conforming parser refuses altogether. The three are laid out in
+/// `docs/XML-CONTRACT.md` §2 and written into the manifest's `xml.totals`.
 const EXPECTED_MALFORMED: usize = 210;
 /// Documents in the corpus, the denominator every other figure is read against.
 const EXPECTED_DOCUMENTS: usize = 23_936;

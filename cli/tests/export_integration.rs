@@ -9,7 +9,8 @@
 //! every awkward thing the corpus actually does happens here too: a siglum with
 //! a slash in it, two different documents sharing a siglum inside one group,
 //! the same siglum filed under two groups, a stylesheet instruction to drop,
-//! and junk that the corpus's own gates have to keep out.
+//! **a document carrying two of them**, and junk that the corpus's own gates
+//! have to keep out.
 
 use aruna::export::{self, PACKAGE};
 use std::fs;
@@ -21,8 +22,21 @@ use zip::ZipWriter;
 /// A manuscript as the corpus writes them: no declaration, a stylesheet
 /// instruction, and the header the parser reads.
 fn manuscript(siglum: &str) -> String {
+    stylesheets(1, siglum)
+}
+
+/// The same, with `count` copies of the stylesheet instruction in front.
+///
+/// One document of TLHdig Beta 0.3 carries two —
+/// `CTH 475_XML_HFR/KBo 43.119.xml`, byte-identical instructions, both in the
+/// prologue and both removed. It is the whole reason this helper exists: with
+/// one instruction per document a count of documents and a count of
+/// instructions are the same number, and the difference between them cannot be
+/// tested at all.
+fn stylesheets(count: usize, siglum: &str) -> String {
+    let pi = r#"<?xml-stylesheet href="HPMxml.css" type="text/css"?>"#.repeat(count);
     format!(
-        r#"<?xml-stylesheet href="HPMxml.css" type="text/css"?><AOxml xml:space="preserve"><AOHeader><docID>{siglum}</docID><meta><uebern editor="FB" date="2017-03-28"/></meta></AOHeader><body><text><l lg="Hit"/>  spacing  kept  </text></body></AOxml>"#
+        r#"{pi}<AOxml xml:space="preserve"><AOHeader><docID>{siglum}</docID><meta><uebern editor="FB" date="2017-03-28"/></meta></AOHeader><body><text><l lg="Hit"/>  spacing  kept  </text></body></AOxml>"#
     )
 }
 
@@ -41,7 +55,8 @@ fn write_archive(path: &Path) {
     add("root/CTH 5_XML_HFR/KBo 1.1.xml", &manuscript("KBo 1.1"));
     add("root/CTH 5_XML_HFR/544-f.xml", &manuscript("544/f"));
     add("root/CTH 5_XML_TLH/KBo 1.1.xml", &manuscript("KBo 1.1"));
-    add("root/CTH 9_XML_HFR/KUB 2.1.xml", &manuscript("KUB 2.1"));
+    // Two stylesheet instructions, as `CTH 475_XML_HFR/KBo 43.119.xml` has.
+    add("root/CTH 9_XML_HFR/KUB 2.1.xml", &stylesheets(2, "KUB 2.1"));
 
     // Debris the gates must keep out, of every kind the archive carries.
     add("__MACOSX/root/CTH 5_XML_HFR/._KBo 1.1.xml", "resource fork");
@@ -72,7 +87,12 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
     assert_eq!(built.documents, 4, "the debris is not a document");
     assert_eq!(built.fragment_links, 4);
     assert_eq!(built.disambiguated, 1, "the repeated KBo 1.1");
-    assert_eq!(built.stylesheet_dropped, 4);
+    // **Instructions, not documents.** Four documents carry a stylesheet
+    // instruction and one of them carries two, so five are removed. Until
+    // 2026-09-10 this counted documents while every label in the tree —
+    // `export_beta` prints "stylesheet PIs dropped" — said instructions, and on
+    // the corpus the two answers differ by exactly one.
+    assert_eq!(built.stylesheet_dropped, 5);
 
     // Structure: an inventory, two group directories, nothing else.
     let mut top: Vec<String> = fs::read_dir(&root)

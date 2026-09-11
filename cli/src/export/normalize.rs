@@ -66,14 +66,6 @@ pub fn normalize_into(bytes: &[u8], out: &mut Vec<u8>) {
     out.extend_from_slice(&body[i..]);
 }
 
-/// Whether a document carries the stylesheet instruction the package drops.
-///
-/// Counted by the export so the number it reports is what was actually removed
-/// rather than an estimate.
-pub fn carries_stylesheet(bytes: &[u8]) -> bool {
-    find_exact(bytes, b"<?xml-stylesheet").is_some()
-}
-
 /// How many leading bytes are XML whitespace.
 fn leading_whitespace(bytes: &[u8]) -> usize {
     bytes

@@ -97,7 +97,7 @@ fn main() -> ExitCode {
         match verify::compare(&source, &normalised) {
             Ok(report) => {
                 for target in report.dropped {
-                    *dropped.entry(target).or_default() += 1;
+                    *dropped.entry(target.to_string()).or_default() += 1;
                 }
                 if report.added_declaration {
                     added += 1;

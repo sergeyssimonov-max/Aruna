@@ -94,8 +94,9 @@ pub struct PackageReport {
     pub groups: usize,
     /// Documents that needed a suffix because their siglum was taken.
     pub disambiguated: usize,
-    /// Documents that carried a stylesheet instruction the package does
-    /// without.
+    /// Stylesheet instructions the package does without, removed.
+    ///
+    /// Instructions, not documents: one document of the corpus carries two.
     pub stylesheet_dropped: usize,
 }
 

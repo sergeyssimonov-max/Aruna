@@ -271,3 +271,203 @@ fn the_gates_refuse_an_empty_document_and_accept_the_rest() {
         }
     }
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Второе мнение: две программы из состава macOS.
+//
+// До 10.09.2026 `xmllint` и `xsltproc` были названы в спецификации (§3.8) и в
+// комментариях этого дерева, но ни один тест их не звал: XML-сторона будущей
+// приемки PDF держалась на прозе. Ниже она держится прогоном.
+//
+// Оба теста пропускаются молча, когда программы нет: они входят в macOS, а
+// конвейер собирается и на другой системе, и отсутствие внешней программы не
+// должно превращаться в отказ сборки. Java здесь запрещена, сеть не нужна,
+// зависимостей не прибавляется.
+
+/// Есть ли программа в `PATH`.
+fn have(tool: &str) -> bool {
+    std::process::Command::new(tool)
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Каноническая форма документа по `xmllint --c14n`, или `None`, если документ
+/// разборщику не дался.
+fn canonical(bytes: &[u8], at: &Path) -> Option<Vec<u8>> {
+    std::fs::write(at, bytes).expect("write");
+    let out = std::process::Command::new("xmllint")
+        .arg("--c14n")
+        .arg(at)
+        .output()
+        .expect("run xmllint");
+    out.status.success().then_some(out.stdout)
+}
+
+/// Строки канонической формы без тех инструкций, которые нормализации
+/// разрешено снимать.
+///
+/// C14N выбрасывает объявление XML и **сохраняет** инструкции обработки вне
+/// корневого элемента, поэтому снятая ссылка на таблицу стилей видна в
+/// канонической форме исходника и отсутствует в форме пакетной копии. Это не
+/// расхождение деревьев, а ровно тот разрешенный список, который держит
+/// `verify::compare`; чтобы структурный критерий говорил о структуре, список
+/// снимается с обеих сторон одинаково.
+fn without_dropped(canonical: &[u8]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(canonical);
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text.as_ref();
+    while let Some(at) = rest.find("<?") {
+        let (before, tail) = rest.split_at(at);
+        out.push_str(before);
+        let Some(end) = tail.find("?>") else {
+            rest = tail;
+            break;
+        };
+        let pi = &tail[2..end];
+        let target = pi.split([' ', '\t', '\r', '\n']).next().unwrap_or(pi);
+        if !verify::is_dropped(target.as_bytes()) {
+            out.push_str(&tail[..end + 2]);
+        }
+        rest = &tail[end + 2..];
+    }
+    out.push_str(rest);
+    // Перевод строки, оставшийся от снятой инструкции. C14N ставит каждую
+    // инструкцию верхнего уровня на свою строку, и снятие самой инструкции
+    // оставляет её перевод; пробел между инструкциями пролога разрешенный
+    // список называет отдельным правилом (`REFLOW prologue whitespace`), так
+    // что расхождением он быть не может.
+    out.trim_start().as_bytes().to_vec()
+}
+
+/// **Структурный критерий рядом с текстовым: нормализация не меняет дерева.**
+///
+/// `verify::compare` доказывает, что тело документа побайтово то же. Это
+/// сильное утверждение о байтах и **никакое** о структуре: там, где байты
+/// сравнивают, дерево не проверяют, и урок §4.13 стоит именно об этом — знаки
+/// не меняются от того, где закрыть элемент. Здесь то же самое спрашивает
+/// сторонняя реализация, и спрашивает о дереве: канонические формы исходника и
+/// пакетной копии обязаны совпасть, если снять с обеих разрешенные инструкции.
+///
+/// Это заготовка под приемку PDF (§8.3): два критерия, текстовый и
+/// структурный, и второй здесь появляется впервые.
+#[test]
+fn the_package_copy_is_the_same_tree_as_the_source() {
+    if !have("xmllint") {
+        eprintln!("xmllint отсутствует — проверка пропущена");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = dir.path().join("source.xml");
+    let dst = dir.path().join("normalised.xml");
+
+    let mut checked = 0usize;
+    for (name, bytes) in all() {
+        // Только корректные: у остальных канонической формы нет вовсе, и это
+        // свойство исходных данных, а не нормализации.
+        let Some(before) = canonical(&bytes, &src) else {
+            continue;
+        };
+        let mut normalised = Vec::new();
+        normalize_into(&bytes, &mut normalised);
+        // Ровно тот путь, по которому документ попадает в пакет: то, что
+        // `verify::compare` отвергает, туда не доходит вовсе. Единственный
+        // такой образец здесь — документ, объявивший latin-1: канонической
+        // формы у нормализованной копии нет и быть не должно, потому что
+        // копия эта никогда не пишется.
+        if verify::compare(&bytes, &normalised).is_err() {
+            continue;
+        }
+        let after = canonical(&normalised, &dst)
+            .unwrap_or_else(|| panic!("{name}: нормализованный документ перестал разбираться"));
+
+        assert_eq!(
+            without_dropped(&before),
+            without_dropped(&after),
+            "{name}: дерево изменилось, хотя байты тела совпали"
+        );
+        checked += 1;
+    }
+    assert!(
+        checked >= 15,
+        "проверено всего {checked} образцов — сторонний разборщик отверг больше, чем должен"
+    );
+}
+
+/// **Поля манифеста, извлеченные не этим крейтом.**
+///
+/// Крейт читает семь полей из первых 16 КиБ собственным сканером. Проверять
+/// его собственным же чтением — значит мерить проект против себя самого;
+/// §8.1 спецификации на этот случай называет `xsltproc`, извлекающий те же
+/// поля из корректного исходника по XPath. Здесь берется `docID` — то, из чего
+/// получается сиглум, то есть имя файла в пакете и ключ описи.
+///
+/// Вторая заготовка под приемку PDF: способ сверить извлечение с манифестом,
+/// не спрашивая извлекатель о нем самом.
+#[test]
+fn the_siglum_is_what_an_independent_extractor_reads() {
+    if !have("xsltproc") {
+        eprintln!("xsltproc отсутствует — проверка пропущена");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sheet = dir.path().join("docid.xsl");
+    std::fs::write(
+        &sheet,
+        r#"<?xml version="1.0"?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:output method="text"/>
+  <xsl:template match="/"><xsl:value-of select="normalize-space((//docID)[1])"/></xsl:template>
+</xsl:stylesheet>
+"#,
+    )
+    .expect("write");
+
+    let doc = dir.path().join("doc.xml");
+    let mut checked = 0usize;
+    for (name, bytes) in all() {
+        let head = String::from_utf8_lossy(&bytes[..bytes.len().min(HEADER_READ_LIMIT)]);
+        if !looks_like_manuscript(&head) {
+            continue;
+        }
+        let record = parse_manuscript(&archive_path(&name), &head);
+        std::fs::write(&doc, &bytes).expect("write");
+        let out = std::process::Command::new("xsltproc")
+            .arg(&sheet)
+            .arg(&doc)
+            .output()
+            .expect("run xsltproc");
+        if !out.status.success() {
+            // Некорректный XML: у стороннего разборщика мнения нет, и это не
+            // расхождение — это те самые 206 документов.
+            continue;
+        }
+        let theirs = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if theirs.is_empty() {
+            continue;
+        }
+        // **Ссылки на сущности этот крейт не раскрывает, и это записанное
+        // решение, а не расхождение.** Раскрытие внешних сущностей — дыра в
+        // безопасности, внутренних — решение, которое `docs/XML-CONTRACT.md`
+        // §5 держит открытым: сегодня таких документов в корпусе ноль.
+        // `xsltproc` раскрывает и то и другое, поэтому на таком образце два
+        // ответа расходятся законно. Пропускается по признаку самого ответа,
+        // а не по имени файла: имя ничего не доказывает, а `&…;` в поле —
+        // ровно тот случай, о котором идет речь.
+        if record.sigla.starts_with('&') && record.sigla.ends_with(';') {
+            continue;
+        }
+        assert_eq!(
+            record.sigla, theirs,
+            "{name}: сиглум крейта и docID стороннего извлекателя разошлись"
+        );
+        checked += 1;
+    }
+    assert!(
+        checked >= 10,
+        "сверено всего {checked} образцов — выборка перестала быть представительной"
+    );
+}

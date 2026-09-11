@@ -22,9 +22,7 @@
 //! carries no serialisation dependency, and one field order written out is
 //! cheaper than one more crate.
 
-#[cfg(test)]
-use crate::xml_wellformed::classify;
-use crate::xml_wellformed::{Finding, Reason};
+use crate::xml_wellformed::{beyond_the_parser, Beyond, Finding, Limit, Reason};
 
 use super::naming::{href, pdf_path};
 use super::verify::{self, ADD_DECLARATION, DROP_BOM, REFLOW_PROLOGUE};
@@ -335,15 +333,37 @@ pub struct XmlReport {
     pub documents: usize,
     /// The ones a strict parser refuses, in the order they were written.
     pub findings: Vec<(String, Finding)>,
+    /// The ones it accepts that a conforming parser objects to.
+    ///
+    /// Disjoint from `findings` by construction — [`Self::examine`] asks the
+    /// second question only of documents that answered the first with "yes" —
+    /// and that is the whole reason the two lists are filled in one place
+    /// rather than by two callers. A document counted in both would make the
+    /// manifest's totals add up to more documents than the package holds.
+    pub beyond: Vec<(String, Beyond)>,
 }
 
 impl XmlReport {
-    /// Record one document's verdict.
-    pub fn observe(&mut self, file: &std::path::Path, finding: Option<Finding>) {
+    /// Examine one document: both questions, asked in the only order that makes
+    /// sense of them.
+    ///
+    /// First, does this crate's parser refuse it — that is the finding the
+    /// manifest has published since 2026-09-06. If it does not, does it hold
+    /// one of the two defects that parser is known to miss. A refused document
+    /// is not asked the second question: the answer would describe the wreckage
+    /// after the first error rather than a defect of its own.
+    pub fn examine(&mut self, file: &std::path::Path, bytes: &[u8]) {
         self.documents += 1;
-        if let Some(finding) = finding {
-            self.findings
-                .push((file.to_string_lossy().into_owned(), finding));
+        match crate::xml_wellformed::classify(bytes) {
+            Some(finding) => self
+                .findings
+                .push((file.to_string_lossy().into_owned(), finding)),
+            None => {
+                if let Some(beyond) = beyond_the_parser(bytes) {
+                    self.beyond
+                        .push((file.to_string_lossy().into_owned(), beyond));
+                }
+            }
         }
     }
 
@@ -366,9 +386,53 @@ impl XmlReport {
             .collect()
     }
 
+    /// How many documents fall under each known limit, both limits listed.
+    ///
+    /// Zero is kept for the same reason as in [`Self::by_reason`]: a class with
+    /// no documents and a class nobody looked for read identically otherwise.
+    pub fn by_limit(&self) -> Vec<(&'static str, usize)> {
+        Limit::ALL
+            .iter()
+            .map(|limit| {
+                (
+                    limit.key(),
+                    self.beyond
+                        .iter()
+                        .filter(|(_, b)| b.limit == *limit)
+                        .count(),
+                )
+            })
+            .collect()
+    }
+
     /// Documents the parser accepts.
     pub fn well_formed(&self) -> usize {
         self.documents - self.findings.len()
+    }
+
+    /// Documents that are not well-formed XML at all.
+    ///
+    /// The ones refused here, plus the ones accepted here whose defect is a raw
+    /// `<` in an attribute value — which XML forbids outright, so a conforming
+    /// parser stops on them. `xmllint --noout` over the package of 2026-09-10
+    /// reported exactly this set: 206 + 4 = 210, and the four names matched.
+    pub fn not_well_formed_xml(&self) -> usize {
+        self.findings.len()
+            + self
+                .beyond
+                .iter()
+                .filter(|(_, b)| b.limit == Limit::RawLessThanInAttributeValue)
+                .count()
+    }
+
+    /// Documents a namespace-aware conforming parser objects to at all.
+    ///
+    /// The number above plus the thirteen whose only defect is a qualified name
+    /// with no local part: legal XML 1.0, forbidden by *Namespaces in XML*, and
+    /// reported by `libxml2` as a namespace error it still exits zero on.
+    /// 206 + 4 + 13 = 223.
+    pub fn objected_to(&self) -> usize {
+        self.findings.len() + self.beyond.len()
     }
 }
 
@@ -501,16 +565,20 @@ pub fn render_manifest(
     let _ = writeln!(out, "    \"documents\": {},", xml.documents);
     let _ = writeln!(out, "    \"well_formed\": {},", xml.well_formed());
     let _ = writeln!(out, "    \"not_well_formed\": {},", xml.findings.len());
-    // The one thing this parser is known to miss, said in the file rather than
-    // only in the source: a reader counting documents against `xmllint` will
-    // otherwise find four they cannot account for.
+    // What this parser is known to miss, said in the file rather than only in
+    // the source — and since 2026-09-10 counted rather than remembered. The
+    // sentence that stood here named four documents and no more; `xmllint`
+    // objects to seventeen, and the missing thirteen were invisible because
+    // nothing looked for them.
     let _ = writeln!(
         out,
         "    \"known_limit\": {},",
         string(
-            "Two things XML forbids are accepted by this parser: a raw '<' inside an attribute \
-             value, and an empty local name. Four documents of this corpus are counted \
-             well-formed here that xmllint refuses."
+            "Two things this parser accepts that a conforming one does not: a raw '<' inside an \
+             attribute value, which XML forbids outright, and a qualified name with no local \
+             part such as <AO:-LineNrExpl>, which Namespaces in XML forbids. Both are scanned \
+             for and both are listed under beyond_this_parser below, with the file, the line and \
+             the column of the first occurrence in each document."
         )
     );
     out.push_str("    \"by_reason\": {\n");
@@ -533,7 +601,91 @@ pub fn render_manifest(
         let _ = writeln!(out, "        \"column\": {}", finding.column);
         let _ = writeln!(out, "      }}{}", comma(i, xml.findings.len()));
     }
-    out.push_str("    ]\n  },\n");
+    out.push_str("    ],\n");
+
+    // The other half of the same question, and the half that went uncounted
+    // from August until 2026-09-10.
+    //
+    // These documents are *not* in the list above: this parser accepts them.
+    // They are here because a reader who checks the package with `xmllint` will
+    // otherwise find seventeen documents blamed that the manifest calls fine,
+    // and will have no way to tell a known limit from a defect in this program.
+    // Same shape as the list above — file, class, line, column — so the two can
+    // be read together.
+    out.push_str("    \"beyond_this_parser\": {\n");
+    let _ = writeln!(
+        out,
+        "      \"note\": {},",
+        string(
+            "Documents this parser accepts and a conforming parser objects to. The package ships \
+             them like every other document; what is recorded is a property of the source data. \
+             Positions are in the package copy, counted from 1, the column in characters."
+        )
+    );
+    let _ = writeln!(out, "      \"documents\": {},", xml.beyond.len());
+    out.push_str("      \"by_limit\": {\n");
+    let limits = xml.by_limit();
+    for (i, (key, count)) in limits.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "        {}: {count}{}",
+            string(key),
+            comma(i, limits.len())
+        );
+    }
+    out.push_str("      },\n");
+    out.push_str("      \"documents_beyond_this_parser\": [\n");
+    for (i, (file, beyond)) in xml.beyond.iter().enumerate() {
+        let _ = writeln!(out, "        {{");
+        let _ = writeln!(out, "          \"file\": {},", string(file));
+        let _ = writeln!(out, "          \"limit\": {},", string(beyond.limit.key()));
+        let _ = writeln!(out, "          \"line\": {},", beyond.line);
+        let _ = writeln!(out, "          \"column\": {}", beyond.column);
+        let _ = writeln!(out, "        }}{}", comma(i, xml.beyond.len()));
+    }
+    out.push_str("      ]\n");
+    out.push_str("    },\n");
+
+    // Three numbers a reader will otherwise have to derive, each with the
+    // sentence that says what it counts.
+    //
+    // They are written out because they were being derived wrongly. Until
+    // 2026-09-10 this file published one of them, 206, beside a sentence about
+    // four documents, and the other two existed only in `docs/XML-CONTRACT.md`
+    // as the output of a command nobody re-ran. Every number here is computed
+    // by the run that wrote the file, from the two lists above.
+    out.push_str("    \"totals\": {\n");
+    let totals: [(&str, usize, &str); 3] = [
+        (
+            "refused_here",
+            xml.findings.len(),
+            "Documents this crate's parser refuses. Listed by name, reason and position under \
+             not_well_formed_documents. Nothing follows from it about the package: all of them \
+             are shipped.",
+        ),
+        (
+            "not_well_formed_xml",
+            xml.not_well_formed_xml(),
+            "Documents that are not well-formed XML at all: refused_here plus the ones accepted \
+             here whose defect is a raw '<' in an attribute value, which XML forbids outright. \
+             This is what xmllint --noout exits non-zero on.",
+        ),
+        (
+            "objected_to_by_a_conforming_parser",
+            xml.objected_to(),
+            "not_well_formed_xml plus the documents whose only defect is a qualified name with no \
+             local part. Those are legal XML 1.0 and forbidden by Namespaces in XML, so libxml2 \
+             reports them as a namespace error and still exits zero — which is why they went \
+             uncounted until 2026-09-10.",
+        ),
+    ];
+    for (i, (key, count, means)) in totals.iter().enumerate() {
+        let _ = writeln!(out, "      {}: {{", string(key));
+        let _ = writeln!(out, "        \"documents\": {count},");
+        let _ = writeln!(out, "        \"means\": {}", string(means));
+        let _ = writeln!(out, "      }}{}", comma(i, totals.len()));
+    }
+    out.push_str("    }\n  },\n");
 
     // The groups, in the order the inventory lists them — which is the order a
     // table of contents wants.
@@ -735,7 +887,7 @@ mod tests {
             } else {
                 br#"<a><t><w>nu</w></t></a>"#
             };
-            xml.observe(&place.relative, classify(bytes));
+            xml.examine(&place.relative, bytes);
         }
         render_manifest(&records, &placed, "test", "abc123", &applied, &fonts, &xml)
     }
@@ -870,7 +1022,7 @@ mod tests {
             } else {
                 br#"<a><t><w>nu</w></t></a>"#
             };
-            xml.observe(&place.relative, classify(bytes));
+            xml.examine(&place.relative, bytes);
         }
 
         assert_eq!(xml.documents, placed.len(), "every document is examined");
@@ -890,6 +1042,68 @@ mod tests {
             Reason::ALL.len(),
             "every reason is listed, including the ones with no documents"
         );
+    }
+
+    /// The three totals are one arithmetic identity, held here rather than
+    /// trusted.
+    ///
+    /// 206 refused, 4 accepted with a raw `<`, 13 accepted with a colon and no
+    /// local name, 223 objected to — the numbers of TLHdig Beta 0.3, and the
+    /// property is that the last is the sum of the first three however the
+    /// corpus changes. A document counted under both a reason and a limit would
+    /// break it, which is exactly the mistake `examine` exists to prevent.
+    #[test]
+    fn the_three_totals_are_the_sum_of_the_two_lists() {
+        let (_, placed) = built();
+        let mut xml = XmlReport::default();
+        for (i, place) in placed.iter().enumerate() {
+            let bytes: &[u8] = match i {
+                0 => br#"<a><t><w>nu</t></a>"#,
+                1 => br#"<a><w trans="a<b">nu</w></a>"#,
+                2 => br#"<a><AO:-italic>nu</AO:-italic></a>"#,
+                _ => br#"<a><t><w>nu</w></t></a>"#,
+            };
+            xml.examine(&place.relative, bytes);
+        }
+
+        assert_eq!(xml.findings.len(), 1, "one document is refused here");
+        assert_eq!(xml.beyond.len(), 2, "two are accepted here and objected to");
+        assert_eq!(
+            xml.well_formed(),
+            xml.documents - 1,
+            "a document with a known limit is well-formed as far as this parser is concerned"
+        );
+        assert_eq!(
+            xml.not_well_formed_xml(),
+            2,
+            "the refusal plus the raw '<', which XML forbids outright"
+        );
+        assert_eq!(
+            xml.objected_to(),
+            xml.findings.len() + xml.beyond.len(),
+            "and the widest number is the two lists together"
+        );
+
+        let summed: usize = xml.by_limit().iter().map(|(_, count)| count).sum();
+        assert_eq!(
+            summed,
+            xml.beyond.len(),
+            "the breakdown accounts for every one"
+        );
+        assert_eq!(
+            xml.by_limit().len(),
+            Limit::ALL.len(),
+            "both limits are listed, including one with no documents"
+        );
+
+        // The lists are disjoint. Written as a check rather than a comment
+        // because the totals above are only meaningful while it holds.
+        for (file, _) in &xml.beyond {
+            assert!(
+                !xml.findings.iter().any(|(refused, _)| refused == file),
+                "{file} is counted twice"
+            );
+        }
     }
 
     /// The section says what it is for, and says it in the file.
@@ -916,6 +1130,26 @@ mod tests {
             json.contains("\"known_limit\""),
             "the parser's blind spot is stated in the file, not only in the source"
         );
+        // And the documents it applies to are named, which is what the prose
+        // alone could not do: the sentence said "four" for three weeks while
+        // seventeen documents answered to it.
+        for key in [
+            "\"beyond_this_parser\"",
+            "\"by_limit\"",
+            "\"documents_beyond_this_parser\"",
+            "\"totals\"",
+            "\"refused_here\"",
+            "\"not_well_formed_xml\"",
+            "\"objected_to_by_a_conforming_parser\"",
+            "\"means\"",
+            "\"raw-less-than-in-attribute-value\"",
+            "\"colon-without-local-name\"",
+        ] {
+            assert!(
+                json.contains(key),
+                "the xml section no longer publishes {key}"
+            );
+        }
         // The reason keys are published names; a rename is a schema change and
         // has to be a deliberate one.
         assert!(json.contains("\"element-never-closed\": 1"));

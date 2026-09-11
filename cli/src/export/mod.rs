@@ -268,7 +268,12 @@ pub struct Built {
     pub fragment_links: usize,
     /// Fragments that needed a suffix because their siglum was already taken.
     pub disambiguated: usize,
-    /// Documents that carried a stylesheet instruction the package does without.
+    /// Stylesheet instructions the package does without, removed.
+    ///
+    /// **Instructions, not documents.** One document of TLHdig Beta 0.3 carries
+    /// two of them, so the two counts are not the same number: 8 424 against
+    /// 8 423. Until 2026-09-10 this field held the second and every label on it
+    /// said the first.
     pub stylesheet_dropped: usize,
 }
 
@@ -319,8 +324,19 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // reader can tell which edition of the corpus they are looking at.
     let archive_digest = digest_of(zip)?;
     let mut tallies = Tallies::default();
-    let stylesheet_dropped =
-        write_documents(zip, &fragments, &placed, staging.path(), &mut tallies, job)?;
+    write_documents(zip, &fragments, &placed, staging.path(), &mut tallies, job)?;
+    // Read off the tally the manifest publishes rather than counted a second
+    // time beside it. Two counters over the same documents are two answers to
+    // one question, and these two gave different ones: this number came from a
+    // search for the literal `<?xml-stylesheet` — once per document, whether
+    // the document carried one instruction or two — while `applied` is filled
+    // by `verify::compare`, which names every instruction it actually saw
+    // removed. The number the caller prints is now that one.
+    let stylesheet_dropped = tallies
+        .applied
+        .get(&verify::drop_pi("xml-stylesheet"))
+        .copied()
+        .unwrap_or(0);
 
     // Moved out of the fragments rather than copied out of them: the archive
     // paths are what a fragment carries beyond its record, and the last thing
@@ -384,12 +400,18 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
 
     let previous = Replaced::aside(&final_root, destination)?;
     staging.publish(&final_root)?;
-    for left in previous.committed() {
-        job.report(Event::PreviousPackageLeft { path: &left });
-    }
 
     job.report(Event::CheckingPublished);
     let published = validate(&final_root, &records, &placed)?;
+
+    // **Только теперь, и не строкой раньше.** Прежний пакет снимался сразу
+    // после переименования, то есть до того, как опубликованное дерево было
+    // прочитано заново: отказ этой проверки заставал читателя без его копии и
+    // с непроверенной под ее именем. Пока `committed` не вызван, `Replaced`
+    // держит копию и по выходу отсюда любым отказом вернет ее на место.
+    for left in previous.committed() {
+        job.report(Event::PreviousPackageLeft { path: &left });
+    }
     // `assert_eq!`, а не `debug_assert_eq!`: сравнение двух уже собранных
     // описей стоит микросекунды, а обещание «опубликованное равно собранному»
     // до сих пор держалось только в отладочной сборке — то есть нигде, где
@@ -500,6 +522,22 @@ impl Drop for Replaced {
             return;
         }
         if let Some(aside) = &self.aside {
+            // **Имя может быть занято, и снять занявшее его дерево здесь
+            // правильно.** Сюда приходят и отказы после публикации: под именем
+            // пакета в этот момент стоит то, что положил этот прогон, а
+            // читательская копия лежит в `aside`. Один `rename` на занятое имя
+            // отвечает `ENOTEMPTY` и молча ничего не делает — читатель
+            // остается с непроверенным пакетом под своим именем и со своим
+            // собственным под точечным, которого он не видит.
+            //
+            // Убирается только то, что этот прогон сам туда поставил: `aside`
+            // не `None` лишь после удавшегося переименования с этого имени,
+            // после которого занять его мог только `Staging::publish` этого
+            // прогона. Чужой прогон Aruna сюда не встанет — блокировка
+            // публикации объявлена раньше `Replaced` и потому снимается позже.
+            if fs::symlink_metadata(&self.target).is_ok() {
+                let _ = fs::remove_dir_all(&self.target);
+            }
             // Best effort, and the only thing left worth doing: the run has
             // already failed, and putting the reader's package back matters
             // more than reporting why the restore failed too.
@@ -645,9 +683,6 @@ pub fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>
     Ok(fragments)
 }
 
-/// Pass 2: read each document whole, normalise it, write it where it belongs.
-///
-/// Returns how many carried a stylesheet instruction, which is the one thing
 /// What one pass over the archive counts, in one place.
 ///
 /// Everything here is filled while the documents are written and read again
@@ -664,11 +699,12 @@ struct Tallies {
     xml: manifest::XmlReport,
 }
 
-/// the normaliser removes that is worth counting.
+/// Pass 2: read each document whole, normalise it, write it where it belongs.
 ///
-/// Three of those counts travel together in [`Tallies`] rather than as three
-/// out-parameters: they are filled by the same pass, read by the same manifest,
-/// and adding a fourth should not widen every signature between here and there.
+/// Returns nothing but success. Everything this pass counts goes into
+/// [`Tallies`], which the manifest reads and which the caller now reads too —
+/// the stylesheet count used to come back as a return value counted a second
+/// way, and the two ways disagreed.
 fn write_documents(
     zip: &Path,
     fragments: &[Fragment],
@@ -676,7 +712,7 @@ fn write_documents(
     staging: &Path,
     tallies: &mut Tallies,
     job: &Job<'_>,
-) -> Result<usize> {
+) -> Result<()> {
     // **One slot per entry name, and the archive is held to it here.**
     //
     // `collect` on a map keeps the last value for a repeated key, so an archive
@@ -700,7 +736,6 @@ fn write_documents(
 
     let mut archive = open(zip)?;
     let mut written = 0usize;
-    let mut dropped = 0usize;
     // The package's own size, accumulated as it is written rather than measured
     // afterwards: the point of the ceiling is to stop before the disk is full,
     // and a check after the last write is a check after the damage.
@@ -742,9 +777,6 @@ fn write_documents(
                 limit: MAX_DOCUMENT,
             });
         }
-        if normalize::carries_stylesheet(&bytes) {
-            dropped += 1;
-        }
         normalised.clear();
         normalize::normalize_into(&bytes, &mut normalised);
 
@@ -757,7 +789,7 @@ fn write_documents(
                 // what is permitted. One list, so a change cannot be counted
                 // under a name the manifest never advertises.
                 for rule in report.dropped {
-                    *tallies.applied.entry(verify::drop_pi(&rule)).or_default() += 1;
+                    *tallies.applied.entry(verify::drop_pi(rule)).or_default() += 1;
                 }
                 if report.added_declaration {
                     *tallies
@@ -789,9 +821,12 @@ fn write_documents(
         // the finding is recorded and the loop goes on. A parser that decided
         // membership would make the package a filtered view of the corpus
         // rather than a copy of it.
-        tallies
-            .xml
-            .observe(relative, crate::xml_wellformed::classify(&normalised));
+        //
+        // One call and not two: `examine` asks both questions the manifest
+        // publishes — is this document refused here, and if it is not, does it
+        // hold one of the two defects this parser is known to miss — and it is
+        // the only place that knows a document may not be counted under both.
+        tallies.xml.examine(relative, &normalised);
 
         let out = staging.join(relative);
         if let Some(parent) = out.parent() {
@@ -845,7 +880,7 @@ fn write_documents(
             written,
         });
     }
-    Ok(dropped)
+    Ok(())
 }
 
 /// The archive's own digest, for the manifest to record.
@@ -898,6 +933,58 @@ pub(crate) mod tests_support {
 mod tests {
     use super::tests_support::fragment;
     use super::*;
+
+    /// **Отказ после публикации не отбирает у читателя его пакет.**
+    ///
+    /// Проверка опубликованного дерева читает его заново уже после
+    /// переименования, и отказать она может – между переименованием и чтением
+    /// в каталог назначения успевает вписаться что угодно, от `.DS_Store`
+    /// Finder'а до чужой программы. На этом отказе `Replaced` не подтвержден,
+    /// то есть обязан вернуть читателю то, что забрал.
+    ///
+    /// Разыгрывается ровно то состояние, в котором он это делает: прежний
+    /// пакет отставлен в сторону, на его имени стоит новый, подтверждения не
+    /// было. До 10.09.2026 возврат делался одним `rename` на занятое имя –
+    /// `ENOTEMPTY`, результат отбрасывался молча, и читатель оставался с
+    /// непроверенным пакетом под своим именем и со своим собственным под
+    /// точечным, которого не видно.
+    ///
+    /// Снять занятое имя здесь можно: под ним стоит дерево, которое положил
+    /// этот же прогон, а читательская копия – в `aside`. Блокировка публикации
+    /// в это время еще держится: она объявлена раньше и снимается позже.
+    #[test]
+    fn a_failure_after_publishing_gives_the_reader_their_package_back() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join(PACKAGE);
+
+        // Пакет читателя.
+        fs::create_dir_all(target.join("CTH 5")).expect("create");
+        fs::write(target.join("CTH 5/KBo 1.1.xml"), b"previous").expect("write");
+
+        let held = Replaced::aside(&target, dir.path()).expect("moved aside");
+        assert!(!target.exists(), "старый пакет не убран с имени");
+
+        // Публикация: на освободившемся имени встает дерево этого прогона.
+        fs::create_dir_all(target.join("CTH 9")).expect("create");
+        fs::write(target.join("CTH 9/KBo 2.1.xml"), b"new").expect("write");
+
+        // И проверка опубликованного отказала: подтверждения нет.
+        drop(held);
+
+        assert_eq!(
+            fs::read(target.join("CTH 5/KBo 1.1.xml")).ok().as_deref(),
+            Some(&b"previous"[..]),
+            "читателю не вернули его пакет"
+        );
+        assert!(
+            !target.join("CTH 9").exists(),
+            "непроверенное дерево осталось под именем пакета"
+        );
+        assert!(
+            !dir.path().join(format!(".{PACKAGE}.previous")).exists(),
+            "копия осталась лежать под точечным именем"
+        );
+    }
 
     /// **An archive that names one entry twice is stopped by name.**
     ///

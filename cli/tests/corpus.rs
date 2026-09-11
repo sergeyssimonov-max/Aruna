@@ -115,11 +115,12 @@ fn the_whole_corpus_normalises_without_distortion_and_the_archive_is_not_written
         normalize_into(&source, &mut out);
         match verify::compare(&source, &out) {
             Ok(report) => {
+                // No longer asserted here that the rule is on the permit
+                // list: since 2026-09-10 `compare` returns the list's own name
+                // rather than the document's spelling, so the type carries what
+                // this line used to check. `verify::a_dropped_instruction_is_counted_under_the_permitted_name`
+                // holds that property where it now lives.
                 for rule in report.dropped {
-                    assert!(
-                        verify::is_dropped(rule.as_bytes()),
-                        "{name} dropped <?{rule}…?>, which is not on the permit list"
-                    );
                     *applied.entry(format!("DROP_PI {rule}")).or_default() += 1;
                 }
                 if report.added_declaration {
@@ -155,13 +156,21 @@ fn the_whole_corpus_normalises_without_distortion_and_the_archive_is_not_written
 
 /// The corpus contains documents no conforming XML parser will accept.
 ///
-/// 210 of 23 936, measured with `xmllint --noout`. `xmllint` reports the first
-/// error in each and blames: an attribute name that is not a name (82), a raw
-/// `<` inside an attribute value (44), a tag mismatch (54), a qualified name
-/// with an empty local part (13), and a handful of others. Counting the whole
-/// document rather than its first error, 121 have tags that do not balance —
-/// most of those also have an attribute error earlier, which is what `xmllint`
-/// stops on. All four classes are reproduced in `fixtures/xml/malformed/`.
+/// 210 of 23 936 are not well-formed XML, and 223 are objected to at all;
+/// re-measured with `xmllint --noout` on 2026-09-10, and the three numbers are
+/// laid out in `docs/XML-CONTRACT.md` §2 and in the manifest's `xml.totals`.
+/// `xmllint` reports the first error in each and blames: an attribute name that
+/// is not a name (82), a tag mismatch (65), a raw `<` inside an attribute value
+/// (44), an attribute construct (15), a qualified name with no local part (13),
+/// and five others. Counting the whole document rather than its first error, 121
+/// have tags that do not balance — most of those also have an attribute error
+/// earlier, which is what `xmllint` stops on. All the classes are reproduced in
+/// `fixtures/xml/malformed/`.
+///
+/// The breakdown written here until 2026-09-10 said 54 tag mismatches and put
+/// the 13 qualified names inside the 210. It summed to 210 because the two
+/// errors cancelled: the 13 are a `namespace error` that `libxml2` exits zero
+/// on, and they belong to the 223, not the 210.
 ///
 /// Only the tag-mismatch class is counted here, because it is the only one this
 /// project can measure without shipping an XML parser it does not have. The
@@ -333,4 +342,250 @@ fn every_document_the_gates_admit_survives_decoding_intact() {
         contract.not_nfc, NOT_NFC,
         "the number of documents outside NFC moved"
     );
+}
+
+/// The seventeen documents this crate's parser accepts and `libxml2` objects to.
+///
+/// Paths inside the archive, with its own top folder stripped — not package
+/// paths, because `place` renames a colliding document and the archive is what
+/// this test reads.
+///
+/// **Why they are written out rather than counted.** A count would pass on a
+/// scanner that found seventeen different documents. These names are the ones
+/// `xmllint --noout` blames over the exported package, measured 2026-09-10, and
+/// naming them is what makes [`aruna::xml_wellformed::beyond_the_parser`] a
+/// reproduction of that measurement rather than a second opinion about it.
+///
+/// A new edition of the corpus will move this list, and moving it is an edit
+/// here, made after re-running `xmllint` — never after reading a diff.
+const RAW_LESS_THAN: [&str; 4] = [
+    "CTH 211_XML_TLH/DAAM 6.93.xml",
+    "CTH 447_XML_BESRIT/KBo 11.72+.xml",
+    "CTH 581_XML_HDivT/KBo 18.142.xml",
+    "CTH 76_XML_SVH/KUB 19.6+.xml",
+];
+
+/// The thirteen with `<AO:-…>`: a colon, and after it something that cannot
+/// begin a local name.
+///
+/// `libxml2` calls this a *namespace* error and exits zero on it, which is why
+/// these thirteen went uncounted from the first measurement in August until
+/// 2026-09-10 while their four neighbours above were known all along.
+const COLON_WITHOUT_LOCAL_NAME: [&str; 13] = [
+    "CTH 52_XML_SVH/KBo 1.3+.xml",
+    "CTH 526_XML_KULTINV/KUB 25.23+.xml",
+    "CTH 528_XML_KULTINV/KBo 13.192.xml",
+    "CTH 577_XML_HDivT/KUB 52.25.xml",
+    "CTH 61_XML_HAnn/KBo 50.19.xml",
+    "CTH 61_XML_HAnn/KBo 50.30+.xml",
+    "CTH 628_XML_HFR/IBoT 2.85+.xml",
+    "CTH 628_XML_HFR/KBo 47.71.xml",
+    "CTH 647_XML_HFR/KBo 31.190.xml",
+    "CTH 670_XML_HFR/CTH 670-0026-0050/KBo 39.105.xml",
+    "CTH 670_XML_HFR/CTH 670-3926-3950/KBo 18.192.xml",
+    "CTH 670_XML_HFR/CTH 670-aus-CTH 832/KBo 52.74.xml",
+    "CTH 670_XML_HFR/CTH 670-aus-CTH 832/KBo 66.131.xml",
+];
+
+/// What this crate's parser accepts and a conforming one does not — by name.
+///
+/// The acceptance test for the scanner that closes the gap between the 206 this
+/// crate refuses and the 223 `libxml2` objects to. Set equality in both
+/// directions, because both directions are defects: a name missing means the
+/// scanner stopped seeing a document `xmllint` blames, and an extra name means
+/// it invented one, and the manifest would publish either.
+///
+/// Run over the *normalised* bytes, since those are what the package holds and
+/// what `xmllint` was run against.
+#[test]
+fn the_documents_beyond_this_parser_are_the_seventeen_xmllint_names() {
+    let Some(path) = required() else { return };
+    let file = std::fs::File::open(&path).expect("open");
+    let mut zip = zip::ZipArchive::new(std::io::BufReader::with_capacity(1 << 18, file))
+        .expect("read archive");
+
+    let mut raw_lt: Vec<String> = Vec::new();
+    let mut no_local: Vec<String> = Vec::new();
+    let mut source = Vec::new();
+    let mut out = Vec::new();
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i).expect("entry");
+        let name = entry.name().to_string();
+        if !is_manuscript_xml(&name) {
+            continue;
+        }
+        source.clear();
+        entry.read_to_end(&mut source).expect("read entry");
+        let head = String::from_utf8_lossy(&source[..source.len().min(HEADER_READ_LIMIT)]);
+        if !looks_like_manuscript(&head) {
+            continue;
+        }
+        out.clear();
+        normalize_into(&source, &mut out);
+        // Only the ones this parser accepts. A document it already refuses is
+        // counted in the 206 and would be counted twice here.
+        if aruna::xml_wellformed::classify(&out).is_some() {
+            continue;
+        }
+        let Some(beyond) = aruna::xml_wellformed::beyond_the_parser(&out) else {
+            continue;
+        };
+        let short = name
+            .split_once('/')
+            .map_or(name.clone(), |(_, r)| r.to_string());
+        match beyond.limit {
+            aruna::xml_wellformed::Limit::RawLessThanInAttributeValue => raw_lt.push(short),
+            aruna::xml_wellformed::Limit::ColonWithoutLocalName => no_local.push(short),
+        }
+    }
+
+    raw_lt.sort();
+    no_local.sort();
+    let mut expected_raw = RAW_LESS_THAN.map(str::to_string).to_vec();
+    let mut expected_local = COLON_WITHOUT_LOCAL_NAME.map(str::to_string).to_vec();
+    expected_raw.sort();
+    expected_local.sort();
+
+    assert_eq!(
+        raw_lt, expected_raw,
+        "the documents with a raw '<' in an attribute value are not the ones xmllint blames"
+    );
+    assert_eq!(
+        no_local, expected_local,
+        "the documents with a colon and no local name are not the ones xmllint blames"
+    );
+    assert_eq!(
+        raw_lt.len() + no_local.len(),
+        17,
+        "206 refused here plus 17 accepted here and objected to elsewhere is the 223"
+    );
+}
+
+/// **Структурный критерий на всем корпусе: пакетная копия — то же дерево.**
+///
+/// Байтовый критерий — `verify::compare` — уже идет по всем 23 936 документам
+/// в первом тесте этого файла и доказывает, что тело документа побайтово то
+/// же. О структуре он не говорит ничего, и §4.13 стоит ровно на этом уроке:
+/// последовательность знаков не меняется от того, где закрыть элемент.
+///
+/// Здесь тот же вопрос задает сторонняя реализация и задает его о дереве:
+/// `xmllint --c14n` приводит порядок атрибутов, кавычки и запись пустого
+/// элемента к одному виду, так что совпадение канонических форм — это
+/// совпадение деревьев, а не байтов. Разрешенный список снимается с обеих
+/// сторон одинаково: C14N сохраняет инструкции обработки вне корня, а снятая
+/// ссылка на таблицу стилей — то самое, что нормализации разрешено убрать.
+///
+/// Документы, которых сторонний разборщик не берет, пропускаются: их 210, они
+/// остаются в пакете, и отсутствие у них канонической формы — свойство
+/// исходных данных.
+///
+/// `#[ignore]`, потому что это 23 936 запусков внешней программы — минуты, а
+/// не секунды. Включается:
+///
+/// ```sh
+/// ARUNA_ZIP=cli/fixtures/…zip cargo nextest run --test corpus --run-ignored all
+/// ```
+#[test]
+#[ignore = "23 936 запусков xmllint: минуты; включается вручную"]
+fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
+    let Some(path) = required() else { return };
+    if std::process::Command::new("xmllint")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| !s.success())
+        .unwrap_or(true)
+    {
+        eprintln!("xmllint отсутствует — проверка пропущена");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = dir.path().join("source.xml");
+    let dst = dir.path().join("normalised.xml");
+    let file = std::fs::File::open(&path).expect("open");
+    let mut zip = zip::ZipArchive::new(std::io::BufReader::with_capacity(1 << 18, file))
+        .expect("read archive");
+
+    let (mut same, mut refused) = (0usize, 0usize);
+    let mut differing: Vec<String> = Vec::new();
+    let mut source = Vec::new();
+    let mut out = Vec::new();
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i).expect("entry");
+        let name = entry.name().to_string();
+        if !is_manuscript_xml(&name) {
+            continue;
+        }
+        source.clear();
+        entry.read_to_end(&mut source).expect("read entry");
+        let head = String::from_utf8_lossy(&source[..source.len().min(HEADER_READ_LIMIT)]);
+        if !looks_like_manuscript(&head) {
+            continue;
+        }
+        out.clear();
+        normalize_into(&source, &mut out);
+        if verify::compare(&source, &out).is_err() {
+            continue;
+        }
+        let Some(before) = canonical_form(&source, &src) else {
+            refused += 1;
+            continue;
+        };
+        let after = canonical_form(&out, &dst)
+            .unwrap_or_else(|| panic!("{name}: пакетная копия перестала разбираться"));
+        if without_dropped_pis(&before) == without_dropped_pis(&after) {
+            same += 1;
+        } else if differing.len() < 5 {
+            differing.push(name);
+        }
+    }
+
+    assert!(
+        differing.is_empty(),
+        "у {} документов дерево изменилось при совпавших байтах тела; первые: {differing:#?}",
+        differing.len()
+    );
+    assert!(
+        same > 23_000,
+        "сверено всего {same} документов при {refused} отвергнутых сторонним разборщиком — \
+         выборка перестала быть корпусом"
+    );
+    eprintln!("структурный критерий: {same} совпало, {refused} без канонической формы");
+}
+
+/// Каноническая форма по `xmllint --c14n`, или `None` — документ ей не дался.
+fn canonical_form(bytes: &[u8], at: &std::path::Path) -> Option<Vec<u8>> {
+    std::fs::write(at, bytes).expect("write");
+    let out = std::process::Command::new("xmllint")
+        .arg("--c14n")
+        .arg(at)
+        .output()
+        .expect("run xmllint");
+    out.status.success().then_some(out.stdout)
+}
+
+/// Каноническая форма без инструкций, которые нормализации разрешено снимать,
+/// и без оставшегося от них пробела.
+fn without_dropped_pis(canonical: &[u8]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(canonical);
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text.as_ref();
+    while let Some(at) = rest.find("<?") {
+        let (before, tail) = rest.split_at(at);
+        out.push_str(before);
+        let Some(end) = tail.find("?>") else {
+            rest = tail;
+            break;
+        };
+        let pi = &tail[2..end];
+        let target = pi.split([' ', '\t', '\r', '\n']).next().unwrap_or(pi);
+        if !verify::is_dropped(target.as_bytes()) {
+            out.push_str(&tail[..end + 2]);
+        }
+        rest = &tail[end + 2..];
+    }
+    out.push_str(rest);
+    out.trim_start().as_bytes().to_vec()
 }

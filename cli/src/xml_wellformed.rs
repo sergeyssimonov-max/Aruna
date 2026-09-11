@@ -37,14 +37,21 @@
 //! deliberate.** Widening a reason until everything falls into one is how a
 //! classification stops carrying information.
 //!
-//! **The parser has blind spots, and they are recorded rather than worked
-//! around.** `quick-xml` accepts a raw `<` inside an attribute value and an
-//! empty local name (`<AO:>`), both of which XML forbids; four documents of the
-//! corpus are called well-formed here that `xmllint` refuses. Closing them
-//! would take a second parser, and the one measured for the purpose was
-//! rejected on 2026-09-06 for damaging the transliteration in silence. Four
-//! documents named wrongly in a manifest is the smaller cost, and naming the
-//! limits here is what keeps them known rather than surprising.
+//! **The parser has blind spots, they are recorded rather than worked around,
+//! and since 2026-09-10 they are measured rather than remembered.**
+//! `quick-xml` accepts a raw `<` inside an attribute value, and a colon with no
+//! local name after it (`<AO:-LineNrExpl>`, `<AO:--italic>` — both occur); XML
+//! forbids the first outright and
+//! *Namespaces in XML* forbids the second. Closing them would take a second
+//! parser, and the one measured for the purpose was rejected on 2026-09-06 for
+//! damaging the transliteration in silence — so the limits stay, and
+//! [`beyond_the_parser`] walks the bytes for both and names the documents.
+//!
+//! The prose that stood here until 2026-09-10 said "four documents". Four is
+//! what `xmllint` refuses outright; it also reports thirteen more, as a
+//! *namespace* error, and exits zero on them — which is why they were never
+//! counted. Seventeen documents of this corpus are accepted here and objected
+//! to by `libxml2`, and the manifest now lists all seventeen by name.
 //!
 //! What is *not* left to the parser: an input that ends with elements still
 //! open, and a double hyphen inside a comment. `quick-xml` is silent on the
@@ -452,6 +459,219 @@ fn first_refusal(bytes: &[u8]) -> Option<(Refusal, usize)> {
     }
 }
 
+/// A defect XML forbids and this parser accepts.
+///
+/// Not a second classifier. [`classify`] answers "does `quick-xml` refuse
+/// this", and everything it refuses is already named by a [`Reason`]. This
+/// answers the other question, the one the module header has carried as prose
+/// since 2026-09-06: *of the documents it accepts, which ones would a
+/// conforming parser still object to, and where*. Two classes, both measured on
+/// the corpus, both scanned over the bytes rather than asked of a parser —
+/// asking is what the crate cannot do, since these are exactly the two things
+/// its parser does not see.
+///
+/// **Why measure at all rather than write the number down.** The count used to
+/// be four, in a sentence, in three files. `xmllint` reports seventeen
+/// documents, and the missing thirteen were invisible because nothing in this
+/// crate looked for them. A number that no code produces cannot notice a new
+/// edition of the corpus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Limit {
+    /// A raw `<` inside an attribute value: `<w trans="a<b">`.
+    ///
+    /// Forbidden by XML outright — `<` in a value must be `&lt;` — and the
+    /// reason is that a parser cannot otherwise tell a value from the start of
+    /// the next tag. `quick-xml` takes it as an ordinary character of the
+    /// value; `libxml2` says "Unescaped '<' not allowed in attributes values"
+    /// and stops. Four documents of this corpus, measured 2026-09-10.
+    RawLessThanInAttributeValue,
+    /// A colon in an element name with no local name after it: `<AO:-LineNrExpl>`.
+    ///
+    /// XML 1.0 on its own permits this — `:` and `-` are both name characters,
+    /// so `AO:-italic` is a legal `Name`. *Namespaces in XML* does not: a name
+    /// with a colon must be `prefix:local`, and `-italic` cannot begin a local
+    /// name. `libxml2` reports it as a namespace error rather than a parser
+    /// error, and — this is the part worth knowing — still exits zero, so a
+    /// build that only checked the exit status would never have seen these.
+    /// Thirteen documents, measured 2026-09-10.
+    ColonWithoutLocalName,
+}
+
+impl Limit {
+    /// The name the manifest and the window use. Stable: it is a published key.
+    pub fn key(self) -> &'static str {
+        match self {
+            Limit::RawLessThanInAttributeValue => "raw-less-than-in-attribute-value",
+            Limit::ColonWithoutLocalName => "colon-without-local-name",
+        }
+    }
+
+    /// Both of them, so a breakdown can list a class with no documents.
+    pub const ALL: [Limit; 2] = [
+        Limit::RawLessThanInAttributeValue,
+        Limit::ColonWithoutLocalName,
+    ];
+}
+
+/// One defect beyond this parser, and where it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Beyond {
+    pub limit: Limit,
+    /// Line of the first one, counted from 1 in the package copy — the same
+    /// convention [`Finding`] uses, and the same one `xmllint` run over the
+    /// package reports, so the two can be compared line for line.
+    pub line: usize,
+    /// Column, counted from 1 in characters.
+    pub column: usize,
+}
+
+/// The first defect in `bytes` that this crate's parser accepts and XML does
+/// not. `None` means there is none.
+///
+/// Meant for documents [`classify`] returned `None` for; it is safe on any
+/// input, but on a document that is already refused the answer describes
+/// wreckage. The scan walks tags the way [`unterminated_start_tag`] does —
+/// comments, CDATA, declarations and processing instructions stepped over,
+/// quoted values walked through — because those are the places where a `<` and
+/// a `:` mean nothing.
+pub fn beyond_the_parser(bytes: &[u8]) -> Option<Beyond> {
+    let mut i = 0usize;
+    while i < bytes.len() {
+        let start = i + memchr::memchr(b'<', &bytes[i..])?;
+        let rest = &bytes[start..];
+        if rest.starts_with(b"<!--") {
+            i = memchr_after(bytes, start + 4, b"-->");
+            continue;
+        }
+        if rest.starts_with(b"<![CDATA[") {
+            i = memchr_after(bytes, start + 9, b"]]>");
+            continue;
+        }
+        // One walk of the tag, not two: `scan_tag` is `end_of_tag` with the
+        // one extra question asked while the quotes are already being tracked.
+        // Two walks cost a second pass over every tag of 340 MB to learn what
+        // the first pass had in hand.
+        let (end, quoted) = scan_tag(bytes, start);
+        if rest.starts_with(b"<!") || rest.starts_with(b"<?") {
+            i = end.max(start + 1);
+            continue;
+        }
+        // Element name first, then the attributes, because that is the order
+        // the bytes are in: reporting the first defect in the document means
+        // reporting the leftmost one inside a tag too.
+        let (name_at, name) = tag_name(bytes, start);
+        if colon_without_local_name(name) {
+            let (line, column) = position(bytes, name_at);
+            return Some(Beyond {
+                limit: Limit::ColonWithoutLocalName,
+                line,
+                column,
+            });
+        }
+        if let Some(at) = quoted {
+            let (line, column) = position(bytes, at);
+            return Some(Beyond {
+                limit: Limit::RawLessThanInAttributeValue,
+                line,
+                column,
+            });
+        }
+        i = end.max(start + 1);
+    }
+    None
+}
+
+/// The name of the tag beginning at `start`, and where it begins.
+///
+/// `</w>` and `<w …>` alike: the slash of an end tag is stepped over, so a
+/// closing tag is held to the same rule as the opening one. `libxml2` reports
+/// the QName failure on both.
+fn tag_name(bytes: &[u8], start: usize) -> (usize, &[u8]) {
+    let mut at = start + 1;
+    if bytes.get(at) == Some(&b'/') {
+        at += 1;
+    }
+    let mut end = at;
+    while end < bytes.len() {
+        match bytes[end] {
+            b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>' => break,
+            _ => end += 1,
+        }
+    }
+    (at, &bytes[at..end])
+}
+
+/// Whether a name carries a colon that no local name follows.
+///
+/// Deliberately narrow. It does not ask whether the name is a valid `NCName`
+/// on both sides of the colon — that would be a second, wider judgement about
+/// documents nobody has measured, and a class in the manifest is worth having
+/// only when the documents under it were counted. It asks the one thing
+/// `libxml2` refused on: after the first colon there has to be something that
+/// can begin a name.
+///
+/// "Can begin a name" is taken as a letter, `_`, or any byte outside ASCII —
+/// the last because `NameStartChar` covers most of Unicode and this corpus is
+/// written in it. A digit, a hyphen, a dot, a second colon or nothing at all is
+/// not a name start, which is exactly the set `AO:-italic` and `AO:` fall into.
+fn colon_without_local_name(name: &[u8]) -> bool {
+    let Some(colon) = memchr::memchr(b':', name) else {
+        return false;
+    };
+    match name.get(colon + 1) {
+        None => true,
+        Some(&byte) => !(byte.is_ascii_alphabetic() || byte == b'_' || byte >= 0x80),
+    }
+}
+
+/// Where the tag beginning at `start` ends, and where inside it a `<` stands in
+/// a quoted attribute value.
+///
+/// [`end_of_tag`] answers the first question and tracks quotes to do it; this
+/// is that walk with the second question asked from the same state. The `<`
+/// found here is the mirror of [`unquoted_lt`]'s: there a `<` **outside** the
+/// quotes means the tag was never finished, here one **inside** them is a value
+/// XML forbids. Different defects, different repairs — but the same single pass
+/// over the bytes tells them apart.
+fn scan_tag(bytes: &[u8], start: usize) -> (usize, Option<usize>) {
+    let mut quoted_lt: Option<usize> = None;
+    let mut i = start + 1;
+    while i < bytes.len() {
+        // Вне значения интересны ровно три байта из двухсот пятидесяти шести,
+        // и искать их побайтно незачем: 96 % байтов корпуса лежат внутри тегов
+        // (средний тег 51 байт), так что скалярный обход этого места был
+        // обходом всех 339,5 МБ по одному байту — 7,26 % команд прогона,
+        // замерено счетчиком инструкций 10.09.2026.
+        let Some(offset) = memchr::memchr3(b'"', b'\'', b'>', &bytes[i..]) else {
+            break;
+        };
+        let at = i + offset;
+        let quote = match bytes[at] {
+            b'>' => return (at + 1, quoted_lt),
+            other => other,
+        };
+        // Внутри значения интересны два: закрывающая кавычка и голый `<`.
+        // `>` здесь не значит ничего — в значении он не требует экранирования,
+        // и этот корпус им пользуется.
+        let mut j = at + 1;
+        loop {
+            let Some(offset) = memchr::memchr2(quote, b'<', &bytes[j..]) else {
+                return (bytes.len(), quoted_lt);
+            };
+            let at = j + offset;
+            if bytes[at] == quote {
+                i = at + 1;
+                break;
+            }
+            if quoted_lt.is_none() {
+                quoted_lt = Some(at);
+            }
+            j = at + 1;
+        }
+    }
+    (bytes.len(), quoted_lt)
+}
+
 /// Line and column of a byte offset, counted in one pass.
 fn position(bytes: &[u8], at: usize) -> (usize, usize) {
     let at = at.min(bytes.len());
@@ -662,5 +882,86 @@ mod tests {
         keys.dedup();
         assert_eq!(keys.len(), count, "two reasons share a key");
         assert_eq!(count, 10);
+    }
+    /// The two blind spots, found by the scanner that exists for them.
+    ///
+    /// The same two fixtures the test above asserts `classify` is silent on.
+    /// Together the pair is the whole statement: this parser accepts these
+    /// documents, and this crate knows exactly what is wrong with them.
+    #[test]
+    fn the_blind_spots_are_found_by_the_scanner_written_for_them() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/xml");
+        let cases: [(&str, Limit); 2] = [
+            (
+                "malformed/unescaped-lt-in-attribute.xml",
+                Limit::RawLessThanInAttributeValue,
+            ),
+            ("malformed/empty-qname.xml", Limit::ColonWithoutLocalName),
+        ];
+        for (name, want) in cases {
+            let bytes = std::fs::read(dir.join(name)).expect("образец на месте");
+            assert_eq!(classify(&bytes), None, "образец {name} разборщиком принят");
+            assert_eq!(
+                beyond_the_parser(&bytes).map(|b| b.limit),
+                Some(want),
+                "образец {name}"
+            );
+        }
+    }
+
+    /// And it is silent on documents that have neither defect.
+    ///
+    /// Both halves matter equally. A scanner that answers "yes" everywhere
+    /// would put 23 936 documents in the manifest under a heading that means
+    /// nothing; the corpus test holds it to seventeen, and this holds it to the
+    /// shapes that look like the defect and are not: a colon that does have a
+    /// local name after it, a `<` outside quotes, an `&lt;` where it belongs.
+    #[test]
+    fn a_document_with_neither_defect_says_so() {
+        for xml in [
+            r#"<AOxml><AO:TxtPubl>KBo 1.1</AO:TxtPubl></AOxml>"#,
+            r#"<a><w trans="a&lt;b">x</w></a>"#,
+            r#"<a><!-- a<b and AO:- --><w c="1"/></a>"#,
+            r#"<a><![CDATA[a<b AO:-]]></a>"#,
+            r#"<a><?xml-stylesheet href="a<b"?><w/></a>"#,
+        ] {
+            assert_eq!(beyond_the_parser(xml.as_bytes()), None, "для {xml}");
+        }
+    }
+
+    /// An end tag is held to the same rule as the start tag.
+    #[test]
+    fn a_colon_without_a_local_name_is_found_on_an_end_tag_too() {
+        let xml = r#"<a><AO:italic>x</AO:-italic></a>"#;
+        assert_eq!(
+            beyond_the_parser(xml.as_bytes()).map(|b| b.limit),
+            Some(Limit::ColonWithoutLocalName)
+        );
+    }
+
+    /// The position is the package copy's, the same as a finding's.
+    #[test]
+    fn the_limit_names_the_line_it_is_on() {
+        let xml = "<a>\n  <w c=\"1\"/>\n  <w trans=\"a<b\"/>\n</a>";
+        let beyond = beyond_the_parser(xml.as_bytes()).expect("найден");
+        assert_eq!(beyond.limit, Limit::RawLessThanInAttributeValue);
+        assert_eq!(beyond.line, 3);
+    }
+
+    /// The published keys, held the way the reasons' keys are.
+    #[test]
+    fn every_limit_names_itself_distinctly() {
+        let mut keys: Vec<&str> = Limit::ALL.iter().map(|l| l.key()).collect();
+        for key in &keys {
+            assert!(
+                !key.is_empty() && key.chars().all(|c| c.is_ascii_lowercase() || c == '-'),
+                "ключ {key} попадет в JSON и в разметку окна"
+            );
+        }
+        let count = keys.len();
+        keys.sort_unstable();
+        keys.dedup();
+        assert_eq!(keys.len(), count, "два предела делят ключ");
+        assert_eq!(count, 2);
     }
 }
