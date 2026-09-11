@@ -49,14 +49,93 @@ of which — `Geneva.ttf` among them — map them to a blank. So the old **642 o
 left the numerator and the denominator together, and **the six that cannot be
 drawn are the same six as before.**
 
-**Seven characters are covered by the repository and not by the four faces the
-shared stack names**: `U+02FD`, `U+0341`, `U+206F`, `U+2093`, `U+2E17` and the
-half brackets `U+2E22`/`U+2E23`. They belong to the main face, which is
-`Noto Serif` in PDF and the system face in HTML — so in the exported page those
-seven are still drawn by whatever the reader's system provides. That is the
-residual and it is a consequence of the owner's decision of 2026-08-30 not to
-embed a web font in a package of 24 000 files, not an oversight. Named here
-because a residual nobody writes down stops being known.
+### The residual: seven characters that ride on the main face
+
+**Seven characters are covered by the repository and by none of the four faces
+the shared stack names.** They belong to the main face, which is `Noto Serif` in
+PDF and the system face in HTML — so in the exported page those seven are drawn
+by whatever the reader's system provides. It follows from the owner's decision
+of 2026-08-30 not to embed a web font in a package of 24 000 files, and it is
+recorded here rather than left to be discovered.
+
+Counted over the corpus archive on 2026-09-11:
+
+| | occurrences | documents | of the corpus |
+|---|---:|---:|---:|
+| `U+02FD` modifier letter shelf | **13 260** | **1 991** | **8.3 %** |
+| `U+2093` subscript small x | 339 | 133 | 0.6 % |
+| `U+2E22` top left half bracket | 36 | 26 | 0.1 % |
+| `U+2E23` top right half bracket | 35 | 25 | 0.1 % |
+| `U+2E17` double oblique hyphen | 6 | 1 | 0.004 % |
+| `U+0341` combining acute tone mark | 2 | 1 | 0.004 % |
+| `U+206F` nominal digit shapes | 2 | 1 | 0.004 % |
+
+**One of the seven is the whole of the problem, and it is not one of the ones
+the project worried about.** `U+02FD` is in 1 991 documents — one in twelve of
+the corpus — and occurs 13 260 times. That is **more often than any cuneiform
+sign this document has ever discussed**: `U+100009`, the most frequent of the
+five nothing draws, occurs 2 715 times in 976 documents, and `U+100000`, the
+sign the repository carries a whole font for, occurs 927 times in 370.
+
+The tempting sentence about it is that `U+02FD` is an ordinary modifier letter,
+present in most text faces, so in practice it will almost certainly render.
+**Measured on this machine, that sentence is false.** Of the 358 font files
+macOS 13 ships, 23 carry `U+02FD` — and the interface font is not among them.
+`system-ui` on macOS resolves to San Francisco, `SFNS.ttf` and its siblings, and
+San Francisco does not have this character. It reaches the page only because the
+browser walks past the main face into some other installed font — Geneva,
+Monaco, one of the Arials. Which one, the reader never learns and nobody chose.
+
+"Almost certainly renders" is exactly the formulation this project abandoned on
+2026-08-22, when the audit showed that three fifths of the corpus was being
+drawn by substitutions nobody had selected. It is not a better sentence for
+being about one character instead of 389.
+
+**The other six are rare, and the half brackets are the thinnest thread of all.**
+Together they account for 420 occurrences across 187 documents — against the
+13 260 of the first. By frequency the half brackets `U+2E22`/`U+2E23` were
+feared out of proportion: 71 occurrences in 51 documents. By availability they
+are the opposite of safe — **exactly one file in the whole of macOS 13 carries
+either of them, `Geneva.ttf`**, a face from the bitmap era that survives for
+compatibility. One deletion upstream and the half brackets of this corpus stop
+rendering on every Mac.
+
+The rest are drawn by something on this system: `U+0341` by 60 files, `U+2093`
+by 22 — and it is the one character of the seven that San Francisco does carry —
+`U+2E17` by 18, `U+206F` by 12.
+
+### What can be proved about each output, and what cannot
+
+This is the part worth stating plainly, because it is a property of the shape of
+the decision rather than of any font.
+
+**In PDF the question is closed by measurement.** The face is embedded: the file
+travels with the document, it carries its own `cmap`, and asking whether a
+character will be drawn is asking what is in a file that is right there. The
+answer is the same on every machine that opens it, forever, and
+`cli/examples/font_coverage` gives it today.
+
+**In HTML there is no such question to ask.** The main face is the reader's
+system face, chosen by their operating system and its version, and the fallback
+chain after it is chosen by their browser. Nothing in this repository can
+measure it, no test can hold it, and no audit run here says anything about the
+machine the page is read on. **A hole in the exported page becomes known only if
+a reader writes to say they see a box.**
+
+That asymmetry is not an argument against the decision of 2026-08-30. Its ground
+has not moved: the package holds some 24 000 files and a web font would add
+weight to every one of them. What has moved is the price. The decision was made
+about the appearance of running prose — a serif here, the system's face there,
+a difference a reader would call typography. It now also covers characters of
+the scholarly notation: a half bracket is not a matter of taste, and an editor
+who sees `⸢` as an empty box has lost a distinction the transliteration is
+making. The decision stands; what it costs is written down.
+
+`docs/PROJECT-SPEC.ru.md` §7.3 carries this as an open position with a condition
+that measurement can close: whether the seven are covered by the system fonts of
+the platforms the inventory actually reaches. macOS is measured above and all
+seven are drawable there; Windows and the common distributions are not, and
+until they are the answer is partial.
 
 **How much of the corpus each touches**, counted over the 23 936 documents the
 package holds (2026-08-24):
