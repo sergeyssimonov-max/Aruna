@@ -132,21 +132,50 @@ VSNF 126, and a tail of smaller ones.
 
 ### Documents that are not well-formed XML
 
-**210 of 23 936 (0.88 %).** Measured with `xmllint --noout` over the exported
-package. `xmllint` stops at the first error in each document and blames:
+Three numbers, and they are different questions. Re-measured 2026-09-10 with
+`xmllint --noout` over the exported package; the manifest's `xml.totals` now
+carries all three, each with a sentence saying what it counts.
 
-| class | documents |
-|---|---|
-| attribute name that is not a name | 82 |
-| raw `<` inside an attribute value | 44 |
-| start and end tag do not match | 54 |
-| qualified name with an empty local part | 13 |
-| other (`expected '>'`, attribute construct) | 17 |
+| | documents | what it is |
+|---|---|---|
+| refused by this crate's parser | **206** | `quick-xml`, strict, no recovery. Named with reason, line and column in `manifest.json` under `not_well_formed_documents`. |
+| not well-formed XML | **210** | the 206 plus 4 more: a raw `<` inside an attribute value, which `quick-xml` takes for an ordinary character. `xmllint --noout` exits non-zero on exactly these 210. |
+| objected to by a conforming parser | **223** | the 210 plus 13 more: an element name of the form `<AO:-…>`, a qualified name with no local part. |
+
+The 206 are a subset of the 210 and the 210 of the 223 — checked in both
+directions, by name, on 2026-09-10.
+
+**The 13 are the correction of a three-week error.** They are legal XML 1.0:
+`:` and `-` are both name characters, so `AO:-LineNrExpl` is a well-formed
+`Name`. *Namespaces in XML* is what they break, and `libxml2` reports that as a
+`namespace error` and **exits zero** — so a measurement that read the exit
+status never saw them, and the table that stood here counted them inside the 210
+and made the arithmetic balance by mis-stating the tag-mismatch class as 54.
+
+First-error blame over the 223, which is what `xmllint` prints and the only
+figure it prints:
+
+| class | documents | kind |
+|---|---|---|
+| attribute name that is not a name | 82 | parser error |
+| start and end tag do not match | 65 | parser error |
+| raw `<` inside an attribute value | 44 | parser error |
+| attributes construct error | 15 | parser error |
+| `Failed to parse QName 'AO:'` | 13 | namespace error |
+| `expected '>'` | 3 | parser error |
+| attribute given twice | 1 | parser error |
 
 Counting whole documents rather than first errors, **121** have tags that do not
 balance; most of those also have an attribute error earlier, which is what
 `xmllint` stops on. That figure is asserted by
 `tests/corpus.rs::the_documents_whose_tags_do_not_balance_are_the_ones_already_known`.
+
+**The 17 are now produced by this crate, not copied from `xmllint`.**
+`xml_wellformed::beyond_the_parser` scans for both classes and gives file, line
+and column; `tests/corpus.rs::the_documents_beyond_this_parser_are_the_seventeen_xmllint_names`
+holds it to the seventeen names `xmllint` blames, in both directions. A number
+that no code produces cannot notice a new edition of the corpus, and for three
+weeks this one did not.
 
 This is recorded, not repaired. **The next stage must decide a policy before it
 meets these documents, not after** — see §5.
@@ -169,10 +198,35 @@ whole of what normalisation may do, and it is defined in exactly one place —
 | rule | what it does | applied, whole corpus |
 |---|---|---|
 | `DROP_BOM` | a leading U+FEFF | 0 |
-| `DROP_PI xml` | the declaration, replaced by a canonical one | 442 |
+| `DROP_PI xml` | the declaration, replaced by a canonical one | 0 |
 | `DROP_PI xml-stylesheet` | `HPMxml.css` is not part of the package | 8 424 |
 | `ADD declaration` | `<?xml version="1.0" encoding="UTF-8"?>` | 23 494 |
 | `REFLOW prologue whitespace` | between prologue instructions, to one newline | 812 |
+
+**The counts are of instructions, not of documents, and two of these rows were
+read the other way until 2026-09-10.**
+
+`DROP_PI xml` stood here as 442, which is how many documents declare an encoding
+at all — 23 936 less the 23 494 that get a declaration written for them. The
+counter has always been 0 and is right to be: all 442 declare
+`<?xml version="1.0" encoding="UTF-8"?>` byte for byte, `verify::compare` sees
+that instruction in the output as well as the source, and counts it kept rather
+than dropped and re-added. Nothing changed in those documents, so nothing is
+counted. Measured over the archive on 2026-09-10: 442 declarations, none of them
+differing from the canonical one by a byte.
+
+`DROP_PI xml-stylesheet` is 8 424 instructions in **8 423** documents — one
+document, `CTH 475_XML_HFR/KBo 43.119.xml`, opens with two byte-identical copies
+and both are removed. That is why §2's table of what the corpus contains says
+8 423 and this one says 8 424: different questions, one apart.
+
+The row's key is the permit list's spelling and never the document's. Targets
+are matched without regard to case, so a document opening `<?XML-STYLESHEET …?>`
+is removed under this rule — and until 2026-09-10 it was counted under
+`DROP_PI XML-STYLESHEET`, a key the `permitted` list above never offers. This
+corpus contains no such spelling; the property is held by
+`verify::a_dropped_instruction_is_counted_under_the_permitted_name` rather than
+by that fact.
 
 **Everything after the prologue is byte-identical.** Not "equivalent", not "the
 same once both sides are normalised" — identical. Comparing normalised forms
@@ -278,6 +332,13 @@ Open questions, each of which changes what the converter does:
    with a measurement showing it does not alter text in silence. The
    measurements are in `PROJECT-SPEC.ru.md` §4.13; the requirement they replaced
    is struck in `PDF-ACCEPTANCE.md` §0, requirement 3.
+
+   **Extended 2026-09-10 to the seventeen the strict parser accepts.** The
+   decision above covers the 206 it refuses; the other seventeen would have
+   reached the converter as ordinary documents and been mis-typeset without a
+   word. They are now scanned for, listed in the manifest under
+   `beyond_this_parser` with file, line and column, and the converter is to
+   treat them exactly as the 206: refuse and report.
 2. **Entity expansion.** None appear today. When one does: expand and record,
    or refuse?
 3. **Comments.** Three documents carry them. Editorial or incidental?
