@@ -84,7 +84,7 @@
         <span class="cuneiform-note"
           >Cuneiform note: some of the documents linked here use U+100000 in their cuneiform lines —
           a sign with no Unicode code point that is drawn only by the UllikummiA font, created by
-          Sylvie Vanséveren and available on the Hethitologie Portal Mainz (hethport.net/cuneifont).</span
+          Sylvie Vanséveren and available on the Hethitologie Portal Mainz.</span
         >
         <span class="markup-note"
           >Примечание о разметке: часть связанных здесь документов не проходит строгий разбор XML –
