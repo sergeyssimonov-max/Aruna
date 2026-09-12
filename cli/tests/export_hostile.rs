@@ -645,3 +645,92 @@ fn a_siglum_longer_than_a_filesystem_component_leaves_nothing_behind() {
         Err(other) => panic!("neither built nor an I/O refusal: {other}"),
     }
 }
+
+/// **The archive is read through one handle, so it cannot be exchanged under
+/// the build.**
+///
+/// The two passes used to open the path themselves and the digest opened it a
+/// third time. Between them the file behind that path can be replaced — a
+/// corpus re-downloaded beside a running build, a sync service finishing its
+/// work, an archive rebuilt in place — and every read after the swap is a read
+/// of another archive. Nothing failed: the headers came from one file, the
+/// bodies from another, and the manifest named the digest of the second while
+/// the placement in it was decided by the first. A package whose provenance is
+/// stated wrongly, with no sign of it anywhere.
+///
+/// Played out exactly: the impostor carries the same entry name, so it slots
+/// into the place the first pass reserved, and a different document inside it.
+/// The swap happens on `HeadersRead`, which is the seam — the first pass is
+/// finished and the documents are not written yet.
+///
+/// The last assertion is about the test rather than the export: if the rename
+/// silently failed, everything above would pass for the wrong reason.
+#[test]
+fn an_archive_exchanged_between_the_passes_does_not_reach_the_package() {
+    use aruna::job::{Cancel, Job};
+    use aruna::md5::md5_file;
+    use aruna::progress::{Event, Progress};
+
+    let dir = tempdir().expect("tempdir");
+    let genuine = archive(
+        &dir.path().join("genuine"),
+        &[text("root/CTH 5_XML_HFR/a.xml", "KBo 1.1")],
+    );
+    let impostor = archive(
+        &dir.path().join("impostor"),
+        &[text("root/CTH 5_XML_HFR/a.xml", "KUB 2.2")],
+    );
+    let genuine_digest = md5_file(&genuine).expect("digest the genuine archive");
+    let impostor_digest = md5_file(&impostor).expect("digest the impostor");
+    assert_ne!(
+        genuine_digest, impostor_digest,
+        "two archives of different documents must not hash alike"
+    );
+
+    /// Renames the impostor onto the path the build was given, once.
+    struct Swap {
+        at: PathBuf,
+        impostor: PathBuf,
+    }
+
+    impl Progress for Swap {
+        fn report(&self, event: Event<'_>) {
+            if matches!(event, Event::HeadersRead { .. }) {
+                fs::rename(&self.impostor, &self.at).expect("the archive is exchanged");
+            }
+        }
+    }
+
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+    let swap = Swap {
+        at: genuine.clone(),
+        impostor: impostor.clone(),
+    };
+    let cancel = Cancel::new();
+    export::build(&genuine, &destination, "hostile", &Job::new(&swap, &cancel)).expect("builds");
+
+    let root = destination.join(PACKAGE);
+    let documents: Vec<PathBuf> = files(&root)
+        .into_iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "xml"))
+        .collect();
+    assert_eq!(documents.len(), 1, "one document went in, one comes out");
+    let body = fs::read_to_string(root.join(&documents[0])).expect("read the document");
+    assert!(
+        body.contains("KBo 1.1") && !body.contains("KUB 2.2"),
+        "the package holds the exchanged document: {body}"
+    );
+
+    let manifest = fs::read_to_string(root.join("manifest.json")).expect("read the manifest");
+    assert!(
+        manifest.contains(&genuine_digest),
+        "the manifest names an archive this package was not built from: {manifest}"
+    );
+
+    assert_eq!(
+        md5_file(&genuine).expect("digest what the path names now"),
+        impostor_digest,
+        "the rename did not happen, so nothing above was tested"
+    );
+}

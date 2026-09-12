@@ -302,7 +302,32 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     validate::check_destination(&final_root)?;
 
     job.report(Event::ReadingHeaders);
-    let mut fragments = collect_fragments_with(zip, job)?;
+    // **One open file for the whole build, and every answer taken from it.**
+    // The two passes used to open the path themselves and the digest opened it
+    // a third time, so three reads of "the archive" were three reads of
+    // whatever that path named at the moment each of them looked. Replace the
+    // file between them — a corpus re-downloaded beside a running build, a
+    // sync service finishing its work — and the manifest names an archive the
+    // package was not built from, which is the one thing the digest is in the
+    // manifest to rule out. Nothing here notices, and nothing fails: the
+    // reader gets a package that states its own provenance wrongly.
+    //
+    // A handle is the only thing that survives that. The path is named once,
+    // and the bytes hashed below are the bytes the entries are read from
+    // afterwards because there is no second file to be read from.
+    let mut file = crate::archive::open_zip_file(zip)?;
+    // The archive this package was built from, named in the manifest so a
+    // reader can tell which edition of the corpus they are looking at.
+    //
+    // Hashed before the central directory is parsed, which moves one refusal
+    // later than it used to stand: an archive whose trailer lies about its
+    // entry count is now read through once before the directory it declares is
+    // counted and refused. That is a read of a local file and no allocation —
+    // the ceiling exists to stop a million records being built in memory, and
+    // that half still happens before the parse.
+    let archive_digest = crate::md5::md5_stream(&mut file).map_err(ArunaError::io(zip))?;
+    let mut archive = crate::archive::zip_from_handle(file, zip)?;
+    let mut fragments = collect_fragments_from(&mut archive, job)?;
     job.report(Event::HeadersRead {
         manuscripts: fragments.len(),
         groups: distinct_groups(&fragments),
@@ -320,11 +345,15 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     job.report(Event::WritingDocuments {
         documents: placed.len(),
     });
-    // The archive this package was built from, named in the manifest so a
-    // reader can tell which edition of the corpus they are looking at.
-    let archive_digest = digest_of(zip)?;
     let mut tallies = Tallies::default();
-    write_documents(zip, &fragments, &placed, staging.path(), &mut tallies, job)?;
+    write_documents(
+        &mut archive,
+        &fragments,
+        &placed,
+        staging.path(),
+        &mut tallies,
+        job,
+    )?;
     // Read off the tally the manifest publishes rather than counted a second
     // time beside it. Two counters over the same documents are two answers to
     // one question, and these two gave different ones: this number came from a
@@ -648,7 +677,19 @@ pub fn collect_fragments(zip: &Path) -> Result<Vec<Fragment>> {
 /// `collect_fragments` is public and a caller that has no job should not have
 /// to invent one.
 pub fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>> {
-    let mut archive = open(zip)?;
+    collect_fragments_from(&mut open(zip)?, job)
+}
+
+/// The same scan over an archive already open.
+///
+/// This is the form [`build`] uses, and the reason the other two exist as
+/// wrappers: the build holds one handle for both passes and the digest, and a
+/// pass that takes a path would open a second file behind its back. A caller
+/// that has only a path gets the wrappers above.
+fn collect_fragments_from(
+    archive: &mut ZipArchive<BufReader<File>>,
+    job: &Job<'_>,
+) -> Result<Vec<Fragment>> {
     let mut fragments = Vec::new();
     let mut window = Vec::with_capacity(HEADER_READ_LIMIT);
     let mut path = String::new();
@@ -706,7 +747,7 @@ struct Tallies {
 /// the stylesheet count used to come back as a return value counted a second
 /// way, and the two ways disagreed.
 fn write_documents(
-    zip: &Path,
+    archive: &mut ZipArchive<BufReader<File>>,
     fragments: &[Fragment],
     placed: &[Placed],
     staging: &Path,
@@ -734,7 +775,6 @@ fn write_documents(
         }
     }
 
-    let mut archive = open(zip)?;
     let mut written = 0usize;
     // The package's own size, accumulated as it is written rather than measured
     // afterwards: the point of the ceiling is to stop before the disk is full,
@@ -883,17 +923,14 @@ fn write_documents(
     Ok(())
 }
 
-/// The archive's own digest, for the manifest to record.
-fn digest_of(path: &Path) -> Result<String> {
-    crate::md5::md5_file(path).map_err(ArunaError::io(path))
-}
-
 /// The same gate the inventory pass opens through.
 ///
 /// Both passes read the same archive, and an entry count this program refuses
 /// in one of them is not one it should accept in the other — the export used to
 /// open the file itself, so `MAX_ENTRIES` applied to the first pass and not to
-/// the second.
+/// the second. Since the build opens the archive once and hands the same handle
+/// to both passes, this serves the callers that scan headers without building
+/// anything: the window's inventory, the examples, the tests.
 fn open(zip: &Path) -> Result<ZipArchive<BufReader<File>>> {
     crate::archive::open_zip(zip)
 }
@@ -994,12 +1031,20 @@ mod tests {
     /// the survivor, and the second write failed as `AlreadyExists` on a path —
     /// an I/O error that named the destination and not the archive.
     ///
-    /// The archive path here does not exist, and that is the second half of
-    /// what this checks: the failure must come before anything is opened, so
-    /// the duplicate is reported as a fact about the input rather than as
-    /// whatever the reader happens to hit first.
+    /// The archive here holds nothing and the staging directory does not
+    /// exist, and that is the second half of what this checks: the failure must
+    /// come before an entry is read or a file is written, so the duplicate is
+    /// reported as a fact about the input rather than as whatever the reader
+    /// happens to hit first.
     #[test]
     fn an_archive_that_names_one_entry_twice_is_refused_by_name() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("empty.zip");
+        zip::write::ZipWriter::new(fs::File::create(&path).expect("create"))
+            .finish()
+            .expect("an archive of no entries");
+        let mut archive = open(&path).expect("the empty archive opens");
+
         let fragments = vec![
             fragment("KBo 1.1", "CTH 5", "xml/KBo 1.1.xml"),
             fragment("KBo 2.2", "CTH 5", "xml/KBo 1.1.xml"),
@@ -1008,7 +1053,7 @@ mod tests {
         let mut tallies = Tallies::default();
 
         let failure = write_documents(
-            Path::new("/nowhere/there-is-no-archive.zip"),
+            &mut archive,
             &fragments,
             &placed,
             Path::new("/nowhere/staging"),

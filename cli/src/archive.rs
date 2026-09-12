@@ -254,11 +254,32 @@ pub(crate) fn open_zip(zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
 ///
 /// Checked twice, and the two are not the same check. The trailer is asked
 /// first, before the directory exists in memory, and it is what makes the
-/// ceiling worth having. The archive is asked afterwards because a trailer this
+/// ceiling worth having — that half is [`open_zip_file_within`]. The archive is
+/// asked afterwards, in [`zip_from_handle_within`], because a trailer this
 /// program could not read leaves the first check with nothing to say — and
 /// because an archive whose trailer lies about the count would otherwise walk
 /// past a limit it does not meet.
 fn open_zip_within(zip_path: &Path, limit: usize) -> Result<ZipArchive<BufReader<File>>> {
+    let file = open_zip_file_within(zip_path, limit)?;
+    zip_from_handle_within(file, zip_path, limit)
+}
+
+/// Open the file and refuse it on its own trailer, parsing nothing.
+///
+/// **This exists so that a run can read the archive's bytes without naming its
+/// path a second time.** The handle comes back at the start of the file and is
+/// meant to be the only one the run uses: whoever needs the bytes for something
+/// besides the entries — the export hashes them for its manifest — reads them
+/// here and hands this same handle to [`zip_from_handle`]. A path reopened is
+/// not a promise about bytes, and between two opens the file behind it can be
+/// replaced; then the digest names one archive and the package holds another,
+/// with nothing to say so.
+pub(crate) fn open_zip_file(zip_path: &Path) -> Result<File> {
+    open_zip_file_within(zip_path, MAX_ENTRIES)
+}
+
+/// The trailer half of [`open_zip_within`], with the limit as an argument.
+fn open_zip_file_within(zip_path: &Path, limit: usize) -> Result<File> {
     let mut file = File::open(zip_path).map_err(ArunaError::io(zip_path))?;
 
     if let Some(declared) = declared_entries(&mut file) {
@@ -269,6 +290,25 @@ fn open_zip_within(zip_path: &Path, limit: usize) -> Result<ZipArchive<BufReader
             });
         }
     }
+    file.rewind().map_err(ArunaError::io(zip_path))?;
+    Ok(file)
+}
+
+/// The archive from a handle that is already open, on the bytes that handle
+/// holds.
+///
+/// Rewinds first, so a caller that has read the whole file for its own reasons
+/// hands it over without having to know where the parse begins.
+pub(crate) fn zip_from_handle(file: File, zip_path: &Path) -> Result<ZipArchive<BufReader<File>>> {
+    zip_from_handle_within(file, zip_path, MAX_ENTRIES)
+}
+
+/// The directory half of [`open_zip_within`], with the limit as an argument.
+fn zip_from_handle_within(
+    mut file: File,
+    zip_path: &Path,
+    limit: usize,
+) -> Result<ZipArchive<BufReader<File>>> {
     file.rewind().map_err(ArunaError::io(zip_path))?;
 
     let archive = ZipArchive::new(BufReader::with_capacity(256 * 1024, file))?;

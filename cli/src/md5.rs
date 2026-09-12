@@ -182,14 +182,23 @@ fn nibble(v: u8) -> char {
 /// cache checking what it holds, the export naming the archive in its manifest,
 /// and the example that proves nothing was distorted. Three loops is three
 /// chances to pick a different buffer size and wonder why the numbers differ.
+///
+/// The export no longer opens a path to be digested — it hashes the handle it
+/// already reads the entries from, through [`md5_stream`] — so what is left
+/// here are the callers that have a path and nothing else.
 pub fn md5_file(path: &std::path::Path) -> std::io::Result<String> {
-    use std::io::Read as _;
+    md5_stream(std::fs::File::open(path)?)
+}
 
-    let mut file = std::fs::File::open(path)?;
+/// The same digest over a reader, for a caller that has one open already.
+///
+/// Reads to the end from wherever the reader stands: a file handle is rewound
+/// by its owner, who is the one who knows what else it is for.
+pub fn md5_stream<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
     let mut digest = Md5::new();
     let mut buf = [0u8; 64 * 1024];
     loop {
-        let read = file.read(&mut buf)?;
+        let read = reader.read(&mut buf)?;
         if read == 0 {
             break;
         }
