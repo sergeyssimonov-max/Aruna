@@ -130,17 +130,20 @@ Series, by leading letters of the file name: KBo 14 033, KUB 4 072, EBo 1 373,
 CHDS 1 060, IBoT 571, DAAM 441, DBH 404, ABoT 391, Bo 289, FHL 169, UBT 160,
 VSNF 126, and a tail of smaller ones.
 
-### Documents that are not well-formed XML
+### Documents a parser has something to say about
 
-Three numbers, and they are different questions. Re-measured 2026-09-10 with
-`xmllint --noout` over the exported package; the manifest's `xml.totals` now
-carries all three, each with a sentence saying what it counts.
+Three numbers, and they are three different questions: what this program could
+not read, what breaks XML, and what breaks Namespaces in XML. Only the first has
+a consequence for a reader — those documents are the ones a conversion cannot
+take. Re-measured 2026-09-10 with `xmllint --noout` over the exported package;
+the manifest's `xml.totals` now carries all three, each with a sentence saying
+what it counts.
 
 | | documents | what it is |
 |---|---|---|
-| refused by this crate's parser | **206** | `quick-xml`, strict, no recovery. Named with reason, line and column in `manifest.json` under `not_well_formed_documents`. |
+| unread here | **206** | refused by this crate's parser — `quick-xml`, no recovery. Named with reason, line and column in `manifest.json` under `not_well_formed_documents`. Says nothing by itself about XML: it is this program's boundary. |
 | not well-formed XML | **210** | the 206 plus 4 more: a raw `<` inside an attribute value, which `quick-xml` takes for an ordinary character. `xmllint --noout` exits non-zero on exactly these 210. |
-| objected to by a conforming parser | **223** | the 210 plus 13 more: an element name of the form `<AO:-…>`, a qualified name with no local part. |
+| not well-formed XML, or invalid under Namespaces in XML | **223** | the 210 plus 13 more: an element name of the form `<AO:-…>`, a qualified name with no local part. **Those 13 are well-formed XML** — the word for them is namespace-invalid, not incorrect XML. |
 
 The 206 are a subset of the 210 and the 210 of the 223 — checked in both
 directions, by name, on 2026-09-10.
@@ -333,7 +336,7 @@ Open questions, each of which changes what the converter does:
    measurements are in `PROJECT-SPEC.ru.md` §4.13; the requirement they replaced
    is struck in `PDF-ACCEPTANCE.md` §0, requirement 3.
 
-   **Extended 2026-09-10 to the seventeen the strict parser accepts.** The
+   **Extended 2026-09-10 to the seventeen this parser accepts.** The
    decision above covers the 206 it refuses; the other seventeen would have
    reached the converter as ordinary documents and been mis-typeset without a
    word. They are now scanned for, listed in the manifest under
