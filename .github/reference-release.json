@@ -11,14 +11,14 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.5 is the",
-    "current release, published on 2026-09-10. A release cannot record itself — the commit",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.6 is the",
+    "current release, published on 2026-09-12. A release cannot record itself — the commit",
     "it names is the commit that carries it, and no file can contain its own hash — so each",
     "entry here is added by the commit after the release it describes.",
     "",
-    "v2.5.5 replaced v2.5.4, withdrawn on 2026-09-10 — release, tag and DMG. The same",
-    "happened to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to v2.5.1 on 2026-09-04, to",
-    "v2.5.0 on 2026-09-01 and",
+    "v2.5.6 replaced v2.5.5, withdrawn on 2026-09-12 — release, tag and DMG. The same",
+    "happened to v2.5.4 on 2026-09-10, to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to",
+    "v2.5.1 on 2026-09-04, to v2.5.0 on 2026-09-01 and",
     "to v2.1.0 through v2.4.0",
     "on 2026-08-30, so the 2.x line is still represented by its head alone. A reference",
     "cannot be re-cut, so the work that follows one takes a number of its own, and keeping",
@@ -47,11 +47,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.5.5",
-      "commit": "075a4c8f665bd5f2f031eaa2d49a9203cd9bb93f",
-      "published": "2026-09-10T01:21:34Z",
-      "dmg_sha256": "9dd8ded588637d13cf013b3abc4ded6ba9ab3955da6ef41a49771cdbed8efe1a",
-      "why": "The current release and the third reference. It replaced v2.5.4, withdrawn the same day: a reference cannot be re-cut, so the work that followed it took a number of its own and the list stays at three by retiring the release it replaces. What it carries over v2.5.4 is a font and a sentence. `UllikummiA` — the only face that draws U+100000, a sign with no Unicode code point occurring 927 times in 370 documents, and one no operating system installs — now ships in the repository, unmodified, with the Hethitologie-Portal Mainz terms verbatim beside it and a test holding it to its digest; the exported inventory names the sign, says where the font is, and carries the credit those terms require. The documents themselves are untouched: the byte mirror of the corpus hashes to 7cfcdce4…35d0 exactly as it did for v2.5.4."
+      "tag": "v2.5.6",
+      "commit": "afa8e891486e512b77ab7b5fc1cd2d85d33f4dd3",
+      "published": "2026-09-12T12:08:19Z",
+      "dmg_sha256": "b5f1fea2eb935d34a3b96750c4bcb149d7e685decb1e29a94135a900de16a14a",
+      "why": "The current release and the third reference. It replaced v2.5.5, withdrawn the same day, and the reason the number moved at all is worth recording: the release gate of 2026-09-12 refused to hand out an image built under 2.5.5, because a v2.5.5 with a different digest already stood on the Releases page and the README tells a reader to check that digest. A reference cannot be re-cut, so a bump was the only way out that leaves the instruction true. What it carries over v2.5.5 is what the program knows about the corpus and how safely it publishes. The parser's blind spot was measured: known_limit named four documents where seventeen answered, thirteen of them <AO:-…> names libxml calls a namespace error and exits zero on. Three numbers replace one — 206 refused here, 210 not well-formed XML, 223 objected to by a conforming parser, nesting 206 within 210 within 223 — each with a corpus test holding the names. Two ways to lose a reader's package are closed, each with a test that failed first: the lock file was read without a bound, and a validation failure after publication removed the existing copy before the published tree had been read back. The whole font stack now ships in the repository, Arial written out and no system face left in it, covering 639 of the corpus's 645 code points. The documents themselves are untouched: the byte mirror hashes to 7cfcdce4…35d0 exactly as it did for v2.5.5 and v2.5.4."
     }
   ]
 }

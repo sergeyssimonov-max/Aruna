@@ -15,7 +15,7 @@ ran, which is why the rule exists.
 
 | Committed | Digest |
 |---|---|
-| `Aruna-macos-universal.dmg` | `9dd8ded588637d13cf013b3abc4ded6ba9ab3955da6ef41a49771cdbed8efe1a` |
+| `Aruna-macos-universal.dmg` | `b5f1fea2eb935d34a3b96750c4bcb149d7e685decb1e29a94135a900de16a14a` |
 | `SHA256SUMS` | the line above, as the contour wrote it |
 
 Download them from [Releases](https://github.com/sergeyssimonov-max/Aruna/releases):
