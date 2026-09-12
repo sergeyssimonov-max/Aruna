@@ -87,12 +87,10 @@
           Sylvie Vanséveren and available on the Hethitologie Portal Mainz.</span
         >
         <span class="markup-note"
-          >Примечание о разметке: часть связанных здесь документов не проходит строгий разбор XML –
-          в них не сходятся теги, пропущен знак «=» в атрибуте, встречается голый знак «&lt;» внутри
-          значения атрибута или имя вида &lt;AO:-…&gt; без части после двоеточия. Это свойство
-          исходных документов, а не сборки пакета: все они лежат здесь без изменений и открываются
-          по ссылкам так же, как остальные. Поименный список с причинами и номерами строк – в файле
-          manifest.json, раздел xml.</span
+          >Please note: some of the documents linked here do not follow the rules of XML validation.
+          This is a feature of the source documents, not how the package was built. They are all
+          provided as they were originally and can be opened via the links in the same way as the
+          others. You can find a list of their names in the manifest.json file.</span
         >
       </p>
       <section class="legend" aria-label="Column legend">
