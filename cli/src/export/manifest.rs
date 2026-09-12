@@ -329,9 +329,9 @@ impl FontContract {
 /// would be a worse mirror for no gain.
 #[derive(Default, Clone)]
 pub struct XmlReport {
-    /// Documents examined — every document written, well-formed or not.
+    /// Documents examined — every document written, read or not.
     pub documents: usize,
-    /// The ones a strict parser refuses, in the order they were written.
+    /// The ones this program's parser refuses, in the order they were written.
     pub findings: Vec<(String, Finding)>,
     /// The ones it accepts that a conforming parser objects to.
     ///
@@ -545,7 +545,8 @@ pub fn render_manifest(
     }
     out.push_str("    }\n  },\n");
 
-    // Which documents are not well-formed XML, and why. Placed above the
+    // Which documents this program could not read, which ones break a standard,
+    // and why. Placed above the
     // groups because it is a summary and the groups are eight megabytes of
     // list; a reader opening this file sees the counts without scrolling.
     //
@@ -556,10 +557,15 @@ pub fn render_manifest(
         out,
         "    \"note\": {},",
         string(
-            "Whether each document is well-formed XML, checked with a strict parser: nothing is \
-             repaired and nothing is excluded. Every document listed here is present in the \
-             package; the property described is the source data's, and it is what stops a \
-             document from being converted, not from being copied."
+            "What a parser has to say about each document, in three separate questions. \
+             Which ones this program could not read: that is what well_formed and \
+             not_well_formed below count, and those two names are older than the distinction \
+             — the count is refusals of this program's parser, not a verdict on XML. Which \
+             ones break XML itself, and which ones break Namespaces in XML while being \
+             well-formed XML: both are in totals below, each with a sentence saying what it \
+             counts. Nothing is repaired and nothing is excluded. Every document listed here \
+             is present in the package; the property described is the source data's, and it \
+             is what stops a document from being converted, not from being copied."
         )
     );
     let _ = writeln!(out, "    \"documents\": {},", xml.documents);
