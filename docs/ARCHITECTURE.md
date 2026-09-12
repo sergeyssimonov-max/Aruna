@@ -8,7 +8,7 @@ and §7 is where it is described.
 
 The environment, the frontend stack, the pinned versions and the checks that
 guard them are **not** described here. They are fixed by
-[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 47, 2026-09-12), which is normative; this
+[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 48, 2026-09-13), which is normative; this
 document is about the Rust that runs underneath it.
 
 ---
