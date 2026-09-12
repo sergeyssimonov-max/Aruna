@@ -129,12 +129,28 @@ pub struct Fonts {
 /// оно мешает превращению документа в PDF, а не его хранению.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct XmlSummary {
-    /// Документов в пакете – все, и корректные, и нет.
+    /// Документов в пакете – все, и прочитанные, и нет.
     documents: u32,
-    /// Из них корректный XML.
-    well_formed: u32,
-    /// Из них не корректный XML.
-    not_well_formed: u32,
+    /// Из них программа прочитала.
+    ///
+    /// Не «корректный XML»: среди прочитанных есть и те, что XML нарушают
+    /// (голый `<` в значении атрибута), и те, что нарушают пространства имен.
+    read: u32,
+    /// Из них программа не прочитала: разметка нарушена внутри текста.
+    ///
+    /// **Единственное число с последствием для читателя** – эти документы не
+    /// попадут в PDF. О правилах XML оно само по себе не говорит: четыре
+    /// прочитанных документа нарушают XML все равно, а тринадцать других не
+    /// нарушают его вовсе – см. `not_well_formed_xml` и `objected_to` ниже.
+    ///
+    /// **Имя на проводе и ключ в манифесте разошлись нарочно.** В манифесте то
+    /// же число лежит под ключом `not_well_formed`, и это имя неверно тем же
+    /// способом, каким была неверна подпись в окне: 206 – отказы нашего
+    /// разборщика, а не нарушение стандарта. Ключ манифеста – часть формата
+    /// пакета: его правка двигает сумму пакета и ломает читателей, которые по
+    /// нему ходят, поэтому она отдельное решение владельца. Провод наш, и здесь
+    /// имя исправлено 13.09.2026.
+    unread: u32,
     /// По причинам, включая те, у которых ноль.
     ///
     /// Ноль перечислен нарочно – он отличает «искали и не нашли» от «не
@@ -142,26 +158,34 @@ pub struct XmlSummary {
     /// не выносит: там строка «ноль документов» читается как найденная беда.
     /// Провод несет полный список, показывать из него – решение окна.
     reasons: Vec<XmlReasonCount>,
-    /// Имена некорректных, в порядке манифеста.
+    /// Имена непрочитанных, в порядке манифеста.
     documents_not_well_formed: Vec<XmlDocument>,
-    /// Документов, которые этот разборщик принимает, а строгий – нет.
+    /// Документов, которые программа читает, а стандарты их не допускают.
     ///
     /// Вторая половина того же вопроса, и до 10.09.2026 ее не считал никто.
     /// Числа выше говорят, что отказал разборщик ядра; это – что он пропустил.
     /// В пакете 2026-09-10 их семнадцать: четыре с голым `<` внутри значения
-    /// атрибута и тринадцать с именем вида `<AO:-…>`, у которого нет локальной
-    /// части.
+    /// атрибута – эти нарушают XML – и тринадцать с именем вида `<AO:-…>`, у
+    /// которого нет локальной части: эти корректны как XML и нарушают
+    /// пространства имен.
     beyond_this_parser: u32,
     /// По классам предела, включая класс с нулем.
     limits: Vec<XmlLimitCount>,
     /// Имена этих документов, в порядке манифеста.
     documents_beyond_this_parser: Vec<XmlLimitDocument>,
-    /// Некорректный XML как таковой: отказы ядра плюс голый `<`.
+    /// Нарушают правила XML: непрочитанные плюс четыре с голым `<`.
     ///
     /// То самое число, на котором `xmllint --noout` выходит с ненулевым кодом:
     /// 210 в пакете 2026-09-10.
     not_well_formed_xml: u32,
-    /// Все, к чему придирается строгий разборщик: 223 в том же пакете.
+    /// Нарушают правила XML либо правила пространств имен: 223 в том же пакете.
+    ///
+    /// **Тринадцать из них – корректный XML.** Двоеточие и дефис входят в
+    /// состав имени по XML 1.0, поэтому `AO:-LineNrExpl` – законное `Name`;
+    /// нарушены у них «Пространства имен в XML», отдельный стандарт, и libxml
+    /// зовет это `namespace error` и выходит с нулевым кодом. Слово
+    /// «некорректный XML» к этому числу неприменимо – оно применимо к
+    /// [`XmlSummary::not_well_formed_xml`].
     objected_to: u32,
 }
 
@@ -173,7 +197,10 @@ pub struct XmlReasonCount {
     documents: u32,
 }
 
-/// Один некорректный документ и место первой ошибки.
+/// Один непрочитанный документ и место первой ошибки.
+///
+/// «Непрочитанный», а не «некорректный»: отказ принадлежит нашему разборщику, и
+/// о правилах XML сам по себе не говорит – см. [`XmlSummary::unread`].
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct XmlDocument {
     /// Путь внутри пакета.
@@ -191,7 +218,7 @@ pub struct XmlLimitCount {
     documents: u32,
 }
 
-/// Один документ, который разборщик ядра принял, а строгий – нет.
+/// Один документ, который программа прочитала, а стандарт его не допускает.
 ///
 /// Отдельный тип, а не [`XmlDocument`] с переименованным полем: там `reason` –
 /// причина отказа, здесь `limit` – класс того, чего разборщик не увидел. Одно
@@ -463,8 +490,8 @@ fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryE
 
     Ok(XmlSummary {
         documents: counted(section.documents),
-        well_formed: counted(section.well_formed),
-        not_well_formed: counted(section.not_well_formed),
+        read: counted(section.well_formed),
+        unread: counted(section.not_well_formed),
         reasons: section
             .by_reason
             .into_iter()
@@ -1505,8 +1532,8 @@ mod markup {
         let summary = read_xml_summary(dir.path()).expect("манифест несет секцию");
 
         assert_eq!(summary.documents, 4);
-        assert_eq!(summary.well_formed, 2);
-        assert_eq!(summary.not_well_formed, 2);
+        assert_eq!(summary.read, 2);
+        assert_eq!(summary.unread, 2);
         assert_eq!(
             summary.documents_not_well_formed.len(),
             2,
@@ -1572,7 +1599,7 @@ mod markup {
 
         let summary = read_xml_summary(dir.path()).expect("первая половина на месте");
 
-        assert_eq!(summary.not_well_formed, 2, "она читается как раньше");
+        assert_eq!(summary.unread, 2, "она читается как раньше");
         assert_eq!(summary.beyond_this_parser, 0);
         assert!(summary.limits.is_empty());
         assert!(summary.documents_beyond_this_parser.is_empty());
@@ -1596,11 +1623,8 @@ mod markup {
         let summary = read_xml_summary(dir.path()).unwrap();
 
         let summed: u32 = summary.reasons.iter().map(|r| r.documents).sum();
-        assert_eq!(summed, summary.not_well_formed);
-        assert_eq!(
-            summary.well_formed + summary.not_well_formed,
-            summary.documents
-        );
+        assert_eq!(summed, summary.unread);
+        assert_eq!(summary.read + summary.unread, summary.documents);
     }
 
     /// **Пакет, собранный до 06.09.2026, получает отказ, а не нули.**
