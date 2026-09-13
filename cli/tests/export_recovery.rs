@@ -18,6 +18,12 @@
 //! directly and the run is asked to cope with them. That also makes each case
 //! nameable — "a staging directory from an earlier run" is a state, where "a
 //! process killed at some point" is a lottery.
+//!
+//! One kill is real, in `cli_process.rs`: a staging directory is left by a
+//! `SIGKILL`, because whether its owner is alive is asked of the kernel and a
+//! planted directory cannot be made to have had an owner that died. Here a
+//! planted staging directory is either older than anything live, or carries a
+//! marker nobody holds — the two states a dead run's leaves.
 
 mod support;
 
@@ -27,25 +33,20 @@ use std::process::{Command, Stdio};
 use support::{manuscript, mixed_archive};
 use tempfile::{tempdir, TempDir};
 
-/// Everything directly inside `dir`, by name.
-/// What the destination holds besides the package and abandoned staging.
+/// What the destination holds besides the package.
 ///
-/// **Staging is excepted since 2.2.0, and that is a trade rather than a
-/// loosening.** A build used to stage under one name, `.{PACKAGE}.build`, so
-/// the next build found a killed run's directory and cleared it. That name is
-/// now unique to the run, because the binary exports on every run and two of
-/// them — a second double-click — meet in one Downloads folder: measured with
-/// the shared name, each cleared the other's directory and **both runs failed
-/// with no package at all**. The cost is here: a run killed by a signal leaves
-/// its staging behind, and the next run builds beside it rather than over it.
-/// What has not changed is that nothing from it is ever published, which the
-/// assertions below still hold.
+/// **Staging is no longer excepted.** From 2.2.0 it had to be: a build stages
+/// under a name unique to its run, so two runs in one Downloads folder do not
+/// destroy each other, and the next run could not tell a killed run's
+/// directory from a live one's — it built beside it. Since 13.09.2026 each
+/// staging directory carries a locked owner marker and the next run removes
+/// the ones nobody holds, so whatever a killed run left is expected gone.
 fn beside(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .expect("read")
         .flatten()
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n != PACKAGE && !n.starts_with(&format!(".{PACKAGE}.build")))
+        .filter(|n| n != PACKAGE)
         .collect();
     names.sort();
     names
@@ -67,6 +68,20 @@ fn files(root: &Path) -> Vec<PathBuf> {
     }
     out.sort();
     out
+}
+
+/// A staging directory as a run killed long ago left it.
+///
+/// Planted without a marker, as 2.5.7 and earlier leave it, and aged past
+/// anything a live run could be: a fresh markerless directory may be one, and
+/// the build is right to leave it.
+fn abandoned(path: &Path) -> &Path {
+    let past = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 3600);
+    std::fs::File::open(path)
+        .expect("open")
+        .set_modified(past)
+        .expect("age");
+    path
 }
 
 /// A destination holding a finished package, and the archive it was built from.
@@ -104,6 +119,7 @@ fn a_staging_directory_from_a_killed_run_does_not_stop_the_next_one() {
     )
     .expect("half a document");
     std::fs::write(staging.join("stray.txt"), "left over").expect("stray");
+    abandoned(&staging);
 
     let built = export::build(&zip, &destination, "second", &aruna::job::Job::unattended())
         .expect("a leftover staging directory must not stop a build");
@@ -117,6 +133,34 @@ fn a_staging_directory_from_a_killed_run_does_not_stop_the_next_one() {
     assert!(
         !files(&destination.join(PACKAGE)).contains(&PathBuf::from("stray.txt")),
         "a file from the killed run's staging directory was published"
+    );
+}
+
+/// A staging directory under this version's name, whose owner marker nobody
+/// holds, is removed however fresh it is.
+///
+/// The gate's measurement of 13.09.2026, in the state it left: a kill at the
+/// start of publishing left a whole second package, 382.8 MiB, beside the
+/// published one, and every later build left it there.
+#[test]
+fn a_staging_directory_whose_owner_is_gone_is_removed_by_the_next_build() {
+    let (_dir, zip, destination) = published();
+
+    let staging = destination.join(format!(".{PACKAGE}.build.999999.0"));
+    std::fs::create_dir_all(staging.join("CTH 5")).expect("staging");
+    std::fs::write(staging.join("CTH 5").join("KBo 1.1.xml"), "a whole copy").expect("copy");
+    std::fs::write(
+        destination.join(format!(".{PACKAGE}.build.999999.0.owner")),
+        "",
+    )
+    .expect("marker");
+
+    export::build(&zip, &destination, "second", &aruna::job::Job::unattended()).expect("the build");
+
+    assert!(
+        beside(&destination).is_empty(),
+        "the dead run's staging survived the build: {:?}",
+        beside(&destination)
     );
 }
 
@@ -172,6 +216,7 @@ fn a_destination_holding_every_kind_of_leftover_still_builds() {
     let staging = destination.join(format!(".{PACKAGE}.build"));
     std::fs::create_dir_all(&staging).expect("staging");
     std::fs::write(staging.join("half.xml"), "half a document").expect("half");
+    abandoned(&staging);
 
     let aside = destination.join(format!(".{PACKAGE}.previous"));
     std::fs::create_dir_all(&aside).expect("aside");
@@ -216,6 +261,7 @@ fn a_build_that_recovered_produces_the_package_a_clean_one_would() {
     let staging = messy.join(format!(".{PACKAGE}.build"));
     std::fs::create_dir_all(staging.join("CTH 9")).expect("staging");
     std::fs::write(staging.join("CTH 9").join("KUB 2.1.xml"), "not this").expect("half");
+    abandoned(&staging);
     std::fs::create_dir_all(messy.join(format!(".{PACKAGE}.previous"))).expect("aside");
     export::build(&zip, &messy, "reference", &aruna::job::Job::unattended())
         .expect("the build that had to recover");
@@ -292,10 +338,7 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
         // The package is what the run is now *for*; the scratch file is the
         // orphan this test planted.
         .filter(|n| {
-            n != "TLHdig_Beta_0.3.html"
-                && n != "TLHdig_Beta_0.3.html.999999.0.part"
-                && n != PACKAGE
-                && !n.starts_with(&format!(".{PACKAGE}.build"))
+            n != "TLHdig_Beta_0.3.html" && n != "TLHdig_Beta_0.3.html.999999.0.part" && n != PACKAGE
         })
         .collect();
     assert!(
@@ -369,7 +412,9 @@ fn a_failed_build_leaves_an_orphaned_package_where_it_found_it() {
 fn recovering_once_is_enough_and_running_again_changes_nothing() {
     let (_dir, zip, destination) = published();
 
-    std::fs::create_dir_all(destination.join(format!(".{PACKAGE}.build"))).expect("staging");
+    let staging = destination.join(format!(".{PACKAGE}.build"));
+    std::fs::create_dir_all(&staging).expect("staging");
+    abandoned(&staging);
     export::build(&zip, &destination, "second", &aruna::job::Job::unattended()).expect("recovers");
     let after_recovery = files(&destination.join(PACKAGE));
 

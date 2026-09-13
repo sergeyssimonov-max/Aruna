@@ -613,6 +613,104 @@ fn an_interrupted_run_leaves_no_half_written_inventory() {
     }
 }
 
+/// **A run killed with `SIGKILL` leaves its staging, and the next run takes it
+/// away.**
+///
+/// No destructor runs on `SIGKILL`, so what a kill leaves is real and is left:
+/// the release gate of 13.09.2026 measured 130.5 MiB after a kill while
+/// writing and a whole second package, 382.8 MiB, after a kill at the start
+/// of publishing — both surviving every later successful build. The next run
+/// can tell that directory's owner is gone only because the kernel dropped
+/// the lock on its marker when the process died, so this is the one place
+/// the kill has to be real rather than planted.
+///
+/// `Child::kill` is `SIGKILL` and needs no `unsafe`.
+#[test]
+fn a_run_killed_mid_build_leaves_nothing_after_the_next_one() {
+    let sandbox = Sandbox::new();
+    let entries: Vec<(String, String)> = (0..8000)
+        .map(|i| {
+            (
+                format!("root/CTH {}_XML_HFR/KBo {i}.xml", i % 200),
+                manuscript(&format!("KBo {i}")),
+            )
+        })
+        .collect();
+    let borrowed: Vec<(&str, &str)> = entries
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect();
+    let archive = sandbox.archive(&borrowed);
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_aruna"))
+        .env("HOME", sandbox.path())
+        .env("ARUNA_ZIP", &archive)
+        .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
+        .env_remove("XDG_CACHE_HOME")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn");
+
+    // Killed once its staging holds part of the package, not blind.
+    let staging_prefix = format!(".{PACKAGE}.build.");
+    let started = std::time::Instant::now();
+    let staging = loop {
+        let found = fs::read_dir(sandbox.downloads())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .find(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with(&staging_prefix) && !n.ends_with(".owner"))
+                    && fs::read_dir(p).map(|d| d.count() >= 10).unwrap_or(false)
+            });
+        if let Some(path) = found {
+            break path;
+        }
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(120),
+            "the run never started writing its staging directory"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    };
+    child.kill().expect("SIGKILL");
+    child.wait().expect("wait");
+
+    assert!(
+        staging.is_dir(),
+        "the run finished before it was killed; nothing was left to recover from"
+    );
+    assert!(
+        !sandbox.package_root().exists(),
+        "a killed run published a package"
+    );
+
+    let out = sandbox.run(&archive);
+    assert_no_panic(&out);
+    assert!(
+        out.status.success(),
+        "the next run failed:\n{}",
+        stderr(&out)
+    );
+    assert!(
+        sandbox.package_root().is_dir(),
+        "the next run published nothing"
+    );
+    assert!(
+        !staging.exists(),
+        "the killed run's staging survived the next build"
+    );
+    assert_eq!(
+        leftovers(&sandbox.downloads()),
+        Vec::<String>::new(),
+        "the next run left the killed run's leftovers in Downloads"
+    );
+}
+
 #[cfg(unix)]
 unsafe fn libc_kill(pid: i32, sig: i32) {
     extern "C" {

@@ -340,6 +340,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         .filter(|(p, f)| p.relative != output_path(group_label(&f.record), &f.record.sigla))
         .count();
 
+    sweep_abandoned_staging(destination);
     let staging = Staging::fresh(staging)?;
 
     job.report(Event::WritingDocuments {
@@ -583,14 +584,22 @@ impl Drop for Replaced {
 /// directory behind — up to 372 MB of a package nobody asked for, cleared only
 /// if the next build happened to use the same destination. Every `?` between
 /// creation and the rename is now covered by going out of scope.
+///
+/// What going out of scope cannot cover is a kill, and for that the directory
+/// carries an [`Owner`]: claimed before the directory exists, held until it is
+/// published or removed, and what [`sweep_abandoned_staging`] asks before it
+/// deletes anything. Fields drop in order, so the marker outlives the
+/// directory it vouches for by the length of `Drop`.
 struct Staging {
     path: PathBuf,
     published: bool,
+    _owner: Option<Owner>,
 }
 
 impl Staging {
     /// An empty staging directory, clearing whatever an earlier run left.
     fn fresh(path: PathBuf) -> Result<Self> {
+        let owner = Owner::claim(owner_marker(&path));
         if path.exists() {
             remove_dir(&path)?;
         }
@@ -598,6 +607,7 @@ impl Staging {
         Ok(Self {
             path,
             published: false,
+            _owner: owner,
         })
     }
 
@@ -639,15 +649,228 @@ impl Drop for Staging {
 /// literally the same — both take it from [`crate::paths::run_tag`], which is
 /// where that shape is decided.
 ///
-/// **What this gives up.** A run killed with a signal leaves its staging
-/// directory behind, and the next run no longer clears it by finding it under
-/// the name it would have used itself — it simply builds beside it. That
-/// leftover is a real cost, up to the size of a package, and it is the price
-/// of two runs not destroying each other. Everything else about recovery is
-/// unchanged: a build that *fails* still clears its own staging through
-/// `Drop`, and an orphaned published copy is still swept by [`Replaced`].
+/// **What that took away, and how it came back.** A run killed with a signal
+/// leaves its staging directory behind, and a unique name means the next run
+/// no longer finds it under the name it would have used itself. From 2.2.0
+/// until 13.09.2026 the next run simply built beside it, and the release gate
+/// measured the cost: 130.5 MiB left by a kill while writing, a whole second
+/// package, 382.8 MiB, by a kill at the start of publishing — each surviving
+/// every later successful build. [`sweep_abandoned_staging`] now removes them,
+/// and tells a dead run's directory from a live one's by the lock on its
+/// [`Owner`] marker rather than by its name.
 fn staging_name() -> String {
     format!(".{PACKAGE}.build.{}", crate::paths::run_tag())
+}
+
+/// The marker that says a staging directory's run is still alive: its name
+/// with `.owner` after it, beside it rather than inside it.
+///
+/// Beside, because inside is what gets renamed into the package.
+fn owner_marker(staging: &Path) -> PathBuf {
+    let mut name = staging.as_os_str().to_owned();
+    name.push(".owner");
+    PathBuf::from(name)
+}
+
+/// A staging directory's claim to be alive: an exclusive lock on its marker.
+///
+/// **Asking the operating system rather than the clock.** The publish lock in
+/// [`lock`] judges a holder dead by the age of a file, because asking whether
+/// a process id is alive is `kill(pid, 0)` and this crate forbids `unsafe`.
+/// Staging cannot use age: a live run's directory goes minutes without its
+/// modification time moving — longest while it waits up to ten minutes for
+/// someone else's publication — and a guess wrong in that direction deletes
+/// a package being built. A lock held by an open file answers the actual
+/// question, safely: the kernel releases it when the process ends, however
+/// it ends, `SIGKILL` included, and not a moment before. Measured on this
+/// machine before it was relied on — held by a live process: `WouldBlock`;
+/// the same process killed: acquired; a second handle in the *same* process:
+/// `WouldBlock` too, so two builds in one process cannot sweep each other.
+///
+/// **Why not lock the directory itself**, which also opens: between creating
+/// it and locking it there is a window in which it exists and nobody holds
+/// it, and a sweep landing there deletes a live run's directory. A marker
+/// claimed *before* the directory exists has no such window.
+///
+/// Best effort, and the fallback is the state before this existed: a
+/// filesystem that refuses the marker or the lock leaves the run without one,
+/// and its directory is then protected only by [`MARKERLESS_AGE`].
+struct Owner {
+    path: PathBuf,
+    _file: File,
+}
+
+impl Owner {
+    /// How many times a claim is retried when a sweep is holding the marker.
+    ///
+    /// A sweep holds an unowned marker for the time it takes to unlink one
+    /// file; the retries exist so that a sweep which found the marker in the
+    /// instant between its creation and its lock does not leave this run
+    /// markerless.
+    const ATTEMPTS: u32 = 8;
+
+    fn claim(path: PathBuf) -> Option<Self> {
+        use std::os::unix::fs::MetadataExt as _;
+
+        for _ in 0..Self::ATTEMPTS {
+            let Ok(file) = File::options()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&path)
+            else {
+                return None;
+            };
+            match file.try_lock() {
+                Ok(()) => {}
+                Err(fs::TryLockError::WouldBlock) => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    continue;
+                }
+                Err(fs::TryLockError::Error(_)) => {
+                    drop(file);
+                    let _ = fs::remove_file(&path);
+                    return None;
+                }
+            }
+            // Locked — but a sweep may have unlinked the name between this
+            // run creating the file and locking it, and a lock on a file no
+            // longer at the path protects nothing. The same inode at the path
+            // is the claim; anything else is another attempt.
+            let held = file.metadata().map(|m| (m.dev(), m.ino()));
+            let named = fs::symlink_metadata(&path).map(|m| (m.dev(), m.ino()));
+            match (held, named) {
+                (Ok(a), Ok(b)) if a == b => return Some(Self { path, _file: file }),
+                _ => continue,
+            }
+        }
+        None
+    }
+}
+
+impl Drop for Owner {
+    fn drop(&mut self) {
+        // Unlinked while still locked, so no sweep can find it unlocked in
+        // between; the lock goes with the file right after.
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+/// How old a staging directory without a marker must be before it is removed.
+///
+/// Markerless directories are what 2.5.7 and earlier leave, and what a run on
+/// a filesystem that refused the marker leaves; nothing can say whether their
+/// run is alive, so their age is all there is. The modification time of a
+/// staging root moves while documents are written — each group creates a
+/// folder in it — and stops for the validation that follows and for the wait
+/// on someone else's publication, which [`lock`] bounds at ten minutes. An
+/// hour is six times that wait plus the whole write and check of the real
+/// corpus, measured at a minute and a half.
+const MARKERLESS_AGE: std::time::Duration = std::time::Duration::from_secs(3600);
+
+/// What a name in the destination is, as far as the sweep is concerned.
+#[derive(Debug, PartialEq, Eq)]
+enum Leftover {
+    /// `.{PACKAGE}.build` — the shared name used before 2.2.0.
+    Legacy,
+    /// `.{PACKAGE}.build.<pid>.<n>`.
+    Staging,
+    /// `.{PACKAGE}.build.<pid>.<n>.owner`.
+    Marker,
+}
+
+fn classify_leftover(name: &str) -> Option<Leftover> {
+    let prefix = format!(".{PACKAGE}.build");
+    let rest = name.strip_prefix(&prefix)?;
+    if rest.is_empty() {
+        return Some(Leftover::Legacy);
+    }
+    let rest = rest.strip_prefix('.')?;
+    let (tag, kind) = match rest.strip_suffix(".owner") {
+        Some(tag) => (tag, Leftover::Marker),
+        None => (rest, Leftover::Staging),
+    };
+    let (pid, counter) = tag.split_once('.')?;
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    (digits(pid) && digits(counter)).then_some(kind)
+}
+
+/// Remove the staging directories of runs that are gone, and nothing else.
+///
+/// Runs before a build writes anything, so the space a killed run took is
+/// back before this one needs it. A directory goes only when its marker could
+/// be locked, which only happens once its run has ended; a directory without
+/// a marker goes only past [`MARKERLESS_AGE`]. A marker nobody holds and with
+/// no directory — a run killed between claiming and creating, or between
+/// publishing and unlinking — goes as well.
+///
+/// Symbolic links are never followed and never removed: the name pattern is
+/// no guarantee of who put an entry there, and this is a deletion in the
+/// reader's Downloads folder.
+///
+/// Nothing here fails the build. A leftover that cannot be removed costs the
+/// disk space it already cost, which is no reason to refuse a package.
+fn sweep_abandoned_staging(destination: &Path) {
+    let Ok(entries) = fs::read_dir(destination) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Some(kind) = entry.file_name().to_str().and_then(classify_leftover) else {
+            continue;
+        };
+        // `DirEntry::file_type` does not follow symbolic links.
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        let path = entry.path();
+        match kind {
+            Leftover::Staging | Leftover::Legacy if file_type.is_dir() => {
+                let marker = owner_marker(&path);
+                match File::open(&marker) {
+                    Ok(file) if kind == Leftover::Staging => {
+                        if file.try_lock().is_ok() {
+                            let _ = fs::remove_dir_all(&path);
+                            let _ = fs::remove_file(&marker);
+                        }
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        let old = entry
+                            .metadata()
+                            .and_then(|m| m.modified())
+                            .ok()
+                            .and_then(|t| t.elapsed().ok())
+                            .is_some_and(|age| age > MARKERLESS_AGE);
+                        if old {
+                            let _ = fs::remove_dir_all(&path);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Leftover::Marker if file_type.is_file() => {
+                // The marker names its directory: without the suffix it is
+                // that name again.
+                let Some(directory) = path
+                    .to_str()
+                    .and_then(|s| s.strip_suffix(".owner"))
+                    .map(PathBuf::from)
+                else {
+                    continue;
+                };
+                // A directory beside it is the case above, handled there with
+                // the directory; only a marker alone is this one's.
+                if fs::symlink_metadata(&directory).is_ok() {
+                    continue;
+                }
+                if let Ok(file) = File::open(&path) {
+                    if file.try_lock().is_ok() {
+                        let _ = fs::remove_file(&path);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Pass 1: every entry the corpus's own gates accept, as a record and a path.
@@ -1185,5 +1408,206 @@ mod tests {
             }
             other => panic!("expected a collision, got {other}"),
         }
+    }
+
+    /// Состарить запись каталога: столько, сколько пролежал бы оставленный.
+    fn age(path: &Path, by: std::time::Duration) {
+        let past = std::time::SystemTime::now() - by;
+        File::open(path)
+            .expect("open")
+            .set_modified(past)
+            .expect("set_modified");
+    }
+
+    const OLD: std::time::Duration = std::time::Duration::from_secs(2 * 3600);
+
+    /// Сборка оставленного прогона – каталог и маркер, который никто не держит.
+    fn abandoned(destination: &Path, tag: &str) -> PathBuf {
+        let staging = destination.join(format!(".{PACKAGE}.build.{tag}"));
+        fs::create_dir_all(staging.join("CTH 5")).expect("staging");
+        fs::write(staging.join("CTH 5/KBo 1.1.xml"), b"half").expect("half");
+        fs::write(owner_marker(&staging), b"").expect("marker");
+        staging
+    }
+
+    #[test]
+    fn only_the_names_a_build_stages_under_are_leftovers() {
+        let p = PACKAGE;
+        assert_eq!(
+            classify_leftover(&format!(".{p}.build")),
+            Some(Leftover::Legacy)
+        );
+        assert_eq!(
+            classify_leftover(&format!(".{p}.build.36379.0")),
+            Some(Leftover::Staging)
+        );
+        assert_eq!(
+            classify_leftover(&format!(".{p}.build.36379.12.owner")),
+            Some(Leftover::Marker)
+        );
+        for name in [
+            format!(".{p}.previous"),
+            format!(".{p}.publish.lock"),
+            format!(".{p}.buildx"),
+            format!(".{p}.build."),
+            format!(".{p}.build.1"),
+            format!(".{p}.build.1."),
+            format!(".{p}.build.a.0"),
+            format!(".{p}.build.1.0.x"),
+            format!(".{p}.build.owner"),
+            format!(".{p}.build.1.0.owner.owner"),
+            p.to_string(),
+            format!("{p}.build.1.0"),
+        ] {
+            assert_eq!(classify_leftover(&name), None, "{name}");
+        }
+    }
+
+    /// **Сборка убитого прогона убирается следующим.** Замер заслона
+    /// 13.09.2026: 130,5 МиБ после убийства на записи и 382,8 МиБ после
+    /// убийства в начале публикации переживали любую последующую сборку.
+    #[test]
+    fn the_staging_of_a_run_that_is_gone_is_removed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let staging = abandoned(dir.path(), "999999.0");
+
+        sweep_abandoned_staging(dir.path());
+
+        assert!(!staging.exists(), "каталог мертвого прогона остался");
+        assert!(
+            !owner_marker(&staging).exists(),
+            "маркер мертвого прогона остался"
+        );
+    }
+
+    /// Живая сборка неприкосновенна – в том числе в этом же процессе, где
+    /// блокировка берется второй рукоятью и обязана не взяться.
+    #[test]
+    fn the_staging_of_a_run_still_building_is_left_alone() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(staging_name());
+        let live = Staging::fresh(path.clone()).expect("fresh");
+        fs::write(live.path().join("doc.xml"), b"being written").expect("write");
+        age(live.path(), OLD);
+
+        sweep_abandoned_staging(dir.path());
+
+        assert!(
+            path.join("doc.xml").is_file(),
+            "у живого прогона сняли сборку"
+        );
+        assert!(
+            owner_marker(&path).is_file(),
+            "у живого прогона сняли маркер"
+        );
+
+        drop(live);
+        assert!(!path.exists());
+        assert!(
+            !owner_marker(&path).exists(),
+            "прогон, закончивший неудачей, оставил маркер"
+        );
+    }
+
+    /// Держит маркер другой открытый файл – значит, владелец жив.
+    #[test]
+    fn a_marker_someone_holds_keeps_its_directory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let staging = abandoned(dir.path(), "999999.1");
+        let holder = File::open(owner_marker(&staging)).expect("open");
+        holder.lock().expect("lock");
+
+        sweep_abandoned_staging(dir.path());
+        assert!(staging.join("CTH 5/KBo 1.1.xml").is_file());
+
+        drop(holder);
+        sweep_abandoned_staging(dir.path());
+        assert!(!staging.exists(), "владелец ушел, а каталог остался");
+    }
+
+    /// Опубликованная сборка не оставляет маркера рядом с пакетом.
+    #[test]
+    fn publishing_takes_the_marker_with_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(staging_name());
+        let staging = Staging::fresh(path.clone()).expect("fresh");
+        staging.publish(&dir.path().join(PACKAGE)).expect("publish");
+
+        assert!(dir.path().join(PACKAGE).is_dir());
+        let left: Vec<_> = fs::read_dir(dir.path())
+            .expect("read")
+            .flatten()
+            .map(|e| e.file_name())
+            .filter(|n| n != PACKAGE)
+            .collect();
+        assert!(left.is_empty(), "рядом с пакетом осталось {left:?}");
+    }
+
+    /// Каталог без маркера – от 2.5.7 и раньше – судится по возрасту: свежий
+    /// может быть живым прогоном прежней версии.
+    #[test]
+    fn a_staging_without_a_marker_goes_only_once_it_is_old() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let fresh_legacy = dir.path().join(format!(".{PACKAGE}.build"));
+        let fresh_tagged = dir.path().join(format!(".{PACKAGE}.build.1.0"));
+        let old_tagged = dir.path().join(format!(".{PACKAGE}.build.2.0"));
+        for d in [&fresh_legacy, &fresh_tagged, &old_tagged] {
+            fs::create_dir_all(d.join("CTH 5")).expect("create");
+        }
+        age(&old_tagged, OLD);
+
+        sweep_abandoned_staging(dir.path());
+        assert!(fresh_legacy.is_dir(), "свежий каталог без маркера снят");
+        assert!(fresh_tagged.is_dir(), "свежий каталог без маркера снят");
+        assert!(!old_tagged.exists(), "старый каталог без маркера остался");
+
+        age(&fresh_legacy, OLD);
+        sweep_abandoned_staging(dir.path());
+        assert!(!fresh_legacy.exists(), "старый общий каталог остался");
+    }
+
+    /// Маркер без каталога и без владельца убирается; с владельцем – нет.
+    #[test]
+    fn a_lone_marker_goes_only_when_nobody_holds_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let lone = dir.path().join(format!(".{PACKAGE}.build.7.0.owner"));
+        let held = dir.path().join(format!(".{PACKAGE}.build.8.0.owner"));
+        fs::write(&lone, b"").expect("lone");
+        fs::write(&held, b"").expect("held");
+        let holder = File::open(&held).expect("open");
+        holder.lock().expect("lock");
+
+        sweep_abandoned_staging(dir.path());
+        assert!(!lone.exists(), "маркер без владельца остался");
+        assert!(held.exists(), "маркер живого прогона снят");
+    }
+
+    /// Ничего, кроме имен сборки, и никаких символических ссылок – даже
+    /// под именем сборки и даже старых.
+    #[test]
+    fn the_sweep_touches_nothing_else() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&outside).expect("outside");
+        fs::write(outside.join("theirs.txt"), b"theirs").expect("theirs");
+        let destination = dir.path().join("out");
+        fs::create_dir_all(&destination).expect("destination");
+
+        let link = destination.join(format!(".{PACKAGE}.build.3.0"));
+        std::os::unix::fs::symlink(&outside, &link).expect("symlink");
+        age(&outside, OLD);
+        let previous = destination.join(format!(".{PACKAGE}.previous"));
+        let similar = destination.join(format!(".{PACKAGE}.build.x.0"));
+        for d in [&previous, &similar] {
+            fs::create_dir_all(d).expect("create");
+            age(d, OLD);
+        }
+
+        sweep_abandoned_staging(&destination);
+
+        assert!(outside.join("theirs.txt").is_file(), "прошли по ссылке");
+        assert!(fs::symlink_metadata(&link).is_ok(), "ссылку сняли");
+        assert!(previous.is_dir(), "сняли отставленный пакет");
+        assert!(similar.is_dir(), "сняли чужое имя");
     }
 }

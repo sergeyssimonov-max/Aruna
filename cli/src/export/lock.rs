@@ -29,8 +29,11 @@ use super::PACKAGE;
 
 /// How long a lock may exist before it is assumed abandoned.
 ///
-/// Nothing here can ask whether a process is alive: that is `kill(pid, 0)`, and
-/// this crate forbids `unsafe`. Age is what is left, and it is enough because
+/// Nothing here asks whether a process is alive. Asking by process id is
+/// `kill(pid, 0)`, and this crate forbids `unsafe`; asking by a lock the kernel
+/// releases on exit is safe and is what staging does since 13.09.2026 (see
+/// `Owner` in the parent module), but this lock is a file whose content is its
+/// token and has not been moved onto that. Age is what it uses, and it is enough because
 /// the interval it bounds is short and known — moving a directory, renaming
 /// another onto its name, and reading back 23 936 files, measured at two to six
 /// seconds on the real corpus. Five minutes is fifty times that.
