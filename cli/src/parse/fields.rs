@@ -35,7 +35,7 @@ pub fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
     // puts `<AO:TxtPubl>` in the body, beside the inventory number.
     if let Some(text) = text_of(header, b"docID")
         .or_else(|| text_of(xml, b"docID"))
-        .filter(|text| !is_join_mark(text))
+        .filter(|text| !is_join_mark(text) && !carries_replacement(text))
     {
         return text;
     }
@@ -44,11 +44,11 @@ pub fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
         // manuscript list, not to the siglum this row is filed under.
         let primary = text.split('{').next().unwrap_or(&text);
         let primary = normalize_ws(primary);
-        if !primary.is_empty() && !is_join_mark(&primary) {
+        if !primary.is_empty() && !is_join_mark(&primary) && !carries_replacement(&primary) {
             return primary;
         }
     }
-    if let Some(text) = text_of(header, b"title") {
+    if let Some(text) = text_of(header, b"title").filter(|text| !carries_replacement(text)) {
         return text;
     }
     file_stem(path).unwrap_or_else(|| MISSING.to_string())
@@ -71,6 +71,19 @@ pub fn extract_sigla(header: &str, xml: &str, path: &str) -> String {
 /// swallowed by the same rule.
 fn is_join_mark(text: &str) -> bool {
     text.contains('€')
+}
+
+/// Whether a value carries U+FFFD, the character a lossy read puts in place of
+/// bytes that are not UTF-8.
+///
+/// The header window is decoded with replacement, so such a character is one
+/// the source does not have — the release gate of 2026-09-13 got the package
+/// file `KBo 55.173���.xml` from a `docID` holding `E9 FF FE`. A siglum made of
+/// it names a file, a row and a PDF after something nobody wrote. The chain
+/// goes on to what the source does say, and the archive entry's own name is
+/// always there at its end. No siglum in the corpus contains the character.
+fn carries_replacement(text: &str) -> bool {
+    text.contains('\u{FFFD}')
 }
 
 /// Text of the first `<tag>`, whitespace collapsed, or `None` if it says nothing.

@@ -109,6 +109,14 @@ pub enum Reason {
     /// one document, and naming it is how anyone who wants to fix that one
     /// finds it.
     MismatchedEndTagName,
+    /// Bytes that are not UTF-8, which is the only encoding this crate reads.
+    ///
+    /// Named since 2026-09-13. The release gate planted `E9 FF FE` inside a
+    /// `docID` and the manifest filed the document under [`Self::Unclassified`]
+    /// — a reason that invites measurement, for a defect that needs none. Asked
+    /// only when the parser's refusal fits nothing else, so a document with a
+    /// markup defect before its bad bytes keeps the reason it always had.
+    InvalidEncoding,
     /// Not well-formed, and none of the above fits.
     ///
     /// Deliberately not a catch-all that gets widened. A document here is an
@@ -133,6 +141,7 @@ impl Reason {
             Reason::DuplicateEndTag => "duplicate-end-tag",
             Reason::NoSuchElement => "no-such-element",
             Reason::MismatchedEndTagName => "mismatched-end-tag-name",
+            Reason::InvalidEncoding => "invalid-encoding",
             Reason::Unclassified => "unclassified",
         }
     }
@@ -141,7 +150,7 @@ impl Reason {
     ///
     /// A breakdown that omits the empty reasons cannot be told from one where
     /// the classifier never tried them.
-    pub const ALL: [Reason; 10] = [
+    pub const ALL: [Reason; 11] = [
         Reason::UnterminatedStartTag,
         Reason::AttributeNotSeparated,
         Reason::AttributeValueUnclosed,
@@ -151,6 +160,7 @@ impl Reason {
         Reason::DuplicateEndTag,
         Reason::NoSuchElement,
         Reason::MismatchedEndTagName,
+        Reason::InvalidEncoding,
         Reason::Unclassified,
     ];
 }
@@ -185,6 +195,7 @@ pub fn classify(bytes: &[u8]) -> Option<Finding> {
     // and elsewhere, under whatever name the wreckage happens to produce. Three
     // different `quick-xml` classes carried it on 2026-09-05, and it is one
     // defect.
+    let mut at = at;
     let reason = match kind {
         Refusal::UnclosedValue => Reason::AttributeValueUnclosed,
         _ if unterminated_start_tag(bytes, at).is_some() => Reason::UnterminatedStartTag,
@@ -193,7 +204,15 @@ pub fn classify(bytes: &[u8]) -> Option<Finding> {
         Refusal::Unterminated => Reason::UnterminatedStartTag,
         Refusal::Duplicated => Reason::AttributeGivenTwice,
         Refusal::Mismatched { end, open } => mismatch_reason(bytes, at, &end, &open),
-        Refusal::Other => Reason::Unclassified,
+        Refusal::Other => match std::str::from_utf8(bytes) {
+            // The position is the first byte that is not UTF-8, not wherever
+            // the parser happened to stop: that byte is the defect.
+            Err(error) => {
+                at = error.valid_up_to();
+                Reason::InvalidEncoding
+            }
+            Ok(_) => Reason::Unclassified,
+        },
     };
     let (line, column) = position(bytes, at);
     Some(Finding {
@@ -838,12 +857,13 @@ mod tests {
         // неправильный. Документ корректен, он просто не в UTF-8, а крейт
         // собран без поддержки перекодировки: фича отключена нарочно, корпус
         // весь в UTF-8, и тянуть таблицы кодировок ради ноля документов
-        // незачем. Названо здесь, потому что `unclassified` в этом одном
-        // случае значит «не та кодировка», а не «неправильная разметка».
+        // незачем. До 13.09.2026 он стоял здесь под `unclassified` с
+        // оговоркой, что в этом одном случае она значит «не та кодировка»;
+        // теперь у этого случая своя причина, и оговорка стала ключом.
         let latin1 = std::fs::read(dir.join("valid/declared-latin1.xml")).expect("образец");
         assert_eq!(
             classify(&latin1).map(|f| f.reason),
-            Some(Reason::Unclassified),
+            Some(Reason::InvalidEncoding),
             "документ корректен, но не в UTF-8"
         );
 
@@ -889,7 +909,7 @@ mod tests {
         keys.sort_unstable();
         keys.dedup();
         assert_eq!(keys.len(), count, "two reasons share a key");
-        assert_eq!(count, 10);
+        assert_eq!(count, 11);
     }
     /// The two blind spots, found by the scanner that exists for them.
     ///
@@ -971,5 +991,35 @@ mod tests {
         keys.dedup();
         assert_eq!(keys.len(), count, "два предела делят ключ");
         assert_eq!(count, 2);
+    }
+
+    /// **Байты не в UTF-8 названы своей причиной, а не общей.**
+    ///
+    /// Заслон 13.09.2026, позиция 5: документ с `E9 FF FE` внутри `docID`
+    /// ушел в манифест под `unclassified`, строка 1 – хотя дефект назван точно
+    /// и назван самим разборщиком модели (`Refusal::NotUtf8`). Причина
+    /// `unclassified` – приглашение измерять, а здесь измерять нечего.
+    ///
+    /// Отрицательный контроль рядом: знак замены, записанный в UTF-8 честно,
+    /// – корректный текст, и классификатор обязан о нем молчать. Проверка по
+    /// знаку U+FFFD, а не по байтам, спутала бы эти два случая.
+    #[test]
+    fn bytes_that_are_not_utf8_have_a_reason_of_their_own() {
+        let mut bytes = b"<AOxml><docID>KBo 55.173".to_vec();
+        bytes.extend_from_slice(&[0xE9, 0xFF, 0xFE]);
+        bytes.extend_from_slice(b"</docID></AOxml>");
+
+        let finding = classify(&bytes).expect("документ не в UTF-8 не прочитан");
+        assert_eq!(finding.reason.key(), "invalid-encoding");
+        // Столбец – первый байт не в UTF-8, а не место, где споткнулся
+        // разборщик: перед ним 24 знака.
+        assert_eq!((finding.line, finding.column), (1, 25));
+
+        let genuine = "<AOxml><docID>KBo \u{FFFD}</docID></AOxml>";
+        assert_eq!(
+            classify(genuine.as_bytes()),
+            None,
+            "знак замены, записанный в UTF-8, – корректный текст"
+        );
     }
 }

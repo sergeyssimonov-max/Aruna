@@ -179,7 +179,16 @@ fn acquire_within(
                             let _ = fs::remove_file(&path);
                         }
                     }
-                    continue;
+                    // **Straight to the next attempt only if the name is free.**
+                    // A removal that did not happen — a directory at the lock
+                    // path, a file this user may not delete — used to `continue`
+                    // here as well, past both the deadline and the pause: the
+                    // release gate of 2026-09-13 watched a run spin at 95–99 %
+                    // CPU for 720 s and never refuse. Whatever is still there
+                    // is waited for like a live holder, and refused like one.
+                    if fs::symlink_metadata(&path).is_err() {
+                        continue;
+                    }
                 }
                 if SystemTime::now() >= deadline {
                     return Err(ArunaError::PublishBusy {
@@ -283,11 +292,35 @@ fn abandoned(path: &Path, stale: Duration) -> bool {
 }
 
 /// What the lock file says about who holds it, for the error message.
+///
+/// **Only a token this program writes is repeated, and nothing else.** The
+/// name lies in the reader's folder and anything can be put there; until
+/// 2026-09-13 whatever it held went into the refusal after a `trim`, and the
+/// release gate saw ESC sequences, BEL and NUL reach the terminal from a file
+/// it had planted. Filtering characters would still repeat a stranger's words
+/// in this program's voice, so the shape of [`token`] is the whole test.
 fn holder(path: &Path) -> String {
-    read_token(path)
-        .map(|text| text.trim().to_string())
-        .filter(|text| !text.is_empty())
-        .unwrap_or_else(|| "an unnamed run".to_string())
+    match read_token(path) {
+        Some(text) if is_token(text.trim()) => text.trim().to_string(),
+        Some(_) => "a lock file this program did not write".to_string(),
+        None => "an unnamed run".to_string(),
+    }
+}
+
+/// Whether `text` has the shape [`token`] gives it: `pid <digits>, since
+/// <digits>.<digits>`.
+fn is_token(text: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let Some(rest) = text.strip_prefix("pid ") else {
+        return false;
+    };
+    let Some((pid, since)) = rest.split_once(", since ") else {
+        return false;
+    };
+    let Some((seconds, nanos)) = since.split_once('.') else {
+        return false;
+    };
+    digits(pid) && digits(seconds) && digits(nanos)
 }
 
 /// This run, in a form a person reading the file can act on.
@@ -530,5 +563,90 @@ mod tests {
             Err(ArunaError::Cancelled { phase }) => assert_eq!(phase, Phase::Publishing),
             other => panic!("expected a stop, got {other:?}"),
         }
+    }
+
+    /// **Отказ не повторяет содержимое чужого файла.**
+    ///
+    /// Заслон 13.09.2026, позиция 3: файл под именем блокировки с ESC, BEL,
+    /// BS и NUL внутри уехал в текст отказа целиком, и терминал читателя
+    /// исполнил цветовые последовательности. Имя лежит в каталоге читателя, и
+    /// что в нем, решает кто угодно; в отказ идет только то, что написала эта
+    /// программа, – собственный токен. Токен той же проверкой проходит:
+    /// `a_second_publication_waits_and_then_says_who_holds_it` по-прежнему
+    /// находит в отказе `pid`.
+    #[test]
+    fn a_foreign_lock_file_is_not_repeated_into_the_refusal() {
+        let dir = tempdir().expect("tempdir");
+        let (stale, wait, poll) = instant();
+        let path = lock_path(dir.path());
+        let foreign = "(FOREIGN-CONTENT-3f9a\u{1b}[31mRED\u{1b}[0m\u{7}\u{8}\u{0}tail)";
+        fs::write(&path, foreign).expect("write");
+
+        match acquire_within(dir.path(), &Job::unattended(), stale, wait, poll) {
+            Err(ArunaError::PublishBusy { holder, .. }) => {
+                assert!(
+                    !holder.chars().any(char::is_control),
+                    "управляющие знаки в отказе: {holder:?}"
+                );
+                assert!(
+                    !holder.contains("FOREIGN-CONTENT"),
+                    "чужое содержимое в отказе: {holder:?}"
+                );
+            }
+            other => panic!("ожидался занятый замок, получено {other:?}"),
+        }
+        assert_eq!(
+            fs::read_to_string(&path).expect("read"),
+            foreign,
+            "чужой файл тронут"
+        );
+    }
+
+    /// **Каталог на месте файла блокировки кончается отказом, а не вечным
+    /// циклом.**
+    ///
+    /// Заслон 13.09.2026, позиция 4: каталог старше порога устаревания
+    /// признавался брошенным, `remove_file` на нем молча не удавался, и
+    /// `continue` уводил мимо и срока, и паузы – 720 с при 95–99 % процессора,
+    /// пока прогон не убили. Любая неудача снятия подчиняется тому же сроку и
+    /// той же паузе, что и живой держатель.
+    ///
+    /// На коде с дефектом вызов не возвращается никогда, поэтому он идет в
+    /// своем потоке с предохранителем: не дождались – это и есть отказ теста,
+    /// а флаг отмены затем выпускает поток из цикла, чтобы набор не повис.
+    #[test]
+    fn a_directory_where_the_lock_belongs_ends_in_a_refusal_rather_than_a_spin() {
+        let dir = tempdir().expect("tempdir");
+        let path = lock_path(dir.path());
+        fs::create_dir(&path).expect("a directory at the lock path");
+
+        let destination = dir.path().to_path_buf();
+        let cancel = crate::job::Cancel::new();
+        let worker_cancel = cancel.clone();
+        let (sent, received) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let job = Job::new(&crate::progress::Silent, &worker_cancel);
+            let outcome = acquire_within(
+                &destination,
+                &job,
+                // Все, что уже лежит, достаточно старо: ровно случай заслона.
+                Duration::ZERO,
+                Duration::from_millis(60),
+                Duration::from_millis(5),
+            )
+            .map(|_| ());
+            let _ = sent.send(outcome);
+        });
+
+        let outcome = received.recv_timeout(Duration::from_secs(5));
+        cancel.cancel();
+        let _ = worker.join();
+
+        match outcome {
+            Ok(Err(ArunaError::PublishBusy { .. })) => {}
+            Err(_) => panic!("ожидание не кончилось за 5 с: цикл без паузы и срока"),
+            Ok(other) => panic!("ожидался отказ по занятому замку, получено {other:?}"),
+        }
+        assert!(path.is_dir(), "каталог под именем блокировки снят");
     }
 }

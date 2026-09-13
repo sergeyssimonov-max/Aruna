@@ -734,3 +734,80 @@ fn an_archive_exchanged_between_the_passes_does_not_reach_the_package() {
         "the rename did not happen, so nothing above was tested"
     );
 }
+
+/// **Имя файла не строится из знаков, которых нет в источнике.**
+///
+/// Заслон 13.09.2026, позиция 5 – единственная, что портит данные, а не
+/// поведение: `docID` с байтами `E9 FF FE` дал файл пакета
+/// `CTH 786/KBo 55.173���.xml`. Три знака замены придумало чтение заголовка с
+/// потерями, и дальше они прошли в сиглу, в опись и в имя. В манифесте тот же
+/// документ стоял под `unclassified`, хотя дефект – кодировка.
+///
+/// Документ при этом никуда не девается: пакет – зеркало, и байты источника
+/// обязаны дойти до него как пришли, иначе починка имени стала бы починкой
+/// документа.
+#[test]
+fn a_siglum_that_is_not_utf8_names_no_file_with_invented_characters() {
+    let dir = tempdir().expect("tempdir");
+    let mut body = br#"<?xml-stylesheet href="HPMxml.css" type="text/css"?><AOxml xml:space="preserve"><AOHeader><docID>KBo 55.173"#.to_vec();
+    body.extend_from_slice(&[0xE9, 0xFF, 0xFE]);
+    body.extend_from_slice(br#"</docID><meta><uebern editor="FB" date="2017-03-28"/></meta></AOHeader><body><text><l lg="Hit"/>text</text></body></AOxml>"#);
+    let owned = [
+        ("root/CTH 786_XML_HFR/KBo 55.173.xml", body),
+        text("root/CTH 5_XML_HFR/KBo 1.1.xml", "KBo 1.1"),
+    ];
+    let zip = archive(dir.path(), &owned);
+
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+    export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("builds");
+
+    let root = destination.join(PACKAGE);
+    let written = files(&root);
+    let invented: Vec<&PathBuf> = written
+        .iter()
+        .filter(|p| p.to_string_lossy().contains('\u{FFFD}'))
+        .collect();
+    assert!(
+        invented.is_empty(),
+        "имя файла пакета с придуманными знаками: {invented:?}"
+    );
+
+    let copy = written
+        .iter()
+        .find(|p| p.starts_with("CTH 786") && p.extension().is_some_and(|e| e == "xml"))
+        .expect("документ в пакете");
+    let out = fs::read(root.join(copy)).expect("read");
+    assert!(
+        out.windows(3).any(|w| w == [0xE9, 0xFF, 0xFE]),
+        "байты источника не дошли до пакета"
+    );
+
+    // Опись называет документ тем, что в источнике есть.
+    for page in written
+        .iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "html"))
+    {
+        let html = fs::read_to_string(root.join(page)).expect("опись");
+        assert!(
+            !html.contains('\u{FFFD}'),
+            "{page:?} называет документ придуманными знаками"
+        );
+    }
+
+    let manifest = fs::read_to_string(root.join(export::MANIFEST)).expect("manifest");
+    assert!(
+        manifest.contains("\"invalid-encoding\": 1"),
+        "у дефекта кодировки нет своей причины в манифесте"
+    );
+    assert!(
+        manifest.contains("\"unclassified\": 0"),
+        "дефект кодировки ушел в общую причину"
+    );
+}
