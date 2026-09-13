@@ -37,7 +37,7 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 cd cli
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus)'   # 389
+cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 389
 ```
 
 ### Standard — about 25 s
@@ -62,6 +62,8 @@ to make its absence a failure, which is what CI does after downloading it.
 ```sh
 cd cli
 ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(corpus)'   # 3
+ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(document_model)'   # 3, 30 s, needs xsltproc
+cargo nextest run --profile ci -E 'binary(document_model)' --run-ignored ignored-only   # the whole corpus against xsltproc, 67 s
 cargo run --release --example corpus_inventory -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 cargo run --release --example verify_normalization -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 shasum -a 256 fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
@@ -79,7 +81,7 @@ swapped for a different one between the two passes the build makes over it.
 
 ```sh
 cd cli
-cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 21
+cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 22
 cargo nextest run --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 11
 cargo run --release --example fuzz_naming
 cargo run --release --example fuzz_pipeline   # 200 000 documents
@@ -259,10 +261,11 @@ test.
 | `tests/progress_flow.rs` | 6 | which stages a run reports, in what order, with what numbers |
 | `tests/reliability.rs` | 4 | two builds byte-identical, no descriptors accumulated, nothing left beside the package |
 | `tests/xml_contract.rs` | 9 | the fixture set: immutability, the permit list, field extraction |
-| `tests/xml_hostile.rs` | 9 | XXE, entity expansion, external DTD, XInclude, resource exhaustion |
+| `tests/xml_hostile.rs` | 10 | XXE, entity expansion, external DTD, XInclude, resource exhaustion — through the export and, since 2026-09-13, through the document model |
 | `tests/authenticity.rs` | 2 | the published package against the archive, as multisets of file contents: nothing lost, invented, altered or written twice. The second is `#[ignore]` and runs the whole corpus — `--run-ignored ignored-only` |
 | `tests/window_seams.rs` | 3 | the seams a window will drive: the build on a thread of its own stopped from the caller's, that the library neither prints nor ends the process, and that the destination is the caller's to name |
 | `tests/corpus.rs` | 3 | the whole archive: non-distortion, no writes, the malformed count, and that nothing the gates admit comes out of decoding damaged |
+| `tests/document_model.rs` | 4 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; and the whole corpus read twice and refused exactly where the manifest says |
 
 Fixtures are described in `cli/fixtures/xml/MANIFEST.md` with a SHA-256 for each.
 
@@ -271,9 +274,10 @@ binary itself: a strict reader for the one JSON document this crate writes, a
 local origin that answers more than one client at a time, and the archives the
 newer tests are built from.
 
-One binary needs something the crate does not: `corpus` needs the 71 MiB
-archive. It skips when the archive is absent, and `ARUNA_REQUIRE_FIXTURE=1`
-turns that skip into a failure — which is what a CI job that has just downloaded
+Two binaries need something the crate does not: `corpus` and `document_model`
+need the 71 MiB archive, and `document_model` also needs `xsltproc`, which ships
+with macOS and is a package on Linux. They skip when either is absent, and
+`ARUNA_REQUIRE_FIXTURE=1` turns that skip into a failure — which is what a CI job that has just downloaded
 the archive should set, so the job cannot go back to passing without doing the
 work.
 

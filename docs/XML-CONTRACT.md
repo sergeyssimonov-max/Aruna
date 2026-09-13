@@ -89,7 +89,7 @@ TLHdig Beta 0.3, MD5 `f9acbc8db3111cc7dd88d82f7819a912`:
 | size min / p50 / p95 / max | 807 B / 5 634 B / 49 010 B / 897 320 B |
 | elements | 4 882 576 |
 | attributes | 6 372 963 |
-| deepest nesting | 80 (`CTH 420_XML_TLH/KBo 59.74.xml`, one of the 206 this parser refuses); among the 23 713 the document model reads, the figure printed by `tests/document_model.rs` |
+| deepest nesting | 80 (`CTH 420_XML_TLH/KBo 59.74.xml`, one of the 206 this parser refuses); 14 among the 23 713 the document model reads (`CTH 592_XML_HFR/IBoT 4.62+.xml`, the root counted as 1, counted on the model by `tests/document_model.rs`) |
 | most elements in one document | 9 171 (`CTH 561_XML_HDivT/KUB 5.1+.xml`) |
 | longest single text run | 261 bytes |
 | distinct code points | 648 |
