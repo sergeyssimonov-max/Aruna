@@ -585,7 +585,7 @@ and the names are part of the contract:
 |---|---|---|
 | `corpus_location` | — | where the package and the inventory go, and whether they are there |
 | `corpus_stats` | package path | counts, the CTH spread, the writing counters, and which of the two answered |
-| `corpus_xml` | package path | how many documents are well-formed XML, the breakdown by reason, and the name, reason and position of each that is not |
+| `corpus_xml` | package path | how many documents the document model refuses (`objected_to`, the one number with a consequence: not converted), its parts — refused by the parser (`unread`), accepted by the parser but not well-formed XML, well-formed XML but not namespace-well-formed — and the name, reason and position of each |
 | `open_inventory` | inventory path | nothing, or one sentence saying why it did not open |
 | `build_corpus` | a destination folder, or nothing for the downloads folder | `BuildReport`, or `BuildFailure` |
 | `cancel_build` | — | nothing; the confirmation arrives as the failure |
