@@ -366,6 +366,18 @@ enum Refusal {
     Other,
 }
 
+/// The settings every strict reader of this crate runs with.
+///
+/// Строже, чем по умолчанию: двойной дефис внутри комментария XML запрещает, а
+/// `quick-xml` его пропускает, пока не попросят. Разбор обязан быть строгим –
+/// это записано решением 4.13, – и настройка, которую можно забыть, ставится в
+/// одном месте. Зовут ее двое: классификатор ниже и модель документа
+/// ([`crate::document`]); разойдись они в настройке, модель приняла бы документ,
+/// который классификатор назвал непрочитанным.
+pub(crate) fn strict(config: &mut quick_xml::reader::Config) {
+    config.check_comments = true;
+}
+
 /// The first thing `quick-xml` refuses, and where.
 ///
 /// Two kinds of refusal, and the difference decides what may be counted. A
@@ -376,11 +388,7 @@ enum Refusal {
 /// the parser walking through wreckage.
 fn first_refusal(bytes: &[u8]) -> Option<(Refusal, usize)> {
     let mut reader = Reader::from_reader(bytes);
-    // Строже, чем по умолчанию: двойной дефис внутри комментария XML запрещает,
-    // а `quick-xml` его пропускает, пока не попросят. Разбор здесь обязан быть
-    // строгим – это записано решением 4.13, – и настройка, которую можно
-    // забыть, ставится один раз рядом с разборщиком.
-    reader.config_mut().check_comments = true;
+    strict(reader.config_mut());
     let mut buf = Vec::new();
     let mut open: Vec<String> = Vec::new();
 
@@ -673,7 +681,7 @@ fn scan_tag(bytes: &[u8], start: usize) -> (usize, Option<usize>) {
 }
 
 /// Line and column of a byte offset, counted in one pass.
-fn position(bytes: &[u8], at: usize) -> (usize, usize) {
+pub(crate) fn position(bytes: &[u8], at: usize) -> (usize, usize) {
     let at = at.min(bytes.len());
     let line = 1 + memchr::memchr_iter(b'\n', &bytes[..at]).count();
     let start = memchr::memrchr(b'\n', &bytes[..at]).map_or(0, |i| i + 1);

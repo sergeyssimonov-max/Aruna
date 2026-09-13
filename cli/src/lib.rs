@@ -17,6 +17,7 @@ pub mod app;
 pub mod archive;
 pub mod cache;
 pub mod catalog;
+pub mod document;
 pub mod download;
 pub mod error;
 pub mod export;
