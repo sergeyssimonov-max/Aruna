@@ -1,24 +1,28 @@
 //! What a document written to attack the reader gets out of this program.
 //!
-//! The honest answer is "nothing", and the reason is structural rather than
-//! defensive: there is no XML parser here. The dependency list has no XML crate
-//! in it. What this program calls parsing is a scan for seven fields in the
-//! first 16 KiB, and what it calls exporting is a byte copy. Nothing resolves an
-//! entity, opens a DTD, follows an XInclude or expands anything, because there
-//! is no code that could.
+//! The honest answer is "nothing", and there are two paths to hold it on.
 //!
-//! That is worth more than a mitigation and it is also worth less: it holds only
-//! for as long as it is true, and the next stage of this project needs a real
-//! parser to turn these documents into PDF. These tests exist so that the day a
-//! parser arrives, the properties it has to keep are already written down and
-//! already failing if it does not.
+//! The export has no parser in it. What it calls parsing is a scan for seven
+//! fields in the first 16 KiB, and what it calls exporting is a byte copy.
+//! Nothing there resolves an entity, opens a DTD, follows an XInclude or expands
+//! anything, because there is no code that could.
+//!
+//! That held only for as long as it was true, and these tests were written so
+//! that the day a parser arrived, the properties it had to keep were already
+//! written down. It arrived: `quick-xml` on 2026-09-05, and the document model
+//! on top of it on 2026-09-13. The model refuses a `DOCTYPE` where it stands
+//! and resolves only the five predefined entities and character references, and
+//! the tests below now put every fixture and every generated document through
+//! it as well as through the export.
 //!
 //! Every bound here is generous enough not to be flaky and tight enough to mean
 //! something: a TCP connection to an unroutable address takes seconds to time
 //! out, so completing in under two is evidence that none was attempted.
 
+use aruna::document::{Document, Kind, Refusal, Undecided};
 use aruna::export::{self, normalize_into, verify, PACKAGE};
 use aruna::parse::{looks_like_manuscript, parse_manuscript, HEADER_READ_LIMIT};
+use std::borrow::Cow;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -210,7 +214,63 @@ fn field_values_that_are_paths_stay_inside_the_package() {
     );
 }
 
+/// The document model is the second path through a parser, and the day it
+/// arrived is the day this file was written for: every fixture, hostile,
+/// malformed or valid, goes through it inside the same budget, and nothing
+/// that declares a document type gets further than the declaration.
+///
+/// The model does not fetch because it refuses first. A `DOCTYPE` is a
+/// construct this project has no policy for (`docs/XML-CONTRACT.md` §5), so the
+/// document is refused where the declaration stands — before an entity in it
+/// could be looked at, let alone resolved.
+#[test]
+fn the_document_model_reads_every_fixture_in_bounded_time_and_resolves_nothing() {
+    let mut outcomes = Vec::new();
+    for group in ["hostile", "malformed", "valid"] {
+        let mut paths: Vec<PathBuf> = std::fs::read_dir(fixtures().join(group))
+            .expect("list fixtures")
+            .map(|entry| entry.expect("fixture entry").path())
+            .filter(|path| path.extension().is_some_and(|e| e == "xml"))
+            .collect();
+        paths.sort();
+        for path in paths {
+            let bytes = std::fs::read(&path).expect("read fixture");
+            let name = format!(
+                "{group}/{}",
+                path.file_name()
+                    .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+            );
+            let start = Instant::now();
+            let result = Document::read(&bytes);
+            let took = start.elapsed();
+            assert!(took < BUDGET, "{name}: took {took:?}");
+            if bytes.windows(9).any(|w| w == b"<!DOCTYPE") {
+                assert!(
+                    matches!(
+                        result,
+                        Err(Refusal::Undecided {
+                            what: Undecided::DocumentType,
+                            ..
+                        })
+                    ),
+                    "{name}: a document type declaration was not refused: {:?}",
+                    result.as_ref().err()
+                );
+            }
+            outcomes.push(match result {
+                Ok(document) => format!("{name}: read, {} nodes", document.nodes().len()),
+                Err(refusal) => format!("{name}: refused, {refusal}"),
+            });
+        }
+    }
+    assert!(outcomes.len() > 30, "the fixture set went missing");
+    eprintln!("{outcomes:#?}");
+}
+
 /// The three fixtures whose size is the point, built here rather than committed.
+///
+/// Each goes through the document model as well as through the export, within
+/// the same budget.
 mod generated {
     use super::*;
 
@@ -236,6 +296,18 @@ mod generated {
             source.len() + verify::DECLARATION.len(),
             "the body should be copied, not rewritten"
         );
+
+        // The model keeps its nodes in one vector, so a deep document is a long
+        // vector and not a deep structure: dropping it recurses nowhere.
+        let start = Instant::now();
+        let document = Document::read(&source).expect("the model reads it");
+        assert!(document.nodes().len() > 50_000);
+        drop(document);
+        assert!(
+            start.elapsed() < BUDGET,
+            "the model took {:?}",
+            start.elapsed()
+        );
     }
 
     #[test]
@@ -251,6 +323,24 @@ mod generated {
 
         let (took, _) = run("root/CTH 5_XML_HFR/attrs.xml", &source);
         assert!(took < BUDGET, "took {took:?}");
+
+        let start = Instant::now();
+        let result = Document::read(&source);
+        assert!(
+            start.elapsed() < BUDGET,
+            "the model took {:?}",
+            start.elapsed()
+        );
+        let document = result.expect("the model reads it");
+        let attributes = document
+            .nodes()
+            .iter()
+            .map(|node| match &node.kind {
+                Kind::Element(element) => element.attributes.len(),
+                _ => 0,
+            })
+            .max();
+        assert_eq!(attributes, Some(100_000));
     }
 
     #[test]
@@ -265,5 +355,24 @@ mod generated {
         let (took, out) = run("root/CTH 5_XML_HFR/huge.xml", &source);
         assert!(took < BUDGET, "took {took:?}");
         assert_eq!(out.len(), source.len() + verify::DECLARATION.len());
+
+        // And the model holds the eight megabytes once: the text node borrows
+        // from the source rather than copying it.
+        let start = Instant::now();
+        let document = Document::read(&source).expect("the model reads it");
+        assert!(
+            start.elapsed() < BUDGET,
+            "the model took {:?}",
+            start.elapsed()
+        );
+        let text = document
+            .nodes()
+            .iter()
+            .find_map(|node| match &node.kind {
+                Kind::Text(text) if text.len() >= 8 * 1024 * 1024 => Some(text),
+                _ => None,
+            })
+            .expect("the long text node");
+        assert!(matches!(text, Cow::Borrowed(_)), "the text was copied");
     }
 }

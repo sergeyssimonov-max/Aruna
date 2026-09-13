@@ -165,6 +165,11 @@ pub enum Refusal {
     NotUtf8 { line: usize, column: usize },
     /// `quick-xml` refused it — one of the documents the manifest names, with
     /// the classifier's reason.
+    ///
+    /// Line and column are counted in the bytes handed to [`Document::read`].
+    /// Read from the archive, that is one line off the manifest for a document
+    /// that gets a declaration written in front of it — 23 494 of them — since
+    /// the manifest counts in the package copy.
     #[error("unread: {} at line {}, column {}", .0.reason.key(), .0.line, .0.column)]
     Unread(Finding),
     /// Accepted by the parser and forbidden by XML or by *Namespaces in XML*.

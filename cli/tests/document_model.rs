@@ -18,13 +18,14 @@
 //! would measure this project against itself.
 //!
 //! Skipped when the archive is not there, as `tests/corpus.rs` is, and turned
-//! into a failure by `ARUNA_REQUIRE_FIXTURE=1`. The comparisons with `xsltproc`
-//! are skipped when it is not installed; its absence is never read as a pass —
-//! the test says so and does nothing.
+//! into a failure by `ARUNA_REQUIRE_FIXTURE=1`. The same variable governs
+//! `xsltproc`: without it a missing `xsltproc` skips the comparison and says
+//! so, with it the test fails — a job that promises the corpus checks cannot
+//! pass by not having the instrument.
 //!
 //! ```sh
 //! cargo nextest run --locked --test document_model
-//! # the whole corpus against xsltproc — minutes:
+//! # the whole corpus against xsltproc — about a minute (67 s on 2026-09-13):
 //! cargo nextest run --locked --test document_model --run-ignored all
 //! ```
 
@@ -72,6 +73,10 @@ fn xsltproc_present() -> bool {
         .status()
         .is_ok_and(|status| status.success());
     if !present {
+        assert!(
+            std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
+            "ARUNA_REQUIRE_FIXTURE is set but xsltproc is not installed"
+        );
         eprintln!("xsltproc is not installed: the comparison did not run, and nothing is claimed");
     }
     present
@@ -414,9 +419,58 @@ fn the_model_says_what_xsltproc_says_for_the_sample() {
     );
 }
 
+/// The same comparison over the committed fixtures the model reads.
+///
+/// Needs no archive, and covers what the corpus does not have: a CDATA
+/// section, a byte order mark, instructions other than the stylesheet, unknown
+/// elements, many attributes on one element.
+#[test]
+fn the_model_says_what_xsltproc_says_for_the_valid_fixtures() {
+    if !xsltproc_present() {
+        return;
+    }
+    let reference = Xsltproc::new();
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/xml/valid");
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .expect("list fixtures")
+        .map(|entry| entry.expect("fixture entry").path())
+        .filter(|path| path.extension().is_some_and(|e| e == "xml"))
+        .collect();
+    paths.sort();
+    let (mut compared, mut refused) = (0usize, Vec::new());
+    for path in paths {
+        let bytes = std::fs::read(&path).expect("read fixture");
+        let name = path.display().to_string();
+        let document = match Document::read(&bytes) {
+            Ok(document) => document,
+            Err(refusal) => {
+                refused.push(format!("{name}: {refusal}"));
+                continue;
+            }
+        };
+        let model = comparable(&listing(&document));
+        let expected = comparable(
+            &reference
+                .listing(&bytes)
+                .unwrap_or_else(|| panic!("{name}: the model read it and libxml2 did not")),
+        );
+        assert!(
+            model == expected,
+            "{name}: {}",
+            first_difference(&model, &expected)
+        );
+        compared += 1;
+    }
+    // Two of the valid fixtures carry what the model has no policy for, and
+    // they are the only two.
+    assert_eq!(refused.len(), 2, "{refused:#?}");
+    assert!(compared >= 17, "compared only {compared}");
+    eprintln!("fixtures: {compared} identical to xsltproc, refused: {refused:#?}");
+}
+
 /// The same comparison over every document the model reads.
 #[test]
-#[ignore = "one xsltproc run per document: minutes; run by hand"]
+#[ignore = "one xsltproc run per document: about a minute; run by hand"]
 fn the_model_says_what_xsltproc_says_for_the_whole_corpus() {
     let Some(path) = required() else { return };
     if !xsltproc_present() {
