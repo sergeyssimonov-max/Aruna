@@ -82,7 +82,7 @@ swapped for a different one between the two passes the build makes over it.
 ```sh
 cd cli
 cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 22
-cargo nextest run --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 11
+cargo nextest run --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 12
 cargo run --release --example fuzz_naming
 cargo run --release --example fuzz_pipeline   # 200 000 documents
 cargo run --release --example fuzz_layers     # 300 000 inputs
@@ -249,11 +249,11 @@ test.
 |---|---|---|
 | library and `bin/aruna` | 270 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
-| `tests/cli_process.rs` | 16 | the binary as a child process, cache versus network, and the two words it answers on the command line |
+| `tests/cli_process.rs` | 17 | the binary as a child process, cache versus network, and the two words it answers on the command line |
 | `tests/cache_lifecycle.rs` | 9 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
 | `tests/export_integration.rs` | 8 | the export against an archive shaped like the corpus |
 | `tests/export_hostile.rs` | 12 | archives written to break the export, and destinations that refuse it |
-| `tests/export_recovery.rs` | 7 | building again over what a killed run left behind |
+| `tests/export_recovery.rs` | 8 | building again over what a killed run left behind, including a staging directory whose owner is gone |
 | `tests/package_pages.rs` | 11 | the inventory against the package it describes, and that no CTH folder has a page |
 | `tests/cancellation.rs` | 10 | stopping a run, that it leaves the reader's package alone, and that a run stopped half way is followed by a complete one in the same process |
 | `tests/cache_concurrency.rs` | 4 | several runs competing for one cache: the race, the sweep, the sockets |

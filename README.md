@@ -89,13 +89,17 @@ it: its «Остановить» reaches the same flag, and a run stopped that w
 nothing and leaves nothing behind. From a terminal, Ctrl-C is still the blunt
 version.
 
-What a killed run leaves in `~/Downloads` is one hidden directory,
-`.TLHdig_Beta_0.3.build.<pid>.<n>`: its unfinished package. Nothing is published
-from it and the next run is not blocked by it — that one builds beside it under
-its own name — so it is safe to delete with `rm -rf
-~/Downloads/.TLHdig_Beta_0.3.build.*`. A finished package is never at risk from
-this: the previous one is moved aside only after the new one is written whole
-and checked.
+What a killed run leaves in `~/Downloads` is a hidden directory,
+`.TLHdig_Beta_0.3.build.<pid>.<n>` — its unfinished package, up to the size of a
+whole one — and a small `.owner` file beside it. Nothing is published from it,
+and the next run removes both before it writes anything: the run holds a lock on
+the `.owner` file while it works, the system drops that lock when the process
+ends however it ends, and only a directory whose lock nobody holds is removed —
+so a second copy of the program still building in the same folder is never
+touched. A directory without an `.owner` file, as 2.5.7 and earlier leave it, is
+removed once it is an hour old. A finished package is never at risk from this:
+the previous one is moved aside only after the new one is written whole and
+checked.
 
 ### Gatekeeper
 
