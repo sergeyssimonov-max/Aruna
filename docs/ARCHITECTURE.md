@@ -8,7 +8,7 @@ and §7 is where it is described.
 
 The environment, the frontend stack, the pinned versions and the checks that
 guard them are **not** described here. They are fixed by
-[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 50, 2026-09-13), which is normative; this
+[`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) (редакция 51, 2026-09-13), which is normative; this
 document is about the Rust that runs underneath it.
 
 ---
@@ -49,7 +49,7 @@ row is named by a lower one.
 | **adapter** | `main.rs` | — |
 | **application** | `app` | parse a command line, choose an exit code, print |
 | **presentation** | `presentation`, `style`, `html`, `export/inventory` | read the filesystem, parse XML |
-| **domain** | `parse`, `order`, `paths`, `catalog`, `md5`, `export/{naming,normalize,validate,verify,manifest}` | know a renderer exists |
+| **domain** | `parse`, `document`, `xml_wellformed`, `order`, `paths`, `catalog`, `md5`, `export/{naming,normalize,validate,verify,manifest}` | know a renderer exists |
 | **infrastructure** | `archive`, `cache`, `download`, `zenodo`, `xml_scan`, `export/mod` | decide what the corpus means |
 | **signals** | `progress`, `job`, `error` | depend on any of the above |
 
@@ -80,6 +80,7 @@ Checked, not asserted:
 ```
 Zenodo / local .zip
   └─ download · cache · archive          infrastructure: fetch, verify MD5, open
+      ├─ document                         bytes → Document: the XML model; nothing consumes it yet
       └─ xml_scan · parse                 bytes → ManuscriptRecord, gates and limits
           └─ order                        the one sort the whole program uses
               └─ presentation             CorpusPresentation: groups, fragments, hrefs

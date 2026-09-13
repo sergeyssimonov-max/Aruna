@@ -89,7 +89,7 @@ TLHdig Beta 0.3, MD5 `f9acbc8db3111cc7dd88d82f7819a912`:
 | size min / p50 / p95 / max | 807 B / 5 634 B / 49 010 B / 897 320 B |
 | elements | 4 882 576 |
 | attributes | 6 372 963 |
-| deepest nesting | 80 (`CTH 420_XML_TLH/KBo 59.74.xml`) |
+| deepest nesting | 80 (`CTH 420_XML_TLH/KBo 59.74.xml`, one of the 206 this parser refuses); among the 23 713 the document model reads, the figure printed by `tests/document_model.rs` |
 | most elements in one document | 9 171 (`CTH 561_XML_HDivT/KUB 5.1+.xml`) |
 | longest single text run | 261 bytes |
 | distinct code points | 648 |
@@ -106,7 +106,7 @@ Structure, by number of documents carrying it:
 | BOM | 0 |
 | DOCTYPE / DTD | 0 |
 | CDATA | 0 |
-| entity references | 0 |
+| entity references beyond the five predefined and character references | 0 |
 | XInclude | 0 |
 
 The eight namespaces are `http://hethiter.net/ns/AO/1.0`,
@@ -256,42 +256,65 @@ UTF-8), so the rule costs nothing today and closes the guarantee.
 
 ## 4. XML → internal model → PDF
 
-There is no PDF converter. There is also **no XML parser**: the dependency list
-is `dirs`, `memchr`, `thiserror`, `ureq`, `zip`. What this project calls parsing
-is a scan for seven fields in the first 16 KiB of a document; the body is never
-interpreted, only copied.
+There is no PDF converter. There is, since 2026-09-13, a **document model**:
+`cli/src/document.rs`, over the parser adopted on 2026-09-05 (§5), with no new
+dependency. It is the XML Information Set of one document — line ends and
+attribute values normalised, the predefined entities and character references
+replaced, adjacent character data one node — and it holds nothing the document
+does not: no siglum, no CTH number, no editor, no default for anything absent.
+Nothing consumes it yet. The inventory fields are still produced by a scan of
+the first 16 KiB, and deriving them from the model is the next step, together
+with the semantic manifest of `PDF-ACCEPTANCE.md` §2.
 
-So the middle column below is mostly empty today, and that emptiness is the
-finding: **a real parser is a prerequisite for the PDF stage, not an
-optimisation.**
+The model is built for **23 713** documents and refused for **223**: the 206 this
+parser refuses, with the classifier's reason, and the seventeen of §2 it accepts
+— §5 sends both to the same place. Over all 23 713 it was compared with
+`xsltproc`, one line per node in document order, and **25 857 289 lines are
+identical** (`tests/document_model.rs`, 2026-09-13; a 52-document sample of the
+same comparison runs with every test run).
 
 | XML construct | in the corpus | internal model today | destination in the PDF |
 |---|---|---|---|
-| root `AOxml` | 23 936 | — | document frame |
-| element tree | 4.88 M elements | — | **layout structure — needs a parser** |
-| attributes | 6.37 M | 7 named fields only | metadata block; editorial attributes visible |
-| namespaces | 8, everywhere | — | qualified names resolved before layout; ODF `table:` renders as a table |
-| mixed content | 23 616 docs | — | **inline runs must stay inline** — the single largest layout risk |
-| text nodes | — | — | body text |
-| `docID` / siglum | 23 936 | `sigla` | running head and heading |
-| `CTHNr` / folder | 23 936 | `cth`, `cth_num` | group, bookmark, table of contents |
-| `AO:InvNr` | most | `inv` | metadata block |
-| editor, date | most | `authorship`, `year` | metadata block and PDF metadata |
-| `lg` language codes | most | `lang` | metadata block; script selection |
-| empty markers (`lb`, `gap`, `parlbk`) | most | — | line and section breaks — layout, not nothing |
-| comments | 3 docs | — | technical appendix; **not dropped** |
-| processing instructions | 8 423 docs | counted | the stylesheet PI is dropped by rule; any other PI goes to the appendix |
-| XML declaration | 442 docs | rewritten by rule | not shown; recorded in the manifest |
-| ids | 600 duplicated | — | anchors; duplicates cannot be resolved by id alone and need the document path as well |
-| unknown elements | possible | — | **must be visible in the appendix, never silently dropped** |
-| CDATA | 0 today | — | text, as written |
-| entity references | 0 today | — | expansion is a decision, recorded when made |
-| DTD | 0 today | — | not fetched, ever |
-| XInclude | 0 today | — | not followed, ever |
+| root `AOxml` | 23 936 | `Document::root` | document frame |
+| element tree | 4.88 M elements | `Kind::Element`, in document order | layout structure |
+| attributes | 6.37 M | `Element::attributes`, in the order written; the scan still reads 7 named fields | metadata block; editorial attributes visible |
+| namespaces | 8, everywhere | `Element::namespaces` as declared; `Name::namespace` resolved | qualified names resolved before layout; ODF `table:` renders as a table |
+| mixed content | 23 616 docs | `Kind::Text` between elements, whitespace kept | **inline runs must stay inline** — the single largest layout risk |
+| text nodes | — | `Kind::Text` | body text |
+| `docID` / siglum | 23 936 | element `docID`; `sigla` from the scan | running head and heading |
+| CTH number / folder | **0 as XML**; the folder name, 23 936 | nothing — see below; `cth`, `cth_num` from the folder | group, bookmark, table of contents |
+| `AO:InvNr` | 2 774 docs | element `AO:InvNr`; `inv` from the scan | metadata block |
+| editor, date | 23 646 docs carry an `editor` attribute | the attributes as written; `authorship`, `year` from the scan | metadata block and PDF metadata |
+| `lg` language codes | 23 711 docs | the attributes as written; `lang` from the scan | metadata block; script selection |
+| empty markers (`lb`, `gap`, `parsep`) | most | elements without children | line and section breaks — layout, not nothing |
+| comments | 3 docs | `Kind::Comment` | technical appendix; **not dropped** |
+| processing instructions | 8 423 docs | `Kind::Instruction`, in place | the stylesheet PI is dropped by rule; any other PI goes to the appendix |
+| XML declaration | 442 docs | `Document::declaration`, `None` when absent | not shown; recorded in the manifest |
+| ids | 600 duplicated | attributes as written; no uniqueness assumed | anchors; duplicates cannot be resolved by id alone and need the document path as well |
+| unknown elements | possible | an element like any other — the model has no vocabulary to be unknown to | **must be visible in the appendix, never silently dropped** |
+| CDATA | 0 today | text, joined with its neighbours | text, as written |
+| entity references beyond the five predefined | 0 today | the document is refused: no policy yet | expansion is a decision, recorded when made |
+| DTD | 0 today | the document is refused: nothing fetched | not fetched, ever |
+| XInclude | 0 today | an element like any other; not followed | not followed, ever |
 | the original file | 23 936 | copied verbatim | see below |
 
 **No category is "ignored".** Where a construct is not displayed, the row says
 where it goes instead.
+
+**Three rows of this table were wrong until 2026-09-13**, and building the model
+is what showed it; measured over the archive that day.
+
+- **No document carries a CTH number as XML.** The row said `CTHNr`, 23 936. No
+  element or attribute of that name occurs anywhere; the CTH number comes from
+  the folder the archive files a document under, which is what `parse` has
+  always read. A `cth` element exists in 748 documents and is something else. So
+  the requirement "group, bookmark, table of contents" rests on the archive's
+  layout, not on the document, and the model rightly has nothing to say about
+  it. This is a defect of the contract, not of the model: a value XML does not
+  carry cannot be read out of XML.
+- **`AO:InvNr` is in 2 774 documents**, not "most".
+- **`parlbk` occurs nowhere.** The section markers of this corpus are `parsep`
+  (72 989) and `parsep_dbl` (3 126).
 
 ### Authenticity: the original beside the PDF
 

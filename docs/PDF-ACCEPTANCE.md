@@ -61,10 +61,12 @@ does with documents.
 ## 0. Prerequisite: a real XML parser
 
 The current pipeline reads seven metadata fields out of the first 16 KiB of a
-document and copies the rest byte for byte. It still has no element tree: the
-parser adopted below reads events in a stream, for the classification step and
-nothing else. The dependency list is `dirs`, `memchr`, `quick-xml`, `thiserror`,
-`ureq`, `zip`.
+document and copies the rest byte for byte. **Since 2026-09-13 it also has an
+element tree**: `cli/src/document.rs` builds the document model over the parser
+adopted below — the XML Information Set of a document, refused for 223 documents
+and compared with `xsltproc` node for node over the other 23 713. Nothing
+consumes it yet; the semantic manifest of §2 is the next step. The dependency
+list is unchanged: `dirs`, `memchr`, `quick-xml`, `thiserror`, `ureq`, `zip`.
 
 Converting these manuscripts without losing their content therefore begins with
 choosing a parser, not a PDF library. The parser was adopted on 2026-09-05:
@@ -75,7 +77,10 @@ choosing a parser, not a PDF library. The parser was adopted on 2026-09-05:
    nothing resolves anything; a parser makes them a configuration to get right.
    `cli/tests/xml_hostile.rs` already checks them and will keep doing so.
 2. **Streaming**, so a document is not held twice. The corpus is 339.5 MB of
-   text and the largest document is 897 KB.
+   text and the largest document is 897 KB. The document model keeps this by
+   borrowing: a document's text is read once, the parser pulls events from it,
+   and the model refers back to it wherever XML does not change what was
+   written — a copy is made only where the specification does change it.
 3. ~~**Recoverable**: 210 of 23 936 documents are not well-formed. A parser that
    can only refuse turns 0.88 % of the corpus into a hole.~~
 
