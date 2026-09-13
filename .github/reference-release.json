@@ -11,13 +11,13 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.7 is the",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.8 is the",
     "current release, published on 2026-09-13. A release cannot record itself — the commit",
     "it names is the commit that carries it, and no file can contain its own hash — so each",
     "entry here is added by the commit after the release it describes.",
     "",
-    "v2.5.7 replaced v2.5.6, withdrawn on 2026-09-13 — release, tag and DMG. The same",
-    "happened to v2.5.5 on 2026-09-12, to v2.5.4 on 2026-09-10, to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to",
+    "v2.5.8 replaced v2.5.7, withdrawn on 2026-09-13 — release, tag and DMG. The same",
+    "happened to v2.5.6 earlier on 2026-09-13, to v2.5.5 on 2026-09-12, to v2.5.4 on 2026-09-10, to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to",
     "v2.5.1 on 2026-09-04, to v2.5.0 on 2026-09-01 and",
     "to v2.1.0 through v2.4.0",
     "on 2026-08-30, so the 2.x line is still represented by its head alone. A reference",
@@ -47,11 +47,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.5.7",
-      "commit": "fbd90f8b04859e8338f0379b361c25884b4da970",
-      "published": "2026-09-12T22:47:37Z",
-      "dmg_sha256": "c428cdf5b4376f2b72ed7333ff3e04ab6f534cf4a3ac3fd56cc41d73ddee0f19",
-      "why": "The current release and the third reference. It replaced v2.5.6, withdrawn the same day, and the number moved for the rule rather than for an obstacle: a reference release is not re-cut, so work that lands after one takes a number of its own. What it carries over v2.5.6 is one correctness defect closed and the words the program uses about the corpus. The defect: building a package named the archive path three times — headers, digest, bodies — so an archive replaced between those reads left the manifest stating a provenance the package did not have, with nothing failing and nothing warning; one open descriptor now serves both passes and the digest, and a test that swaps an impostor archive at the seam fails twice on the old code. The words: the window led with «Некорректных XML – 206» and «Полностью строгий разбор насчитывает 223», which put three different questions on one scale of strictness — it now leads with the only number that costs a reader anything (206 documents this program cannot read, the ones a conversion will not take) and says the rest in prose, naming the thirteen documents that break Namespaces in XML as the well-formed XML they are. The inventory's markup note is English, the manifest's xml note says which question each count answers, and the wire carries read/unread where it carried well_formed/not_well_formed. The documents themselves are untouched: the byte mirror hashes to 7cfcdce4…35d0 exactly as it did for v2.5.6, v2.5.5 and v2.5.4; the package as a whole hashes to 91fca734…6071, moved by the inventory's wording and one note inside manifest.json."
+      "tag": "v2.5.8",
+      "commit": "e2a34ace4a884933735bc2f6f869c009a473f661",
+      "published": "2026-09-13T16:13:30Z",
+      "dmg_sha256": "440c08feca04753c9eb2db31b3146e6c5a5c6d1f6a8eb2a43dfae58d142b7aa5",
+      "why": "The current release and the third reference. It replaced v2.5.7, withdrawn the same day, and the number moved for the rule rather than for an obstacle: a reference release is not re-cut, so work that lands after one takes a number of its own. What it carries over v2.5.7 is four positions of the release gate of 2026-09-13 closed, each by a test that failed on the code before it, and the window's number put on the set that has a consequence. A killed build left its staging directory — up to a whole second package of 382.8 MiB — and no later build removed it; each staging directory now carries an owner marker under an OS lock, and the next build removes the ones whose owner is gone, never a live run's, proven by a real SIGKILL. A foreign lock file is no longer echoed into the refusal, a directory at the lock path ends in a refusal instead of an endless loop at 95–99 % CPU, and a docID that is not UTF-8 no longer names a package file after invented replacement characters — the manifest records it under a reason of its own, invalid-encoding. The window's «Не будут преобразованы» stands over 223, the documents the document model refuses, with 206 / 4 / 13 as its explanation. The documents themselves are untouched: the byte mirror hashes to 7cfcdce4…35d0 exactly as it did for v2.5.7 and back to v2.5.4; the package as a whole hashes to 714d6f65…68a5, moved by one manifest line — removing it gives v2.5.7's 91fca734…6071."
     }
   ]
 }
