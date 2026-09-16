@@ -22,7 +22,7 @@
 //! them is a deliberate edit here.
 
 use aruna::export::{normalize_into, verify};
-use aruna::parse::{is_manuscript_xml, looks_like_manuscript, HEADER_READ_LIMIT};
+use aruna::parse::{entry_name, is_manuscript_xml, looks_like_manuscript, HEADER_READ_LIMIT};
 use std::io::Read as _;
 use std::path::PathBuf;
 
@@ -553,6 +553,56 @@ fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
          выборка перестала быть корпусом"
     );
     eprintln!("структурный критерий: {same} совпало, {refused} без канонической формы");
+}
+
+/// **Ни одно имя записи архива не читается чужой кодовой таблицей.**
+///
+/// Найдено 16.09.2026 при разборе пятой позиции заслона. `zip` читает имя
+/// записи как CP437, пока флаг UTF-8 не сказан, а в этом архиве флага нет ни у
+/// одной из 26 910 записей: шестнадцать имен с не-ASCII байтами крейт отдавал
+/// как `Mu╠ênchen 5.xml`. Знаков этих в источнике нет, а имя записи – последнее
+/// звено цепочки сиглы, то есть то самое, чем называется файл пакета, когда
+/// `docID` документа прочитать нельзя.
+///
+/// Отрицательный контроль здесь обязателен: без него тест прошел бы и на
+/// прежнем коде. Шестнадцать имен обязаны отличаться от того, что крейт
+/// говорит сам, – иначе проверять нечего.
+#[test]
+fn no_entry_name_is_read_through_a_foreign_code_page() {
+    let Some(path) = required() else { return };
+
+    let file = std::fs::File::open(&path).expect("open the archive");
+    let mut archive =
+        zip::ZipArchive::new(std::io::BufReader::new(file)).expect("read the archive");
+
+    let (mut entries, mut non_ascii, mut repaired) = (0usize, 0usize, 0usize);
+    let mut seen: Vec<String> = Vec::new();
+    for i in 0..archive.len() {
+        let entry = archive.by_index(i).expect("entry");
+        let name = entry_name(entry.name_raw(), entry.name());
+        assert!(
+            !name.contains('\u{FFFD}'),
+            "имя записи со знаком замены: {name:?}"
+        );
+        entries += 1;
+        if !name.is_ascii() {
+            non_ascii += 1;
+            repaired += usize::from(name != entry.name());
+            seen.push(name.to_string());
+        }
+    }
+
+    assert_eq!(entries, 26_910, "архив сменил состав");
+    assert_eq!(non_ascii, 16, "имен с не-ASCII байтами стало другое число");
+    assert_eq!(
+        repaired, non_ascii,
+        "имена читаются так же, как их отдает крейт, – проверять нечего"
+    );
+    assert!(
+        seen.iter()
+            .any(|name| name.ends_with("/Mu\u{308}nchen 5.xml")),
+        "`München 5.xml` в NFD не найден среди {seen:#?}"
+    );
 }
 
 /// Каноническая форма по `xmllint --c14n`, или `None` — документ ей не дался.

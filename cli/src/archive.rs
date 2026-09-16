@@ -9,7 +9,8 @@ use crate::error::{ArunaError, Result};
 use crate::job::{Job, Phase};
 use crate::order::sort_records;
 use crate::parse::{
-    is_manuscript_xml, looks_like_manuscript, parse_manuscript, ManuscriptRecord, HEADER_READ_LIMIT,
+    entry_name, is_manuscript_xml, looks_like_manuscript, parse_manuscript, ManuscriptRecord,
+    HEADER_READ_LIMIT,
 };
 use crate::progress::Event;
 use std::fs::File;
@@ -162,7 +163,9 @@ fn read_archive<P: Probe>(
         // Copied out because reading the entry consumes it, and into the buffer
         // from the last pass because 24 500 names is 24 500 allocations.
         scratch.path.clear();
-        scratch.path.push_str(entry.name());
+        scratch
+            .path
+            .push_str(entry_name(entry.name_raw(), entry.name()));
 
         // The path gate, which costs nothing: an entry rejected here is never
         // inflated.

@@ -75,6 +75,26 @@ pub fn truncate_on_char_boundary(s: &str, max: usize) -> &str {
     &s[..i]
 }
 
+/// The name of an archive entry, read as its bytes say rather than as its flag
+/// says.
+///
+/// `zip` decodes an entry name as CP437 unless bit 11 of the general purpose
+/// flag claims UTF-8, and the corpus archive sets that bit on none of its
+/// 26 910 entries. Sixteen of the names are UTF-8 all the same — `München 5.xml`,
+/// `İzmir 1270+.xml`, `Çorum 2.xml`, `HT 1.I – II 16.xml` — and CP437 turns the
+/// first of them into `Mu╠ênchen 5.xml`: characters the source does not have,
+/// which is what specification 4.9.6 forbids. The entry name is the last resort
+/// of the siglum chain ([`fields::extract_sigla`]), the one place a document
+/// whose own `docID` cannot be read gets its package file named from — so
+/// reading the name wrong is reading it wrong exactly where it is needed.
+///
+/// CP437 stays for an archive that really is CP437: `fallback` is the name the
+/// crate already decoded, and it is asked for only when the bytes are not UTF-8.
+/// Measured 2026-09-16: no entry name in this corpus is anything but UTF-8.
+pub fn entry_name<'a>(raw: &'a [u8], fallback: &'a str) -> &'a str {
+    std::str::from_utf8(raw).unwrap_or(fallback)
+}
+
 /// Parse a single XML document given its archive-relative path and raw text.
 ///
 /// Two windows are handed to the field extractors and every extractor takes the
@@ -252,6 +272,32 @@ fn header_block<'a>(xml: &'a str, tag: &[u8]) -> Option<&'a str> {
 mod tests {
     use super::fixtures::SAMPLE_FULL;
     use super::*;
+
+    /// **Имя записи архива читается по своим байтам, а не по чужому флагу.**
+    ///
+    /// Заслон 13.09.2026, позиция 5, попутная находка 16.09.2026: в архиве
+    /// корпуса флага UTF-8 нет ни у одной из 26 910 записей, и `zip` читает
+    /// имена как CP437. Шестнадцать имен от этого получают знаки, которых в
+    /// источнике нет, – а имя записи и есть последнее звено цепочки сиглы.
+    ///
+    /// Второй случай – настоящая CP437, где запасное чтение и нужно: байт
+    /// `0x9A` там значит «Ü» и никакой последовательностью UTF-8 не является.
+    #[test]
+    fn an_entry_name_is_read_as_its_bytes_say() {
+        // `München 5.xml`, как его пишет macOS: `u` и знак умлаута отдельно.
+        let raw = "CTH 570_XML_HDivT/Mu\u{308}nchen 5.xml".as_bytes();
+        assert_eq!(
+            entry_name(raw, "CTH 570_XML_HDivT/Mu╠ênchen 5.xml"),
+            "CTH 570_XML_HDivT/Mu\u{308}nchen 5.xml"
+        );
+
+        let cp437 = b"CTH 570/M\x9aNCHEN.XML";
+        assert_eq!(
+            entry_name(cp437, "CTH 570/MÜNCHEN.XML"),
+            "CTH 570/MÜNCHEN.XML",
+            "байты не UTF-8 – запасное чтение крейта"
+        );
+    }
 
     /// TLHdig keeps the inventory number outside the header — `<AO:InvNr>` sits
     /// in `<AO:Manuscripts>` in the body. Searching the header alone found it in
