@@ -462,17 +462,24 @@ only route.
 `cli/tests/fonts.rs` holds the file to its length and digest on every run: the
 terms forbid modifying it, and an edited font would breach them in silence.
 
-**The exported inventory tells its reader, and the package carries no font.**
-The summary block of `TLHdig_Beta_0.3.html` names the sign, says no operating
-system draws it, points at `cli/resources/fonts/` and carries the credit the
-terms require. Nothing beyond that line, and the reason is a measurement rather
-than a preference: the inventory holds **no** occurrence of `U+100000` and no
-cuneiform character at all — checked 2026-09-09 by emitting the catalogue of all
-23 936 manuscripts and counting — because all 927 occurrences live in the `cu`
-attribute of `<lb>` inside the documents themselves. Those the package mirrors
-byte for byte, and a byte mirror carries no stylesheet, so an `@font-face` rule
-would have styled a sign that is nowhere on the page it was added to. The reader
-installs the font, or does not, and the line says which it is.
+**The exported inventory no longer tells its reader, and the package carries no
+font.** Until 2026-09-17 the summary block of `TLHdig_Beta_0.3.html` named the
+sign, said that only `UllikummiA` draws it and carried the credit the terms ask
+for. The owner removed that line; the credit travels where it also always was —
+`README.md`, this document and `cli/resources/fonts/UllikummiA-TERMS.txt` — and
+the package, which never carried the font, now says nothing about it either. The
+cost is named rather than softened: a reader who has only the package learns
+nowhere that one sign of the corpus needs a font nobody has by default, and the
+sign renders as a blank box until someone tells them. Where the line stood, the
+reason it was one line and not a stylesheet is unchanged, and it is a
+measurement rather than a preference: the inventory holds **no** occurrence of
+`U+100000` and no cuneiform character at all — checked 2026-09-09 by emitting
+the catalogue of all 23 936 manuscripts and counting — because
+all 927 occurrences live in the `cu` attribute of `<lb>` inside the documents
+themselves. Those the package mirrors byte for byte, and a byte mirror carries
+no stylesheet, so an `@font-face` rule would have styled a sign that is nowhere
+on the page it was added to. The reader installs the font, or does not, and now
+nothing in the package says which it is.
 
 The other three faces — `UllikummiB`, `UllikummiC`, `Semiramis Unicode 3` — are
 still not here, for the reason given above: they cover nothing this corpus uses.
