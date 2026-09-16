@@ -81,17 +81,6 @@
             >Groups (CTH): {groups}</span
           ></span
         >
-        <span class="cuneiform-note"
-          >Cuneiform note: some of the documents linked here use U+100000 in their cuneiform lines —
-          a sign with no Unicode code point that is drawn only by the UllikummiA font, created by
-          Sylvie Vanséveren and available on the Hethitologie Portal Mainz.</span
-        >
-        <span class="markup-note"
-          >Please note: some of the documents linked here do not follow the rules of XML validation.
-          This is a feature of the source documents, not how the package was built. They are all
-          provided as they were originally and can be opened via the links in the same way as the
-          others. You can find a list of their names in the manifest.json file.</span
-        >
       </p>
       <section class="legend" aria-label="Column legend">
         <p class="legend-title">Columns</p>
