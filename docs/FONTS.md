@@ -363,6 +363,74 @@ scholarly use with a credit. The four Noto files carry `0x0000`, Installable,
 which permits everything. Read out of each file's own `OS/2` table on
 2026-09-10, not taken from a catalogue.
 
+## How the files travel, and where they are checked
+
+Settled 2026-09-17, when the premise changed: **the inventory and the PDF are
+built on the reader's machine, not here.** The application is installed on a
+clean Mac, downloads the corpus itself and writes both outputs there. A font
+this corpus needs therefore has to arrive with the application, because nothing
+on that machine will fetch it — and this program never goes looking for one.
+
+**Into the application.** `tauri.conf.json` declares
+`"resources": { "../cli/resources/fonts/": "fonts/" }`, so all twelve files —
+seven fonts, five licence texts — are copied into the bundle. On macOS that is
+`Aruna.app/Contents/Resources/fonts/`, measured 2026-09-17 on a build of 2.5.8:
+twelve files, 4 352 KiB, and the bundle grew from 9.2 MB to 14 MB. The path is
+named once in code, `aruna_desktop_lib::FONT_RESOURCES`, so the two halves of
+that decision cannot drift.
+
+macOS ships `Noto Sans Cuneiform` and `STIX Two Math` itself, byte-identical to
+the release files (measured 2026-09-12), and they travel anyway: a PDF embeds a
+font *file*, and cannot embed a face by name.
+
+**Into the package.** The package carries exactly one font, `UllikummiA.ttf`,
+beside the inventory, with `UllikummiA-TERMS.txt` next to it. Everything else in
+the stack is drawn from the reader's system, where on macOS it is present — and
+`Noto Sans Cuneiform` with `STIX Two Math` together weigh 1.6 MB that would buy
+nothing. The page loads the one file it cannot do without by a relative path,
+`@font-face { src: url('./UllikummiA.ttf') }`, never by a family name in the
+system and never by a URL.
+
+Measured 2026-09-17 on the corpus, twice with the same answer:
+
+| | |
+|---|---|
+| files in the package | 23 940 — 23 936 documents, the inventory, the manifest, the font, the terms |
+| documents | 23 936, digest `7cfcdce4…35d0` — **unmoved** |
+| package digest | `1d2e0b4aa90eba507a1b7265ec1d657ef96a42c305afdb14db2d36c38e1cff13` |
+| the addition | 507 020 bytes — 503 160 the font, 3 860 the terms |
+| its share of the package | 0.143 % of 354 691 339 bytes |
+
+**Where integrity is checked: both ends, and they are different questions.**
+
+At build time, `cli/tests/fonts.rs` and `aruna::fonts` hold the tree against the
+SHA-256 table above — that catches a font edited, re-saved or subsetted in this
+repository before it can ship, which for `UllikummiA` is a licence matter and
+not a hygiene one.
+
+At start-up, the application verifies the directory inside the bundle it was
+installed from. That is the check the table cannot do: a file replaced after the
+build, truncated by a copy, or damaged on the reader's disk is invisible here
+and visible there. Three refusals, because three repairs: a file that is not
+there says the install is incomplete, a file of the wrong length says how short
+it is, and a file of the right length and the wrong digest says it has been
+replaced. **No font is ever substituted for another** — in a PDF the wrong face
+draws the wrong sign, and nothing downstream would notice.
+
+**The credit is in the output, not only here.** The Mainz terms ask the user of
+the font to mention a credit, and until 2026-09-17 it stood in `README.md`, in
+this file and in `UllikummiA-TERMS.txt` — that is, in the repository, which the
+reader of a package never sees. The inventory now carries it on the page, word
+for word as the terms give it:
+
+> Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal Mainz
+
+It is one constant, `aruna::fonts::CREDIT`, held against the terms file by a
+test and put on the page by the exporter, so the page and the licence cannot
+say different things. **In the PDF it is not there yet**, and that is deferred
+rather than done: there is no PDF. The requirement is written into
+`docs/PDF-ACCEPTANCE.md` so the first PDF is not the one that forgets it.
+
 ## Deliberately not named
 
 **`Hiragino Sans GB`** would close one more code point, `U+E83A`, and must not be

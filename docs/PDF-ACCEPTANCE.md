@@ -319,3 +319,27 @@ Before bundling anything: verify the licence permits both redistribution **and**
 embedding, and record both. Check that every code point in the corpus has a
 glyph — the list is produced by `corpus_inventory`. Do not convert text to
 outlines.
+
+**The files are already here, and already checked.** Since 2026-09-17 all seven
+fonts and five licence texts ride in the application bundle at
+`Aruna.app/Contents/Resources/fonts/`, verified against the SHA-256 table of
+`docs/FONTS.md` when the application starts. The PDF stage reads them from
+there, through `aruna::fonts`, and from nowhere else: no system path, no lookup
+by family name, no download. A font that is missing or is not the recorded file
+is a refusal naming the file, never a substitution — a substituted face draws
+the wrong sign and no later check would see it.
+
+**The credit has to be in the document, and this is the acceptance item that
+says so.** The Mainz terms ask the user of `UllikummiA` to mention:
+
+> Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal Mainz
+
+The inventory carries it visibly on the page as of 2026-09-17. The PDF does not
+carry it anywhere, because there is no PDF; the first one must, and in the
+document metadata at least — `set document(author: …)` is not the place, since
+the author of the corpus is not the author of the font, so it belongs in the
+keywords or a colophon line that Typst writes into the file. **Whether a visible
+line is also wanted is open**: the inventory has one because it is a page, and a
+663-document PDF set would carry it 663 times. Decide it with the first PDF, and
+do not ship one without the metadata. The constant is `aruna::fonts::CREDIT`;
+quoting it a second time by hand would be a paraphrase waiting to happen.
