@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
-#[cfg(feature = "e2e")]
+// Нужен в обеих сборках с 17.09.2026: `setup` спрашивает у него каталог
+// ресурсов и состояние. До этого его звала только ветка `e2e`.
 use tauri::Manager;
 
 #[cfg(feature = "e2e")]
@@ -1102,6 +1103,38 @@ fn contract() -> tauri_specta::Builder<tauri::Wry> {
         .events(tauri_specta::collect_events![BuildProgress])
 }
 
+/// Где внутри приложения лежат шрифты, относительно каталога ресурсов.
+///
+/// `tauri.conf.json` кладет `cli/resources/fonts/` сюда, и на macOS это
+/// `Aruna.app/Contents/Resources/fonts/`. Одно место, названное один раз: путь
+/// в конфигурации и путь в коде – это две половины одного решения, и разойтись
+/// им нельзя.
+pub const FONT_RESOURCES: &str = "fonts";
+
+/// Итог проверки шрифтов при запуске: каталог, который прошел сверку, либо
+/// причина отказа.
+///
+/// Хранится, а не печатается и забывается: контур PDF, когда он появится,
+/// обязан отказать со ссылкой на эту причину, а не искать шрифт заново. Пока
+/// контура нет, значение читает только сам запуск – и это записано честно, а не
+/// выдано за работающую проверку в продукте.
+#[derive(Default)]
+pub struct FontResources(std::sync::Mutex<Option<std::result::Result<std::path::PathBuf, String>>>);
+
+impl FontResources {
+    /// Записать итог. Один раз, при запуске.
+    fn set(&self, outcome: std::result::Result<std::path::PathBuf, String>) {
+        if let Ok(mut slot) = self.0.lock() {
+            *slot = Some(outcome);
+        }
+    }
+
+    /// Каталог со сверенными шрифтами, если сверка прошла.
+    pub fn directory(&self) -> Option<std::path::PathBuf> {
+        self.0.lock().ok()?.as_ref()?.as_ref().ok().cloned()
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let contract = contract();
@@ -1141,11 +1174,50 @@ pub fn run() {
         // защиту логгера ниже текстовым поиском относительно `tauri_plugin_log`,
         // и вставка в `setup` сдвинула бы то, что он ищет.
         .manage(Building::default())
+        .manage(FontResources::default())
         .invoke_handler(contract.invoke_handler())
         .setup(move |app| {
             // Первой строкой: пока события не смонтированы, ни одно из них не
             // дойдет до окна, а сборку окно может начать сразу.
             contract.mount_events(app);
+
+            // Шрифты проверяются здесь, при запуске, и только отсюда.
+            //
+            // **Почему при запуске, а не при сборке.** Сборочная проверка
+            // держит дерево – это `fonts::tests` и `cli/tests/fonts.rs`, и они
+            // ловят правку шрифта до того, как он уедет. Но файл внутри уже
+            // установленного приложения ей не виден: подмену, обрезание при
+            // копировании образа, испорченный том – видит только тот, кто
+            // читает файл на той машине. Поэтому проверок две, и вторая
+            // здесь.
+            //
+            // Каталог берется у Tauri и больше нигде: ни системных путей, ни
+            // поиска по имени семейства. Приложение, не знающее, где его
+            // ресурсы, не станет угадывать – в PDF угаданный шрифт нарисует
+            // не тот знак, и никто ниже по течению этого не заметит.
+            let outcome = app
+                .handle()
+                .path()
+                .resource_dir()
+                .map_err(|e| format!("каталог ресурсов недоступен: {e}"))
+                .and_then(|dir| {
+                    let fonts = dir.join(FONT_RESOURCES);
+                    aruna::fonts::verify_dir(&fonts)
+                        .map(|()| fonts)
+                        .map_err(|e| e.to_string())
+                });
+            match &outcome {
+                Ok(dir) => log::info!("шрифты на месте: {}", dir.display()),
+                // Отказ называет файл и причину – их несет сама ошибка ядра.
+                // `eprintln!` рядом с журналом сознательно: плагин журнала
+                // регистрируется только в отладочной сборке, а это сообщение
+                // нужно и в выпуске.
+                Err(message) => {
+                    log::error!("{message}");
+                    eprintln!("Aruna: {message}");
+                }
+            }
+            app.handle().state::<FontResources>().set(outcome);
 
             #[cfg(feature = "e2e")]
             app.handle()

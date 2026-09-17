@@ -17,6 +17,33 @@
  * and every declaration below computes to what it computed to before.
  */
 
+/* The one font the package carries, loaded from beside the page.
+ *
+ * `UllikummiA` draws `U+100000`, which occurs 927 times in 370 documents and
+ * which nothing on a stock Mac draws — not one of the 366 faces macOS ships.
+ * Naming it in the stack below is therefore a wish on every machine but the one
+ * that has it installed, and the reader's machine is the one that does not:
+ * the package is built on a clean Mac by the installed application, and the
+ * repository this font came from is never on it.
+ *
+ * So the exporter puts the file next to the inventory and this rule loads it
+ * from there — a relative path, not a URL and not a family name in the system.
+ * The package opens from a folder with no network (§5.4), and `docs/FONTS.md`
+ * records the digest of the file the exporter writes.
+ *
+ * The terms this font is distributed under are in `UllikummiA-TERMS.txt`, which
+ * travels beside it in the package, and the credit they require is on the page
+ * itself — the `.font-credit` line in the meta block.
+ *
+ * **The console form's standalone inventory has no package beside it**, so
+ * there this rule finds nothing and the stack falls through exactly as it did
+ * before. That page is no worse than it was; the package page is better.
+ */
+@font-face {
+  font-family: UllikummiA;
+  src: url('./UllikummiA.ttf') format('truetype');
+}
+
 :root {
   color-scheme: light;
 

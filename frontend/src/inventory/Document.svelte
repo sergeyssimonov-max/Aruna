@@ -28,6 +28,7 @@
     script = '',
     source = '',
     authors = '',
+    fonts = '',
     generated = '',
     manuscripts = '',
     groups = '',
@@ -44,6 +45,14 @@
     source?: string
     /** Who is credited with the corpus itself, not with one manuscript. */
     authors?: string
+    /**
+     * The font credit the Hethitologie-Portal Mainz terms require for `UllikummiA`, quoted
+     * word for word from `cli/resources/fonts/UllikummiA-TERMS.txt`. It belongs on the page
+     * itself because the package travels to readers who never see the repository, where the
+     * same credit is also carried. Plain text, so it goes in as a text expression and Svelte
+     * escapes it — not `{@html}`.
+     */
+    fonts?: string
     /** The `Generated:` line, or nothing when there is no timestamp to give. */
     generated?: string
     /** How many manuscripts the table holds. */
@@ -75,6 +84,7 @@
       <p class="meta">
         <span>Source: {source}</span>
         <span>Corpus authors: {authors}</span>
+        <span class="font-credit">{fonts}</span>
         {@html generated}
         <span class="counts"
           ><span class="count">Manuscripts: {manuscripts}</span><span class="count"

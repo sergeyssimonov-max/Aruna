@@ -96,6 +96,7 @@ const MARKUP: readonly {
       ...placeholders(
         'source',
         'authors',
+        'fonts',
         'generated',
         'manuscripts',
         'groups',
