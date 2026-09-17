@@ -270,6 +270,21 @@ fn advice(err: &ArunaError) -> Option<String> {
              Это ошибка сборщика, а не ваших данных."
                 .to_string()
         }
+        // The fonts either arrived with the application or they did not, and
+        // neither case is about the corpus or the network. The advice differs
+        // because the repair does: one is an install to redo, the other a file
+        // that is not the one recorded — and this program will not quietly use
+        // another in its place.
+        ArunaError::FontMissing { .. } => {
+            "Приложение установлено не полностью: файл шрифта не на месте.\n\
+             Переустановите его из образа — шрифты лежат внутри приложения и не скачиваются."
+                .to_string()
+        }
+        ArunaError::FontAltered { .. } => {
+            "Файл шрифта не совпадает с записанным в docs/FONTS.md.\n\
+             Другой шрифт вместо него подставлен не будет: в PDF это дало бы не тот знак."
+                .to_string()
+        }
         // Nothing to advise: the reader stopped the run on purpose, and
         // `report` has already said so without calling it an error.
         ArunaError::Cancelled { .. } => return None,

@@ -207,10 +207,15 @@ fn assert_same_documents(archive: &Path, root: &Path, admitted: usize, in_packag
         admitted, in_package,
         "the number of documents written is not the number the gates admitted"
     );
+    // Four files that are not documents, and the number is the assertion: the
+    // inventory, the manifest, the font the page draws `U+100000` with and the
+    // terms that font is distributed under. Two until 2026-09-17; anything
+    // beyond these four is something nobody decided to ship.
     assert_eq!(
         files,
-        in_package + 2,
-        "the package holds files that are neither a document, the inventory nor the manifest"
+        in_package + 4,
+        "the package holds files that are none of: a document, the inventory, the manifest, \
+         UllikummiA.ttf, UllikummiA-TERMS.txt"
     );
 }
 

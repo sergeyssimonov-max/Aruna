@@ -94,7 +94,8 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
     // the corpus the two answers differ by exactly one.
     assert_eq!(built.stylesheet_dropped, 5);
 
-    // Structure: an inventory, two group directories, nothing else.
+    // Structure: an inventory, the font it draws `U+100000` with, that font's
+    // terms, the manifest, two group directories, nothing else.
     let mut top: Vec<String> = fs::read_dir(&root)
         .expect("read")
         .flatten()
@@ -103,7 +104,14 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
     top.sort();
     assert_eq!(
         top,
-        vec!["CTH 5", "CTH 9", "TLHdig_Beta_0.3.html", "manifest.json"]
+        vec![
+            "CTH 5",
+            "CTH 9",
+            "TLHdig_Beta_0.3.html",
+            "UllikummiA-TERMS.txt",
+            "UllikummiA.ttf",
+            "manifest.json"
+        ]
     );
 
     let mut group5: Vec<String> = fs::read_dir(root.join("CTH 5"))
@@ -191,8 +199,8 @@ fn none_of_the_archive_debris_reaches_the_package() {
     collect(&root, &mut files);
     assert_eq!(
         files.len(),
-        6,
-        "four documents, one inventory, one manifest: {files:?}"
+        8,
+        "four documents, one inventory, one manifest, the font and its terms: {files:?}"
     );
     for path in &files {
         let name = path
@@ -201,7 +209,11 @@ fn none_of_the_archive_debris_reaches_the_package() {
             .to_string_lossy()
             .to_string();
         assert!(
-            name.ends_with(".xml") || name == format!("{PACKAGE}.html") || name == "manifest.json",
+            name.ends_with(".xml")
+                || name == format!("{PACKAGE}.html")
+                || name == "manifest.json"
+                || name == aruna::fonts::PACKAGED_FONT
+                || name == aruna::fonts::PACKAGED_TERMS,
             "{name} is not something the package should hold"
         );
         assert!(!name.starts_with('.'), "{name} is hidden debris");

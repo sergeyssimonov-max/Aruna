@@ -39,6 +39,27 @@ pub enum ArunaError {
     #[error("oversized download of {url}: stopped after {got} bytes, limit is {limit}")]
     Oversized { url: String, limit: u64, got: u64 },
 
+    /// A font the application ships is not in the resource directory it was
+    /// supposed to arrive in. An incomplete install, not a corrupted one, and
+    /// the two are separate messages because they call for different repairs.
+    #[error(
+        "{path} is not there, and it covers {covers}; the application is installed incompletely"
+    )]
+    FontMissing {
+        path: std::path::PathBuf,
+        covers: &'static str,
+    },
+
+    /// A font is present and is not the file `docs/FONTS.md` records. Never
+    /// substituted for silently: in a PDF the wrong face draws the wrong sign,
+    /// and nothing downstream would notice.
+    #[error("{path} has been replaced or damaged: expected SHA-256 {expected}, found {found}")]
+    FontAltered {
+        path: std::path::PathBuf,
+        expected: &'static str,
+        found: String,
+    },
+
     /// The bytes arrived intact by length but hash to something else. Zenodo
     /// publishes an MD5 per file, so a silently corrupted or republished archive
     /// is caught here instead of surfacing as an obscure parse failure.

@@ -85,3 +85,96 @@ fn the_terms_travel_with_the_font() {
         );
     }
 }
+
+/// Nothing in this program reaches into the machine's own font directories.
+///
+/// The whole point of carrying the files is that the machine the inventory and
+/// the PDF are built on is not this one: it is a clean Mac that has never had
+/// `UllikummiA` and never will. A path into `/System/Library/Fonts` or
+/// `~/Library/Fonts` in the program would quietly undo that — it would work
+/// here, on the desk where every font is installed, and fail or, worse, find
+/// something else on the reader's.
+///
+/// `examples/font_coverage` is exempt and is the reason the exemption is named
+/// rather than assumed: measuring what a system draws is exactly what it is
+/// for, and it is an example, not the program.
+#[test]
+fn no_source_file_reaches_for_a_system_font_directory() {
+    let roots = [
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../src-tauri/src"),
+    ];
+    let forbidden = [
+        "/System/Library/Fonts",
+        "/Library/Fonts",
+        "~/Library/Fonts",
+        "/usr/share/fonts",
+    ];
+
+    let mut stack: Vec<PathBuf> = roots.to_vec();
+    let mut read = 0usize;
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir)
+            .expect("read a source directory")
+            .flatten()
+        {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).expect("read a source file");
+            read += 1;
+            for needle in forbidden {
+                assert!(
+                    !text.contains(needle),
+                    "{} names {needle}: the fonts ship with the application and are read from it",
+                    path.display()
+                );
+            }
+        }
+    }
+    assert!(read > 20, "only {read} source files were scanned");
+}
+
+/// Every shipped file is the file `docs/FONTS.md` records, and the five licence
+/// texts are beside them.
+///
+/// The table lives in `aruna::fonts`; this asks it about the tree the bundle is
+/// built from, which is the build-time half of the pair. The run-time half is
+/// in the application's `setup`, against the directory inside the installed
+/// bundle — a file replaced after the build is invisible here and visible
+/// there, which is why there are two.
+#[test]
+fn the_seven_fonts_and_five_licences_are_the_recorded_files() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts");
+    aruna::fonts::verify_dir(&dir).expect("the repository's font directory verifies");
+
+    assert_eq!(aruna::fonts::FONTS.len(), 7);
+    assert_eq!(aruna::fonts::LICENCES.len(), 5);
+    for font in &aruna::fonts::FONTS {
+        let path = dir.join(font.file);
+        assert_eq!(
+            aruna::sha256::sha256_file(&path).expect("digest"),
+            font.sha256,
+            "{} is not the file docs/FONTS.md records",
+            font.file
+        );
+    }
+
+    // The digests are in the document too, so a reader comparing against
+    // upstream and a machine checking at run time read the same numbers.
+    let doc =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/FONTS.md"))
+            .expect("read docs/FONTS.md");
+    for font in &aruna::fonts::FONTS {
+        assert!(
+            doc.contains(font.sha256),
+            "docs/FONTS.md does not carry the digest of {}",
+            font.file
+        );
+    }
+}

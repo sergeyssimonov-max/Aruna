@@ -297,6 +297,14 @@ impl Failure {
             ExportInvalid { .. } => ("package_invalid", Some(Phase::Validating), false),
             ExportIncomplete { .. } => ("package_incomplete", Some(Phase::Validating), false),
             ExportPackageTooLarge { .. } => ("package_too_large", Some(Phase::Exporting), false),
+
+            // The fonts the application was installed with. Neither is worth
+            // another attempt and neither is about this run: one says the
+            // install is incomplete, the other that a file in it is not the one
+            // recorded. Two codes, because a front end that says "reinstall"
+            // for the first would be wrong about the second.
+            FontMissing { .. } => ("font_missing", None, false),
+            FontAltered { .. } => ("font_altered", None, false),
         };
 
         Failure {

@@ -1,3 +1,8 @@
+@font-face {
+  font-family: UllikummiA;
+  src: url("./UllikummiA.ttf") format("truetype");
+}
+
 :root {
   color-scheme: light;
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Cuneiform", UllikummiA,

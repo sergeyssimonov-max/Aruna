@@ -55,13 +55,22 @@ pub const PACKAGE: &str = "TLHdig_Beta_0.3";
 /// The machine-readable model of the package.
 pub const MANIFEST: &str = "manifest.json";
 
-/// Whether `name` is one of the two files the package carries at its root.
+/// Whether `name` is one of the four files the package carries at its root.
 ///
 /// The validator's walk and its refusal to overwrite a stranger's folder each
 /// listed these independently, and this very pair had to be extended by hand in
 /// both places when the manifest arrived. One list, asked twice.
+///
+/// Four since 2026-09-17: the inventory, the manifest, and the font the
+/// inventory draws `U+100000` with together with the terms that font is
+/// distributed under. The font is here because the page is read on a machine
+/// that has never heard of it — see [`crate::fonts`] — and the terms are here
+/// because they are a condition of carrying it, not a courtesy.
 pub fn is_root_file(name: &str) -> bool {
-    name == MANIFEST || name.strip_prefix(PACKAGE) == Some(".html")
+    name == MANIFEST
+        || name.strip_prefix(PACKAGE) == Some(".html")
+        || name == crate::fonts::PACKAGED_FONT
+        || name == crate::fonts::PACKAGED_TERMS
 }
 
 /// The most one document may be, inflated.
@@ -385,6 +394,25 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     let html = crate::html::render_linked_html(&corpus, "");
     let inventory = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
     fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
+
+    // The font the page needs and the terms it travels under, written from the
+    // bytes compiled into this binary so that the console program and the
+    // window produce the same package. Unmodified, both of them: the terms
+    // forbid distributing a changed file, and `fonts::tests` holds these bytes
+    // against the ones on disk.
+    for (name, bytes) in [
+        (
+            crate::fonts::PACKAGED_FONT,
+            crate::fonts::PACKAGED_FONT_BYTES,
+        ),
+        (
+            crate::fonts::PACKAGED_TERMS,
+            crate::fonts::PACKAGED_TERMS_BYTES,
+        ),
+    ] {
+        let path = staging.path().join(name);
+        fs::write(&path, bytes).map_err(ArunaError::io(path))?;
+    }
 
     let manifest_json = manifest::render_manifest(
         &records,

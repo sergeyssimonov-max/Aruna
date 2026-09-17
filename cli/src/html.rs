@@ -264,6 +264,13 @@ fn render(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
             ("SCRIPT", INVENTORY_SCRIPT),
             ("SOURCE", &escape_html(corpus.source)),
             ("AUTHORS", &authors),
+            // The credit the Mainz terms require for `UllikummiA`, which the
+            // package now carries beside this page. It is on the page rather
+            // than only in the repository because the reader of a package never
+            // sees the repository, and the terms ask the user of the font — us
+            // — to mention it. Quoted, never rewritten: `crate::fonts::CREDIT`
+            // is held against the terms file by a test.
+            ("FONTS", &escape_html(crate::fonts::CREDIT)),
             ("GENERATED", &generated_line(generated_at)),
             ("MANUSCRIPTS", &corpus.manuscripts().to_string()),
             ("GROUPS", &groups.to_string()),

@@ -418,8 +418,8 @@ fn the_inventory_carries_screen_and_print_rules() {
 // The package as a whole
 // ---------------------------------------------------------------------------
 
-/// The folder holds the inventory, the manifest and the manuscripts. Nothing
-/// else.
+/// The folder holds the inventory, the manifest, the manuscripts, and the one
+/// font the page cannot be read without together with its terms. Nothing else.
 ///
 /// A build that left an intermediate representation, a temporary file or a
 /// backup behind would still pass every link check above.
@@ -432,8 +432,11 @@ fn the_package_holds_only_what_a_reader_needs() {
             .file_name()
             .and_then(|n| n.to_str())
             .expect("a file name");
-        let allowed =
-            name.ends_with(".xml") || name == format!("{PACKAGE}.html") || name == "manifest.json";
+        let allowed = name.ends_with(".xml")
+            || name == format!("{PACKAGE}.html")
+            || name == "manifest.json"
+            || name == aruna::fonts::PACKAGED_FONT
+            || name == aruna::fonts::PACKAGED_TERMS;
         assert!(allowed, "the package holds {}", file.display());
         for junk in [".bak", ".tmp", ".part", ".orig", "~"] {
             assert!(
@@ -533,4 +536,54 @@ fn the_manifest_the_inventory_and_the_folder_name_the_same_groups() {
             );
         }
     }
+}
+
+/// The page carries the font it needs and the credit the font's terms ask for.
+///
+/// Three things at once, because they are one decision: the file is beside the
+/// page, the page names it by a path rather than by a family the reader's
+/// machine is supposed to have, and the credit the Hethitologie-Portal Mainz
+/// terms require is visible on the page. The repository has carried that credit
+/// since the font arrived, but a reader of the package never sees the
+/// repository — and the package is what travels.
+#[test]
+fn the_inventory_carries_the_font_it_needs_and_credits_its_author() {
+    let package = Package::build();
+    let html = package.inventory();
+
+    assert!(
+        html.contains(aruna::fonts::CREDIT),
+        "the inventory does not carry the credit the font's terms require"
+    );
+    assert!(
+        html.contains("url(\"./UllikummiA.ttf\")") || html.contains("url('./UllikummiA.ttf')"),
+        "the inventory does not load the font from beside itself"
+    );
+    assert!(
+        !html.contains("local(UllikummiA")
+            && !html.contains("local(\"UllikummiA")
+            && !html.contains("local('UllikummiA"),
+        "the inventory would take the font from the reader's system if it had one"
+    );
+
+    let font = package.root.join(aruna::fonts::PACKAGED_FONT);
+    let bytes = std::fs::read(&font).expect("the package carries the font");
+    assert_eq!(
+        bytes.as_slice(),
+        aruna::fonts::PACKAGED_FONT_BYTES,
+        "the font in the package is not the file the terms describe"
+    );
+    assert_eq!(
+        aruna::sha256::sha256_hex(&bytes),
+        aruna::fonts::FONTS[0].sha256,
+        "the font in the package is not the digest docs/FONTS.md records"
+    );
+
+    let terms = std::fs::read_to_string(package.root.join(aruna::fonts::PACKAGED_TERMS))
+        .expect("the package carries the terms");
+    let flat = terms.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        flat.contains(aruna::fonts::CREDIT),
+        "the terms beside the font do not carry the credit"
+    );
 }
