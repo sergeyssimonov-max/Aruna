@@ -740,6 +740,34 @@ describe('идет сборка', () => {
       await screen.findByRole('heading', { level: 1, name: 'Остановлено' }),
     ).toBeInTheDocument()
   })
+
+  /**
+   * **Остановленная сборка не выдается за готовую.**
+   *
+   * Шестая красная позиция заслона 13.09.2026 — со стороны окна. Отмена уже
+   * проверялась двумя тестами: что нажатие уходит в ядро и что по отказу с
+   * `cancelled` заголовок становится «Остановлено». Не проверялось третье, и
+   * оно и есть предмет позиции: что после отмены на экране не остается ничего
+   * от прогона, которого не было, — ни полосы, ни стадии, ни отчета, ни
+   * предложения открыть опись, которой никто не писал. Прогон начат из
+   * состояния «пакета нет», поэтому пакету взяться неоткуда.
+   */
+  it('на отмене не оставляет на экране ни полосы, ни отчета, ни описи', async () => {
+    const { finish } = await building()
+
+    emit(tock({ stage: 'writing', done: 5984, total: 23936 }))
+    await tick()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25')
+
+    await fireEvent.click(await primary())
+    finish(bad(failure({ code: 'cancelled', cancelled: true, message: 'сборка остановлена' })))
+
+    expect(await screen.findByText('сборка остановлена')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Остановлено')
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Открыть опись' })).toBeNull()
+    expect(screen.queryByText(/Документов/)).toBeNull()
+  })
 })
 
 describe('кончилось', () => {
