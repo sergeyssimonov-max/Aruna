@@ -491,8 +491,10 @@ it is the layer the DTO will be built from.
 Verified behaviour-preserving rather than assumed: the package rebuilt after the
 refactor is byte-for-byte the one built before it — zero differences. The file
 count read 24 601 here, from the era when the package carried a page per CTH
-folder; a package has held 23 938 files since those went on 2026-08-23, measured
-again on 2026-09-06.
+folder; the package this refactor was verified against held 23 938 files — the
+count from 2026-08-23, when those pages went, measured again on 2026-09-06. It
+holds 23 940 since 2026-09-17, when the packaged font and the text of its terms
+went in (`4d2caf2`).
 
 ### 2.3 Cancellation — done
 

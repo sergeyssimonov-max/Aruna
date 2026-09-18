@@ -49,11 +49,15 @@ cannot resolve stops the build rather than overwriting.
 
 ### The same input gives the same output
 
-Two builds of the archive produce the same package, byte for byte: **23 938
+Two builds of the archive produce the same package, byte for byte: **23 940
 files each time, 0 present in one and not the other, 0 with the same path and
-different bytes.** Measured again on 2026-09-06.
+different bytes.** Measured again on 2026-09-18.
 
-The count was 24 601 here until then, and had been wrong since 2026-08-23: it
+The count read 23 938 from 2026-08-23 until 2026-09-17, when the packaged font
+and the text of its terms went into the package (`4d2caf2`); those two are the
+whole of the difference.
+
+Before 2026-09-06 it read 24 601 here, and had been wrong since 2026-08-23: it
 included a page for each of the 663 CTH folders, and those pages were given up
 that day. The property never changed — two builds are identical — but the
 number stating it described a package this program had stopped producing.

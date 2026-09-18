@@ -149,10 +149,11 @@ cd cli
 cargo run --release --example determinism -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 ```
 
-Observed on 2026-09-06: 23 938 files each time, 0 present in one build and not
-the other, 0 with the same path and different bytes. (It read 24 601 until then,
-from a run made while the package still carried a page per CTH folder; those
-went on 2026-08-23.) `tests/reliability.rs` holds the same
+Observed on 2026-09-18: 23 940 files each time, 0 present in one build and not
+the other, 0 with the same path and different bytes. (It read 23 938 from
+2026-08-23 until the packaged font and the text of its terms went in on
+2026-09-17, and 24 601 before 2026-09-06, from a run made while the package
+still carried a page per CTH folder; those went on 2026-08-23.) `tests/reliability.rs` holds the same
 property against a synthetic archive, so a regression is caught without the
 71 MiB.
 

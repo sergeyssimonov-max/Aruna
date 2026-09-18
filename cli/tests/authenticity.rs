@@ -45,8 +45,9 @@ use tempfile::tempdir;
 
 /// What TLHdig Beta 0.3 holds, and what the specification records in 3.6.
 const DOCUMENTS: usize = 23_936;
-/// The documents, plus the inventory and the manifest.
-const FILES_IN_PACKAGE: usize = DOCUMENTS + 2;
+/// The documents, plus the inventory, the manifest, the one packaged font and
+/// the text of its terms — four files since 2026-09-17, two before it.
+const FILES_IN_PACKAGE: usize = DOCUMENTS + 4;
 
 /// The document as the package is expected to hold it, built from the permit
 /// list rather than from the normaliser.
@@ -295,7 +296,7 @@ fn a_package_holds_every_admitted_document_once_and_unchanged() {
 /// directory and reads every file back — so it is `#[ignore]` and the ordinary
 /// `nextest` run stays under ten seconds. It is the acceptance check for the
 /// authenticity contour, and the anchors it asserts are the ones the
-/// specification records in 3.6: 23 936 documents, 23 938 files.
+/// specification records in 3.6: 23 936 documents, 23 940 files.
 ///
 /// Skipped, like `tests/corpus.rs`, when the archive is not on this machine;
 /// `ARUNA_REQUIRE_FIXTURE=1` turns that skip into a failure.
