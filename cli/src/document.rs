@@ -871,6 +871,44 @@ mod tests {
         ));
     }
 
+    /// Заимствование доказывается адресом, а не именем варианта.
+    ///
+    /// `Cow::Borrowed` сам по себе говорит только, что копии не делали здесь;
+    /// он был бы тем же и для строки, взятой откуда угодно еще. Здесь
+    /// проверяется то, ради чего модель писалась: текст лежит внутри самого
+    /// документа, то есть документ в памяти один. Отрицательный контроль рядом —
+    /// копия той же строки в диапазон не попадает, иначе проверка сходилась бы
+    /// у чего угодно.
+    #[test]
+    fn borrowed_text_points_into_the_document_itself() {
+        let xml = String::from(r#"<a trans="nu"><w>ta</w></a>"#);
+        let document = read(&xml);
+        let from = xml.as_bytes().as_ptr() as usize;
+        let range = from..from + xml.len();
+
+        let Kind::Text(Cow::Borrowed(text)) = &document.nodes()[2].kind else {
+            panic!("текст не заимствован");
+        };
+        assert!(
+            range.contains(&(text.as_ptr() as usize)),
+            "текст лежит не в документе, значит документ скопирован"
+        );
+
+        let Cow::Borrowed(value) = &element(&document, 0).attributes[0].value else {
+            panic!("значение атрибута не заимствовано");
+        };
+        assert!(
+            range.contains(&(value.as_ptr() as usize)),
+            "значение атрибута лежит не в документе"
+        );
+
+        let copy = text.to_string();
+        assert!(
+            !range.contains(&(copy.as_ptr() as usize)),
+            "отрицательный контроль не работает: копия попала в диапазон"
+        );
+    }
+
     #[test]
     fn names_are_resolved_by_the_declarations_in_the_document() {
         let document = read(
