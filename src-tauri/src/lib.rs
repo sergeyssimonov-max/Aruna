@@ -1025,29 +1025,12 @@ async fn build_corpus(
             app: handle,
             job: counted(id.get()),
         };
-        let job = aruna::job::Job::with_id(id, &sink, &cancel);
         // Ядро умеет читать архив с диска, окно этой возможностью не
         // пользуется: `None` — закрепленная запись Zenodo через кеш.
         let request = aruna::app::CorpusRequest {
             local_archive: None,
         };
-        // Две ветки, а не одна с подстановкой умолчания: место, где спрашивают
-        // у платформы про папку загрузок, обязано остаться единственным, и оно
-        // внутри `app::build_corpus`.
-        match &chosen {
-            Some(folder) => aruna::app::build_corpus_into(&request, folder, &job),
-            None => aruna::app::build_corpus(&request, &job),
-        }
-        .map(|report| BuildReport {
-            job: counted(report.job.get()),
-            package: report.package.root.display().to_string(),
-            inventory: report.inventory.display().to_string(),
-            documents: counted(report.package.documents),
-            groups: counted(report.package.groups),
-            disambiguated: counted(report.package.disambiguated),
-            stylesheet_dropped: counted(report.package.stylesheet_dropped),
-        })
-        .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
+        build_once(id, &request, chosen.as_deref(), &cancel, &sink)
     })
     .await;
 
@@ -1065,6 +1048,44 @@ async fn build_corpus(
             true,
         )),
     }
+}
+
+/// Сборка как работа: тот же путь, которым идет команда, но без Tauri вокруг.
+///
+/// Выделено 17.09.2026 ради шва, которого не было. Отмена идущей сборки через
+/// окно до сих пор не была доказана ничем: `cancel_build` проверялся на флаге,
+/// которому тест сам же его и вручил, а сборка при этом не шла. Здесь сборка
+/// идет настоящая, флаг приходит из того же `Building`, что у команды, и
+/// проверить можно и исход, и то, что под окончательным именем ничего не
+/// осталось.
+///
+/// Контракт провода не затронут: команда выше сохранила и имя, и аргументы, и
+/// форму ответа, а `bindings.ts` порождается из них.
+fn build_once(
+    id: aruna::job::JobId,
+    request: &aruna::app::CorpusRequest,
+    chosen: Option<&std::path::Path>,
+    cancel: &aruna::job::Cancel,
+    progress: &dyn aruna::progress::Progress,
+) -> Result<BuildReport, BuildFailure> {
+    let job = aruna::job::Job::with_id(id, progress, cancel);
+    // Две ветки, а не одна с подстановкой умолчания: место, где спрашивают
+    // у платформы про папку загрузок, обязано остаться единственным, и оно
+    // внутри `app::build_corpus`.
+    match chosen {
+        Some(folder) => aruna::app::build_corpus_into(request, folder, &job),
+        None => aruna::app::build_corpus(request, &job),
+    }
+    .map(|report| BuildReport {
+        job: counted(report.job.get()),
+        package: report.package.root.display().to_string(),
+        inventory: report.inventory.display().to_string(),
+        documents: counted(report.package.documents),
+        groups: counted(report.package.groups),
+        disambiguated: counted(report.package.disambiguated),
+        stylesheet_dropped: counted(report.package.stylesheet_dropped),
+    })
+    .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
 }
 
 /// Попросить текущую сборку остановиться.
@@ -2037,6 +2058,187 @@ mod tests {
             backend.name(),
             "noop-wdio",
             "a release build registered the wdio backend"
+        );
+    }
+}
+
+/// Отмена идущей сборки — со стороны оболочки, на настоящей сборке.
+///
+/// Шестая красная позиция заслона 13.09.2026: «отмена идущей сборки через окно
+/// ничем не доказана». Доказано до сих пор было соседнее — что `Building::stop`
+/// поднимает флаг, который тест сам же ему и вручил, и что окно по отказу с
+/// `cancelled` говорит «Остановлено». Между этими двумя фактами лежала сборка,
+/// которой ни один тест не запускал.
+///
+/// Здесь она идет. Флаг живет в том же `Building`, что у команды; останавливает
+/// его тот же `stop()`, который зовет `cancel_build`; работу делает тот же
+/// `build_once`, который зовет `build_corpus`. Разница с командой одна и она
+/// названа: архив берется с диска, а не из закрепленной записи Zenodo, потому
+/// что тест в сеть не ходит.
+///
+/// Момент отмены выбран событием, а не таймером: нажатие приходит, когда окно
+/// увидело «пишу документы», — и это воспроизводимо на любой машине, тогда как
+/// задержка в миллисекундах делает тест хрупким и прячет дефект.
+///
+/// Зубы проверены пробой 17.09.2026: с обезвреженным `Building::stop` первый из
+/// двух тестов падает на том, что сборка дошла до конца.
+#[cfg(test)]
+mod cancelling {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    /// Архив корпуса, если он на месте. Тест тяжелый и помечен `#[ignore]`.
+    fn fixture() -> Option<std::path::PathBuf> {
+        let named = std::env::var_os("ARUNA_ZIP").map(std::path::PathBuf::from);
+        let path = named.unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip")
+        });
+        path.is_file().then_some(path)
+    }
+
+    /// Окно, которое нажимает «Остановить», услышав названную стадию.
+    ///
+    /// Это и есть кнопка: `stop()` — ровно то, что делает команда
+    /// `cancel_build`, и зовется он здесь по тому же состоянию.
+    struct WindowThatStops<'a> {
+        at: &'static str,
+        building: &'a Building,
+        seen: Mutex<Vec<&'static str>>,
+        presses: AtomicUsize,
+    }
+
+    impl aruna::progress::Progress for WindowThatStops<'_> {
+        fn report(&self, event: aruna::progress::Event<'_>) {
+            let name = match event {
+                aruna::progress::Event::ParsingArchive => "ParsingArchive",
+                aruna::progress::Event::Indexed { .. } => "Indexed",
+                aruna::progress::Event::ReadingHeaders => "ReadingHeaders",
+                aruna::progress::Event::WritingDocuments { .. } => "WritingDocuments",
+                aruna::progress::Event::CheckingPackage => "CheckingPackage",
+                aruna::progress::Event::CheckingPublished => "CheckingPublished",
+                _ => "other",
+            };
+            self.seen.lock().expect("не отравлен").push(name);
+            if name == self.at && self.presses.fetch_add(1, Ordering::SeqCst) == 0 {
+                self.building.stop();
+            }
+        }
+    }
+
+    /// Что лежит в каталоге назначения.
+    fn entries(root: &std::path::Path) -> Vec<String> {
+        let Ok(dir) = std::fs::read_dir(root) else {
+            return Vec::new();
+        };
+        let mut names: Vec<String> = dir
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// **Нажатие в окне останавливает идущую сборку, и пакета под окончательным
+    /// именем не остается.**
+    #[test]
+    #[ignore = "читает архив корпуса; запускать явно"]
+    fn a_running_build_stops_when_the_window_asks() {
+        let Some(zip) = fixture() else {
+            eprintln!("пропуск: архива корпуса нет");
+            return;
+        };
+        let destination = tempfile::tempdir().expect("каталог назначения");
+
+        let building = Building::default();
+        let cancel = aruna::job::Cancel::new();
+        building.claim(cancel.clone()).expect("место свободно");
+
+        let window = WindowThatStops {
+            at: "WritingDocuments",
+            building: &building,
+            seen: Mutex::new(Vec::new()),
+            presses: AtomicUsize::new(0),
+        };
+        let request = aruna::app::CorpusRequest {
+            local_archive: Some(zip),
+        };
+        let outcome = build_once(
+            aruna::job::JobId::next(),
+            &request,
+            Some(destination.path()),
+            &cancel,
+            &window,
+        );
+        building.release();
+
+        let refusal = outcome.expect_err("сборка обязана была остановиться");
+        assert_eq!(refusal.code, "cancelled", "отказ не назвался отменой");
+        assert!(refusal.cancelled, "отказ не помечен как отмена");
+
+        assert!(
+            window.presses.load(Ordering::SeqCst) >= 1,
+            "окно так и не нажало: стадии {:?}",
+            window.seen.lock().expect("не отравлен")
+        );
+        assert_eq!(
+            entries(destination.path()),
+            Vec::<String>::new(),
+            "после отмены в каталоге назначения что-то осталось"
+        );
+
+        // Место свободно: следующая сборка не упрется в «сборка уже идет».
+        building
+            .claim(aruna::job::Cancel::new())
+            .expect("после отмены место снова свободно");
+    }
+
+    /// Отрицательный контроль к тесту выше.
+    ///
+    /// Без нажатия тот же путь обязан собрать пакет целиком. Без этого теста
+    /// предыдущий доказывал бы только то, что сборка не доходит до конца, —
+    /// что верно и для сборки, сломанной чем угодно другим.
+    #[test]
+    #[ignore = "читает архив корпуса; запускать явно"]
+    fn the_same_run_without_a_press_builds_the_whole_package() {
+        let Some(zip) = fixture() else {
+            eprintln!("пропуск: архива корпуса нет");
+            return;
+        };
+        let destination = tempfile::tempdir().expect("каталог назначения");
+
+        let building = Building::default();
+        let cancel = aruna::job::Cancel::new();
+        building.claim(cancel.clone()).expect("место свободно");
+
+        // Тот же приемник, но стадии, которой он ждет, в сборке не бывает.
+        let window = WindowThatStops {
+            at: "НетТакойСтадии",
+            building: &building,
+            seen: Mutex::new(Vec::new()),
+            presses: AtomicUsize::new(0),
+        };
+        let request = aruna::app::CorpusRequest {
+            local_archive: Some(zip),
+        };
+        let report = build_once(
+            aruna::job::JobId::next(),
+            &request,
+            Some(destination.path()),
+            &cancel,
+            &window,
+        )
+        .expect("без нажатия сборка обязана дойти до конца");
+        building.release();
+
+        assert_eq!(window.presses.load(Ordering::SeqCst), 0, "никто не нажимал");
+        assert_eq!(report.documents, 23936);
+        assert_eq!(report.groups, 663);
+        assert_eq!(
+            entries(destination.path()),
+            vec!["TLHdig_Beta_0.3".to_string()],
+            "пакет не встал под окончательным именем"
         );
     }
 }
