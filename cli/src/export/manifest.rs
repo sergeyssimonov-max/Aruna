@@ -495,15 +495,21 @@ pub fn render_manifest(
     }
     out.push_str("    }\n  },\n");
 
-    // The font contract: coverage the corpus demands, not fonts it ships.
+    // The font contract: the coverage the corpus demands, and the one font the
+    // package carries because its pages cannot be read without it. Both claims
+    // are about this package, so both are checked against it —
+    // `tests/package_pages.rs` reads this block back and compares it with the
+    // files actually placed.
     out.push_str("  \"fonts\": {\n");
-    out.push_str("    \"files_included\": false,\n");
+    out.push_str("    \"files_included\": true,\n");
     let _ = writeln!(
         out,
         "    \"note\": {},",
         string(
             "Coverage required by the corpus, counted from the documents. \
-             The package ships no font files; choosing them belongs to the renderer."
+             The package ships one font file, UllikummiA.ttf, with the text of \
+             its terms beside it: it draws U+100000, which nothing else does. \
+             Choosing any other font belongs to the renderer."
         )
     );
     let _ = writeln!(out, "    \"documents_examined\": {},", fonts.documents);

@@ -391,13 +391,17 @@ nothing. The page loads the one file it cannot do without by a relative path,
 `@font-face { src: url('./UllikummiA.ttf') }`, never by a family name in the
 system and never by a URL.
 
-Measured 2026-09-17 on the corpus, twice with the same answer:
+Measured 2026-09-17 on the corpus, twice with the same answer; the package
+digest was measured again on 2026-09-18, when the manifest stopped denying the
+font it ships — that edit moved one file and no other, and `diff -rq` between the
+two packages names `manifest.json` and nothing else:
 
 | | |
 |---|---|
 | files in the package | 23 940 — 23 936 documents, the inventory, the manifest, the font, the terms |
 | documents | 23 936, digest `7cfcdce4…35d0` — **unmoved** |
-| package digest | `1d2e0b4aa90eba507a1b7265ec1d657ef96a42c305afdb14db2d36c38e1cff13` |
+| package digest | `87c854bfefe1475f800fa6399dd49d1e113b31cc603825832c8fca41fe1e7d49` — 2026-09-18 |
+| package digest before the manifest was corrected | `1d2e0b4aa90eba507a1b7265ec1d657ef96a42c305afdb14db2d36c38e1cff13` — 2026-09-17 |
 | the addition | 507 020 bytes — 503 160 the font, 3 860 the terms |
 | its share of the package | 0.143 % of 354 691 339 bytes |
 

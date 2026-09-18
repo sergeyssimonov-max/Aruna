@@ -448,6 +448,74 @@ fn the_package_holds_only_what_a_reader_needs() {
     }
 }
 
+/// **The manifest's font block says what the package actually holds.**
+///
+/// It said the opposite for a day. `files_included` was `false` and the note
+/// read «The package ships no font files» from the day the block was written
+/// until 2026-09-18, and both stayed false from 2026-09-17, when
+/// `UllikummiA.ttf` and the text of its terms went into the package. Nothing
+/// caught it because nothing read those two keys — not the code, not a test —
+/// and a claim nobody reads is a claim nobody can keep true.
+///
+/// So this is not a test of a string. It asks the package the same question the
+/// manifest answers and compares the two: if the font ever leaves the package,
+/// or the block goes back to denying it, one of these fails.
+#[test]
+fn the_manifest_says_about_fonts_what_the_package_holds() {
+    let package = Package::build();
+
+    let manifest = Json::parse(
+        &std::fs::read_to_string(package.root.join("manifest.json")).expect("manifest"),
+    )
+    .expect("the manifest is JSON");
+    let fonts = manifest
+        .get("fonts")
+        .expect("the manifest has a font block");
+
+    let claimed = fonts
+        .get("files_included")
+        .and_then(Json::as_bool)
+        .expect("the block says whether font files are included");
+    let note = fonts
+        .get("note")
+        .and_then(Json::as_str)
+        .expect("the block carries a note");
+
+    let held: BTreeSet<String> = package
+        .files()
+        .iter()
+        .filter_map(|f| f.file_name().and_then(|n| n.to_str()))
+        .filter(|n| n.ends_with(".ttf"))
+        .map(|n| n.to_string())
+        .collect();
+
+    assert_eq!(
+        claimed,
+        !held.is_empty(),
+        "the manifest says files_included = {claimed} while the package holds {held:?}"
+    );
+    assert_eq!(
+        held,
+        BTreeSet::from([aruna::fonts::PACKAGED_FONT.to_string()]),
+        "the package holds fonts the manifest does not describe"
+    );
+    assert!(
+        note.contains(aruna::fonts::PACKAGED_FONT),
+        "the note does not name the font the package ships: {note}"
+    );
+    assert!(
+        !note.contains("ships no font"),
+        "the note denies a font the package carries: {note}"
+    );
+
+    // The terms travel with it, and the note is the only place in the package
+    // that says the font is there at all.
+    assert!(
+        package.root.join(aruna::fonts::PACKAGED_TERMS).is_file(),
+        "the font is in the package without the text of its terms"
+    );
+}
+
 /// The manifest, the inventory and the folder agree about the groups.
 ///
 /// Three independent descriptions of one package; the exporter writes them from
