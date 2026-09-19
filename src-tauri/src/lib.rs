@@ -1202,6 +1202,22 @@ pub fn run() {
             // дойдет до окна, а сборку окно может начать сразу.
             contract.mount_events(app);
 
+            // Журнал – до первой записи в него, а не после.
+            //
+            // `log` без установленного логгера молчит: вызов уходит в никуда.
+            // Проверка шрифтов ниже писала в журнал, а плагин регистрировался
+            // в конце `setup`, так что удачный исход не попадал в журнал
+            // никогда, а отказ уцелел только благодаря `eprintln!` рядом.
+            // Держит `spec-guard`.
+            #[cfg(not(feature = "e2e"))]
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+
             // Шрифты проверяются здесь, при запуске, и только отсюда.
             //
             // **Почему при запуске, а не при сборке.** Сборочная проверка
@@ -1244,14 +1260,6 @@ pub fn run() {
             app.handle()
                 .add_capability(include_str!("../capabilities-e2e/e2e.json"))?;
 
-            #[cfg(not(feature = "e2e"))]
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
             Ok(())
         })
         .run(tauri::generate_context!())

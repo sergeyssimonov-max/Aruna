@@ -345,6 +345,25 @@ describe('the end-to-end contour cannot reach a release build', () => {
    * Two global loggers in one process is a panic at start-up, and the wdio
    * crates install theirs first.
    */
+  /**
+   * И регистрируется он раньше первой записи в журнал.
+   *
+   * `log` до установки логгера – пустышка: вызов уходит в никуда и не
+   * возвращает ошибки. Проверка шрифтов при запуске писала в журнал строками
+   * выше регистрации плагина, то есть не писала никуда, и успешный исход не
+   * попадал в журнал вовсе; отказ уцелел только из-за `eprintln!` рядом.
+   */
+  it('registers the log plugin before anything logs', () => {
+    const plugin = TAURI_LIB.indexOf('tauri_plugin_log::Builder')
+    const first = TAURI_LIB.search(/log::(info|warn|error|debug|trace)!/)
+    expect(plugin, 'the log plugin is not registered at all').toBeGreaterThan(-1)
+    expect(first, 'nothing logs at all').toBeGreaterThan(-1)
+    expect(
+      plugin,
+      'a log call stands before the logger is installed: it goes nowhere',
+    ).toBeLessThan(first)
+  })
+
   it('does not register the log plugin under the e2e feature', () => {
     const logLine = TAURI_LIB.indexOf('tauri_plugin_log')
     expect(logLine, 'the log plugin is gone entirely').toBeGreaterThan(-1)
