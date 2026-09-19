@@ -182,6 +182,21 @@ fn archive_parts(name: &str) -> Option<(&str, &str)> {
 /// abandoned, and short enough that the space comes back.
 const ABANDONED_AFTER: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
 
+/// Whether `name` is an unfinished download this module wrote.
+///
+/// Two questions, and each is answered where it belongs: whether the name has
+/// the shape [`crate::paths::scratch_sibling`] writes is that function's own
+/// business, and whether what is left is an archive this module named is
+/// [`archive_parts`]'s.
+///
+/// The rule is [`prune`]'s, for [`prune`]'s reason: [`CACHE_DIR_ENV`] points
+/// wherever the reader says, and an extension is one signal. Deleting on one
+/// signal is how a cache directory pointed at a folder of somebody's own
+/// interrupted downloads takes them with it.
+fn is_our_part(name: &str) -> bool {
+    crate::paths::scratch_base(name).is_some_and(|archive| archive_parts(archive).is_some())
+}
+
 /// Remove unfinished downloads that nothing is writing any more.
 pub fn sweep_unfinished(dir: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -189,7 +204,10 @@ pub fn sweep_unfinished(dir: &Path) {
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().is_none_or(|ext| ext != "part") {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !is_our_part(name) {
             continue;
         }
         let abandoned = entry
@@ -451,26 +469,41 @@ mod tests {
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).unwrap();
     }
 
+    /// Положить файл и состарить его за порог заброшенности.
+    ///
+    /// Оба теста подметания просят одного и того же — файл, который ждали сутки,
+    /// — и до 18.09.2026 просили это двумя разными записями одного и того же
+    /// действия.
+    fn abandoned_file(path: &std::path::Path) {
+        std::fs::write(path, b"x").unwrap();
+        let old = std::time::SystemTime::now() - (ABANDONED_AFTER + Duration::from_secs(60));
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+    }
+
     /// A killed process leaves its `.part` behind — `Drop` does not run for a
     /// signal. In a directory that outlives the run, that is 10 MiB per
     /// interruption, kept for good.
     #[test]
     fn an_abandoned_download_is_swept_and_a_live_one_is_not() {
         let dir = tempdir().unwrap();
-        let stale = dir.path().join("corpus.zip.111.part");
-        let fresh = dir.path().join("corpus.zip.222.part");
+        // Имена строит тот же код, что и в работе: придуманные вручную
+        // доказывали бы только то, что подметается придуманное.
+        let named = dir.path().join(archive_name(
+            "https://example.invalid/corpus.zip",
+            &"a".repeat(32),
+        ));
+        let stale = crate::paths::scratch_sibling(&named);
+        let fresh = crate::paths::scratch_sibling(&named);
         let archive = dir.path().join("corpus.abc.zip");
-        for path in [&stale, &fresh, &archive] {
+        for path in [&fresh, &archive] {
             std::fs::write(path, b"x").unwrap();
         }
-        // Backdate the first one past the threshold.
-        let old = std::time::SystemTime::now() - (ABANDONED_AFTER + Duration::from_secs(60));
-        std::fs::File::options()
-            .write(true)
-            .open(&stale)
-            .unwrap()
-            .set_modified(old)
-            .unwrap();
+        abandoned_file(&stale);
 
         sweep_unfinished(dir.path());
 
@@ -483,5 +516,37 @@ mod tests {
             "a download that may still be running stays"
         );
         assert!(archive.is_file(), "the archive itself is not a leftover");
+    }
+
+    /// A `.part` file this program did not write belongs to whoever did.
+    ///
+    /// [`prune`] above learned this once already: [`CACHE_DIR_ENV`] points
+    /// wherever the reader says, and a directory of their own downloads is a
+    /// perfectly ordinary place to point it. An extension is one signal, and
+    /// one signal is not a reason to delete somebody else's file.
+    #[test]
+    fn an_abandoned_part_file_that_is_not_ours_is_left_alone() {
+        let dir = tempdir().unwrap();
+        let ours = crate::paths::scratch_sibling(&dir.path().join(archive_name(
+            "https://example.invalid/corpus.zip",
+            &"a".repeat(32),
+        )));
+        let foreign = dir.path().join("holiday-video.mp4.part");
+        let shaped_like_ours = dir.path().join("corpus.zip.111.part");
+        for path in [&ours, &foreign, &shaped_like_ours] {
+            abandoned_file(path);
+        }
+
+        sweep_unfinished(dir.path());
+
+        assert!(!ours.is_file(), "our own leftover still goes");
+        assert!(
+            foreign.is_file(),
+            "a download of somebody else's is not ours to delete"
+        );
+        assert!(
+            shaped_like_ours.is_file(),
+            "a name without the digest of an archive we fetched is not ours either"
+        );
     }
 }

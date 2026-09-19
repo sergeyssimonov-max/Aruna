@@ -263,8 +263,14 @@ fn a_stale_part_file_is_swept_and_a_fresh_one_is_left_alone() {
     let digest = md5_hex(&payload);
     let origin = Origin::serving(payload);
 
-    let stale = cache.join("TLHbasis.deadbeefdeadbeefdeadbeefdeadbeef.zip.99.part");
-    let fresh = cache.join("TLHbasis.cafebabecafebabecafebabecafebabe.zip.98.part");
+    // Имена строит тот же код, что и работающая программа: прежние были
+    // придуманы вручную и отличались от настоящих одним звеном — счетчиком
+    // рядом с номером процесса, — а подметание с 18.09.2026 смотрит на всю
+    // форму имени, чтобы не удалить чужой `.part`.
+    let stale =
+        aruna::paths::scratch_sibling(&cache.join("TLHbasis.deadbeefdeadbeefdeadbeefdeadbeef.zip"));
+    let fresh =
+        aruna::paths::scratch_sibling(&cache.join("TLHbasis.cafebabecafebabecafebabecafebabe.zip"));
     std::fs::write(&stale, b"half an archive from a run that was killed").expect("stale");
     std::fs::write(&fresh, b"half an archive from a run still going").expect("fresh");
 

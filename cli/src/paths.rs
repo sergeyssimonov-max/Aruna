@@ -77,6 +77,28 @@ pub fn scratch_sibling(path: &Path) -> PathBuf {
     path.with_file_name(name)
 }
 
+/// The inverse of [`scratch_sibling`]: the name a scratch file was made from,
+/// or `None` if this is not a name [`scratch_sibling`] could have produced.
+///
+/// Stated here, beside the producer, and not where it is asked. The answer
+/// depends on the shape [`scratch_sibling`] writes — the suffix, the two
+/// numeric parts of [`run_tag`] — and a copy of that shape somewhere else is one
+/// edit away from disagreeing with it; [`run_tag`] carries the same warning
+/// about the same kind of copy. `scratch_names_are_recognised_by_their_maker`
+/// below ties the two together, so a change to one fails on the other.
+///
+/// It says nothing about what the base name means: whether the file is one this
+/// program has any business deleting is the caller's question, and
+/// [`crate::cache::sweep_unfinished`] answers it by asking the cache what its
+/// own archives are called.
+pub(crate) fn scratch_base(name: &str) -> Option<&str> {
+    let numeric = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    let rest = name.strip_suffix(".part")?;
+    let (rest, counter) = rest.rsplit_once('.')?;
+    let (base, process) = rest.rsplit_once('.')?;
+    (numeric(counter) && numeric(process) && !base.is_empty()).then_some(base)
+}
+
 /// What makes a name this run's own: `{process id}.{counter}`.
 ///
 /// Two things this program writes need a name nobody else will choose — the
@@ -201,6 +223,45 @@ pub fn ensure_output_parent(path: &std::path::Path) -> Result<()> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    /// The maker and the reader of a scratch name agree, and keep agreeing.
+    ///
+    /// Both halves in one test on purpose: the name is built by
+    /// [`scratch_sibling`] rather than spelled out here, so a change to the
+    /// shape it writes fails here instead of quietly leaving
+    /// [`scratch_base`] answering about a shape nobody produces any more.
+    #[test]
+    fn scratch_names_are_recognised_by_their_maker() {
+        let dir = tempdir().unwrap();
+        let destination = dir.path().join("corpus.abc.zip");
+        let scratch = scratch_sibling(&destination);
+        let name = scratch.file_name().unwrap().to_str().unwrap();
+
+        assert_eq!(scratch_base(name), Some("corpus.abc.zip"));
+
+        // Two names from two calls differ, and both read back to the same base:
+        // the counter is what makes them distinct, and it is not part of the
+        // answer.
+        let second = scratch_sibling(&destination);
+        assert_ne!(scratch, second);
+        assert_eq!(
+            scratch_base(second.file_name().unwrap().to_str().unwrap()),
+            Some("corpus.abc.zip")
+        );
+
+        // And what this program never writes is not recognised: no suffix, one
+        // numeric part instead of two, a part that is not a number, nothing
+        // before them.
+        for foreign in [
+            "corpus.abc.zip",
+            "holiday-video.mp4.part",
+            "corpus.zip.111.part",
+            "corpus.zip.pid.7.part",
+            ".7.1.part",
+        ] {
+            assert_eq!(scratch_base(foreign), None, "{foreign} was read as ours");
+        }
+    }
 
     /// The README tells the reader where the inventory lands, by hand.
     ///
