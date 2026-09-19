@@ -55,7 +55,7 @@
   type Screen =
     | { kind: 'reading' }
     | { kind: 'absent' }
-    | { kind: 'present'; stats: CorpusStats; inventory: string; markup: XmlSummary | null }
+    | { kind: 'present'; stats: CorpusStats; inventory: string | null; markup: XmlSummary | null }
     | { kind: 'unreadable'; inventory: string | null }
     | { kind: 'building' }
     | { kind: 'built'; report: BuildReport }
@@ -202,10 +202,13 @@
       // `unreadable` в ветке выше: без чисел окно не может сказать о пакете
       // ничего. Здесь же оно теряет один блок и показывает остальное.
       const parsed = await commands.corpusXml(located.data.package)
+      // Опись отдельным флагом, как и в ветке `unreadable` выше: два флага
+      // бывают разными – каталог пакета на месте, описи в нем уже нет, – и
+      // кнопка над отсутствующим файлом могла кончиться только отказом.
       screen = {
         kind: 'present',
         stats: counted.data,
-        inventory: located.data.inventory,
+        inventory: located.data.inventory_exists ? located.data.inventory : null,
         markup: parsed.status === 'ok' ? parsed.data : null,
       }
     } catch (error: unknown) {
@@ -246,6 +249,11 @@
       // Мост оборвался, а не сборка отказала: у такого исхода нет ни кода из
       // ядра, ни фазы. Повтор ему назначен потому, что чинить тут нечего –
       // единственное осмысленное действие и есть попробовать снова.
+      //
+      // Номер прогона снимается и здесь: иначе опоздавшее событие прошлого
+      // прогона защелкивается заново, и все события следующего прогона окно
+      // отбрасывает как чужие.
+      finished = job
       screen = {
         kind: 'failed',
         failure: {
@@ -558,17 +566,33 @@
           доходит. `{@const}` стоит там, где ветка уже выбрана.
         -->
         {@const inventory = screen.inventory}
-        <button
-          type="button"
-          class="control"
-          data-testid="primary"
-          onclick={() => void reveal(inventory)}
-        >
-          Открыть опись
-        </button>
-        <button type="button" class="control control-quiet" onclick={() => void build(null)}>
-          Пересобрать
-        </button>
+        <!--
+          Описи может не быть и при целом пакете, и тогда предлагать ее незачем:
+          главным действием становится пересборка – единственное, чем окно может
+          эту опись вернуть.
+        -->
+        {#if inventory !== null}
+          <button
+            type="button"
+            class="control"
+            data-testid="primary"
+            onclick={() => void reveal(inventory)}
+          >
+            Открыть опись
+          </button>
+          <button type="button" class="control control-quiet" onclick={() => void build(null)}>
+            Пересобрать
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="control"
+            data-testid="primary"
+            onclick={() => void build(null)}
+          >
+            Пересобрать
+          </button>
+        {/if}
         <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
           Собрать в папку…
         </button>

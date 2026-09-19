@@ -519,6 +519,38 @@ describe('пакет есть', () => {
   })
 
   /** **Опись открывает система, и открывает ту, что назвал `corpus_location`.** */
+  /**
+   * **Половина пакета – не готовый пакет.**
+   *
+   * `corpus_location` отвечает двумя флагами, и они бывают разными: каталог
+   * пакета на месте, а описи в нем уже нет – так выглядит наполовину удаленный
+   * пакет. Соседняя ветка `unreadable` этот флаг читает с самого начала, а эта
+   * читала только путь, и кнопка «Открыть опись» стояла главной над файлом,
+   * которого нет: нажатие могло кончиться только отказом `InventoryGone`.
+   */
+  it('не предлагает открыть опись, которой на месте нет', async () => {
+    corpusLocation.mockResolvedValue(
+      ok({
+        downloads: DOWNLOADS,
+        package: PACKAGE,
+        inventory: INVENTORY,
+        package_exists: true,
+        inventory_exists: false,
+      }),
+    )
+    corpusStats.mockResolvedValue(ok(bare))
+    corpusXml.mockResolvedValue(ok(markup))
+    render(App)
+
+    expect(await primary()).toHaveTextContent('Пересобрать')
+    expect(screen.queryByRole('button', { name: 'Открыть опись' })).toBeNull()
+
+    // И кнопка не для вида: она и есть единственный способ вернуть опись.
+    buildCorpus.mockResolvedValue(ok(report()))
+    await fireEvent.click(await primary())
+    expect(buildCorpus).toHaveBeenCalledWith(null)
+  })
+
   it('отдает опись плагину opener', async () => {
     await overPackage()
 
@@ -718,6 +750,43 @@ describe('идет сборка', () => {
    * занять несколько секунд. «Остановлено» окно скажет отдельно – по отказу с
    * `cancelled`, пришедшему из ядра (§3 контракта).
    */
+  /**
+   * **Номер прошлого прогона снимается и тогда, когда оборвался мост.**
+   *
+   * Номер прогона защелкивается первым дошедшим событием, а снимает его только
+   * `finished` – номер прогона, чей отчет уже получен. По ветке отказа он
+   * ставится, а по ветке оборванного моста не ставился вовсе: опоздавшее
+   * событие прошлого прогона защелкивало его номер заново, и все события
+   * следующего прогона окно отбрасывало как чужие – полоса стояла на «Начинаю»
+   * всю сборку, хотя сборка шла.
+   */
+  it('не защелкивает номер прошлого прогона, если мост оборвался', async () => {
+    const first = deferred<unknown>()
+    buildCorpus.mockReturnValue(first.promise)
+    await overNothing()
+    await fireEvent.click(await primary())
+    await screen.findByRole('button', { name: 'Отменить' })
+
+    emit(tock({ job: 7, stage: 'parsing' }))
+    await tick()
+
+    first.settle(Promise.reject(new Error('мост оборвался')))
+    await screen.findByText(/мост оборвался/)
+
+    const second = deferred<unknown>()
+    buildCorpus.mockReturnValue(second.promise)
+    await fireEvent.click(await primary())
+    await screen.findByRole('button', { name: 'Отменить' })
+
+    // Опоздавшее событие прошлого прогона – и следом настоящее, свое.
+    emit(tock({ job: 7, stage: 'writing' }))
+    await tick()
+    emit(tock({ job: 8, stage: 'downloading' }))
+    await tick()
+
+    expect(screen.getByText('Скачиваю архив')).toBeInTheDocument()
+  })
+
   it('на отмену говорит «Останавливаю…» и ждет подтверждения', async () => {
     const { finish } = await building()
 
