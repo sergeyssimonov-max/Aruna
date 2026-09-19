@@ -10,6 +10,25 @@
 # wrong and two minutes is the point at which it is killed and reported.
 slow-timeout = { period = "30s", terminate-after = 4 }
 
+# How long after a test's process exits nextest waits for its output pipe to
+# close before calling the test leaky. The default is 100 ms, and it misfired:
+# `cancelling::a_running_build_stops_when_the_window_asks` came back LEAK in the
+# heavy `#[ignore]` set, intermittently and never alone.
+#
+# It leaves nothing. There is no `Command::new` anywhere on that path; watched
+# directly at four samples a second the test has **zero** child processes from
+# start to finish and no orphan after it exits; run by itself it is clean, run
+# with `-j 1` the whole heavy set is clean. It is marked only when it runs
+# beside the two tests that spawn one `xmllint` and one `xsltproc` per document
+# — about 48 000 short-lived processes — and on a machine that busy, observing a
+# pipe close inside 100 ms is a coin toss.
+#
+# Two seconds is a budget for the scheduler, not for a leak: proved on a
+# throwaway crate that a test which really leaves a `sleep 5` behind is still
+# reported LEAK at this setting, while a clean one passes. What was measured is
+# the machine, and that is what this line corrects.
+leak-timeout = "2s"
+
 # A failure that is hard to reproduce is worth all of its output.
 failure-output = "immediate-final"
 status-level = "fail"
@@ -21,6 +40,7 @@ status-level = "fail"
 [profile.ci]
 # Same guards, more said out loud: CI has no one watching it run.
 slow-timeout = { period = "30s", terminate-after = 4 }
+leak-timeout = "2s"
 failure-output = "immediate-final"
 status-level = "all"
 final-status-level = "slow"
