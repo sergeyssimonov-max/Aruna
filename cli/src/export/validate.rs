@@ -136,7 +136,27 @@ pub fn validate(
 
     // …and the filesystem must hold exactly what the inventory links.
     let mut on_disk: HashSet<PathBuf> = HashSet::new();
-    walk(root, root, MAX_DEPTH, &mut on_disk, &mut errors);
+    let mut at_the_root: HashSet<String> = HashSet::new();
+    walk(
+        root,
+        root,
+        MAX_DEPTH,
+        &mut on_disk,
+        &mut at_the_root,
+        &mut errors,
+    );
+
+    // Четыре корневых файла обязаны быть на месте. Обход их только терпел –
+    // «это не сирота», – а требования не предъявлял никто: опись спрашивалась
+    // чтением, манифест – сверкой, а шрифт и текст его условий не спрашивались
+    // вовсе. Читается уже опубликованное дерево, и прежняя копия читателя
+    // снимается после этой проверки, так что пропущенный файл значил бы пакет
+    // без шрифта под готовым именем и нечем вернуть прежний.
+    for required in super::ROOT_FILES {
+        if !at_the_root.contains(required) {
+            errors.push(format!("the package is missing {required}"));
+        }
+    }
     for orphan in on_disk.difference(&expected) {
         errors.push(format!("orphan file in the package: {}", orphan.display()));
     }
@@ -240,6 +260,7 @@ fn walk(
     dir: &Path,
     depth: u32,
     files: &mut HashSet<PathBuf>,
+    at_the_root: &mut HashSet<String>,
     errors: &mut Vec<String>,
 ) {
     // A package is two levels deep and nothing else is allowed in it, so a tree
@@ -285,8 +306,13 @@ fn walk(
                 path.display()
             ));
         } else if kind.is_some_and(|t| t.is_dir()) {
-            walk(root, &path, depth - 1, files, errors);
+            walk(root, &path, depth - 1, files, at_the_root, errors);
         } else if belongs {
+            // Запомнить, а не просто стерпеть: «этот файл здесь уместен» и «этот
+            // файл здесь есть» – разные утверждения, и второе спрашивается ниже
+            // по собранному множеству. Отдельный обход ради него был бы вторым
+            // ответом на вопрос, который этот обход уже задал.
+            at_the_root.insert(name);
             continue;
         } else if !name.ends_with(".xml") {
             errors.push(format!(
@@ -408,6 +434,19 @@ mod tests {
             ),
         )
         .expect("manifest");
+        // Шрифт и его условия – такие же корневые файлы пакета, как опись и
+        // манифест, с 17.09.2026. Фикстура их не писала, и валидатор этого не
+        // замечал; теперь пишет, и замечает.
+        fs::write(
+            dir.join(crate::fonts::PACKAGED_FONT),
+            crate::fonts::PACKAGED_FONT_BYTES,
+        )
+        .expect("font");
+        fs::write(
+            dir.join(crate::fonts::PACKAGED_TERMS),
+            crate::fonts::PACKAGED_TERMS_BYTES,
+        )
+        .expect("terms");
         placed
     }
 
@@ -441,8 +480,16 @@ mod tests {
         std::os::unix::fs::symlink(&outside, root.join("CTH 6")).expect("symlink");
 
         let mut files = std::collections::HashSet::new();
+        let mut at_the_root = std::collections::HashSet::new();
         let mut errors = Vec::new();
-        walk(&root, &root, MAX_DEPTH, &mut files, &mut errors);
+        walk(
+            &root,
+            &root,
+            MAX_DEPTH,
+            &mut files,
+            &mut at_the_root,
+            &mut errors,
+        );
 
         assert!(
             errors.iter().any(|e| e.contains("symbolic link")),
@@ -464,6 +511,34 @@ mod tests {
 
         let counts = validate(dir.path(), &records(&fragments), &placed).expect("valid");
         assert_eq!(counts.fragment_links, 3);
+    }
+
+    /// Прочитанное заново дерево должно нести все четыре корневых файла.
+    ///
+    /// Обход их только терпел: `is_root_file` отвечал «это не сирота», и
+    /// отсутствие шрифта или текста его условий проходило молча. А читает
+    /// валидатор уже опубликованное дерево, и **после** него снимается прежняя
+    /// копия читателя: пакет без шрифта объявлялся готовым, страница не могла
+    /// нарисовать `U+100000`, условия шрифта не ехали никуда, и вернуть
+    /// прежнюю копию было уже нечем.
+    #[test]
+    fn a_package_missing_a_root_file_is_refused_rather_than_read_as_whole() {
+        for missing in [crate::fonts::PACKAGED_FONT, crate::fonts::PACKAGED_TERMS] {
+            let dir = tempdir().unwrap();
+            let root = dir.path();
+            let fragments = sample();
+            let records: Vec<ManuscriptRecord> =
+                fragments.iter().map(|f| f.record.clone()).collect();
+            let placed = package(root, &fragments);
+
+            fs::remove_file(root.join(missing)).expect("remove");
+
+            let refused = validate(root, &records, &placed);
+            assert!(
+                refused.is_err(),
+                "a package without {missing} was read back as whole"
+            );
+        }
     }
 
     /// The failure this whole check exists for: the inventory promises a

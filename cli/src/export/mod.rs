@@ -67,11 +67,21 @@ pub const MANIFEST: &str = "manifest.json";
 /// that has never heard of it — see [`crate::fonts`] — and the terms are here
 /// because they are a condition of carrying it, not a courtesy.
 pub fn is_root_file(name: &str) -> bool {
-    name == MANIFEST
-        || name.strip_prefix(PACKAGE) == Some(".html")
-        || name == crate::fonts::PACKAGED_FONT
-        || name == crate::fonts::PACKAGED_TERMS
+    ROOT_FILES.contains(&name)
 }
+
+/// Те же четыре файла списком.
+///
+/// [`is_root_file`] отвечает о файле, который уже нашли; валидатору нужен
+/// список, потому что «терпеть файл» и «требовать файл» – два разных вопроса,
+/// и второго до 18.09.2026 не задавал никто: пакет без шрифта и без текста его
+/// условий читался заново как целый.
+pub const ROOT_FILES: [&str; 4] = [
+    crate::paths::OUTPUT_FILE_NAME,
+    MANIFEST,
+    crate::fonts::PACKAGED_FONT,
+    crate::fonts::PACKAGED_TERMS,
+];
 
 /// The most one document may be, inflated.
 ///
@@ -1224,6 +1234,50 @@ pub(crate) mod tests_support {
 
 #[cfg(test)]
 mod tests {
+
+    /// Прежняя копия читателя снимается только после того, как опубликованное
+    /// дерево прочитано заново.
+    ///
+    /// Свойство порядка, а не поведения: при удачном прогоне обе расстановки
+    /// дают один и тот же пакет, и поймать разницу можно лишь отказом проверки
+    /// в окне между переименованием и снятием — окне, которого у теста извне
+    /// нет. Поэтому порядок держится чтением исходника, как у стража границы
+    /// модели (`document::tests::the_model_names_no_output_format`).
+    ///
+    /// До 10.09.2026 порядок был обратный, и цена названа в самом коде: отказ
+    /// проверки заставал читателя без его копии и с непроверенным деревом под
+    /// ее именем.
+    #[test]
+    fn the_previous_copy_is_let_go_only_after_the_published_tree_is_read_again() {
+        let source = include_str!("mod.rs");
+        let code = source.split("#[cfg(test)]").next().unwrap_or(source);
+
+        let aside = code
+            .find("Replaced::aside(&final_root, destination)")
+            .expect("прежняя копия больше не отставляется в сторону");
+        let publish = code
+            .find("staging.publish(&final_root)")
+            .expect("staging больше не публикуется под окончательным именем");
+        let read_again = code
+            .find("let published = validate(&final_root")
+            .expect("опубликованное дерево больше не читается заново");
+        let let_go = code
+            .find("previous.committed()")
+            .expect("прежняя копия больше не снимается");
+
+        assert!(
+            aside < publish,
+            "прежняя копия отставляется в сторону после публикации: окно, в котором у читателя нет ни старого пакета, ни нового"
+        );
+        assert!(
+            publish < read_again,
+            "опубликованное дерево читается до того, как оно опубликовано"
+        );
+        assert!(
+            read_again < let_go,
+            "прежняя копия читателя снимается до повторного чтения дерева: отказ проверки застанет его без копии и с непроверенным деревом под ее именем"
+        );
+    }
     use super::tests_support::fragment;
     use super::*;
 
