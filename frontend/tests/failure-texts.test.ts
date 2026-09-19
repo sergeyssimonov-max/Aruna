@@ -16,6 +16,13 @@
  *
  * Read from the sources rather than from a list kept here, because a list kept
  * here is a third place to forget.
+ *
+ * **The scrape has to survive `rustfmt`.** The first version of this file
+ * looked for `("code", Some(` on one line, and `rustfmt` had already broken the
+ * `Network` arm over four — so the guard reported twenty-three codes, missed
+ * the one that is hit most often, and said nothing. Newlines are allowed
+ * between every token below for that reason, and the count is asserted against
+ * the number of arms rather than against a floor picked by hand.
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -23,59 +30,84 @@ import { fileURLToPath } from 'node:url'
 
 const at = (relative: string) => fileURLToPath(new URL(relative, import.meta.url))
 
-/** The codes `app::Failure::of` can produce, read out of the match arm. */
-function coreCodes(): string[] {
-  const rust = readFileSync(at('../../cli/src/app.rs'), 'utf8')
-  const arm = rust.slice(rust.indexOf('let (code, phase, retryable) = match error {'))
-  const codes = [...arm.matchAll(/\("([a-z_]+)",\s*(?:Some\(|None)/g)].map((match) => match[1])
+/** Read once, at module level, the way the tests beside this one do. */
+const RUST = readFileSync(at('../../cli/src/app.rs'), 'utf8')
+const SHELL = readFileSync(at('../../src-tauri/src/lib.rs'), 'utf8')
+const SVELTE = readFileSync(at('../src/App.svelte'), 'utf8')
 
-  expect(
-    codes.length,
-    'no codes found in cli/src/app.rs — has the match arm moved?',
-  ).toBeGreaterThan(10)
-  return [...new Set(codes)]
-}
+const MATCH = 'let (code, phase, retryable) = match error {'
+const TABLE = 'const FAILED: Record<string, string | undefined> = {'
+const AFTER_TABLE = 'const DETAILED'
 
-/** The codes the window has a sentence for, read out of its two tables. */
-function windowCodes(): { failed: Set<string>; window: string } {
-  const svelte = readFileSync(at('../src/App.svelte'), 'utf8')
-  const table = svelte.slice(
-    svelte.indexOf('const FAILED: Record<string, string | undefined> = {'),
-    svelte.indexOf('const DETAILED'),
+/** The codes `app::Failure::of` can produce, read out of its match arm. */
+function coreCodes(): Set<string> {
+  expect(RUST, `cli/src/app.rs no longer holds ${MATCH}`).toContain(MATCH)
+
+  const start = RUST.indexOf(MATCH)
+  const arm = RUST.slice(start, RUST.indexOf('\n        };', start))
+  const codes = [...arm.matchAll(/\(\s*"([a-z_]+)"\s*,\s*(?:Some\s*\(|None)/g)].map(
+    (match) => match[1],
   )
 
-  expect(table, 'the FAILED table is no longer where this test looks').not.toHaveLength(0)
+  // One per arm, and the arms are the lines that end in `=> (` or `=> {`
+  // plus the ones written inline. Counted rather than floored: a code the
+  // regular expression stops matching would otherwise vanish in silence.
+  expect(codes.length, 'the match arm is no longer shaped the way this reads it').toBe(
+    (arm.match(/\(\s*"[a-z_]+"\s*,/g) ?? []).length,
+  )
+  return new Set(codes)
+}
+
+/** The sentences the window has, read out of its table, keyed by code. */
+function windowTable(): { codes: Set<string>; sentences: string[] } {
+  expect(SVELTE, `src/App.svelte no longer holds ${TABLE}`).toContain(TABLE)
+
+  const table = SVELTE.slice(SVELTE.indexOf(TABLE), SVELTE.indexOf(AFTER_TABLE))
+
   return {
-    failed: new Set([...table.matchAll(/^\s{4}([a-z_]+):/gm)].map((match) => match[1])),
-    window: svelte,
+    codes: new Set([...table.matchAll(/^\s{4}([a-z_]+):/gm)].map((match) => match[1])),
+    sentences: [...table.matchAll(/'([^']{10,})'/g)].map((match) => match[1]),
   }
 }
 
 describe('the window has a Russian sentence for every failure the core sends', () => {
   it('cli/src/app.rs and src/App.svelte name the same codes', () => {
-    const { failed, window } = windowCodes()
+    const { codes } = windowTable()
 
     // `cancelled` is the one code whose sentence depends on the phase rather
-    // than on the code, so it has a table of its own.
-    const cancelled = window.includes('const CANCELLED: Record<string, string | undefined> = {')
-    expect(cancelled, 'the cancellation table is gone').toBe(true)
-
-    const missing = coreCodes().filter((code) => code !== 'cancelled' && !failed.has(code))
+    // than on the code, so it has a table of its own — and six tests of its
+    // own in `App.test.ts`, which is where its absence would show.
+    const missing = [...coreCodes()].filter((code) => code !== 'cancelled' && !codes.has(code))
 
     expect(missing, `these codes would reach the reader in English: ${missing.join(', ')}`).toEqual(
       [],
     )
   })
 
-  it('every sentence in the window is Russian', () => {
-    const { failed, window } = windowCodes()
-    const table = window.slice(
-      window.indexOf('const FAILED: Record<string, string | undefined> = {'),
-      window.indexOf('const DETAILED'),
+  /**
+   * The shell has failures of its own — a run already going, a chosen folder
+   * that is gone — and they never reach `Failure::of`, so the table above does
+   * not hold them and the window shows their `message` through the fallback.
+   * That is the right owner for them: the shell knows what it refused and why.
+   * What it must not do is say it in English, and nothing said so until here.
+   */
+  it('the failures the shell raises itself are Russian too', () => {
+    const raised = [...SHELL.matchAll(/BuildFailure::shell\(\s*"[a-z_]+",\s*"([^"]+)"/g)].map(
+      (match) => match[1],
     )
 
-    const sentences = [...table.matchAll(/'([^']{10,})'/g)].map((match) => match[1])
-    expect(sentences.length).toBe(failed.size)
+    expect(raised.length, 'no shell-raised failures found — has the helper moved?').toBeGreaterThan(
+      2,
+    )
+    for (const said of raised) {
+      expect(said, `${said} is what the reader would see`).toMatch(/[А-Яа-я]/)
+      expect(said, `${said} breaks the typography rules`).not.toMatch(/[ёЁ—]/)
+    }
+  })
+
+  it('every sentence in the window is Russian', () => {
+    const { codes, sentences } = windowTable()
+    expect(sentences.length).toBe(codes.size)
 
     for (const sentence of sentences) {
       expect(sentence, `${sentence} has no Cyrillic in it`).toMatch(/[А-Яа-я]/)

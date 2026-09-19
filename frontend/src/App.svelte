@@ -497,16 +497,17 @@
    */
   const DETAILED: ReadonlySet<string> = new Set(['collision', 'archive_duplicate'])
 
-  const explanation: string = $derived.by(() => {
-    if (screen.kind !== 'failed') {
-      return ''
+  /**
+   * Чистая функция, а не `$derived`: пояснение читает одна ветка разметки, и
+   * `kind` там уже сужен до `failed`. Производная величина потребовала бы
+   * часового на прочие состояния и пустой строки, которой на экране не бывает.
+   */
+  function explain(failure: BuildFailure): string {
+    if (!failure.cancelled) {
+      return FAILED[failure.code] ?? failure.message
     }
-    if (!screen.failure.cancelled) {
-      return FAILED[screen.failure.code] ?? screen.failure.message
-    }
-    const phase = screen.failure.phase
-    return (phase === null ? undefined : CANCELLED[phase]) ?? CANCELLED_ANYWHERE
-  })
+    return (failure.phase === null ? undefined : CANCELLED[failure.phase]) ?? CANCELLED_ANYWHERE
+  }
 </script>
 
 <main>
@@ -668,7 +669,7 @@
       -->
       <p class="where">Пакет – {screen.report.package}</p>
     {:else if screen.kind === 'failed'}
-      <p class="about">{explanation}</p>
+      <p class="about">{explain(screen.failure)}</p>
       <!--
         Вторая строка – фраза ядра целиком, и стоит она у двух кодов из
         `DETAILED`. Класс `where` взят потому, что он уже набран младшим

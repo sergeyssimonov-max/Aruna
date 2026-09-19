@@ -155,11 +155,6 @@ function cancellation(over: Partial<BuildFailure> = {}): BuildFailure {
   })
 }
 
-/** Экранировать текст, чтобы искать его регулярным выражением дословно. */
-function escape(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 /** Обещание, которое исполняет тест: сборка длится столько, сколько нужно. */
 function deferred<T>(): { promise: Promise<T>; settle: (value: T) => void } {
   let settle!: (value: T) => void
@@ -1041,39 +1036,35 @@ describe('кончилось', () => {
    * обрывается мост.
    */
   it.each([
-    ['network', 'Не удалось связаться с Hethitologie-Portal Mainz (запись на Zenodo).'],
-    ['server_busy', 'Hethitologie-Portal Mainz (запись на Zenodo) сейчас не успевает отвечать.'],
-    ['http', 'Hethitologie-Portal Mainz (запись на Zenodo) отказался отдать файл.'],
-    ['truncated', 'Загрузка оборвалась на полпути'],
-    ['oversized', 'Ответ оказался длиннее, чем сервер сам объявил.'],
-    ['checksum', 'Архив скачался целиком, но его контрольная сумма не совпала'],
-    ['archive_unreadable', 'Архив не читается: он поврежден.'],
-    ['archive_empty', 'В архиве нет ни одного документа XML.'],
-    ['archive_too_many_entries', 'В архиве больше записей, чем программа готова прочитать.'],
-    ['document_too_large', 'Один документ в архиве больше допустимого предела'],
-    ['archive_duplicate', 'В архиве два документа с одним и тем же именем.'],
-    ['collision', 'Два документа претендуют на одно место в пакете.'],
-    ['distorted', 'Документ изменился при обработке сверх допустимого'],
-    ['package_too_large', 'Пакет вырос больше допустимого предела'],
-    ['package_invalid', 'Пакет собран, но не сошелся со своей же моделью'],
-    ['package_incomplete', 'Записано меньше документов, чем было размечено'],
-    ['no_output_directory', 'Не удалось определить папку загрузок.'],
-    ['destination_not_ours', 'В выбранной папке лежит что-то, чего программа не создавала.'],
-    ['publish_busy', 'В ту же папку сейчас пишет другой запуск Aruna.'],
-    ['output_locked', 'Прежнюю опись не удалось заменить'],
-    ['io', 'Диску не удалось отдать или принять файл.'],
-    ['font_missing', 'Приложение установлено не полностью'],
-    ['font_altered', 'Файл шрифта не совпадает с записанным.'],
-    ['broken', 'Связь с ядром программы оборвалась.'],
+    ['network', /Не удалось связаться с Hethitologie-Portal Mainz \(запись на Zenodo\)/],
+    ['server_busy', /Hethitologie-Portal Mainz \(запись на Zenodo\) сейчас не успевает отвечать/],
+    ['http', /Hethitologie-Portal Mainz \(запись на Zenodo\) отказался отдать файл/],
+    ['truncated', /Загрузка оборвалась на полпути/],
+    ['oversized', /Ответ оказался длиннее, чем сервер сам объявил/],
+    ['checksum', /Архив скачался целиком, но его контрольная сумма не совпала/],
+    ['archive_unreadable', /Архив не читается: он поврежден/],
+    ['archive_empty', /В архиве нет ни одного документа XML/],
+    ['archive_too_many_entries', /В архиве больше записей, чем программа готова прочитать/],
+    ['document_too_large', /Один документ в архиве больше допустимого предела/],
+    ['distorted', /Документ изменился при обработке сверх допустимого/],
+    ['package_too_large', /Пакет вырос больше допустимого предела/],
+    ['package_invalid', /Пакет собран, но не сошелся со своей же моделью/],
+    ['package_incomplete', /Записано меньше документов, чем было размечено/],
+    ['no_output_directory', /Не удалось определить папку загрузок/],
+    ['destination_not_ours', /В выбранной папке лежит что-то, чего программа не создавала/],
+    ['publish_busy', /В ту же папку сейчас пишет другой запуск Aruna/],
+    ['output_locked', /Прежнюю опись не удалось заменить/],
+    ['io', /Диску не удалось отдать или принять файл/],
+    ['font_missing', /Приложение установлено не полностью/],
+    ['font_altered', /Файл шрифта не совпадает с записанным/],
+    ['broken', /Связь с ядром программы оборвалась/],
   ])('на отказе %s говорит по-русски', async (code, said) => {
     await ran(bad(failure({ code, message: 'core said this in English' })))
 
-    expect(await screen.findByText(new RegExp(escape(said)))).toBeInTheDocument()
-    // У двух кодов фраза ядра остается второй строкой намеренно – их
-    // проверяет следующий тест, и требовать от них молчания было бы неверно.
-    if (code !== 'collision' && code !== 'archive_duplicate') {
-      expect(screen.queryByText('core said this in English')).toBeNull()
-    }
+    expect(await screen.findByText(said)).toBeInTheDocument()
+    // Безусловно: фразы ядра на экране нет, и второй строки тоже. Два кода, у
+    // которых она есть, проверяет следующий тест – в этой таблице их нет.
+    expect(screen.queryByText('core said this in English')).toBeNull()
   })
 
   /**
@@ -1097,20 +1088,25 @@ describe('кончилось', () => {
    * ядра ничего не добавляет к сказанному по-русски.
    */
   it.each([
-    ['collision', 'CTH 1: KBo 22.5 is claimed by both a.xml and b.xml'],
-    ['archive_duplicate', 'the archive names KBo 22.5.xml twice'],
-  ])('на отказе %s дает подробность второй строкой', async (code, detail) => {
-    await ran(bad(failure({ code, message: detail })))
+    [
+      'collision',
+      /Два документа претендуют на одно место в пакете/,
+      'CTH 1: KBo 22.5 is claimed by both a.xml and b.xml',
+    ],
+    [
+      'archive_duplicate',
+      /В архиве два документа с одним и тем же именем/,
+      'the archive names KBo 22.5.xml twice',
+    ],
+  ])(
+    'на отказе %s говорит по-русски и дает подробность второй строкой',
+    async (code, said, detail) => {
+      await ran(bad(failure({ code, message: detail })))
 
-    expect(await screen.findByText(detail)).toBeInTheDocument()
-  })
-
-  it('прочим отказам второй строки не дает', async () => {
-    await ran(bad(failure({ code: 'io', message: 'I/O error: Permission denied (os error 13)' })))
-
-    expect(await screen.findByText(/Диску не удалось отдать или принять файл/)).toBeInTheDocument()
-    expect(screen.queryByText(/Permission denied/)).toBeNull()
-  })
+      expect(await screen.findByText(said)).toBeInTheDocument()
+      expect(screen.getByText(detail)).toBeInTheDocument()
+    },
+  )
 
   /**
    * **Английской фразы ядра читатель не видит, а видит русское пояснение по фазе.**
@@ -1139,7 +1135,9 @@ describe('кончилось', () => {
     await ran(bad(cancellation({ phase: null, message: 'cancelled' })))
 
     expect(
-      await screen.findByText(/Остановлено. Незаконченное убрано, прежний пакет остался на месте./),
+      await screen.findByText(
+        /Остановлено\. Незаконченное убрано, прежний пакет остался на месте\./,
+      ),
     ).toBeInTheDocument()
     expect(screen.queryByText('cancelled')).toBeNull()
   })
