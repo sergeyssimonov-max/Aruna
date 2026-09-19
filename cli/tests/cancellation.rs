@@ -402,6 +402,14 @@ fn a_cancelled_run_writes_no_inventory() {
         "a cancelled run left {:?} in the output directory",
         files(&downloads)
     );
+    // The archive it was handed is not the run's to delete, and since
+    // 2026-09-19 the run discards its own copy whatever the outcome — the two
+    // sit one line apart in `cache::discard`, and this is the side that must
+    // not move.
+    assert!(
+        zip.is_file(),
+        "a cancelled run deleted the archive it was given"
+    );
 }
 
 /// Cancelling twice is cancelling once, and a run cancelled after it finished

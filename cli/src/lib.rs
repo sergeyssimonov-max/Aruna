@@ -123,27 +123,37 @@ pub fn run(local_zip: Option<&Path>, job: &Job<'_>) -> Result<PathBuf> {
         None => obtain_archive(download::ZENODO_ZIP_URL, download::ZENODO_ZIP_MD5, job)?,
     };
 
-    job.report(Event::ParsingArchive);
-    let records = archive::parse_zip(source.path(), job)?;
-    job.report(Event::Indexed {
-        manuscripts: records.len(),
-    });
+    let written = (|| -> Result<()> {
+        job.report(Event::ParsingArchive);
+        let records = archive::parse_zip(source.path(), job)?;
+        job.report(Event::Indexed {
+            manuscripts: records.len(),
+        });
 
-    let generated_at = format_now_utc();
-    let html = html::render_html(&records, SOURCE_LABEL, &generated_at);
+        let generated_at = format_now_utc();
+        let html = html::render_html(&records, SOURCE_LABEL, &generated_at);
 
-    // Atomic: a failure here must not destroy the inventory an earlier run left
-    // in place — see `paths::write_atomic`.
-    paths::write_atomic(&out, html.as_bytes())?;
+        // Atomic: a failure here must not destroy the inventory an earlier run
+        // left in place — see `paths::write_atomic`.
+        paths::write_atomic(&out, html.as_bytes())
+    })();
 
-    if let cache::Archive::Temporary(path) = &source {
-        // Nowhere to cache it, so this copy was only ever for this run. A failed
-        // run keeps it on purpose: the partial state is worth inspecting.
-        if let Some(dir) = path.parent() {
-            let _ = fs::remove_dir_all(dir);
-        }
-    }
+    // Whatever the outcome, and that is a decision reversed on 2026-09-19. This
+    // kept the copy after a failure "because the partial state is worth
+    // inspecting", while `app::build_corpus_into` cleared it either way and
+    // said why — two opposite answers to one question, and the reader who paid
+    // for the disagreement was the one who pressed Cancel during the parse:
+    // 71 MiB stayed in the temporary directory, where nothing sweeps.
+    //
+    // There is no partial state to inspect. The copy is the whole archive,
+    // already verified against its digest, or it is nothing at all — an
+    // uncommitted `.part` is dropped by `download::Scratch`. And a cancelled
+    // run is not a failure to inspect at all: `docs/FRONTEND-CONTRACT.md` §3
+    // has the rule this now keeps — "stopping and failing leave the same thing
+    // behind, by the same mechanism".
+    cache::discard(&source);
 
+    written?;
     Ok(out)
 }
 
@@ -246,8 +256,18 @@ fn download_unkept(
     let work_dir = work_dir_for_process();
     fs::create_dir_all(&work_dir).map_err(ArunaError::io(&work_dir))?;
     let dest = work_dir.join(cache::archive_name(url, md5));
-    download_archive(url, md5, &dest, job, releases)?;
-    Ok(cache::Archive::Temporary(dest))
+    match download_archive(url, md5, &dest, job, releases) {
+        Ok(()) => Ok(cache::Archive::Temporary(dest)),
+        Err(err) => {
+            // The file is already gone — `download::Scratch` drops a `.part`
+            // that was never committed — but the directory this call made
+            // outlived every failure, and nothing sweeps the temporary
+            // directory. Without recursion, for the reason `cache::discard`
+            // gives: the directory is the process's, not this call's.
+            let _ = fs::remove_dir(&work_dir);
+            Err(err)
+        }
+    }
 }
 
 /// Fetch the archive to `dest`, saying first what Zenodo publishes.

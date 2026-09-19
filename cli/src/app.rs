@@ -180,12 +180,9 @@ pub fn build_corpus_into(
 
     // This run's own copy of the archive, if that is what it was — cleared
     // whether the build succeeded or not, because either way nothing else will
-    // read it.
-    if let crate::cache::Archive::Temporary(path) = &source {
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::remove_dir_all(dir);
-        }
-    }
+    // read it. The rule lived here twice over: `aruna::run` had the opposite
+    // one until 2026-09-19, and now both ask `cache::discard`.
+    crate::cache::discard(&source);
 
     let package = package?;
     let inventory = package.root.join(crate::paths::OUTPUT_FILE_NAME);

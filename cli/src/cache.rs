@@ -32,6 +32,32 @@ impl Archive {
     }
 }
 
+/// Drop the copy a run made for itself, and the directory it sat in.
+///
+/// Called on the way out of a run whatever the outcome, which is the point: a
+/// cached archive is kept for the next run and a temporary one is never read
+/// again, by anyone, so the only question the outcome could answer is whether
+/// to leave 71 MiB in the temporary directory — where nothing sweeps, because
+/// [`sweep_unfinished`] looks in the cache this run did not have.
+///
+/// A cached archive is left exactly where it is. That is not a detail: the
+/// caller passes whatever the run was served, and the path may be a file the
+/// person chose from their own disk.
+///
+/// The directory goes without recursion. It belongs to the process rather than
+/// to this run — the name carries the pid — and a second run in the same
+/// process may be downloading into it; `remove_dir` refuses a directory that
+/// is not empty, which is exactly the answer wanted there.
+pub(crate) fn discard(archive: &Archive) {
+    let Archive::Temporary(path) = archive else {
+        return;
+    };
+    let _ = std::fs::remove_file(path);
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::remove_dir(dir);
+    }
+}
+
 /// Overrides the cache location. Set it to a temporary directory to keep a run
 /// from touching the real one.
 pub const CACHE_DIR_ENV: &str = "ARUNA_CACHE_DIR";
@@ -548,5 +574,55 @@ mod tests {
             shaped_like_ours.is_file(),
             "a name without the digest of an archive we fetched is not ours either"
         );
+    }
+
+    /// What a run made for itself goes, and the directory with it.
+    #[test]
+    fn a_temporary_archive_is_discarded_with_its_directory() {
+        let temp = tempdir().unwrap();
+        let work = temp.path().join("aruna-work.1");
+        std::fs::create_dir(&work).unwrap();
+        let archive = work.join("corpus.zip");
+        std::fs::write(&archive, b"seventy-one megabytes, pretend").unwrap();
+
+        discard(&Archive::Temporary(archive.clone()));
+
+        assert!(!archive.exists(), "the run's own copy is still there");
+        assert!(!work.exists(), "the directory it sat in is still there");
+    }
+
+    /// A cached archive is somebody else's file, and the caller cannot tell
+    /// which: [`CACHE_DIR_ENV`] may point at a directory of their own
+    /// downloads, and a local archive comes straight from their disk.
+    #[test]
+    fn a_cached_archive_is_not_discarded() {
+        let dir = tempdir().unwrap();
+        let archive = dir.path().join("corpus.zip");
+        std::fs::write(&archive, b"the copy that is kept").unwrap();
+
+        discard(&Archive::Cached(archive.clone()));
+
+        assert!(archive.is_file(), "the cached archive was deleted");
+        assert!(dir.path().is_dir(), "the directory holding it was deleted");
+    }
+
+    /// A directory with something else in it stays: the name carries the
+    /// process, not the run, and a second run in the same process may be
+    /// downloading into it.
+    #[test]
+    fn a_directory_with_another_runs_archive_in_it_stays() {
+        let temp = tempdir().unwrap();
+        let work = temp.path().join("aruna-work.1");
+        std::fs::create_dir(&work).unwrap();
+        let mine = work.join("corpus.a.zip");
+        let theirs = work.join("corpus.b.zip");
+        std::fs::write(&mine, b"mine").unwrap();
+        std::fs::write(&theirs, b"a run that is still going").unwrap();
+
+        discard(&Archive::Temporary(mine.clone()));
+
+        assert!(!mine.exists(), "the run's own copy is still there");
+        assert!(theirs.is_file(), "another run's archive was deleted");
+        assert!(work.is_dir(), "a directory still in use was removed");
     }
 }

@@ -183,6 +183,27 @@ fn with_cache_dir<T>(dir: &std::path::Path, f: impl FnOnce() -> T) -> T {
     outcome
 }
 
+/// `TMPDIR` decides where the scratch directory of a run without a cache goes.
+/// Pointed at a sandbox, it lets a test say "and nothing was left behind"
+/// without naming the directory the producer builds.
+static TEMP_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Run `f` with the process temporary directory pointed at `dir`, and put the
+/// environment back afterwards whatever happens.
+fn with_temp_dir<T>(dir: &std::path::Path, f: impl FnOnce() -> T) -> T {
+    let _guard = TEMP_ENV.lock().unwrap_or_else(|e| e.into_inner());
+    let previous = std::env::var_os("TMPDIR");
+    std::env::set_var("TMPDIR", dir);
+
+    let outcome = f();
+
+    match previous {
+        Some(value) => std::env::set_var("TMPDIR", value),
+        None => std::env::remove_var("TMPDIR"),
+    }
+    outcome
+}
+
 #[test]
 fn a_cold_run_downloads_and_a_warm_one_does_not() {
     let payload = body();
@@ -365,6 +386,66 @@ fn an_unreachable_source_fails_without_leaving_anything_behind() {
         cache.files().is_empty(),
         "a failed download left {:?} in the cache",
         cache.files()
+    );
+}
+
+/// A download that fails leaves no scratch directory behind either.
+///
+/// Without a usable cache the archive goes to `aruna-work.<pid>` in the
+/// temporary directory, made by the run that needs it. The file inside is
+/// already safe — `download::Scratch` drops a `.part` that was never
+/// committed — but the directory itself outlived every failure, and nothing
+/// sweeps there: `cache::sweep_unfinished` looks in the cache, which is
+/// precisely what this run does not have. One empty directory per failed run,
+/// for the life of the machine's temporary directory.
+///
+/// `TMPDIR` points at a sandbox, so the assertion is about everything the run
+/// could have left rather than about a name written down twice.
+#[test]
+fn a_failed_download_leaves_no_scratch_directory_behind() {
+    let cache = CacheDir::new();
+    let sandbox = tempdir().expect("tempdir");
+    // Bind and drop: the port is real and certainly closed.
+    let dead = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = dead.local_addr().expect("addr").port();
+    drop(dead);
+
+    // The cache is unwritable, so the run has nowhere to keep the archive and
+    // falls back to a scratch directory of its own.
+    std::fs::create_dir_all(cache.path()).expect("mkdir");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(cache.path(), std::fs::Permissions::from_mode(0o500))
+            .expect("chmod");
+    }
+
+    let outcome = with_temp_dir(sandbox.path(), || {
+        with_cache_dir(&cache.path(), || {
+            obtain_archive(
+                &format!("http://127.0.0.1:{port}/x.zip"),
+                &md5_hex(&body()),
+                &aruna::job::Job::unattended(),
+            )
+        })
+    });
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(cache.path(), std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
+    }
+
+    assert!(outcome.is_err(), "an unreachable source reported success");
+    let left: Vec<String> = std::fs::read_dir(sandbox.path())
+        .expect("read")
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .collect();
+    assert!(
+        left.is_empty(),
+        "a failed download left {left:?} in the temporary directory"
     );
 }
 
