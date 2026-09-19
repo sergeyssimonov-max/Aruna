@@ -135,6 +135,33 @@ fn report(err: &ArunaError) {
 /// that also handles exit codes.
 ///
 /// `None` means the error message says everything useful on its own.
+///
+/// # This is one of two sets of Russian sentences, and the split is deliberate
+///
+/// The other lives in `frontend/src/App.svelte`, keyed by the failure code the
+/// wire carries. They say the same things about the same failures, and until
+/// 2026-09-19 nothing said why there are two — by which time they had already
+/// drifted apart in four ways. The boundary, written down now:
+///
+/// * **Here** is for the person at a terminal, and that person is usually
+///   building from source. So this may name paths, source constants, and the
+///   releases page, and it calls the source `Zenodo`, which is the host the
+///   program actually talks to.
+/// * **There** is for the reader who has only the application. So no path,
+///   no constant, no URL, one or two sentences — and the source is named
+///   `Hethitologie-Portal Mainz (запись на Zenodo)`, because a reader looks for
+///   the corpus by its publisher rather than by its host. That naming was the
+///   owner's decision of 2026-09-19, taken for the window alone.
+/// * **Neither may contradict the other about what happened.** Different words
+///   for one audience or the other are fine; a different account of the failure
+///   is a defect.
+/// * **Both obey one typography** — `CLAUDE.md`, «Типографика русских текстов»:
+///   middle dash, `е` and never `ё`. This set broke that rule in twelve places
+///   until the day the boundary was written, and `advice_keeps_the_projects_typography`
+///   below is what keeps it now.
+///
+/// Merging the two was considered and declined: the audiences differ, and so do
+/// the naming decision and the level of detail each is allowed.
 fn advice(err: &ArunaError) -> Option<String> {
     Some(match err {
         ArunaError::Network { .. } => {
@@ -147,33 +174,33 @@ fn advice(err: &ArunaError) -> Option<String> {
         // constants are how it is made, and that line is for whoever makes it.
         ArunaError::Http {
             status: 404 | 410, ..
-        } => "Zenodo больше не отдаёт этот файл — вероятно, запись перевыпущена.\n\
+        } => "Zenodo больше не отдает этот файл – вероятно, запись перевыпущена.\n\
               Поставьте свежий выпуск Aruna: он приходит с новым адресом и новой суммой.\n\
                 https://github.com/sergeyssimonov-max/Aruna/releases/latest\n\
-              Если вы собираете из исходников — это ZENODO_ZIP_URL и ZENODO_ZIP_MD5\n\
+              Если вы собираете из исходников – это ZENODO_ZIP_URL и ZENODO_ZIP_MD5\n\
               в cli/src/download.rs."
             .to_string(),
         ArunaError::Http { .. } => "Zenodo сейчас недоступен. Попробуйте позже.".to_string(),
         ArunaError::ChecksumMismatch { .. } => {
             "Архив скачался целиком, но его MD5 не совпал с ожидаемым.\n\
-             Скорее всего, Zenodo перевыпустил архив. Повторный запуск не поможет —\n\
+             Скорее всего, Zenodo перевыпустил архив. Повторный запуск не поможет –\n\
              сумма не изменится.\n\
              Поставьте свежий выпуск Aruna: он приходит с новой суммой.\n\
                https://github.com/sergeyssimonov-max/Aruna/releases/latest\n\
-             Если вы собираете из исходников — сверьте сумму на странице записи\n\
+             Если вы собираете из исходников – сверьте сумму на странице записи\n\
              и обновите ZENODO_ZIP_MD5 в cli/src/download.rs."
                 .to_string()
         }
         ArunaError::EmptyArchive | ArunaError::Zip(_) => {
-            "Архив повреждён или не содержит XML-документов.".to_string()
+            "Архив поврежден или не содержит XML-документов.".to_string()
         }
         ArunaError::DownloadsDir => "Не удалось определить каталог Downloads.".to_string(),
         // The finished inventory is not lost — say where it is, and what is
         // holding the old file open.
         ArunaError::Replace { scratch, .. } => format!(
-            "Новая опись готова и никуда не делась — она лежит рядом:\n  {}\n\
+            "Новая опись готова и никуда не делась – она лежит рядом:\n  {}\n\
              Закройте программу, которая держит старый файл открытым \
-             (обычно это браузер), и запустите ещё раз.",
+             (обычно это браузер), и запустите еще раз.",
             scratch.display()
         ),
         // The message already says how much arrived and where the line is; what
@@ -186,16 +213,16 @@ fn advice(err: &ArunaError) -> Option<String> {
         // constant sends the reader to the wrong line of the source.
         ArunaError::Oversized { limit, .. } if *limit == aruna::download::MAX_METADATA => {
             "Ответ на запрос о записи оказался длиннее, чем запись бывает.\n\
-             Обычно это значит, что вместо Zenodo ответил кто-то другой —\n\
+             Обычно это значит, что вместо Zenodo ответил кто-то другой –\n\
              портал Wi-Fi, корпоративный прокси или подмена ответа.\n\
-             Если же запись просто выросла — предел поднимается в исходниках\n\
+             Если же запись просто выросла – предел поднимается в исходниках\n\
              (MAX_METADATA в cli/src/download.rs)."
                 .to_string()
         }
         ArunaError::Oversized { .. } => "Ответ оказался длиннее, чем сервер сам объявил.\n\
-             Обычно это значит, что до Zenodo дотянулось что-то по дороге —\n\
+             Обычно это значит, что до Zenodo дотянулось что-то по дороге –\n\
              портал Wi-Fi, корпоративный прокси или подмена ответа.\n\
-             Если же архив просто вырос — предел поднимается в исходниках\n\
+             Если же архив просто вырос – предел поднимается в исходниках\n\
              (MAX_DOWNLOAD в cli/src/download.rs), и выпуск с поднятым пределом\n\
              будет новее того, что у вас установлен."
             .to_string(),
@@ -203,7 +230,7 @@ fn advice(err: &ArunaError) -> Option<String> {
         // message already names both, and what to do about it is a question
         // about the corpus rather than about this program.
         ArunaError::ExportCollision { .. } => "Два документа претендуют на одно место в пакете.\n\
-             Это расхождение в исходных данных, а не сбой сборки —\n\
+             Это расхождение в исходных данных, а не сбой сборки –\n\
              сверьте оба исходных пути, названных выше."
             .to_string(),
         // Same shape as the collision above and the same answer: the archive
@@ -211,7 +238,7 @@ fn advice(err: &ArunaError) -> Option<String> {
         // meant.
         ArunaError::ArchiveDuplicateEntry { .. } => {
             "В архиве два документа с одним и тем же именем.\n\
-             Это расхождение в исходных данных, а не сбой сборки —\n\
+             Это расхождение в исходных данных, а не сбой сборки –\n\
              имя названо выше."
                 .to_string()
         }
@@ -223,7 +250,7 @@ fn advice(err: &ArunaError) -> Option<String> {
         // and neither is answered by trying again.
         ArunaError::ExportDocumentTooLarge { .. } => {
             "Один документ в архиве больше допустимого предела и не был прочитан.\n\
-             Обычно это повреждённый архив или архив, собранный так, чтобы\n\
+             Обычно это поврежденный архив или архив, собранный так, чтобы\n\
              раздуться при распаковке. Пакет не собран, память не израсходована."
                 .to_string()
         }
@@ -232,41 +259,41 @@ fn advice(err: &ArunaError) -> Option<String> {
         // answered by trying again.
         ArunaError::ArchiveTooManyEntries { .. } => {
             "В архиве больше записей, чем эта программа готова прочитать.\n\
-             Корпус TLHdig — около 24 500; архив такого размера собран не из него.\n\
+             Корпус TLHdig – около 24 500; архив такого размера собран не из него.\n\
              Ничего не распаковано и не записано."
                 .to_string()
         }
         ArunaError::ExportPackageTooLarge { .. } => {
             "Пакет вырос больше допустимого предела, сборка остановлена.\n\
-             Опубликованного пакета это не коснулось: всё писалось во временную\n\
+             Опубликованного пакета это не коснулось: все писалось во временную\n\
              папку, и она удалена."
                 .to_string()
         }
         // The one failure that means the data was at risk rather than the run.
         ArunaError::ExportDistorted { .. } => {
-            "Документ изменился при нормализации сверх разрешённого — сборка остановлена.\n\
+            "Документ изменился при нормализации сверх разрешенного – сборка остановлена.\n\
              Ничего не опубликовано: это защита содержимого, а не сбой записи.\n\
              Сообщите, какой файл назван выше."
                 .to_string()
         }
         ArunaError::PublishBusy { .. } => {
-            "Другой запуск публикует пакет в ту же папку и не отпускает её.\n\
+            "Другой запуск публикует пакет в ту же папку и не отпускает ее.\n\
              Дождитесь его окончания и повторите. Если больше ни одна копия\n\
              Aruna не работает, удалите файл блокировки, названный выше."
                 .to_string()
         }
         ArunaError::ExportDestination { .. } => {
             "Каталог назначения занят чем-то, чего сборщик не создавал.\n\
-             Он ничего не удалил — перенесите папку в сторону и повторите."
+             Он ничего не удалил – перенесите папку в сторону и повторите."
                 .to_string()
         }
         ArunaError::ExportInvalid { .. } => {
-            "Пакет собран, но не сошёлся со своей же моделью, поэтому не опубликован.\n\
+            "Пакет собран, но не сошелся со своей же моделью, поэтому не опубликован.\n\
              Это ошибка сборщика, а не ваших данных: сообщите, что именно перечислено выше."
                 .to_string()
         }
         ArunaError::ExportIncomplete { .. } => {
-            "Записано не столько документов, сколько размечено, — пакет не опубликован.\n\
+            "Записано не столько документов, сколько размечено – пакет не опубликован.\n\
              Это ошибка сборщика, а не ваших данных."
                 .to_string()
         }
@@ -277,7 +304,7 @@ fn advice(err: &ArunaError) -> Option<String> {
         // another in its place.
         ArunaError::FontMissing { .. } => {
             "Приложение установлено не полностью: файл шрифта не на месте.\n\
-             Переустановите его из образа — шрифты лежат внутри приложения и не скачиваются."
+             Переустановите его из образа – шрифты лежат внутри приложения и не скачиваются."
                 .to_string()
         }
         ArunaError::FontAltered { .. } => {
@@ -295,6 +322,37 @@ fn advice(err: &ArunaError) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// **Русские строки этого входа держат типографику проекта.**
+    ///
+    /// Правило записано в `CLAUDE.md` и до 19.09.2026 нарушалось здесь в
+    /// двенадцати местах: буква «ё» и длинное тире. Нашлось это не проверкой, а
+    /// разбором, который сравнил здешние подсказки с фразами окна – у окна свой
+    /// сторож на то же правило, а у консоли не было никакого. Читается сам
+    /// исходник: строки подсказок многострочные, и собирать их все вызовами
+    /// `advice` значило бы перечислять варианты ошибок вручную и забыть
+    /// новый.
+    #[test]
+    fn advice_keeps_the_projects_typography() {
+        let source = include_str!("main.rs");
+        let offenders: Vec<&str> = source
+            .lines()
+            .filter(|line| {
+                let start = line.trim_start();
+                !start.starts_with("//") && !start.starts_with('*') && !start.starts_with("/*")
+            })
+            .filter(|line| {
+                line.chars()
+                    .any(|c| ('а'..='я').contains(&c) || ('А'..='Я').contains(&c))
+            })
+            .filter(|line| line.contains('ё') || line.contains('Ё') || line.contains('—'))
+            .collect();
+
+        assert!(
+            offenders.is_empty(),
+            "русский текст этого входа нарушает типографику проекта: {offenders:#?}"
+        );
+    }
 
     /// **Оба расхождения в исходных данных советуют одно и то же и говорят
     /// это по-разному.**
