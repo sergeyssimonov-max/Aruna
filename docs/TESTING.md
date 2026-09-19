@@ -201,14 +201,14 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 100
+pnpm test:unit      # 134
 ```
 
 `vitest` runs two projects. **`component`** is jsdom: the 14 tests of
 `src/inventory/filter.test.ts`, which drive the search box and the fold controls
 against a document built out of the artifacts the crate compiles in —
 `document.html` and the row fragments beside it, filled the way `html.rs` fills
-them, so the fixture cannot drift from the page — and the 35 tests
+them, so the fixture cannot drift from the page — and the 66 tests
 of `src/App.test.ts`, which render the window against a mocked `invoke`. The
 second file arrived on 2026-08-30 with the screen it tests: before that the
 window held a prototype nobody intended to keep, so a jsdom test of its markup
@@ -228,6 +228,7 @@ thing jsdom cannot answer for.
 | `tsconfig.e2e.json` | the E2E contour — `e2e/*.e2e.ts` and `wdio.conf.ts` — which no project covered until 2026-08-25. It found both a `wdio.conf.ts` annotated with `Options.Testrunner` (a standalone-session type with no `capabilities` key) and an import of `@wdio/types` that was never declared as a dependency and survived only because it is type-only |
 | `tests/spec-guard.test.ts` | the decisions [`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) fixed — the pnpm pin, the `safari16` floor, the identifier and bundle targets, matching window and document titles, a permission for every registered plugin, and the four gates that keep the E2E contour out of a release |
 | `tests/inventory-artifact.test.ts` | everything in `cli/src/generated/` — the script and the three stylesheet sections — is byte-for-byte what `frontend/src/inventory/` now builds, builds the same twice, and carries none of the bundler's leavings |
+| `tests/failure-texts.test.ts` | every failure code `app::Failure::of` can send has a Russian sentence in the window, the failures the shell raises itself are Russian too, and all of them keep the project's typography — the guard that stops a new core code reaching the reader in English |
 
 The last of those is what makes committed build products safe. The script and
 the stylesheet sections are built by Vite and compiled into the binary with
@@ -248,7 +249,7 @@ test.
 
 | binary | tests | what it holds |
 |---|---|---|
-| library and `bin/aruna` | 364 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
+| library and `bin/aruna` | 365 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
 | `tests/cli_process.rs` | 17 | the binary as a child process, cache versus network, and the two words it answers on the command line |
 | `tests/cache_lifecycle.rs` | 10 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
@@ -269,7 +270,7 @@ test.
 | `tests/document_model.rs` | 4 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; and the whole corpus read twice and refused exactly where the manifest says |
 | `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory
 
-Counted on 2026-09-19 with `cargo nextest list --run-ignored all`: 523 in the `aruna` crate, as above, and 31 in `aruna-desktop`, which is 554 across 23 binaries. Without `--run-ignored` the run is 548: the six heavy ones stay behind `#[ignore]` and need the archive.
+Counted on 2026-09-19 with `cargo nextest list --run-ignored all`: 524 in the `aruna` crate, as above, and 31 in `aruna-desktop`, which is 555 across 23 binaries. Without `--run-ignored` the run is 549: the six heavy ones stay behind `#[ignore]` and need the archive. The count moved by one that evening, when the console's advice got a guard on the project's Russian typography — it reads its own source, because the advice strings are multi-line and listing the error variants by hand is how a new one goes unchecked.
 
 Fixtures are described in `cli/fixtures/xml/MANIFEST.md` with a SHA-256 for each.
 
