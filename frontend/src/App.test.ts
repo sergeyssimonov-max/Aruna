@@ -125,7 +125,7 @@ function report(over: Partial<BuildReport> = {}): BuildReport {
 function failure(over: Partial<BuildFailure> = {}): BuildFailure {
   return {
     code: 'network',
-    phase: 'download',
+    phase: 'obtaining',
     message: 'Zenodo не ответил',
     retryable: true,
     cancelled: false,
@@ -148,7 +148,8 @@ function cancellation(over: Partial<BuildFailure> = {}): BuildFailure {
     code: 'cancelled',
     retryable: false,
     cancelled: true,
-    message: 'сборка остановлена',
+    // Фраза ядра дословно: она английская, и окно ее не показывает.
+    message: 'cancelled during obtaining',
     ...over,
   })
 }
@@ -851,7 +852,7 @@ describe('идет сборка', () => {
     await fireEvent.click(await primary())
     finish(bad(cancellation()))
 
-    expect(await screen.findByText('сборка остановлена')).toBeInTheDocument()
+    expect(await screen.findByText(/Остановлено во время загрузки архива/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Остановлено')
     expect(screen.queryByRole('progressbar')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Открыть опись' })).toBeNull()
@@ -1006,10 +1007,42 @@ describe('кончилось', () => {
   it('на отмененном прогоне говорит «Остановлено», а не об ошибке', async () => {
     await ran(bad(cancellation()))
 
-    expect(await screen.findByText('сборка остановлена')).toBeInTheDocument()
+    expect(await screen.findByText(/Остановлено во время загрузки архива/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Остановлено')
     expect(screen.queryByText(/не удалось/)).toBeNull()
     expect(await primary()).toHaveAccessibleName('Собрать по умолчанию')
+  })
+
+  /**
+   * **Английской фразы ядра читатель не видит, а видит русское пояснение по фазе.**
+   *
+   * `message` у ядра один на оба входа и написан по-английски – «cancelled
+   * during obtaining». В русском окне это единственный отказ, который читатель
+   * встречает на обычном пути, поэтому фразу для него составляет окно, а фазу
+   * берет с провода. Проверяются все пять фаз ядра и запасной случай, когда
+   * фазы нет: `phase` на проводе объявлен как `string | null`.
+   */
+  it.each([
+    ['obtaining', /Остановлено во время загрузки архива/],
+    ['parsing', /Остановлено во время чтения архива/],
+    ['exporting', /Остановлено во время записи пакета/],
+    ['validating', /Остановлено во время проверки записанного/],
+    ['publishing', /Остановлено перед самой заменой пакета/],
+  ])('на отмене в фазе %s говорит по-русски', async (phase, expected) => {
+    await ran(bad(cancellation({ phase })))
+
+    expect(await screen.findByText(expected)).toBeInTheDocument()
+    expect(screen.queryByText(/cancelled during/)).toBeNull()
+  })
+
+  /** **Отмена без фазы тоже объясняется по-русски, а не пустой строкой.** */
+  it('на отмене без фазы дает запасное пояснение', async () => {
+    await ran(bad(cancellation({ phase: null, message: 'cancelled' })))
+
+    expect(
+      await screen.findByText(/Остановлено. Незаконченное убрано, прежний пакет остался на месте./),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('cancelled')).toBeNull()
   })
 
   /**
