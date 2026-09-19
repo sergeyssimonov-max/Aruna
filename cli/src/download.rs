@@ -571,6 +571,10 @@ fn stream_to_file(
     // network is, not how far the transfer got. A quarter-second is fast enough
     // that a bar never looks stuck and slow enough that the events cost nothing.
     let mut ticked = Instant::now();
+    // Сколько байт названо последним тиком: остаток досказывается только если
+    // он есть. Ноль здесь – не «ничего не сказано», а «сказано про ноль», и для
+    // пустого тела досказывать нечего.
+    let mut reported: u64 = 0;
 
     let outcome = loop {
         // Between chunks of 64 KiB. The scratch file is dropped on the way out
@@ -584,6 +588,12 @@ fn stream_to_file(
         let n = match reader.read(&mut buf) {
             Ok(0) => break Ok(()),
             Ok(n) => n,
+            // Прерванное чтение – не оборванная передача. `read` возвращает
+            // `Interrupted` вместо того, чтобы повторить самому, и ответом на
+            // один прерванный кусок в 64 КиБ была повторная выкачка 71 МиБ:
+            // повтор стоял уровнем выше, чем нужно. Отмена при этом не
+            // теряется – ее спрашивают в начале каждого круга.
+            Err(source) if source.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(source) => break Err(source),
         };
         if let Err(source) = file.write_all(&buf[..n]) {
@@ -593,12 +603,27 @@ fn stream_to_file(
         bytes += n as u64;
         if ticked.elapsed() >= TRANSFER_TICK {
             ticked = Instant::now();
+            reported = bytes;
             job.report(Event::Downloading {
                 bytes,
                 total: announced,
             });
         }
     };
+    // Остаток, чтобы последнее, что слышно о передаче, было ею целиком.
+    //
+    // Тик говорится по времени, поэтому тело, пришедшее внутри одного
+    // промежутка, не давало ни одного события: знаменатель стадия объявила, а
+    // числителя не приходило никогда, и на повторе он вдобавок откатывался к
+    // нулю внутри той же стадии. Пишущий проход досказывает остаток той же
+    // формой и по той же причине (`export::write_documents`), включая условие:
+    // передача, чей последний тик уже назвал целое, не говорит этого дважды.
+    if outcome.is_ok() && reported != bytes {
+        job.report(Event::Downloading {
+            bytes,
+            total: announced,
+        });
+    }
     // The data is only on disk once `sync_all` returns, and the file has to be
     // closed before the rename that follows.
     let outcome = outcome.and_then(|()| file.sync_all());
@@ -1130,6 +1155,105 @@ mod tests {
             }
             other => panic!("expected Oversized, got {other:?}"),
         }
+    }
+
+    /// The last thing a window hears about the transfer is the whole of it.
+    ///
+    /// The tick is told by time, so a body that arrives inside one interval
+    /// produced no `Downloading` event at all: the stage had announced a
+    /// denominator and no numerator ever followed. The write pass says the same
+    /// thing the other way round and has said it since it was written —
+    /// `export::write_documents` emits the remainder so that the last fraction a
+    /// window hears is `documents / documents`, and
+    /// `tests/progress_flow.rs::the_write_pass_ticks_are_a_fraction_that_only_grows`
+    /// pins it. The transfer had no such counterpart.
+    #[test]
+    fn the_last_word_on_a_transfer_is_the_whole_of_it() {
+        #[derive(Default)]
+        struct Heard(std::sync::Mutex<Vec<(u64, Option<u64>)>>);
+        impl crate::progress::Progress for Heard {
+            fn report(&self, event: Event<'_>) {
+                if let Event::Downloading { bytes, total } = event {
+                    self.0.lock().expect("lock").push((bytes, total));
+                }
+            }
+        }
+
+        let dir = tempdir().expect("tempdir");
+        let scratch = dir.path().join("short.part");
+        let body = b"a body that arrives inside one tick".to_vec();
+        let heard = Heard::default();
+        let cancel = crate::job::Cancel::new();
+        let job = Job::new(&heard, &cancel);
+
+        let transfer = stream_bounded(
+            std::io::Cursor::new(body.clone()),
+            MAX_DOWNLOAD,
+            Some(body.len() as u64),
+            &scratch,
+            &job,
+        )
+        .expect("the transfer succeeds");
+
+        assert_eq!(transfer.bytes, body.len() as u64);
+        let ticks = heard.0.lock().expect("lock").clone();
+        assert_eq!(
+            ticks.last().copied(),
+            Some((body.len() as u64, Some(body.len() as u64))),
+            "the transfer never said it had arrived: {ticks:?}"
+        );
+        // И ровно один раз: тело пришло внутри одного промежутка, так что
+        // остаток — единственное, что о нём сказано.
+        assert_eq!(ticks.len(), 1, "the whole was reported twice: {ticks:?}");
+    }
+
+    /// One interrupted read is not a failed download.
+    ///
+    /// `read` returns `ErrorKind::Interrupted` instead of retrying, and this
+    /// loop treated it as the end of the transfer. The retry then sat one level
+    /// too high: the answer to one interrupted 64 KiB read was fetching 71 MiB
+    /// again, and three of them inside one run failed it outright.
+    /// `is_retryable_io` above already names the kind — it was only never
+    /// answered here.
+    #[test]
+    fn an_interrupted_read_does_not_lose_the_transfer() {
+        /// Yields `Interrupted` once, then the body, then the end.
+        struct Twitchy {
+            interrupted: bool,
+            rest: std::io::Cursor<Vec<u8>>,
+        }
+        impl Read for Twitchy {
+            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+                if !self.interrupted {
+                    self.interrupted = true;
+                    return Err(std::io::Error::from(std::io::ErrorKind::Interrupted));
+                }
+                self.rest.read(buf)
+            }
+        }
+
+        let dir = tempdir().expect("tempdir");
+        let scratch = dir.path().join("twitchy.part");
+        let body = b"the whole body, delivered after one interruption".to_vec();
+
+        let transfer = stream_bounded(
+            Twitchy {
+                interrupted: false,
+                rest: std::io::Cursor::new(body.clone()),
+            },
+            MAX_DOWNLOAD,
+            Some(body.len() as u64),
+            &scratch,
+            &Job::unattended(),
+        )
+        .expect("an interrupted read is not a failed transfer");
+
+        assert_eq!(transfer.bytes, body.len() as u64);
+        assert_eq!(
+            std::fs::read(&scratch).expect("scratch"),
+            body,
+            "the body on disk is the body that was served"
+        );
     }
 
     /// A response with no stated length still downloads, and still verifies.
