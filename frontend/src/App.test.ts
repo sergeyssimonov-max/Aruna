@@ -133,6 +133,26 @@ function failure(over: Partial<BuildFailure> = {}): BuildFailure {
   }
 }
 
+/**
+ * Отмена в той форме, в какой ее выдает провод: `cancelled` и **не**
+ * `retryable`.
+ *
+ * Ядро метит любую отмену `retryable: false` (`cli/src/app.rs`), и держит это
+ * `a_failure_crosses_with_its_kind_and_its_advice` в `src-tauri`. Умолчание
+ * фикстуры – `retryable: true`, поэтому отмена, собранная из нее вручную,
+ * порождала форму, которой провод не выдает: проверки отмены смотрели на ветку
+ * повторимого отказа, а человек видел другую.
+ */
+function cancellation(over: Partial<BuildFailure> = {}): BuildFailure {
+  return failure({
+    code: 'cancelled',
+    retryable: false,
+    cancelled: true,
+    message: 'сборка остановлена',
+    ...over,
+  })
+}
+
 /** Обещание, которое исполняет тест: сборка длится столько, сколько нужно. */
 function deferred<T>(): { promise: Promise<T>; settle: (value: T) => void } {
   let settle!: (value: T) => void
@@ -800,7 +820,7 @@ describe('идет сборка', () => {
     // Ядро еще не ответило – значит, «Остановлено» еще не правда.
     expect(screen.queryByText('Остановлено')).toBeNull()
 
-    finish(bad(failure({ code: 'cancelled', cancelled: true, message: 'сборка остановлена' })))
+    finish(bad(cancellation()))
 
     // По имени, а не по уровню: заголовок на экране уже есть, и `findBy` вернул
     // бы прежний, не дожидаясь ответа ядра. Ожидается смена текста, а не
@@ -829,7 +849,7 @@ describe('идет сборка', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25')
 
     await fireEvent.click(await primary())
-    finish(bad(failure({ code: 'cancelled', cancelled: true, message: 'сборка остановлена' })))
+    finish(bad(cancellation()))
 
     expect(await screen.findByText('сборка остановлена')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Остановлено')
@@ -978,18 +998,59 @@ describe('кончилось', () => {
    * `cancelled` – единственный исход, который не является неисправностью, и
    * окно говорит о нем словом «Остановлено», а не «не удалось».
    *
-   * Подпись здесь – «Собрать», а не «Собрать по умолчанию»: кнопка повторяет
-   * прогон с той же папкой, какую выбирали, и обещать умолчание она не
-   * вправе. Правило одно на все окно – подпись следует за поведением:
-   * «по умолчанию» стоит там и только там, где зовут `build(null)`.
+   * Прогон здесь начат «Пересобрать», то есть `build(null)`, и подпись
+   * поэтому – «Собрать по умолчанию»: правило одно на все окно, подпись следует
+   * за поведением. Случай, когда папку выбирали, проверяет следующий тест, и
+   * он же несет дефект.
    */
   it('на отмененном прогоне говорит «Остановлено», а не об ошибке', async () => {
-    await ran(bad(failure({ code: 'cancelled', cancelled: true, message: 'сборка остановлена' })))
+    await ran(bad(cancellation()))
 
     expect(await screen.findByText('сборка остановлена')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Остановлено')
     expect(screen.queryByText(/не удалось/)).toBeNull()
-    expect(await primary()).toHaveTextContent('Собрать')
+    expect(await primary()).toHaveAccessibleName('Собрать по умолчанию')
+  })
+
+  /**
+   * **Отмена не забывает выбранную папку.**
+   *
+   * Ядро метит любую отмену `retryable: false`, потому что `retryable` –
+   * совет о неисправности, а останавливали здесь не ее. До 19.09.2026 у окна
+   * не было своей ветки отмены, и отмененный прогон уходил в ветку
+   * неповторимого отказа, где главное действие – `build(null)`: папка,
+   * выбранную которой человек только что назвал, забывалась, и следующий
+   * прогон уходил в загрузки.
+   *
+   * Проверка стоит на том, куда уходит повтор, а не на подписи: подпись –
+   * следствие. Зубы показаны пробой – со снятой веткой отмены в команду
+   * приходит `null`.
+   */
+  it('после отмены собирает в ту же папку, какую выбирали', async () => {
+    const run = deferred<unknown>()
+    open.mockResolvedValue(FOLDER)
+    buildCorpus.mockReturnValue(run.promise)
+    await overNothing()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
+    await vi.waitFor(() => expect(buildCorpus).toHaveBeenCalledWith(FOLDER))
+    await screen.findByRole('button', { name: 'Отменить' })
+
+    await fireEvent.click(await primary())
+    run.settle(bad(cancellation()))
+    await screen.findByRole('heading', { level: 1, name: 'Остановлено' })
+
+    // Подпись снимается до нажатия: после него главной кнопкой станет
+    // «Отменить» – пошел следующий прогон.
+    const label = (await primary()).textContent?.trim()
+
+    buildCorpus.mockClear()
+    buildCorpus.mockReturnValue(deferred<unknown>().promise)
+    await fireEvent.click(await primary())
+
+    expect(buildCorpus).toHaveBeenCalledWith(FOLDER)
+    // Подпись – следствие: обещать умолчание кнопка не вправе.
+    expect(label).toBe('Собрать')
   })
 })
 

@@ -1527,6 +1527,10 @@ mod wire {
         assert_eq!(wire.code, "cancelled");
         assert_eq!(wire.phase.as_deref(), Some("exporting"));
         assert!(wire.cancelled);
+        // `retryable` – совет о неисправности, а отмена ею не является: флаг
+        // приходит снятым. На этом стоит ветка отмены в окне – своя, потому
+        // что читать отмену флагом повторимости нечем.
+        assert!(!wire.retryable);
     }
 }
 
