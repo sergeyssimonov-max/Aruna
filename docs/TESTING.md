@@ -37,7 +37,7 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 cd cli
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 389
+cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 540
 ```
 
 ### Standard — about 25 s
@@ -61,7 +61,7 @@ to make its absence a failure, which is what CI does after downloading it.
 
 ```sh
 cd cli
-ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(corpus)'   # 3
+ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(corpus)'   # 5
 ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(document_model)'   # 3, 30 s, needs xsltproc
 cargo nextest run --profile ci -E 'binary(document_model)' --run-ignored ignored-only   # the whole corpus against xsltproc, 67 s
 cargo run --release --example corpus_inventory -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
@@ -81,7 +81,7 @@ swapped for a different one between the two passes the build makes over it.
 
 ```sh
 cd cli
-cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 22
+cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 25
 cargo nextest run --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 12
 cargo run --release --example fuzz_naming
 cargo run --release --example fuzz_pipeline   # 200 000 documents
@@ -201,14 +201,14 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 57
+pnpm test:unit      # 100
 ```
 
 `vitest` runs two projects. **`component`** is jsdom: the 14 tests of
 `src/inventory/filter.test.ts`, which drive the search box and the fold controls
 against a document built out of the artifacts the crate compiles in —
 `document.html` and the row fragments beside it, filled the way `html.rs` fills
-them, so the fixture cannot drift from the page — and the 4 tests
+them, so the fixture cannot drift from the page — and the 35 tests
 of `src/App.test.ts`, which render the window against a mocked `invoke`. The
 second file arrived on 2026-08-30 with the screen it tests: before that the
 window held a prototype nobody intended to keep, so a jsdom test of its markup
@@ -248,25 +248,28 @@ test.
 
 | binary | tests | what it holds |
 |---|---|---|
-| library and `bin/aruna` | 270 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
+| library and `bin/aruna` | 364 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
 | `tests/cli_process.rs` | 17 | the binary as a child process, cache versus network, and the two words it answers on the command line |
-| `tests/cache_lifecycle.rs` | 9 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
+| `tests/cache_lifecycle.rs` | 10 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
 | `tests/export_integration.rs` | 8 | the export against an archive shaped like the corpus |
-| `tests/export_hostile.rs` | 12 | archives written to break the export, and destinations that refuse it |
+| `tests/export_hostile.rs` | 15 | archives written to break the export, and destinations that refuse it |
 | `tests/export_recovery.rs` | 8 | building again over what a killed run left behind, including a staging directory whose owner is gone |
-| `tests/package_pages.rs` | 11 | the inventory against the package it describes, and that no CTH folder has a page |
-| `tests/cancellation.rs` | 10 | stopping a run, that it leaves the reader's package alone, and that a run stopped half way is followed by a complete one in the same process |
+| `tests/package_pages.rs` | 13 | the inventory against the package it describes, and that no CTH folder has a page |
+| `tests/cancellation.rs` | 11 | stopping a run, that it leaves the reader's package alone, and that a run stopped half way is followed by a complete one in the same process |
 | `tests/cache_concurrency.rs` | 4 | several runs competing for one cache: the race, the sweep, the sockets |
 | `tests/catalog_contract.rs` | 12 | the shape of the JSON catalog, held steady now that its former reader is gone |
-| `tests/progress_flow.rs` | 6 | which stages a run reports, in what order, with what numbers |
+| `tests/progress_flow.rs` | 8 | which stages a run reports, in what order, with what numbers |
 | `tests/reliability.rs` | 4 | two builds byte-identical, no descriptors accumulated, nothing left beside the package |
-| `tests/xml_contract.rs` | 9 | the fixture set: immutability, the permit list, field extraction |
+| `tests/xml_contract.rs` | 11 | the fixture set: immutability, the permit list, field extraction |
 | `tests/xml_hostile.rs` | 10 | XXE, entity expansion, external DTD, XInclude, resource exhaustion — through the export and, since 2026-09-13, through the document model |
 | `tests/authenticity.rs` | 2 | the published package against the archive, as multisets of file contents: nothing lost, invented, altered or written twice. The second is `#[ignore]` and runs the whole corpus — `--run-ignored ignored-only` |
-| `tests/window_seams.rs` | 3 | the seams a window will drive: the build on a thread of its own stopped from the caller's, that the library neither prints nor ends the process, and that the destination is the caller's to name |
-| `tests/corpus.rs` | 3 | the whole archive: non-distortion, no writes, the malformed count, and that nothing the gates admit comes out of decoding damaged |
+| `tests/window_seams.rs` | 6 | the seams a window will drive: the build on a thread of its own stopped from the caller's, that the library neither prints nor ends the process, and that the destination is the caller's to name |
+| `tests/corpus.rs` | 6 | the whole archive: non-distortion, no writes, the malformed count, and that nothing the gates admit comes out of decoding damaged |
 | `tests/document_model.rs` | 4 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; and the whole corpus read twice and refused exactly where the manifest says |
+| `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory
+
+Counted on 2026-09-19 with `cargo nextest list --run-ignored all`: 523 in the `aruna` crate, as above, and 31 in `aruna-desktop`, which is 554 across 23 binaries. Without `--run-ignored` the run is 548: the six heavy ones stay behind `#[ignore]` and need the archive.
 
 Fixtures are described in `cli/fixtures/xml/MANIFEST.md` with a SHA-256 for each.
 
