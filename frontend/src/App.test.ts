@@ -126,7 +126,8 @@ function failure(over: Partial<BuildFailure> = {}): BuildFailure {
   return {
     code: 'network',
     phase: 'obtaining',
-    message: 'Zenodo не ответил',
+    // Фраза ядра, как она приходит на самом деле: английская.
+    message: 'network error while downloading the archive',
     retryable: true,
     cancelled: false,
     ...over,
@@ -152,6 +153,11 @@ function cancellation(over: Partial<BuildFailure> = {}): BuildFailure {
     message: 'cancelled during obtaining',
     ...over,
   })
+}
+
+/** Экранировать текст, чтобы искать его регулярным выражением дословно. */
+function escape(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /** Обещание, которое исполняет тест: сборка длится столько, сколько нужно. */
@@ -792,7 +798,9 @@ describe('идет сборка', () => {
     await tick()
 
     first.settle(Promise.reject(new Error('мост оборвался')))
-    await screen.findByText(/мост оборвался/)
+    // Сам текст ошибки моста на экран не идет: у окна на этот случай своя
+    // фраза, как и на коды ядра.
+    await screen.findByText(/Связь с ядром программы оборвалась/)
 
     const second = deferred<unknown>()
     buildCorpus.mockReturnValue(second.promise)
@@ -967,7 +975,9 @@ describe('кончилось', () => {
   it('на retryable-отказе предлагает «Повторить» и повторяет тот же прогон', async () => {
     await ran(bad(failure()))
 
-    expect(await screen.findByText('Zenodo не ответил')).toBeInTheDocument()
+    expect(
+      await screen.findByText(/Не удалось связаться с Hethitologie-Portal Mainz/),
+    ).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Собрать не удалось')
 
     buildCorpus.mockClear()
@@ -986,9 +996,17 @@ describe('кончилось', () => {
    * именно это.
    */
   it('на неповторимом отказе оставляет главным действием «Собрать»', async () => {
-    await ran(bad(failure({ code: 'distorted', retryable: false, message: 'пакет искажен' })))
+    await ran(
+      bad(
+        failure({
+          code: 'distorted',
+          retryable: false,
+          message: 'KBo 1.1.xml was distorted by normalisation',
+        }),
+      ),
+    )
 
-    expect(await screen.findByText('пакет искажен')).toBeInTheDocument()
+    expect(await screen.findByText(/Документ изменился при обработке/)).toBeInTheDocument()
     expect(await primary()).toHaveTextContent('Собрать по умолчанию')
     expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull()
   })
@@ -1011,6 +1029,87 @@ describe('кончилось', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Остановлено')
     expect(screen.queryByText(/не удалось/)).toBeNull()
     expect(await primary()).toHaveAccessibleName('Собрать по умолчанию')
+  })
+
+  /**
+   * **У каждого кода ядра своя русская фраза, и английской на экране не остается.**
+   *
+   * Таблица здесь повторяет таблицу окна, и это не дублирование, а предмет
+   * проверки: текст, который читает человек, и есть договор с ним. Коды взяты
+   * из `Failure::of` в `cli/src/app.rs` – все, кроме `cancelled`, у которого
+   * фраза своя по фазе – плюс `broken`, который окно ставит себе само, когда
+   * обрывается мост.
+   */
+  it.each([
+    ['network', 'Не удалось связаться с Hethitologie-Portal Mainz (запись на Zenodo).'],
+    ['server_busy', 'Hethitologie-Portal Mainz (запись на Zenodo) сейчас не успевает отвечать.'],
+    ['http', 'Hethitologie-Portal Mainz (запись на Zenodo) отказался отдать файл.'],
+    ['truncated', 'Загрузка оборвалась на полпути'],
+    ['oversized', 'Ответ оказался длиннее, чем сервер сам объявил.'],
+    ['checksum', 'Архив скачался целиком, но его контрольная сумма не совпала'],
+    ['archive_unreadable', 'Архив не читается: он поврежден.'],
+    ['archive_empty', 'В архиве нет ни одного документа XML.'],
+    ['archive_too_many_entries', 'В архиве больше записей, чем программа готова прочитать.'],
+    ['document_too_large', 'Один документ в архиве больше допустимого предела'],
+    ['archive_duplicate', 'В архиве два документа с одним и тем же именем.'],
+    ['collision', 'Два документа претендуют на одно место в пакете.'],
+    ['distorted', 'Документ изменился при обработке сверх допустимого'],
+    ['package_too_large', 'Пакет вырос больше допустимого предела'],
+    ['package_invalid', 'Пакет собран, но не сошелся со своей же моделью'],
+    ['package_incomplete', 'Записано меньше документов, чем было размечено'],
+    ['no_output_directory', 'Не удалось определить папку загрузок.'],
+    ['destination_not_ours', 'В выбранной папке лежит что-то, чего программа не создавала.'],
+    ['publish_busy', 'В ту же папку сейчас пишет другой запуск Aruna.'],
+    ['output_locked', 'Прежнюю опись не удалось заменить'],
+    ['io', 'Диску не удалось отдать или принять файл.'],
+    ['font_missing', 'Приложение установлено не полностью'],
+    ['font_altered', 'Файл шрифта не совпадает с записанным.'],
+    ['broken', 'Связь с ядром программы оборвалась.'],
+  ])('на отказе %s говорит по-русски', async (code, said) => {
+    await ran(bad(failure({ code, message: 'core said this in English' })))
+
+    expect(await screen.findByText(new RegExp(escape(said)))).toBeInTheDocument()
+    // У двух кодов фраза ядра остается второй строкой намеренно – их
+    // проверяет следующий тест, и требовать от них молчания было бы неверно.
+    if (code !== 'collision' && code !== 'archive_duplicate') {
+      expect(screen.queryByText('core said this in English')).toBeNull()
+    }
+  })
+
+  /**
+   * **Код, которого окно еще не знает, показывает фразу ядра, а не пустое место.**
+   *
+   * Запасной путь намеренный: ядро может завести новый код, и тогда английская
+   * строка на экране – это видно и это чинится, а пустой абзац молчит.
+   */
+  it('на незнакомом коде показывает фразу ядра как есть', async () => {
+    await ran(bad(failure({ code: 'quantum_flux', message: 'the core says something new' })))
+
+    expect(await screen.findByText('the core says something new')).toBeInTheDocument()
+  })
+
+  /**
+   * **Двум кодам подробность нужна, и она приходит второй строкой.**
+   *
+   * `collision` называет два исходных документа, `archive_duplicate` – имя
+   * записи, и больше этих имен читателю взять неоткуда: разобраться он может
+   * только по ним. Остальным кодам вторая строка не положена – у них фраза
+   * ядра ничего не добавляет к сказанному по-русски.
+   */
+  it.each([
+    ['collision', 'CTH 1: KBo 22.5 is claimed by both a.xml and b.xml'],
+    ['archive_duplicate', 'the archive names KBo 22.5.xml twice'],
+  ])('на отказе %s дает подробность второй строкой', async (code, detail) => {
+    await ran(bad(failure({ code, message: detail })))
+
+    expect(await screen.findByText(detail)).toBeInTheDocument()
+  })
+
+  it('прочим отказам второй строки не дает', async () => {
+    await ran(bad(failure({ code: 'io', message: 'I/O error: Permission denied (os error 13)' })))
+
+    expect(await screen.findByText(/Диску не удалось отдать или принять файл/)).toBeInTheDocument()
+    expect(screen.queryByText(/Permission denied/)).toBeNull()
   })
 
   /**
