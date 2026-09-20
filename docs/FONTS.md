@@ -649,9 +649,10 @@ published. **This can only be answered by the TLHdig editors**: what these five
 signs are, and which font renders them. Until it is answered a PDF will have a
 hole in 2 379 lines, and no amount of work in this repository will change that.
 
-`docs/TLHDIG-ANFRAGE.de.md` is a drafted enquiry to them, in German, carrying
-the counts and the cited passages. When it is answered, the answer belongs
-here.
+`docs/TLHDIG-ANFRAGE.de.md` is the enquiry to them, in German, carrying the
+counts and the cited passages. **Sent 2026-08-22 to `tlhdig@uni-wuerzburg.de`
+with a copy to the Mainz Impressum; unanswered as of 2026-09-20.** The text is
+frozen as sent. When an answer comes, it belongs here.
 
 What must *not* be done: substituting a similar-looking sign, or dropping the
 characters. The source XML is not ours to change, and a wrong sign that renders
