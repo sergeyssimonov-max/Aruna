@@ -446,7 +446,7 @@ On macOS 13.7.8, 366 font files:
 
 | | before | now |
 |---|---|---|
-| covered by the **declared** stack | 259 / 648 (40 %) | **642 / 648** |
+| covered by the **declared** stack | 256 / 645 (40 %) | **639 / 645** |
 | covered outside it, by system fallback | 389 | **6** |
 | covered only by a font this machine happens to have | 1 | **0** |
 | covered by nothing anywhere | 5 | 5 |
@@ -479,7 +479,7 @@ embedding it in a PDF this project distributes needs a licence from its owner,
 and one code point out of 648 is not a reason to seek one. The replacement is
 free, embeddable without condition, and in the same family as the main face.
 Owner's decision 2026-08-30, `docs/PROJECT-SPEC.ru.md` §3.9; the code and this
-table caught up on 2026-09-10. Coverage did not move: 642 of 648 before and
+table caught up on 2026-09-10. Coverage did not move: 639 of 645 before and
 after, the same six left over.
 
 The four above are the stack **both outputs share**. The main face is not among

@@ -317,10 +317,10 @@ face `docs/FONTS.md` specifies is actually installed, and reports any code point
 the corpus uses that nothing on the machine can draw.
 
 ```
-by the declared font stack   642 of 648      ← expected on a correct machine
+BY THE REPOSITORY’S FILES     639 of 645      ← expected on a correct machine
 ```
 
-Below 642 means a face is missing and the program names which. That makes it the
+Below 639 means a face is missing and the program names which. That makes it the
 check to run when setting up another machine, and the reason it is *not* in the
 automated set: its answer depends on what is installed, and a number that is
 right here and wrong on the next Mac is not something a test should assert. What

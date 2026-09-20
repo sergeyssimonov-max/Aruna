@@ -21,6 +21,17 @@ copy, so the specification below and the documents cannot drift apart.
 648 distinct code points, of which **645 need a glyph** and 382 are above the
 Basic Multiligual Plane. Measured 2026-09-11.
 
+**Two denominators, and which one a sentence takes.** A statement about the
+corpus — how many distinct code points it uses — says **648**. A statement about
+coverage — how many are drawn — says **639 of 645**. The three control
+characters `U+0009`, `U+000A` and `U+000D` cannot be covered by any font, and
+keeping them in the denominator of a coverage figure means carrying three
+permanently uncoverable code points on top of the six real ones: `U+E83A` and
+the five private-use signs `U+100001`, `U+100003`, `U+100005`, `U+100006`,
+`U+100009`. Owner’s decision 2026-09-20. Other documents cite this paragraph
+instead of restating the arithmetic, and dated records of the past keep
+whatever they were written with.
+
 | | |
 |---|---|
 | **drawn by a file of this repository** | **639 / 645** |
@@ -608,7 +619,7 @@ It is not coverage, and the distinction is the whole point. Its `cmap` is four
 groups, and one of them maps **`U+E000..U+10FFFF` — 1 056 768 code points — to a
 single glyph**, the same glyph it uses for `U+0000..U+D7FF`. The file is 2 468
 bytes. What it draws is a placeholder meaning *nothing here can render this*.
-Counting it as coverage would report 648 of 648 for any corpus and any font
+Counting it as coverage would report 645 of 645 for any corpus and any font
 stack, and mean nothing at all.
 
 So `font_coverage` reads it, keeps it in a category of its own, and names it
