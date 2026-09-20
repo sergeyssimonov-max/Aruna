@@ -11,13 +11,13 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.9 is the",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.10 is the",
     "current release, published on 2026-09-20. A release cannot record itself — the commit",
     "it names is the commit that carries it, and no file can contain its own hash — so each",
     "entry here is added by the commit after the release it describes.",
     "",
-    "v2.5.9 replaced v2.5.8, withdrawn on 2026-09-20 — release, tag and DMG. The same",
-    "happened to v2.5.7 on 2026-09-13, to v2.5.6 earlier the same day, to v2.5.5 on 2026-09-12, to v2.5.4 on 2026-09-10, to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to",
+    "v2.5.10 replaced v2.5.9, withdrawn on 2026-09-20 — release, tag and DMG, hours after it",
+    "was published. The same happened to v2.5.8 earlier that day, to v2.5.7 on 2026-09-13, to v2.5.6 earlier the same day, to v2.5.5 on 2026-09-12, to v2.5.4 on 2026-09-10, to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to",
     "v2.5.1 on 2026-09-04, to v2.5.0 on 2026-09-01 and",
     "to v2.1.0 through v2.4.0",
     "on 2026-08-30, so the 2.x line is still represented by its head alone. A reference",
@@ -47,11 +47,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.5.9",
-      "commit": "64599db0ba1e12ac6f405bd2bb9d458983a68aa0",
-      "published": "2026-09-20T09:23:11Z",
-      "dmg_sha256": "144e151ae8488c50a5461f1cc57787a4c0d1dd7cc3a7a99e805b53462ae0dbd1",
-      "why": "The current release and the third reference. It replaced v2.5.8, withdrawn the same day, and the number moved for the rule rather than for an obstacle: a reference release is not re-cut, so work that lands after one takes a number of its own. What it carries over v2.5.8 begins with the font: the pages of the package name a stack the reading machine may not have, and until now the package relied on the reader owning it. The application bundle carries the seven faces it draws with, the package carries the one it cannot do without together with the terms it is distributed under, the inventory credits its author, and manifest.json stopped saying the package carries no font while it carried one — which is why the package now holds 23 940 files and hashes to 87c854bf…7d49 instead of 714d6f65…68a5. The documents themselves are untouched: the byte mirror hashes to 7cfcdce4…35d0 exactly as it did for v2.5.8 and back to v2.5.4, 23 936 documents in 663 folders. A run now leaves nothing behind whichever way it ends — the copy it made for itself goes on success, on failure and on cancellation, a cached archive is never touched, and a cancelled run no longer forgets the folder the reader chose. Four faults of reliability are closed, each by a test that failed on the code before it: the cache sweep deleted .part files this program had not written, a package missing a root file was read back as whole, an interrupted read lost a transfer that had only paused, and the logger was installed after the thing that logs. The window speaks Russian on every path — the core's own English sentence no longer reaches the screen under «Собрать не удалось», every failure code the wire carries has a sentence of its own, and a code without one turns the frontend suite red. An archive entry stored under CP437 is read as its bytes say instead of naming a package file after invented characters. Also here: rustls 0.23.45 for RUSTSEC-2026-0285, revisions 54–65 of the specification, and the release gate of 2026-09-19 — the first run of it to reach the image and the reader's path, and the first to say build."
+      "tag": "v2.5.10",
+      "commit": "b4b793ccfb847c0c9016304a850c89bb4a50f5a8",
+      "published": "2026-09-20T19:15:56Z",
+      "dmg_sha256": "15c54a01e280bd1609255edb14de3c2195a8659a089aec1d88870a705bbc96aa",
+      "why": "The current release and the third reference. It replaced v2.5.9, withdrawn hours after it was published the same day, and the number moved for the rule rather than for a change: a reference release is not re-cut, so work that lands after one takes a number of its own. What it carries over v2.5.9 is documentation and nothing else — sixteen commits, not one line under cli/src, src-tauri/src or frontend/src, and the package it builds hashes to the same 87c854bf…7d49 over 23 940 files, the byte mirror to the same 7cfcdce4…35d0 over 23 936 documents in 663 folders. The application is byte-for-byte the work of v2.5.9; only the version string it reports differs. What the documents gained: one denominator for coverage figures rather than two (the corpus has 648 distinct code points, 645 of them need a glyph, 639 are drawn), the parser adoption date corrected to 2026-09-05, the .notdef requirement moved off a number and onto the measurement it comes from, the registry mark named as what the seven-day wait counts from, and the specification's header cut from 33 000 characters to 2 600 with its history moved into a journal of its own. Revisions 71 to 78. The enquiry to the TLHdig editors is recorded as sent on 2026-08-22 and still unanswered, which is what keeps five code points of the corpus undrawable by any font."
     }
   ]
 }
