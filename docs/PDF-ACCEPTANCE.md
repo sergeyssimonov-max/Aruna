@@ -4,8 +4,19 @@ There is no converter. This document is the specification the future one will be
 held to, written before it exists so that its tests are a contract rather than a
 description of whatever it happened to do.
 
-Nothing here has been implemented, and no placeholder test has been written for
-it. An `#[ignore]` that never runs is not coverage.
+~~Nothing here has been implemented, and no placeholder test has been written
+for it.~~ An `#[ignore]` that never runs is not coverage.
+
+**Corrected 2026-09-20.** The sentence above stopped being true twice over and
+was left standing both times, which is how a document starts describing a
+project it no longer has. Two prerequisites named here are built and checked:
+the document model of §0 since 2026-09-13, and the whole of §7's font delivery
+since 2026-09-17 — seven faces and five licence texts in the application
+bundle, their SHA-256 verified at startup, read through `aruna::fonts` and
+from nowhere else. What remains unimplemented is the converter itself and
+every requirement in §§1–6 that depends on a PDF existing. The distinction
+matters: a prerequisite that is done should be readable as done, or the next
+person re-does it.
 
 **How this file changes.** A requirement written before the work is worth
 keeping only if it cannot be quietly bent to fit whatever was achieved. So this
@@ -25,6 +36,22 @@ a dependency list without the parser adopted three lines below them.
 and `cargo-machete` were run on that tree the same day and are green. A
 correction of fact, not an amendment — no requirement changed.
 
+Amended 2026-09-17: §7, font delivery. Recorded here 2026-09-20, because the
+section was rewritten without the log above being touched — the one rule this
+file sets itself, and the first thing it failed at. The amendment stands as
+written; only its absence from the log is corrected.
+
+Amended 2026-09-20: §7 glyph coverage. Corrected the same day: the opening
+claim that nothing is implemented, the second of the two preconditions, and
+the code-point total of §7. Each is marked below.
+
+**Where this file ends and the specification begins.** `PROJECT-SPEC.ru.md`
+§6.9 lists checks for the PDF contour and says it takes effect with the first
+PDF. This file is the contract; that section is the pre-commit set that will
+enforce part of it. Two documents holding overlapping requirements drift —
+this project has watched that happen three times — so when they disagree, this
+file is the one that states what must be true, and §6.9 is corrected to it.
+
 ---
 
 ## Before any of it: two things that have to be true first
@@ -35,8 +62,14 @@ started, and both are cheap to check.
 
 *Settled 2026-09-02: the owner recorded the first trigger — PDF is a direction
 this project takes, and the package stays the reference result rather than the
-end of the pipeline. The second is still open; see requirement 3 below for what
-three measurements did to it.*
+end of the pipeline.* ~~*The second is still open.*~~
+
+*Corrected 2026-09-20: the second was settled on 2026-09-05 and this paragraph
+never said so. The parser was adopted, the whole gate set was run on that tree,
+and it is green — that is exactly the measurement the paragraph below asks for,
+performed and passed. What stays open is not the XML crate but the typesetting
+engine, measured 2026-09-12 and not adopted; see the note at the end of this
+section.*
 
 **Someone has to be able to read the result.** A PDF is a deliverable only if
 there is a viewer, a print route or a reader waiting for one. Absent that, the
@@ -57,6 +90,21 @@ find out what it costs is to add the candidate, run the whole gate set, and read
 what breaks — before a line of conversion is written, not after. A parser that
 cannot pass those checks is not a parser this project can adopt, whatever it
 does with documents.
+
+**The same test, applied to the typesetting engine, 2026-09-12.** Typst 0.15.1
+with krilla 0.8.2 was added on a throwaway branch and measured rather than
+estimated: the dependency graph goes from 153 crates to **855**, a rise of 702.
+The cost is indivisible — `typst` exposes no features to trim — and it is not
+paid in time or in system dependencies: the tree builds in 25 seconds and needs
+nothing installed outside Cargo, which is what a project with no Homebrew and a
+Java bar has to care about. Two licences would have to be added to `deny.toml`.
+The branch was rolled back in full; nothing of it is in the tree.
+
+The engine is therefore **measured and not adopted**, and that is the honest
+state to record. 702 crates is the largest dependency decision this project
+would ever have taken, larger than the parser by an order of magnitude, and it
+is not a decision to make in passing while writing the first PDF. Whoever makes
+it says so explicitly, with this measurement in front of them.
 
 ## 0. Prerequisite: a real XML parser
 
@@ -311,14 +359,49 @@ foot of a page, text set too tight, and gaps with no reason.
 
 ## 7. Fonts
 
-The corpus uses **648 distinct code points, 382 of them above the BMP**, of
-which 376 are cuneiform. See `XML-CONTRACT.md` §6 for the full table and the
-four consequences that decide the font choice.
+The corpus uses ~~**648**~~ **645 distinct code points, 382 of them above the
+BMP**, of which 376 are cuneiform. See `XML-CONTRACT.md` §6 for the full table
+and the four consequences that decide the font choice.
+
+*Corrected 2026-09-20.* The two figures are the same measurement counted two
+ways, not a change in the corpus: 648 included the three control characters
+`U+0009`, `U+000A` and `U+000D`, which later left both the numerator and the
+denominator of the coverage figure. `648 − 3 = 645`, and `642 − 3 = 639`. The
+count above the BMP is untouched — control characters are not up there. The
+figure appears as 645 in `FONTS.md`, and the two documents now agree.
 
 Before bundling anything: verify the licence permits both redistribution **and**
-embedding, and record both. Check that every code point in the corpus has a
-glyph — the list is produced by `corpus_inventory`. Do not convert text to
-outlines.
+embedding, and record both. Do not convert text to outlines.
+
+~~Check that every code point in the corpus has a glyph — the list is produced
+by `corpus_inventory`.~~
+
+**Amended 2026-09-20. Coverage is 639 of 645, and six code points will never
+have a glyph.** The requirement above cannot be met, and a requirement that
+cannot be met is not held — it is quietly stepped around, which is worse than
+not writing it.
+
+*The measurement.* Every font file in the tree was read against every code
+point of the corpus: 639 of 645 are drawn. The six that are not are
+`U+E83A` and five private-use signs — `U+100001`, `U+100003`, `U+100005`,
+`U+100006`, `U+100009`. Private-use code points carry no meaning any font is
+obliged to know, and no font in existence draws these five; `U+100009` alone
+occurs 2 715 times across 2 379 lines, so this is not a rounding error at the
+edge of the corpus. Four routes out were examined and rejected by the owner
+between 2026-08-30 and 2026-09-04: asking the compilers, visible placeholder
+markers, substituting the private-use codes during normalisation, and — held in
+reserve rather than rejected — substituting a similar face. `LastResort.otf`
+draws a placeholder box for anything, which is why it is counted as its own
+category and never as coverage: a box that says "no glyph" is an honest answer,
+not a glyph.
+
+*What replaces the requirement.* Coverage is checked and reported, not asserted.
+For the 639, a missing glyph in a produced PDF is a failure and the run says
+which code point and which document. For the six, absence is the expected and
+recorded state, named in the manifest, and it must never be masked by a
+substituted face — a substitution draws a wrong sign that no later check can
+see. The number itself is a measurement with a date, like every other number in
+this project, and it moves when the corpus or the font stack moves.
 
 **The files are already here, and already checked.** Since 2026-09-17 all seven
 fonts and five licence texts ride in the application bundle at
@@ -328,6 +411,12 @@ there, through `aruna::fonts`, and from nowhere else: no system path, no lookup
 by family name, no download. A font that is missing or is not the recorded file
 is a refusal naming the file, never a substitution — a substituted face draws
 the wrong sign and no later check would see it.
+
+**Verified in a built image 2026-09-19**, by layer 4 of the release gate, which
+reached the image for the first time. `Aruna.app/Contents/Resources/fonts/`
+carries twelve files — seven faces and five licence texts — and all seven
+SHA-256 sums matched the table in `docs/FONTS.md`. Until that run the claim
+above was true of the tree and untested in the thing a reader installs.
 
 **The credit has to be in the document, and this is the acceptance item that
 says so.** The Mainz terms ask the user of `UllikummiA` to mention:
