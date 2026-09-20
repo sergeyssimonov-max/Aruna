@@ -45,6 +45,13 @@ Amended 2026-09-20: §7 glyph coverage. Corrected the same day: the opening
 claim that nothing is implemented, the second of the two preconditions, and
 the code-point total of §7. Each is marked below.
 
+Corrected 2026-09-20, evening: the code-point total of §7 again, back to 648.
+The morning correction aligned a statement about the corpus to the denominator
+of a coverage figure, on a misreading of `FONTS.md`, which says 648 distinct
+code points of which 645 need a glyph. The rule that separates the two was
+decided by the owner the same day and written once, in `FONTS.md`, section
+Coverage. A correction of fact, not an amendment — no requirement changed.
+
 **Where this file ends and the specification begins.** `PROJECT-SPEC.ru.md`
 §6.9 lists checks for the PDF contour and says it takes effect with the first
 PDF. This file is the contract; that section is the pre-commit set that will
@@ -359,16 +366,24 @@ foot of a page, text set too tight, and gaps with no reason.
 
 ## 7. Fonts
 
-The corpus uses ~~**648**~~ **645 distinct code points, 382 of them above the
-BMP**, of which 376 are cuneiform. See `XML-CONTRACT.md` §6 for the full table
-and the four consequences that decide the font choice.
+The corpus uses **648 distinct code points, 382 of them above the BMP**, of
+which 376 are cuneiform, and **645 of the 648 need a glyph**. See
+`XML-CONTRACT.md` §6 for the full table and the four consequences that decide
+the font choice.
 
-*Corrected 2026-09-20.* The two figures are the same measurement counted two
-ways, not a change in the corpus: 648 included the three control characters
-`U+0009`, `U+000A` and `U+000D`, which later left both the numerator and the
-denominator of the coverage figure. `648 − 3 = 645`, and `642 − 3 = 639`. The
-count above the BMP is untouched — control characters are not up there. The
-figure appears as 645 in `FONTS.md`, and the two documents now agree.
+*Corrected 2026-09-20, twice.* The first correction put 645 here, on the ground
+that `FONTS.md` says 645 and the two documents should agree. It misread the
+source: `FONTS.md` says **648 distinct code points, of which 645 need a glyph**,
+so 648 was never in conflict with it. The second correction, the same evening,
+restored 648 and named 645 as what it is — the drawable subset.
+
+**Two denominators, and the rule for them lives in `FONTS.md`, section
+Coverage** (owner’s decision 2026-09-20). A statement about the corpus says
+648. A statement about coverage says 639 of 645: the three control characters
+`U+0009`, `U+000A` and `U+000D` cannot be covered by any font, and keeping them
+in a coverage denominator carries three permanently uncoverable code points on
+top of the six real ones. `648 − 3 = 645`, and `642 − 3 = 639`. The count above
+the BMP is untouched — control characters are not up there.
 
 Before bundling anything: verify the licence permits both redistribution **and**
 embedding, and record both. Do not convert text to outlines.
