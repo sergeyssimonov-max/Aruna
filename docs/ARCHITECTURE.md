@@ -279,10 +279,26 @@ cargo llvm-cov nextest --summary-only
 cargo audit && cargo deny check && cargo machete
 ```
 
-`src-tauri/` takes the same battery. It has **one** test —
-`a_build_without_the_feature_registers_no_webdriver`, which is the fourth and
-last of the gates keeping the end-to-end contour out of a release: the other
-three are declarations that `frontend/tests/spec-guard.test.ts` reads, and this
-one is the compiler's own answer about what the builder registers when the
-feature is off. `--no-tests=pass` is still needed under `--features e2e`, where
-that test is deliberately absent.
+`src-tauri/` takes the same battery. It holds **31 tests**, all of them in
+`src/lib.rs` — counted 2026-09-20 with `cargo nextest list --run-ignored all`,
+the same way `docs/TESTING.md` counts the console crate. Eleven are in `wire`
+(the generated types the window receives, and the promises about what never
+crosses), seven in `counting`, six in `markup` (the manifest summary and its
+refusals), four in `opening` (opening the inventory), two in `cancelling` —
+and one stands alone: `a_build_without_the_feature_registers_no_webdriver`,
+the fourth and last of the gates keeping the end-to-end contour out of a
+release: the other three are declarations that
+`frontend/tests/spec-guard.test.ts` reads, and this one is the compiler's own
+answer about what the builder registers when the feature is off.
+
+Three of the thirty-one carry `#[ignore]` and run only when asked explicitly:
+`regenerate_the_bindings`, which writes `frontend/src/bindings.ts`, and both
+`cancelling` tests, which read the corpus archive. A default run is **28**.
+
+Two flags need care here. `nextest` runs **without** `--all-features`: that flag
+turns on `e2e`, and the gate test is compiled out under the feature
+(`cfg(all(test, not(feature = "e2e")))`) — the very thing it exists to check.
+Clippy, by contrast, takes `--all-features`, because that branch must be checked
+too. `--no-tests=pass` is no longer a necessity: the other thirty tests sit in
+modules gated on `test` alone and run under the feature as well. It stays as
+insurance for a crate that temporarily has no tests at all.
