@@ -1093,21 +1093,12 @@ fn write_documents(
             Ok(report) => {
                 // Named by `verify`, which also renders the manifest's list of
                 // what is permitted. One list, so a change cannot be counted
-                // under a name the manifest never advertises.
-                for rule in report.dropped {
-                    *tallies.applied.entry(verify::drop_pi(rule)).or_default() += 1;
-                }
-                if report.added_declaration {
-                    *tallies
-                        .applied
-                        .entry(verify::ADD_DECLARATION.to_string())
-                        .or_default() += 1;
-                }
-                if report.reflowed {
-                    *tallies
-                        .applied
-                        .entry(verify::REFLOW_PROLOGUE.to_string())
-                        .or_default() += 1;
+                // under a name the manifest never advertises — and one place
+                // that turns a report into counts, so a change cannot go
+                // uncounted either, which is how `DROP_BOM` went until
+                // 2026-09-21.
+                for rule in report.applied() {
+                    *tallies.applied.entry(rule).or_default() += 1;
                 }
             }
             Err(reason) => {

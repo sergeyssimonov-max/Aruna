@@ -87,8 +87,40 @@ pub struct Report {
     /// `&'static str` rather than `String` so the type says what the values
     /// are: entries of [`DROPPED`] and nothing else.
     pub dropped: Vec<&'static str>,
+    /// Whether a leading U+FEFF was removed.
+    ///
+    /// Absent until 2026-09-21, and nothing noticed: the normaliser dropped the
+    /// mark and this module tolerated its absence, but the report had no field
+    /// to say so, so [`DROP_BOM`] stood in the manifest's `permitted` list as a
+    /// change no package could ever show as applied. TLHdig Beta 0.3 carries no
+    /// BOM, which is why the count of 0 was right by accident.
+    pub dropped_bom: bool,
     pub added_declaration: bool,
     pub reflowed: bool,
+}
+
+impl Report {
+    /// Every permitted change this document underwent, under the name the
+    /// manifest's `applied` map counts it by — one entry per change.
+    ///
+    /// Here rather than at the caller, beside the names themselves: the field
+    /// that was missing above went unnoticed because each field was turned
+    /// into a count somewhere else, one `if` at a time, and a field with no
+    /// `if` was simply never counted.
+    pub fn applied(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        if self.dropped_bom {
+            out.push(DROP_BOM.to_string());
+        }
+        out.extend(self.dropped.iter().map(|rule| drop_pi(rule)));
+        if self.added_declaration {
+            out.push(ADD_DECLARATION.to_string());
+        }
+        if self.reflowed {
+            out.push(REFLOW_PROLOGUE.to_string());
+        }
+        out
+    }
 }
 
 /// Compare a document with its normalised form, allowing only the permit list.
@@ -161,6 +193,7 @@ pub fn compare(source: &[u8], normalised: &[u8]) -> Result<Report, String> {
 
     Ok(Report {
         dropped,
+        dropped_bom: source.len() != strip_bom(source).len(),
         added_declaration,
         reflowed: source_space,
     })
@@ -419,5 +452,39 @@ mod tests {
                 "the name is one the manifest advertises"
             );
         }
+    }
+
+    /// **A dropped byte order mark is counted under [`DROP_BOM`].**
+    ///
+    /// The manifest has always advertised the rule, and until 2026-09-21 no
+    /// document could be counted under it: the report had no field for it.
+    /// The fixture is `cli/fixtures/xml/valid/bom.xml`, run through the real
+    /// normaliser rather than an output written here, so the test is about the
+    /// pair the export actually compares.
+    #[test]
+    fn a_dropped_byte_order_mark_is_counted_under_its_rule() {
+        let source = include_bytes!("../../fixtures/xml/valid/bom.xml");
+        assert!(
+            source.starts_with(&[0xEF, 0xBB, 0xBF]),
+            "the fixture has a BOM"
+        );
+        let out = super::super::normalize::normalize_document(source);
+
+        let report = compare(source, &out).expect("a BOM may be dropped");
+
+        assert!(
+            report.applied().iter().any(|rule| rule == DROP_BOM),
+            "the BOM was dropped and not counted: {:?}",
+            report.applied()
+        );
+    }
+
+    /// And a document without one is not counted under it.
+    #[test]
+    fn a_document_without_a_byte_order_mark_is_not_counted_under_its_rule() {
+        let source = b"<AOxml/>";
+        let report = compare(source, &declared(source)).expect("nothing to refuse");
+
+        assert_eq!(report.applied(), vec![ADD_DECLARATION.to_string()]);
     }
 }
