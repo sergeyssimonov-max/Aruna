@@ -7,7 +7,7 @@
 #
 # **Why it exists.** Measured on 2026-09-22: the v2.5.10 tree built on the
 # owner's machine and the binary in the published image differed in 7.6 million
-# bytes of the arm64 slice alone. Three causes were found, and each is dealt
+# bytes of the arm64 slice alone. Four causes were found, and each is dealt
 # with below:
 #
 # 1. Absolute paths of the machine that built it. Panic locations and `file!()`
@@ -18,7 +18,15 @@
 #    but where the `rust-src` component is installed — it is, by
 #    `rust-toolchain.toml`, and CI does not install it — it points them at the
 #    local copy instead: 72 strings under `~/.rustup/…` here, none in CI.
-# 3. Apple's tools. CI linked with the runner's default Xcode 15.4 (SDK 14.5,
+# 3. The linker's UUID. ld hashes the whole output into LC_UUID, and the output
+#    it hashes still carries the debug map — OSO entries naming the object files,
+#    one of them inside a directory rustc names at random (`deps/rustcXXXXXX/`),
+#    and SO entries naming ring's C sources by absolute path. `strip` removes
+#    them afterwards, but the UUID has already been taken over them, so two
+#    builds of one commit, even on one machine, differed in those 16 bytes and
+#    nowhere else. `ld -S` keeps the debug map out of the output, the UUID is
+#    then taken over what ships, and stays in the binary.
+# 4. Apple's tools. CI linked with the runner's default Xcode 15.4 (SDK 14.5,
 #    ld 1053.12), the owner's machine with Xcode 15.2 (SDK 14.2, ld 1022.1).
 #    macOS 13 cannot run anything newer than 15.2, so 15.2 is the one both use.
 #
@@ -62,7 +70,7 @@ commit=$(rustc -vV | sed -n 's/^commit-hash: //p')
 # general — the checkout itself — goes first. The separator is 0x1f, as
 # CARGO_ENCODED_RUSTFLAGS requires, so a path with a space in it stays one flag.
 sep=$(printf '\037')
-CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$root=/aruna${sep}--remap-path-prefix=$cargo_home=/cargo${sep}--remap-path-prefix=$sysroot/lib/rustlib/src/rust=/rustc/$commit"
+CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$root=/aruna${sep}--remap-path-prefix=$cargo_home=/cargo${sep}--remap-path-prefix=$sysroot/lib/rustlib/src/rust=/rustc/$commit${sep}-Clink-arg=-Wl,-S"
 export CARGO_ENCODED_RUSTFLAGS
 
 echo "build-release: $want_xcode, SDK $sdk, rustc $commit"
