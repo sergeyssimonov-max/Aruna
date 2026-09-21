@@ -431,12 +431,11 @@ jobs:
       # is stated once and cannot drift from what runs locally.
       - uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
 
-      # The exact Node the owner's machine runs: the frontend it builds is
-      # compiled into the release binary, and the release has to be the binary
-      # that machine builds from the same commit.
+      # Node from `.node-version`, the one file that names it; the release job
+      # below says why it is exact.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "22.23.2"
+          node-version-file: .node-version
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
@@ -523,12 +522,13 @@ jobs:
       # same source of the pnpm version — `packageManager` in the root manifest.
       - uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
 
-      # The exact Node the owner's machine runs: the frontend it builds is
-      # compiled into the release binary, and the release has to be the binary
-      # that machine builds from the same commit.
+      # Node from `.node-version`, as pnpm comes from `packageManager`: stated
+      # once, and `scripts/build-release.sh` refuses any other. The frontend it
+      # builds is compiled into the release binary, and the release has to be
+      # the binary the owner's machine builds from the same commit.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "22.23.2"
+          node-version-file: .node-version
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 

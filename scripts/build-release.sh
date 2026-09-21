@@ -53,6 +53,16 @@ if [ "$(printf '%s\n' "$xcode" | sed -n 1p)" != "$want_xcode" ] \
   exit 1
 fi
 
+# --- Node -------------------------------------------------------------------
+# Vite runs under it (`beforeBuildCommand`), and what it builds is compiled into
+# the binary. `.node-version` names it once; CI reads the same file.
+want_node=$(tr -d ' \n' < .node-version)
+node=$(node --version | sed 's/^v//')
+if [ "$node" != "$want_node" ]; then
+  echo "build-release: the release is built with Node $want_node (.node-version), found $node." >&2
+  exit 1
+fi
+
 # --- Flags ------------------------------------------------------------------
 # Flags from the environment would make this build differ from the other one
 # without saying so. Refuse them rather than merge them.
@@ -73,5 +83,5 @@ sep=$(printf '\037')
 CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$root=/aruna${sep}--remap-path-prefix=$cargo_home=/cargo${sep}--remap-path-prefix=$sysroot/lib/rustlib/src/rust=/rustc/$commit${sep}-Clink-arg=-Wl,-S"
 export CARGO_ENCODED_RUSTFLAGS
 
-echo "build-release: $want_xcode, SDK $sdk, rustc $commit"
+echo "build-release: $want_xcode, SDK $sdk, Node $node, rustc $commit"
 exec tauri build --target universal-apple-darwin "$@"
