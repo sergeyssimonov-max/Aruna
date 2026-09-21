@@ -494,6 +494,14 @@ jobs:
     needs: [check, corpus, frontend, desktop]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
+    # Xcode 15.2, not the image's default. The release has to be the binary the
+    # owner's machine builds from the same commit, and that machine is macOS 13,
+    # where 15.2 is the newest Xcode there is. With the default (15.4 on
+    # 2026-09-22) the linker and the SDK differ and so does every byte after
+    # them. `scripts/build-release.sh` refuses any other Xcode, so an image that
+    # drops 15.2 fails this job instead of quietly shipping a different binary.
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_15.2.app/Contents/Developer
     steps:
       # The build number that needed full history is gone with the script that
       # computed it: Tauri takes both `CFBundleShortVersionString` and

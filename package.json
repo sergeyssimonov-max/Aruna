@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build --target universal-apple-darwin",
+    "build": "bash scripts/build-release.sh",
     "build:host": "tauri build",
     "check": "pnpm --dir frontend check",
     "test": "pnpm --dir frontend test:unit",
