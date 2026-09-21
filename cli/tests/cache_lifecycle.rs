@@ -333,13 +333,20 @@ fn an_unwritable_cache_directory_falls_back_to_a_run_of_its_own() {
     let cache = CacheDir::new();
     std::fs::create_dir_all(cache.path()).expect("mkdir");
     std::fs::set_permissions(cache.path(), std::fs::Permissions::from_mode(0o500)).expect("chmod");
+    // The run's own copy is the caller's to drop, and here the caller is this
+    // test, which cannot reach `cache::discard`. Left in the real temporary
+    // directory it stayed there: two `aruna-work.<pid>` per suite run, found
+    // by the dozen on 2026-09-20. In a sandbox it goes with the sandbox.
+    let sandbox = tempdir().expect("tempdir");
 
-    let outcome = with_cache_dir(&cache.path(), || {
-        obtain_archive(
-            &origin.url(),
-            &md5_hex(&payload),
-            &aruna::job::Job::unattended(),
-        )
+    let outcome = with_temp_dir(sandbox.path(), || {
+        with_cache_dir(&cache.path(), || {
+            obtain_archive(
+                &origin.url(),
+                &md5_hex(&payload),
+                &aruna::job::Job::unattended(),
+            )
+        })
     });
 
     std::fs::set_permissions(cache.path(), std::fs::Permissions::from_mode(0o755)).expect("chmod");
@@ -353,6 +360,11 @@ fn an_unwritable_cache_directory_falls_back_to_a_run_of_its_own() {
         std::fs::read(archive.path()).expect("read"),
         payload,
         "the fallback archive is not what the server sent"
+    );
+    assert!(
+        archive.path().starts_with(sandbox.path()),
+        "the run's own copy went outside the temporary directory it was given: {}",
+        archive.path().display()
     );
     assert!(cache.files().is_empty());
 }
@@ -628,13 +640,18 @@ fn a_file_where_the_cache_directory_belongs_does_not_fail_the_run() {
     let dir = tempdir().expect("tempdir");
     let occupied = dir.path().join("cache");
     std::fs::write(&occupied, b"not a directory").expect("write");
+    // A sandbox for the run's own copy, for the reason the unwritable-cache
+    // test above gives.
+    let sandbox = tempdir().expect("tempdir");
 
-    let archive = with_cache_dir(&occupied, || {
-        obtain_archive(
-            &origin.url(),
-            &md5_hex(&payload),
-            &aruna::job::Job::unattended(),
-        )
+    let archive = with_temp_dir(sandbox.path(), || {
+        with_cache_dir(&occupied, || {
+            obtain_archive(
+                &origin.url(),
+                &md5_hex(&payload),
+                &aruna::job::Job::unattended(),
+            )
+        })
     })
     .expect("a file in the way must not fail the run");
 
@@ -643,6 +660,11 @@ fn a_file_where_the_cache_directory_belongs_does_not_fail_the_run() {
         "the archive was reported as cached into a file"
     );
     assert_eq!(std::fs::read(archive.path()).expect("read"), payload);
+    assert!(
+        archive.path().starts_with(sandbox.path()),
+        "the run's own copy went outside the temporary directory it was given: {}",
+        archive.path().display()
+    );
     // And the file that was in the way is untouched.
     assert_eq!(
         std::fs::read(&occupied).expect("read"),
