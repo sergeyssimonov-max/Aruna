@@ -11,10 +11,20 @@
 //! list manuscripts in, and `src/data/inventory.json` is a committed record of
 //! it over the whole corpus.
 
-use crate::parse::ManuscriptRecord;
+use crate::parse::{group_label, ManuscriptRecord};
 
-/// Order records for display: by CTH number, then natural-order sigla
-/// (`KBo 3.22` before `KBo 22.5`), then editor and year.
+/// Order records for display: by CTH number, then the CTH label, then
+/// natural-order sigla (`KBo 3.22` before `KBo 22.5`), then editor and year.
+///
+/// The label is there so that one group is one run. Grouping —
+/// [`crate::parse::group_runs`] — walks this order and cuts where the label
+/// changes, while the number is only the label's first run of digits: `CTH
+/// 12.1` and `CTH 12.2` are both 12. Without the label between them, records
+/// of the two interleaved by siglum, one group came out as several runs, and
+/// the inventory and the manifest listed it more than once. TLHdig Beta 0.3
+/// has no two labels sharing a number, so the order it is published in did
+/// not move when this was added on 2026-09-21; the next edition is not this
+/// one.
 ///
 /// Sequential, like the parsing that feeds it. A thread pool was tried on the
 /// parse and removed at 1.07×; inflating the ZIP is ~72 % of the run and a
@@ -61,8 +71,18 @@ pub fn sort_by_display_order<T>(items: &mut [T], record: impl Fn(&T) -> &Manuscr
 /// then dropped.
 ///
 /// A key is compared as bytes and nothing else, so the whole of the primary
-/// ordering — catalogue number first, then the siglum read in natural order —
-/// is one `memcmp`.
+/// ordering — the group first, then the siglum read in natural order — is one
+/// `memcmp`. The group goes in as its rank among the inventory's groups
+/// ([`group_ranks`]), four bytes wide, rather than as its label encoded: a
+/// natural encoding is not prefix-free, so `CTH 12` followed by a siglum and
+/// `CTH 12a` followed by the same one would diverge at the siglum's first
+/// letter against the label's `a`, and the longer label could sort first. A
+/// fixed-width rank cannot run into what follows it. Comparing the label as a
+/// second key instead was tried and measured on 2026-09-21 with `bench_order`:
+/// 3.3 ms to sort the corpus became 6.0 ms, because every comparison inside a
+/// group — nearly all of them — paid for two equal labels before reaching the
+/// siglum. Ranking costs 3.9 ms, the difference being the one pass that looks
+/// each record's group up.
 struct SortKeys {
     buf: Vec<u8>,
     /// `(start, end)` into `buf`, one per record, in record order.
@@ -89,9 +109,10 @@ impl SortKeys {
         let mut buf = Vec::with_capacity(records.len() * 32);
         let mut spans = Vec::with_capacity(records.len());
 
-        for record in records {
+        for (record, rank) in records.iter().zip(group_ranks(records)) {
             let start = buf.len() as u32;
-            encode_key(&mut buf, record.cth_num, &record.sigla);
+            buf.extend_from_slice(&rank.to_be_bytes());
+            encode_natural(&mut buf, &record.sigla);
             spans.push((start, buf.len() as u32));
         }
 
@@ -105,15 +126,59 @@ impl SortKeys {
     }
 }
 
-/// Write the primary key of one record: catalogue number, then its siglum read
+/// Each record's group, as its rank among the distinct groups of the
+/// inventory.
+///
+/// A group is a catalogue number and a label, ordered by [`encode_group`] and
+/// then by the label itself, byte for byte, where the natural reading cannot
+/// tell two apart: it folds case and reads `012` as `12`, and two labels it
+/// calls equal must still not interleave. Ranking the distinct groups — 663
+/// in this corpus — sorts 663 things rather than comparing labels in every one
+/// of the three hundred thousand comparisons the records need.
+fn group_ranks(records: &[&ManuscriptRecord]) -> Vec<u32> {
+    use std::collections::HashMap;
+
+    let mut index: HashMap<(u32, &str), u32> = HashMap::new();
+    let mut distinct: Vec<(u32, &str)> = Vec::new();
+    let of_record: Vec<u32> = records
+        .iter()
+        .map(|record| {
+            let group = (record.cth_num, group_label(record));
+            *index.entry(group).or_insert_with(|| {
+                distinct.push(group);
+                distinct.len() as u32 - 1
+            })
+        })
+        .collect();
+
+    let mut ranked: Vec<(Vec<u8>, &str, u32)> = distinct
+        .iter()
+        .enumerate()
+        .map(|(i, &(cth_num, label))| {
+            let mut key = Vec::new();
+            encode_group(&mut key, cth_num, label);
+            (key, label, i as u32)
+        })
+        .collect();
+    ranked.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(b.1)));
+
+    let mut rank_of = vec![0u32; ranked.len()];
+    for (rank, (_, _, i)) in ranked.iter().enumerate() {
+        rank_of[*i as usize] = rank as u32;
+    }
+    of_record.iter().map(|&i| rank_of[i as usize]).collect()
+}
+
+/// Write the key a group is ranked by: catalogue number, then its label read
 /// in natural order.
 ///
 /// The catalogue number goes in big-endian so that comparing the bytes compares
 /// the number, and first because it is the primary ordering — `u32::MAX` for a
-/// record with no CTH, which is what sends those to the end.
-fn encode_key(buf: &mut Vec<u8>, cth_num: u32, sigla: &str) {
+/// record with no CTH, which is what sends those to the end. Fixed width, so
+/// the label after it cannot run into it.
+fn encode_group(buf: &mut Vec<u8>, cth_num: u32, label: &str) {
     buf.extend_from_slice(&cth_num.to_be_bytes());
-    encode_natural(buf, sigla);
+    encode_natural(buf, label);
 }
 
 /// Encode `KBo 3.22+` so that byte order is natural order: text compares as
@@ -288,11 +353,11 @@ mod tests {
     #[test]
     fn the_catalogue_number_is_the_primary_key() {
         let mut early = Vec::new();
-        encode_key(&mut early, 5, "ZZZ 999");
+        encode_group(&mut early, 5, "ZZZ 999");
         let mut late = Vec::new();
-        encode_key(&mut late, 786, "AAA 1");
+        encode_group(&mut late, 786, "AAA 1");
         let mut none = Vec::new();
-        encode_key(&mut none, u32::MAX, "AAA 1");
+        encode_group(&mut none, u32::MAX, "AAA 1");
 
         assert!(early < late);
         assert!(late < none);
@@ -346,6 +411,84 @@ mod tests {
                 (786, "KBo 1.1", "AA", "2000"),
             ]
         );
+    }
+
+    fn labelled(sigla: &str, cth: &str) -> ManuscriptRecord {
+        ManuscriptRecord {
+            cth: Some(cth.into()),
+            ..rec(
+                sigla,
+                crate::parse::parse_cth_num(cth).unwrap_or(u32::MAX),
+                "AA",
+                "2000",
+            )
+        }
+    }
+
+    fn runs(records: &[ManuscriptRecord]) -> Vec<(&str, usize)> {
+        crate::parse::group_runs(records)
+            .map(|run| (group_label(&run[0]), run.len()))
+            .collect()
+    }
+
+    /// **One label, one run.** `CTH 12.1` and `CTH 12.2` share the number 12,
+    /// and while the number was the whole of the group key their records
+    /// interleaved by siglum: this input came out as three runs — `12.1`,
+    /// `12.2`, `12.1` — and the inventory and the manifest would have listed
+    /// `CTH 12.1` twice. Found by reading on 2026-09-18; the corpus has no
+    /// such labels, which is why nothing had shown it.
+    #[test]
+    fn records_of_one_label_are_one_run_when_labels_share_a_number() {
+        let mut records = vec![
+            labelled("KBo 1", "CTH 12.1"),
+            labelled("KBo 2", "CTH 12.2"),
+            labelled("KBo 3", "CTH 12.1"),
+        ];
+        sort_records(&mut records);
+
+        assert_eq!(runs(&records), vec![("CTH 12.1", 2), ("CTH 12.2", 1)]);
+    }
+
+    /// The labels are read in natural order — `12.2` before `12.10` — and two
+    /// the natural reading calls equal are still two groups, each one run.
+    #[test]
+    fn labels_sharing_a_number_are_ordered_naturally_and_never_merged() {
+        let mut records = vec![
+            labelled("KBo 1", "CTH 12.10"),
+            labelled("KBo 2", "CTH 12a"),
+            labelled("KBo 3", "CTH 12.2"),
+            labelled("KBo 4", "CTH 12A"),
+            labelled("KBo 5", "CTH 12.10"),
+            labelled("KBo 6", "CTH 12a"),
+            labelled("KBo 7", "CTH 12A"),
+        ];
+        sort_records(&mut records);
+
+        assert_eq!(
+            runs(&records),
+            vec![
+                ("CTH 12.2", 1),
+                ("CTH 12.10", 2),
+                ("CTH 12A", 2),
+                ("CTH 12a", 2)
+            ]
+        );
+    }
+
+    /// A label with no number shares `u32::MAX` with records that have no
+    /// label at all, and is not mixed into them either.
+    #[test]
+    fn a_label_without_a_number_is_one_run_beside_the_unlabelled() {
+        let mut records = vec![
+            rec("KBo 1", u32::MAX, "AA", "2000"),
+            labelled("KBo 2", "CTH ?"),
+            rec("KBo 3", u32::MAX, "AA", "2000"),
+            labelled("KBo 4", "CTH ?"),
+        ];
+        sort_records(&mut records);
+
+        let seen = runs(&records);
+        assert_eq!(seen.len(), 2, "{seen:?}");
     }
 
     #[test]
