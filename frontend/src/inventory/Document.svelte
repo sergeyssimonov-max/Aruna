@@ -102,7 +102,7 @@
         <input
           type="search"
           id="q"
-          aria-label="Поиск по описи"
+          aria-label="Search the inventory"
           placeholder="Search CTH, siglum, lang, corpus, editor, year…"
           autocomplete="off"
           spellcheck="false"
