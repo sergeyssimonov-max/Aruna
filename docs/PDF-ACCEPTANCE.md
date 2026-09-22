@@ -223,6 +223,16 @@ How to check them without installing anything foreign:
 written by this project, and both cost nothing to have. Neither goes anywhere
 near the working path: examples and tests only.
 
+**They are two programs and one opinion.** Both run on libxml2 2.9.13
+(`xsltproc --version`: libxslt 10135 compiled against libxml 20913), so a
+canonical form from one and an extraction from the other agree for the same
+reason and can be wrong for the same reason. They are independent of this
+project's parser, `quick-xml`, and not of each other. A second library ships
+with every Mac: expat 2.2.8 inside `/usr/bin/python3`, which on 2026-09-22
+refused exactly the 210 documents `xmllint` refuses, plus the one archive entry
+that is not a manuscript. That is recorded here as a fact, not adopted as an
+instrument.
+
 **Their absence must never be read as a pass.** That rule survives the
 amendment unchanged, and now has teeth: if the second-reader property has no
 instrument, it is unmet and recorded unmet, not quietly dropped.

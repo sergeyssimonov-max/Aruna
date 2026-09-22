@@ -393,4 +393,5 @@ Baselines are in `PERFORMANCE.md`.
   acceptance — canonical comparison and an independent extraction. `sips`, for
   rasterising a page, is the third. All three ship with the system, and all
   three are for examples and tests; nothing on the working path calls any of
-  them.
+  them. The first two run on the same libxml2 2.9.13, so together they are one
+  opinion, not two (`docs/PDF-ACCEPTANCE.md`, measured 2026-09-22).
