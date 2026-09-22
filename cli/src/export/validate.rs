@@ -447,6 +447,11 @@ mod tests {
             crate::fonts::PACKAGED_TERMS_BYTES,
         )
         .expect("terms");
+        fs::write(
+            dir.join(crate::cth_titles::PACKAGED_TERMS),
+            crate::cth_titles::PACKAGED_TERMS_BYTES,
+        )
+        .expect("CTH terms");
         placed
     }
 
@@ -523,7 +528,11 @@ mod tests {
     /// прежнюю копию было уже нечем.
     #[test]
     fn a_package_missing_a_root_file_is_refused_rather_than_read_as_whole() {
-        for missing in [crate::fonts::PACKAGED_FONT, crate::fonts::PACKAGED_TERMS] {
+        for missing in [
+            crate::fonts::PACKAGED_FONT,
+            crate::fonts::PACKAGED_TERMS,
+            crate::cth_titles::PACKAGED_TERMS,
+        ] {
             let dir = tempdir().unwrap();
             let root = dir.path();
             let fragments = sample();

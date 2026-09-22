@@ -95,7 +95,8 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
     assert_eq!(built.stylesheet_dropped, 5);
 
     // Structure: an inventory, the font it draws `U+100000` with, that font's
-    // terms, the manifest, two group directories, nothing else.
+    // terms, the terms of the CTH titles the inventory shows, the manifest, two
+    // group directories, nothing else.
     let mut top: Vec<String> = fs::read_dir(&root)
         .expect("read")
         .flatten()
@@ -107,6 +108,7 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
         vec![
             "CTH 5",
             "CTH 9",
+            "CTH-TITLES-TERMS.txt",
             "TLHdig_Beta_0.3.html",
             "UllikummiA-TERMS.txt",
             "UllikummiA.ttf",
@@ -199,8 +201,8 @@ fn none_of_the_archive_debris_reaches_the_package() {
     collect(&root, &mut files);
     assert_eq!(
         files.len(),
-        8,
-        "four documents, one inventory, one manifest, the font and its terms: {files:?}"
+        9,
+        "four documents, one inventory, one manifest, the font and its terms, the CTH titles' terms: {files:?}"
     );
     for path in &files {
         let name = path
@@ -213,7 +215,8 @@ fn none_of_the_archive_debris_reaches_the_package() {
                 || name == format!("{PACKAGE}.html")
                 || name == "manifest.json"
                 || name == aruna::fonts::PACKAGED_FONT
-                || name == aruna::fonts::PACKAGED_TERMS,
+                || name == aruna::fonts::PACKAGED_TERMS
+                || name == aruna::cth_titles::PACKAGED_TERMS,
             "{name} is not something the package should hold"
         );
         assert!(!name.starts_with('.'), "{name} is hidden debris");

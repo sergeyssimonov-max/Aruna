@@ -253,6 +253,38 @@ tr.group.folded .chevron {
   color: #ccc;
 }
 
+.group-toggle {
+  max-width: 100%;
+}
+
+.group-label, .group-count {
+  flex: none;
+}
+
+.group-title {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #444;
+  min-width: 0;
+  font-size: .85rem;
+  overflow: hidden;
+}
+
+.group-title:before {
+  content: "· ";
+  color: #ccc;
+}
+
+.group-toggle:hover .group-title, .group-toggle:focus .group-title {
+  white-space: normal;
+  overflow: visible;
+}
+
+.group-title:not([data-cth="exact"]):not([data-cth="parent"]), .cth-note {
+  color: #6b6b6b;
+  font-style: italic;
+}
+
 @media (max-width: 720px) {
   col.c-ed {
     width: 0;
@@ -264,5 +296,20 @@ tr.group.folded .chevron {
 
   col.c-corp {
     width: 4.25rem;
+  }
+
+  .group-toggle {
+    flex-wrap: wrap;
+  }
+
+  .group-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  .group-title:before {
+    content: none;
   }
 }

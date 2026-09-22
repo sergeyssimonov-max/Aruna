@@ -38,6 +38,16 @@
     outline: 0;
   }
 
+  .group-toggle {
+    flex-wrap: wrap;
+  }
+
+  .group-title {
+    white-space: normal;
+    text-overflow: clip;
+    overflow: visible;
+  }
+
   a {
     color: inherit;
     text-decoration: none;

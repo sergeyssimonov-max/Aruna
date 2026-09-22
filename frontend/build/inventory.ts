@@ -112,7 +112,7 @@ const MARKUP: readonly {
   {
     component: 'GroupHeading.svelte',
     artifact: 'group_heading.html',
-    props: placeholders('span', 'label', 'count'),
+    props: placeholders('span', 'label', 'cthStatus', 'cthTitle', 'count'),
   },
   {
     component: 'ManuscriptRow.svelte',

@@ -70,17 +70,18 @@ pub fn is_root_file(name: &str) -> bool {
     ROOT_FILES.contains(&name)
 }
 
-/// Те же четыре файла списком.
+/// Те же пять файлов списком.
 ///
 /// [`is_root_file`] отвечает о файле, который уже нашли; валидатору нужен
 /// список, потому что «терпеть файл» и «требовать файл» – два разных вопроса,
 /// и второго до 18.09.2026 не задавал никто: пакет без шрифта и без текста его
 /// условий читался заново как целый.
-pub const ROOT_FILES: [&str; 4] = [
+pub const ROOT_FILES: [&str; 5] = [
     crate::paths::OUTPUT_FILE_NAME,
     MANIFEST,
     crate::fonts::PACKAGED_FONT,
     crate::fonts::PACKAGED_TERMS,
+    crate::cth_titles::PACKAGED_TERMS,
 ];
 
 /// The most one document may be, inflated.
@@ -418,6 +419,13 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         (
             crate::fonts::PACKAGED_TERMS,
             crate::fonts::PACKAGED_TERMS_BYTES,
+        ),
+        // Whose CTH titles the inventory shows and on what terms: CC BY-SA 4.0
+        // asks for the attribution to travel with the material, and the page
+        // itself carries no notes (owner's decision of 2026-09-17).
+        (
+            crate::cth_titles::PACKAGED_TERMS,
+            crate::cth_titles::PACKAGED_TERMS_BYTES,
         ),
     ] {
         let path = staging.path().join(name);

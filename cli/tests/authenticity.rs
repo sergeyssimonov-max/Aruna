@@ -45,9 +45,11 @@ use tempfile::tempdir;
 
 /// What TLHdig Beta 0.3 holds, and what the specification records in 3.6.
 const DOCUMENTS: usize = 23_936;
-/// The documents, plus the inventory, the manifest, the one packaged font and
-/// the text of its terms — four files since 2026-09-17, two before it.
-const FILES_IN_PACKAGE: usize = DOCUMENTS + 4;
+/// The documents, plus the inventory, the manifest, the one packaged font, the
+/// text of its terms and the terms of the CTH titles — five files since
+/// 2026-09-22, four since 2026-09-17, two before it. Specification 3.6 still
+/// says 23 940 until its edit is made; this number is the measured one.
+const FILES_IN_PACKAGE: usize = DOCUMENTS + 5;
 
 /// The document as the package is expected to hold it, built from the permit
 /// list rather than from the normaliser.
@@ -208,15 +210,16 @@ fn assert_same_documents(archive: &Path, root: &Path, admitted: usize, in_packag
         admitted, in_package,
         "the number of documents written is not the number the gates admitted"
     );
-    // Four files that are not documents, and the number is the assertion: the
-    // inventory, the manifest, the font the page draws `U+100000` with and the
-    // terms that font is distributed under. Two until 2026-09-17; anything
-    // beyond these four is something nobody decided to ship.
+    // Five files that are not documents, and the number is the assertion: the
+    // inventory, the manifest, the font the page draws `U+100000` with, the
+    // terms that font is distributed under, and the terms of the CTH titles the
+    // inventory shows. Two until 2026-09-17, four until 2026-09-22; anything
+    // beyond these five is something nobody decided to ship.
     assert_eq!(
         files,
-        in_package + 4,
+        in_package + 5,
         "the package holds files that are none of: a document, the inventory, the manifest, \
-         UllikummiA.ttf, UllikummiA-TERMS.txt"
+         UllikummiA.ttf, UllikummiA-TERMS.txt, CTH-TITLES-TERMS.txt"
     );
 }
 
@@ -296,7 +299,7 @@ fn a_package_holds_every_admitted_document_once_and_unchanged() {
 /// directory and reads every file back — so it is `#[ignore]` and the ordinary
 /// `nextest` run stays under ten seconds. It is the acceptance check for the
 /// authenticity contour, and the anchors it asserts are the ones the
-/// specification records in 3.6: 23 936 documents, 23 940 files.
+/// specification records in 3.6: 23 936 documents, 23 941 files.
 ///
 /// Skipped, like `tests/corpus.rs`, when the archive is not on this machine;
 /// `ARUNA_REQUIRE_FIXTURE=1` turns that skip into a failure.

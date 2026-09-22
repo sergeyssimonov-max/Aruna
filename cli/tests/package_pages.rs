@@ -418,8 +418,9 @@ fn the_inventory_carries_screen_and_print_rules() {
 // The package as a whole
 // ---------------------------------------------------------------------------
 
-/// The folder holds the inventory, the manifest, the manuscripts, and the one
-/// font the page cannot be read without together with its terms. Nothing else.
+/// The folder holds the inventory, the manifest, the manuscripts, the one font
+/// the page cannot be read without together with its terms, and the terms of
+/// the CTH titles the inventory shows. Nothing else.
 ///
 /// A build that left an intermediate representation, a temporary file or a
 /// backup behind would still pass every link check above.
@@ -436,7 +437,8 @@ fn the_package_holds_only_what_a_reader_needs() {
             || name == format!("{PACKAGE}.html")
             || name == "manifest.json"
             || name == aruna::fonts::PACKAGED_FONT
-            || name == aruna::fonts::PACKAGED_TERMS;
+            || name == aruna::fonts::PACKAGED_TERMS
+            || name == aruna::cth_titles::PACKAGED_TERMS;
         assert!(allowed, "the package holds {}", file.display());
         for junk in [".bak", ".tmp", ".part", ".orig", "~"] {
             assert!(

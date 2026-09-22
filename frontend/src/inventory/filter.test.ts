@@ -47,13 +47,19 @@ const fill = (template: string, values: Record<string, string>) =>
   template.replace(/@@(\w+)@@/g, (hole: string, name: string) => values[name] ?? hole)
 
 /** The document the renderer writes, with the rows a test asks for. */
-function inventory(groups: { label: string; rows: Row[] }[]): void {
+function inventory(
+  groups: { label: string; rows: Row[]; cthStatus?: string; cthTitle?: string }[],
+): void {
   let n = 0
   const body = groups
     .map((group) => {
       const head = fill(artifact(groupHeadingHtml), {
         SPAN: '6',
         LABEL: group.label,
+        // The catalogue title as `html.rs` writes it: already escaped, the
+        // superscript the only markup.
+        CTHSTATUS: group.cthStatus ?? 'exact',
+        CTHTITLE: group.cthTitle ?? 'A title from the catalogue',
         COUNT: String(group.rows.length),
       })
       const rows = group.rows.map((row) => {
@@ -258,5 +264,67 @@ describe('folding', () => {
     expect(hint().textContent).toBe('Match: 2 · 0 shown')
     foldAll().click()
     expect(hint().textContent).toBe('Match: 2')
+  })
+})
+
+describe('catalogue titles', () => {
+  beforeEach(() => {
+    inventory([
+      {
+        label: 'CTH 409',
+        cthTitle: 'Rituals of Tunnawiya',
+        rows: [{ siglum: 'KBo 21.1' }, { siglum: 'KUB 7.53' }],
+      },
+      {
+        label: 'CTH 231',
+        cthTitle: 'Lists of administrators (<sup>LÚ</sup>AGRIG) &amp; &lt;b&gt;',
+        rows: [{ siglum: 'KUB 31.1' }],
+      },
+      {
+        label: 'CTH 15',
+        cthStatus: 'unassigned',
+        cthTitle: 'unassigned in the CTH catalogue',
+        rows: [{ siglum: 'KBo 3.1' }],
+      },
+    ])
+    attachInventoryFilter(document)
+  })
+
+  const title = (i: number) => headings()[i].querySelector('.group-title') as HTMLElement
+
+  it('sits in the heading between the number and the count', () => {
+    const button = headings()[0].querySelector('.group-toggle') as HTMLElement
+    expect(Array.from(button.children).map((el) => el.className)).toEqual([
+      'chevron',
+      'group-label',
+      'group-title',
+      'group-count',
+    ])
+    expect(title(0).textContent).toBe('Rituals of Tunnawiya')
+    expect(title(0).dataset.cth).toBe('exact')
+    expect(title(2).dataset.cth).toBe('unassigned')
+  })
+
+  it('keeps its superscript and nothing the catalogue could inject', () => {
+    expect(title(1).querySelectorAll('sup')).toHaveLength(1)
+    expect(title(1).querySelector('b')).toBeNull()
+    expect(title(1).textContent).toBe('Lists of administrators (LÚAGRIG) & <b>')
+  })
+
+  it('leaves the search reading the number, as before', () => {
+    type('cth 409')
+    expect(shown()).toHaveLength(2)
+    expect(headings().filter((tr) => !tr.hidden)).toHaveLength(1)
+    // The title is not searched: a group is still found by its number, and a
+    // word of its title reaches nothing.
+    type('tunnawiya')
+    expect(shown()).toHaveLength(0)
+  })
+
+  it('leaves the heading a control that folds its group', () => {
+    const toggle = headings()[0].querySelector('.group-toggle') as HTMLButtonElement
+    toggle.click()
+    expect(headings()[0].classList.contains('folded')).toBe(true)
+    expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KUB 31.1', 'KBo 3.1'])
   })
 })

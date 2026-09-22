@@ -493,16 +493,17 @@ fn a_group_is_the_part_of_the_whole_that_belongs_to_it() {
     );
 
     // And the whole is what the build actually wrote: the same corpus, built,
-    // holds one file per placement and nothing else besides the four root
-    // files — inventory, manifest, the font and its terms.
+    // holds one file per placement and nothing else besides the five root
+    // files — inventory, manifest, the font and its terms, the CTH titles'
+    // terms.
     let destination = dir.path().join("out");
     std::fs::create_dir(&destination).expect("destination");
     export::build(&zip, &destination, "seams", &Job::unattended()).expect("builds");
     let written = files(&destination.join(PACKAGE));
     assert_eq!(
         written.len(),
-        placed.len() + 4,
-        "the package holds something other than the placements plus the four root files"
+        placed.len() + aruna::export::ROOT_FILES.len(),
+        "the package holds something other than the placements plus the root files"
     );
     for placement in &placed {
         assert!(

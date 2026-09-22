@@ -268,6 +268,43 @@ tr.group.folded .chevron {
   color: #ccc;
 }
 
+/* The catalogue title after the CTH number, from `cli/src/cth_titles.rs`.
+   One line at ordinary width, cut with an ellipsis: 663 headings that wrapped
+   would bury the table under its own headings. The whole title is one gesture
+   away through the control that is already there — the heading is a button,
+   so a pointer over it, the keyboard's focus on it and a tap on it all open
+   the line. The number and the count never shrink; only the title gives way. */
+.group-toggle {
+  max-width: 100%;
+}
+.group-label,
+.group-count {
+  flex: none;
+}
+.group-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: #444;
+}
+.group-title::before {
+  content: '· ';
+  color: #ccc;
+}
+.group-toggle:hover .group-title,
+.group-toggle:focus .group-title {
+  white-space: normal;
+  overflow: visible;
+}
+/* A note in place of a title reads as a note, not as a text's name. */
+.group-title:not([data-cth='exact']):not([data-cth='parent']),
+.cth-note {
+  color: #6b6b6b;
+  font-style: italic;
+}
+
 @media (max-width: 720px) {
   col.c-ed {
     width: 0;
@@ -278,5 +315,20 @@ tr.group.folded .chevron {
   }
   col.c-corp {
     width: 4.25rem;
+  }
+  /* Too narrow for number, title and count on one line: the title takes a line
+     of its own under them and wraps there, so nothing overlaps, the number is
+     never cut and the page does not scroll sideways. */
+  .group-toggle {
+    flex-wrap: wrap;
+  }
+  .group-title {
+    order: 1;
+    flex-basis: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .group-title::before {
+    content: none;
   }
 }

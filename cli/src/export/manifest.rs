@@ -551,6 +551,12 @@ pub fn render_manifest(
     }
     out.push_str("    }\n  },\n");
 
+    // Which CTH titles the inventory shows, where they come from and on what
+    // terms. The counts are per group, over the six statuses of
+    // `cth_titles::Match`, in a fixed order so that two packages compare by
+    // `diff`; the groups that did not get their own title are named.
+    render_cth_titles(&mut out, records);
+
     // Which documents this program could not read, which ones break a standard,
     // and why. Placed above the
     // groups because it is a summary and the groups are eight megabytes of
@@ -767,6 +773,79 @@ fn permitted() -> Vec<String> {
         "{REFLOW_PROLOGUE}: between prologue instructions, to one newline"
     ));
     out
+}
+
+/// The `cth_titles` section: the snapshot the inventory's titles come from,
+/// and what it said about each group.
+fn render_cth_titles(out: &mut String, records: &[ManuscriptRecord]) {
+    const STATUSES: [&str; 6] = [
+        "exact",
+        "parent",
+        "missing",
+        "not_found",
+        "ambiguous",
+        "unassigned",
+    ];
+    let catalog = crate::cth_titles::Catalog::compiled();
+    let mut counts = [0usize; 6];
+    let mut other: Vec<(String, &'static str)> = Vec::new();
+    for run in group_runs(records) {
+        let Some(first) = run.first() else { continue };
+        let label = crate::parse::group_label(first);
+        let code = catalog.lookup(crate::html::cth_of(label)).code();
+        if let Some(i) = STATUSES.iter().position(|s| *s == code) {
+            counts[i] += 1;
+        }
+        if code != "exact" {
+            other.push((label.to_string(), code));
+        }
+    }
+    out.push_str("  \"cth_titles\": {\n");
+    let _ = writeln!(
+        out,
+        "    \"note\": {},",
+        string(
+            "The title shown beside each CTH number in the inventory, as the Catalog of Hittite \
+             Texts gives it, read from a snapshot of the catalogue page and matched by \
+             identifier. exact: the catalogue gives this number this title. parent: a \
+             subdivision the catalogue does not list, shown with its parent's title and marked \
+             as such. missing: the group has no CTH. not_found: the catalogue does not list the \
+             number. ambiguous: the catalogue lists it more than once. unassigned: the catalogue \
+             reserves the number without a text. Whose titles these are and the licence they \
+             are reproduced under are in the file named by terms."
+        )
+    );
+    let _ = writeln!(out, "    \"source\": {},", string(&catalog.source));
+    let _ = writeln!(out, "    \"fetched\": {},", string(&catalog.fetched));
+    let _ = writeln!(out, "    \"page_sha256\": {},", string(&catalog.sha256));
+    let _ = writeln!(out, "    \"catalogue_entries\": {},", catalog.len());
+    let _ = writeln!(
+        out,
+        "    \"terms\": {},",
+        string(crate::cth_titles::PACKAGED_TERMS)
+    );
+    out.push_str("    \"by_status\": {\n");
+    for (i, (status, n)) in STATUSES.iter().zip(counts).enumerate() {
+        let _ = writeln!(
+            out,
+            "      {}: {n}{}",
+            string(status),
+            comma(i, STATUSES.len())
+        );
+    }
+    out.push_str("    },\n");
+    out.push_str("    \"groups_without_own_title\": [");
+    for (i, (label, code)) in other.iter().enumerate() {
+        let _ = write!(
+            out,
+            "{}{{\"label\": {}, \"status\": {}}}",
+            if i == 0 { "\n      " } else { ",\n      " },
+            string(label),
+            string(code)
+        );
+    }
+    out.push_str(if other.is_empty() { "]\n" } else { "\n    ]\n" });
+    out.push_str("  },\n");
 }
 
 /// The separator after item `i` of `len`: a comma, unless it is the last.

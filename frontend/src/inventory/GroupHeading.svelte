@@ -18,6 +18,8 @@
   const {
     span = 0,
     label = '',
+    cthStatus = '',
+    cthTitle = '',
     count = '',
   }: {
     /**
@@ -31,6 +33,28 @@
     span?: number
     /** The CTH label the group is gathered under. Text, never a link. */
     label?: string
+    /**
+     * The status of the CTH title lookup, as the crate's
+     * `cth_titles::Match::code` names it: `exact`, `parent`, `missing`,
+     * `not_found`, `ambiguous` or `unassigned`.
+     *
+     * It is written into `data-cth` so the stylesheet can set the statuses
+     * that carry no title apart from the titles themselves. Text, decided in
+     * the crate.
+     */
+    cthStatus?: string
+    /**
+     * The title the Catalog of Hittite Texts gives this number, or a short
+     * neutral English note where it gives none.
+     *
+     * Markup rather than text, because a title keeps its superscript:
+     * determinatives such as `<sup>LÚ</sup>`. The crate builds it in
+     * `cli/src/cth_titles.rs` (`title_html`) and `cli/src/html.rs`, escaping
+     * the catalogue's text with `escape_html` and writing the `<sup>` itself —
+     * the same arrangement as the editor cell of `ManuscriptRow.svelte`.
+     * Nothing from the catalogue reaches this hole unescaped.
+     */
+    cthTitle?: string
     /** How many manuscripts stand under this heading. */
     count?: string
   } = $props()
@@ -40,8 +64,9 @@
   <td colspan={span}
     ><button type="button" class="group-toggle" aria-expanded="true"
       ><span class="chevron" aria-hidden="true"></span><span class="group-label">{label}</span><span
-        class="group-count">{count}</span
-      ></button
+        class="group-title"
+        data-cth={cthStatus}>{@html cthTitle}</span
+      ><span class="group-count">{count}</span></button
     ></td
   >
 </tr>

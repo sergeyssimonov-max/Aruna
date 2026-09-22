@@ -293,12 +293,13 @@ fn render_rows(corpus: &CorpusPresentation<'_>) -> (String, usize) {
     let between = separator(DOCUMENT, "ROWS");
     let mut rows = String::new();
     let mut row_n = 0usize;
+    let catalog = crate::cth_titles::Catalog::compiled();
 
     for group in &corpus.groups {
         if !rows.is_empty() {
             rows.push_str(&between);
         }
-        write_group_row(&mut rows, group.label, group.fragments.len());
+        write_group_row(&mut rows, group.label, group.fragments.len(), &catalog);
 
         for fragment in &group.fragments {
             row_n += 1;
@@ -314,16 +315,56 @@ fn render_rows(corpus: &CorpusPresentation<'_>) -> (String, usize) {
 ///
 /// The cell spans the table, which is [`COLUMNS`]'s business and not the
 /// template's: `colspan` is a hole like any other.
-fn write_group_row(out: &mut String, label: &str, count: usize) {
+fn write_group_row(
+    out: &mut String,
+    label: &str,
+    count: usize,
+    catalog: &crate::cth_titles::Catalog,
+) {
+    let found = catalog.lookup(cth_of(label));
     fill(
         out,
         trimmed(GROUP_HEADING),
         &[
             ("SPAN", &COLUMNS.len().to_string()),
             ("LABEL", &escape_html(label)),
+            ("CTHSTATUS", found.code()),
+            ("CTHTITLE", &cth_title_cell(&found)),
             ("COUNT", &count.to_string()),
         ],
     );
+}
+
+/// The group's CTH, or `None` for the group of records that have none.
+pub(crate) fn cth_of(label: &str) -> Option<&str> {
+    (label != crate::parse::MISSING).then_some(label)
+}
+
+/// What the heading says after the CTH number.
+///
+/// A title the catalogue gives this very number is shown as it stands. A
+/// parent's title is shown with the words that make it the parent's, so that it
+/// is never read as confirmed for the subdivision. Every other status gets a
+/// short neutral note in English and no title — nothing is guessed.
+///
+/// **The result is markup.** `GroupHeading.svelte` renders this hole with
+/// `{@html}`, the same arrangement as [`editor_cell`]: the catalogue's text is
+/// escaped by [`crate::cth_titles::title_html`], and the only tags are the
+/// `<sup>` it writes and the `<span>` written here.
+fn cth_title_cell(found: &crate::cth_titles::Match<'_>) -> String {
+    use crate::cth_titles::{title_html, Match};
+    match found {
+        Match::Exact(title) => title_html(title),
+        Match::Parent { parent, title } => format!(
+            "{}<span class=\"cth-note\"> (title of {})</span>",
+            title_html(title),
+            escape_html(&parent.to_string())
+        ),
+        Match::Unassigned => "unassigned in the CTH catalogue".to_string(),
+        Match::NotFound => "not in the CTH catalogue".to_string(),
+        Match::Ambiguous => "listed more than once in the CTH catalogue".to_string(),
+        Match::Missing => "no CTH number".to_string(),
+    }
 }
 
 fn write_item_row(
@@ -743,6 +784,133 @@ mod tests {
     /// Folding is what the group headings are for, so every heading has to be
     /// a control — not a row that happens to have a click handler attached to
     /// it somewhere in the script.
+    /// One heading, written against a catalogue the test states.
+    fn heading(label: &str, snapshot: &str) -> String {
+        let catalog = crate::cth_titles::Catalog::parse(snapshot).expect("test snapshot");
+        let mut out = String::new();
+        write_group_row(&mut out, label, 3, &catalog);
+        out
+    }
+
+    /// The part of a heading after the number.
+    fn title_span(heading: &str) -> &str {
+        let at = heading
+            .find("<span class=\"group-title\"")
+            .expect("a title span");
+        let end = heading[at..]
+            .find("<span class=\"group-count\"")
+            .expect("then the count")
+            + at;
+        &heading[at..end]
+    }
+
+    #[test]
+    fn a_heading_carries_a_short_catalogue_title_after_its_number() {
+        let h = heading("CTH 1", "CTH 1\ttitle\tProclamation of Anitta\n");
+        assert!(
+            h.contains("<span class=\"group-label\">CTH 1</span>"),
+            "{h}"
+        );
+        assert_eq!(
+            title_span(&h),
+            "<span class=\"group-title\" data-cth=\"exact\">Proclamation of Anitta</span>"
+        );
+    }
+
+    #[test]
+    fn a_long_title_with_diacritics_is_written_whole_and_verbatim() {
+        let t = "Instructions of Arnuwanda I and Ašmunikkal for the dignitaries, with Ḫattušili’s and Tutḫaliya’s additions and the list of the lords of Šapinuwa";
+        let h = heading("CTH 260", &format!("CTH 260\ttitle\t{t}\n"));
+        assert!(title_span(&h).contains(t), "{h}");
+    }
+
+    #[test]
+    fn a_superscript_stays_superscript_and_is_the_only_markup() {
+        let h = heading(
+            "CTH 231",
+            "CTH 231\ttitle\tLists of administrators (<sup>LÚ</sup>AGRIG)\n",
+        );
+        assert_eq!(
+            title_span(&h),
+            "<span class=\"group-title\" data-cth=\"exact\">Lists of administrators (<sup>LÚ</sup>AGRIG)</span>"
+        );
+    }
+
+    #[test]
+    fn a_title_with_markup_characters_is_escaped() {
+        let h = heading("CTH 5", "CTH 5\ttitle\tTreaty A & B \"C\" 'D'\n");
+        assert!(
+            title_span(&h).contains("Treaty A &amp; B &quot;C&quot; &#39;D&#39;"),
+            "{h}"
+        );
+        // A bare `<` cannot enter the snapshot at all: the reader refuses it.
+        assert!(crate::cth_titles::Catalog::parse("CTH 5\ttitle\ta <b> c\n").is_err());
+        // And whatever the catalogue text holds between superscript tags is escaped too.
+        assert_eq!(
+            crate::cth_titles::title_html("<sup>x&y</sup>"),
+            "<sup>x&amp;y</sup>"
+        );
+    }
+
+    #[test]
+    fn a_subdivision_the_catalogue_lists_gets_its_own_title() {
+        let h = heading(
+            "CTH 12.1",
+            "CTH 12\ttitle\tParent\nCTH 12.1\ttitle\tChild\n",
+        );
+        assert_eq!(
+            title_span(&h),
+            "<span class=\"group-title\" data-cth=\"exact\">Child</span>"
+        );
+    }
+
+    #[test]
+    fn a_subdivision_it_does_not_list_shows_its_parents_title_marked_as_such() {
+        let h = heading(
+            "CTH 12.1",
+            "CTH 12\ttitle\tThe Anatolian campaigns of Muršili I\n",
+        );
+        assert_eq!(
+            title_span(&h),
+            "<span class=\"group-title\" data-cth=\"parent\">The Anatolian campaigns of Muršili I\
+             <span class=\"cth-note\"> (title of CTH 12)</span></span>"
+        );
+    }
+
+    #[test]
+    fn the_statuses_without_a_title_get_a_short_neutral_note() {
+        let catalog =
+            "CTH 1\ttitle\tA\nCTH 5\ttitle\tOne\nCTH 5\ttitle\tTwo\nCTH 15\tunassigned\t\n";
+        for (label, status, note) in [
+            (crate::parse::MISSING, "missing", "no CTH number"),
+            ("CTH 2", "not_found", "not in the CTH catalogue"),
+            (
+                "CTH 5",
+                "ambiguous",
+                "listed more than once in the CTH catalogue",
+            ),
+            ("CTH 15", "unassigned", "unassigned in the CTH catalogue"),
+        ] {
+            assert_eq!(
+                title_span(&heading(label, catalog)),
+                format!("<span class=\"group-title\" data-cth=\"{status}\">{note}</span>"),
+                "{label}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_whole_inventory_titles_its_groups_from_the_compiled_snapshot() {
+        let records = vec![rec("KBo 1", Some("CTH 409"), 409, "A", "2020")];
+        let html = render_html(&records, "src", "now");
+        assert!(
+            html.contains(
+                "<span class=\"group-title\" data-cth=\"exact\">Rituals of Tunnawiya</span>"
+            ),
+            "the snapshot in the tree names CTH 409"
+        );
+    }
+
     #[test]
     fn every_group_heading_is_a_button_the_keyboard_can_reach() {
         let records = vec![
