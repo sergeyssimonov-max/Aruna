@@ -1,15 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "what the window itself calls: the core, and the folder picker",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
-    "dialog:default",
-    "opener:default",
-    "window-state:default",
-    "store:default"
+    "dialog:allow-open"
   ]
 }

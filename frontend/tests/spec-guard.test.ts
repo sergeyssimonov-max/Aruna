@@ -232,25 +232,50 @@ describe('the shell declares its dependencies exactly', () => {
   })
 })
 
-describe('every registered plugin has permissions', () => {
+describe('the window is granted what it calls and nothing more', () => {
   const DEFAULT_CAPABILITY = json('../../src-tauri/capabilities/default.json')
 
   /**
-   * The failure this prevents is quiet in the worst way: the plugin registers,
-   * the window opens, and the command fails only when a person clicks the
-   * thing that calls it.
+   * **The list is compared whole, and that is the point.** Until 22.09.2026
+   * this checked that each registered plugin had its `:default` set — a rule
+   * that held a grant for every plugin, whoever called it. Three of the four
+   * were never called from the page: the opener runs from `open_inventory`,
+   * window-state restores and saves from its own Rust hooks, the store has no
+   * caller at all. A permission is checked only on a call from the webview, so
+   * those grants did nothing for the application and handed the page the
+   * power to open any URL, reveal any path in Finder and read and write a
+   * store — the acceptance audit of 21.09 recorded it as a finding.
+   *
+   * The failure the old test prevented is still prevented, from the other
+   * side: a new plugin call in the page fails at the click unless its
+   * permission comes with it, and adding that permission means editing this
+   * list, where the addition is seen.
    */
-  it('matches the four plugins the builder registers', () => {
-    for (const [plugin, permission] of [
-      ['tauri_plugin_dialog', 'dialog:default'],
-      ['tauri_plugin_opener', 'opener:default'],
-      ['tauri_plugin_window_state', 'window-state:default'],
-      ['tauri_plugin_store', 'store:default'],
-    ] as const) {
+  it('grants the core and the folder picker, and only them', () => {
+    expect(DEFAULT_CAPABILITY.permissions).toEqual(['core:default', 'dialog:allow-open'])
+  })
+
+  /** The picker is the page's only plugin call; the grant above is its reason. */
+  it('calls no plugin from the page but the dialog, and of the dialog only open', () => {
+    const sources = (readdirSync(at('../src'), { recursive: true }) as string[])
+      .filter((file) => /\.(svelte|ts)$/.test(file) && !/\.test\.ts$/.test(file))
+      .map((file) => text(`../src/${file}`))
+    const imports = sources.flatMap((source) => [
+      ...source.matchAll(/import \{([^}]*)\} from '@tauri-apps\/plugin-([a-z-]+)'/g),
+    ])
+    expect(imports.map((m) => [m[2], m[1].trim()])).toEqual([['dialog', 'open']])
+  })
+
+  /** The plugins stay registered: the grants went, not the Rust side that uses them. */
+  it('keeps the plugins the shell itself uses registered', () => {
+    for (const plugin of [
+      'tauri_plugin_dialog',
+      'tauri_plugin_opener',
+      'tauri_plugin_window_state',
+      'tauri_plugin_store',
+    ]) {
       expect(TAURI_LIB, `${plugin} is not registered`).toContain(plugin)
-      expect(DEFAULT_CAPABILITY.permissions, `${permission} is not granted`).toContain(permission)
     }
-    expect(DEFAULT_CAPABILITY.permissions).toContain('core:default')
   })
 
   /**
