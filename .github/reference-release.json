@@ -11,13 +11,13 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.10 is the",
-    "current release, published on 2026-09-20. A release cannot record itself — the commit",
+    "Three references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, and v2.5.11 is the",
+    "current release, published on 2026-09-22. A release cannot record itself — the commit",
     "it names is the commit that carries it, and no file can contain its own hash — so each",
     "entry here is added by the commit after the release it describes.",
     "",
-    "v2.5.10 replaced v2.5.9, withdrawn on 2026-09-20 — release, tag and DMG, hours after it",
-    "was published. The same happened to v2.5.8 earlier that day, to v2.5.7 on 2026-09-13, to v2.5.6 earlier the same day, to v2.5.5 on 2026-09-12, to v2.5.4 on 2026-09-10, to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to",
+    "v2.5.11 replaced v2.5.10, withdrawn on 2026-09-22 — release, tag and DMG. The same",
+    "happened to v2.5.9 on 2026-09-20, hours after it was published, to v2.5.8 earlier that day, to v2.5.7 on 2026-09-13, to v2.5.6 earlier the same day, to v2.5.5 on 2026-09-12, to v2.5.4 on 2026-09-10, to v2.5.3 on 2026-09-07, to v2.5.2 on 2026-09-06, to",
     "v2.5.1 on 2026-09-04, to v2.5.0 on 2026-09-01 and",
     "to v2.1.0 through v2.4.0",
     "on 2026-08-30, so the 2.x line is still represented by its head alone. A reference",
@@ -47,11 +47,11 @@
       "why": "The second reference: credits the corpus authors, bounds a download that had nothing but the disk to stop it, and is the recent state to fall back to rather than the floor."
     },
     {
-      "tag": "v2.5.10",
-      "commit": "b4b793ccfb847c0c9016304a850c89bb4a50f5a8",
-      "published": "2026-09-20T19:15:56Z",
-      "dmg_sha256": "15c54a01e280bd1609255edb14de3c2195a8659a089aec1d88870a705bbc96aa",
-      "why": "The current release and the third reference. It replaced v2.5.9, withdrawn hours after it was published the same day, and the number moved for the rule rather than for a change: a reference release is not re-cut, so work that lands after one takes a number of its own. What it carries over v2.5.9 is documentation and nothing else — sixteen commits, not one line under cli/src, src-tauri/src or frontend/src, and the package it builds hashes to the same 87c854bf…7d49 over 23 940 files, the byte mirror to the same 7cfcdce4…35d0 over 23 936 documents in 663 folders. The application is byte-for-byte the work of v2.5.9; only the version string it reports differs. What the documents gained: one denominator for coverage figures rather than two (the corpus has 648 distinct code points, 645 of them need a glyph, 639 are drawn), the parser adoption date corrected to 2026-09-05, the .notdef requirement moved off a number and onto the measurement it comes from, the registry mark named as what the seven-day wait counts from, and the specification's header cut from 33 000 characters to 2 600 with its history moved into a journal of its own. Revisions 71 to 78. The enquiry to the TLHdig editors is recorded as sent on 2026-08-22 and still unanswered, which is what keeps five code points of the corpus undrawable by any font."
+      "tag": "v2.5.11",
+      "commit": "79fe35ae89161cdb5a3f68acb52469d420283e1c",
+      "published": "2026-09-21T23:33:47Z",
+      "dmg_sha256": "cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410",
+      "why": "The current release and the third reference. It replaced v2.5.10, and unlike that one it carries code: the inventory's search field is labelled in English, a CTH group is one run even when its labels share a number, a dropped BOM is counted under DROP_BOM, and two cache tests no longer leave a working directory in TMPDIR. The package it builds hashes to dfe12b37…adff over 23 940 files, the byte mirror to the unchanged 7cfcdce4…35d0 over 23 936 documents in 663 folders. It is the first release whose binary is reproducible across machines: the application the runner built, 4e2786bc…a594, is byte-for-byte the one the owner's machine builds from the same commit, because the release build remaps the building machine's paths, keeps the debug map out of LC_UUID, and holds Xcode 15.2 (SDK 14.2) and Node 22.23.2 on both sides. Revisions 80 and 81."
     }
   ]
 }
