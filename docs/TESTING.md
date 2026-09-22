@@ -2,16 +2,16 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **586 tests** as of 2026-09-22: 553 in the console crate — nineteen
+The suite is **591 tests** as of 2026-09-23: 558 in the console crate — nineteen
 integration binaries plus the library and the binary's own tests — and 33 in the
 desktop shell. The crates were joined into one workspace on 2026-08-30, so
 `cargo nextest run` from the repository root runs both, and `-p aruna` narrows it
-back to the console crate. It needs no network, and it runs **580**: six are
+back to the console crate. It needs no network, and it runs **585**: six are
 behind `#[ignore]` by design and come in with `--run-ignored all` — three that
 read the whole corpus in the core (`authenticity`, `corpus`, `document_model`),
 two in the shell that build it, and the shell's `regenerate_the_bindings`, which
 is not a check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **145 `vitest` tests** in
+Beside it, and in a language of its own, are the **146 `vitest` tests** in
 `frontend/` — see *Frontend* below — and the six end-to-end scenarios of
 `frontend/e2e/smoke.e2e.ts`, run against the real window by `pnpm test:e2e`. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
@@ -203,7 +203,7 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 145
+pnpm test:unit      # 146
 ```
 
 `vitest` runs two projects. **`component`** is jsdom: the 18 tests of
@@ -252,7 +252,7 @@ test.
 
 | binary | tests | what it holds |
 |---|---|---|
-| library and `bin/aruna` | 393 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
+| library and `bin/aruna` | 398 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
 | `tests/cli_process.rs` | 17 | the binary as a child process, cache versus network, and the two words it answers on the command line |
 | `tests/cache_lifecycle.rs` | 10 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
@@ -273,7 +273,7 @@ test.
 | `tests/document_model.rs` | 4 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; and the whole corpus read twice and refused exactly where the manifest says |
 | `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory
 
-Counted on 2026-09-22 with `cargo nextest list --workspace --run-ignored all`: 553 in the `aruna` crate, as above, and 33 in `aruna-desktop`, which is 586 across 22 binaries. Without `--run-ignored` the run is 580: the six heavy ones stay behind `#[ignore]` and need the archive. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts.
+Counted on 2026-09-23 with `cargo nextest list --workspace --run-ignored all`: 558 in the `aruna` crate, as above, and 33 in `aruna-desktop`, which is 591 across 22 binaries. Without `--run-ignored` the run is 585: the six heavy ones stay behind `#[ignore]` and need the archive. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts; on 2026-09-23 three download tests (the read timeout in force, a cancel reaching a silent server, a cut body reported as the network's) and two for the declared XML version, 586 and 580 before them.
 
 ## Coverage floors
 
