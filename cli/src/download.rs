@@ -52,12 +52,17 @@ pub fn download_file(url: &str, dest: &Path, job: &Job<'_>) -> Result<()> {
     download_verified(url, dest, None, job)
 }
 
-/// Longest one attempt may take, headers and body together.
+/// Longest one attempt may take, counted from the request to the last byte.
 ///
-/// `timeout_read` below bounds a single read, not the transfer: a server that
-/// dribbles a byte before each deadline keeps the connection alive for as long
-/// as it likes, and the program sits there looking frozen with no way out but
-/// Ctrl-C. This is the ceiling on that.
+/// The read timeout ([`DOWNLOAD_TIMEOUTS`]) bounds a single read, not the
+/// transfer: a server that dribbles a byte before each read timeout keeps the
+/// connection alive for as long as it likes, and the program sits there looking
+/// frozen. This is the ceiling on that, and it is kept by [`stream_to_file`]
+/// between reads of the body. It is not handed to the HTTP client as its
+/// overall timeout: ureq 2 lets an overall timeout override the read timeout,
+/// and until 2026-09-22 that is how the read timeout this comment promised was
+/// in force nowhere. The response head is bounded by the connect timeout and by
+/// the read timeout on each read, and ureq refuses a head over 100 KiB.
 ///
 /// Fifteen minutes is 71 MiB at 79 KiB/s sustained — a floor no working
 /// connection is under, and twelve times slower than the archive actually
@@ -112,13 +117,48 @@ pub fn download_verified(
     expected_md5: Option<&str>,
     job: &Job<'_>,
 ) -> Result<()> {
+    download_verified_within(url, dest, expected_md5, job, DOWNLOAD_TIMEOUTS)
+}
+
+/// How long one attempt may wait, given as the attempt's own numbers.
+///
+/// A parameter rather than two constants read in place, so a test can hold a
+/// server silent for a second instead of for the production read timeout.
+#[derive(Debug, Clone, Copy)]
+struct Timeouts {
+    /// Longest wait for any single read: the response head, or the next piece
+    /// of the body.
+    read: Duration,
+    /// Longest one attempt may take, head and body together.
+    attempt: Duration,
+}
+
+/// The timeouts every download runs with.
+///
+/// Thirty seconds for one read, where it used to say five minutes and mean
+/// fifteen: the read timeout is also how soon a cancel reaches a server that
+/// has gone silent, because nothing else can interrupt a read that is waiting.
+/// Set 2026-09-22 at the owner's word.
+const DOWNLOAD_TIMEOUTS: Timeouts = Timeouts {
+    read: Duration::from_secs(30),
+    attempt: ATTEMPT_DEADLINE,
+};
+
+/// As [`download_verified`], with the timeouts given.
+fn download_verified_within(
+    url: &str,
+    dest: &Path,
+    expected_md5: Option<&str>,
+    job: &Job<'_>,
+    timeouts: Timeouts,
+) -> Result<()> {
     let mut attempt = 1;
     loop {
         // Before an attempt, and again inside the body loop below. A run
         // cancelled between attempts must not start the next one — the whole
         // point of stopping a download is not to fetch the 71 MiB.
         job.check(Phase::Obtaining)?;
-        match attempt_download(url, dest, expected_md5, job) {
+        match attempt_download(url, dest, expected_md5, job, timeouts) {
             Ok(()) => return Ok(()),
             Err(err) if attempt < MAX_ATTEMPTS && is_retryable(&err) => {
                 let delay = retry_delay(attempt, &err);
@@ -276,9 +316,11 @@ fn attempt_download(
     dest: &Path,
     expected_md5: Option<&str>,
     job: &Job<'_>,
+    timeouts: Timeouts,
 ) -> Result<()> {
     create_parent(dest)?;
-    let response = request(url)?;
+    let deadline = Instant::now() + timeouts.attempt;
+    let response = request_within(url, timeouts)?;
 
     // Announced size, when the server sends one — used below to catch a body
     // cut short by a dropped connection.
@@ -299,6 +341,7 @@ fn attempt_download(
         limit,
         announced,
         scratch.path(),
+        (url, deadline),
         job,
     )?;
     transfer.verify(url, limit, announced, expected_md5)?;
@@ -316,12 +359,14 @@ fn stream_bounded(
     limit: u64,
     announced: Option<u64>,
     path: &Path,
+    from: (&str, Instant),
     job: &Job<'_>,
 ) -> Result<Transfer> {
     stream_to_file(
         &mut reader.take(limit.saturating_add(1)),
         announced,
         path,
+        from,
         job,
     )
 }
@@ -380,15 +425,22 @@ fn create_parent(dest: &Path) -> Result<()> {
     std::fs::create_dir_all(parent).map_err(ArunaError::io(&parent))
 }
 
-/// GET `url`, turning a refusal into the error that describes it.
+/// Start one download attempt: the response head, within `timeouts.read`.
 ///
-/// ureq hands back every non-2xx as `Error::Status`, so the status has to be
-/// pulled out of the error rather than off a response. Mapping the whole error
-/// to `Network` — as this did — buried the status: a 404 was reported as a
-/// network failure and, because network failures are retried, fetched three
-/// times before the user heard about it.
-fn request(url: &str) -> Result<ureq::Response> {
-    request_within(url, ATTEMPT_DEADLINE)
+/// No overall `timeout` on this agent, and that is the point. ureq 2 lets an
+/// overall timeout take precedence over the read timeout: it sets the socket's
+/// read timeout to whatever is left of the overall one (`stream.rs` of the
+/// crate), so with both set the read timeout was never in force — a server
+/// that went silent held the attempt, and a cancel with it, until the attempt
+/// deadline, fifteen minutes. The attempt deadline is kept by
+/// [`stream_to_file`] between reads instead.
+fn request_within(url: &str, timeouts: Timeouts) -> Result<ureq::Response> {
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(30))
+        .timeout_read(timeouts.read)
+        .user_agent(&user_agent())
+        .build();
+    call(&agent, url)
 }
 
 /// Fetch a small document as text, for asking questions rather than moving data.
@@ -413,7 +465,7 @@ pub fn fetch_text(url: &str, deadline: Duration) -> Result<String> {
 /// the same fix: read one byte past the cap, and having got it is proof the
 /// body is over.
 fn fetch_text_within(url: &str, deadline: Duration, limit: u64) -> Result<String> {
-    let response = request_within(url, deadline)?;
+    let response = request_answer(url, deadline)?;
 
     // Bytes first, text after the length check, and in that order for a
     // reason: `read_to_string` validates UTF-8 across the whole read, so a body
@@ -450,8 +502,8 @@ fn fetch_text_within(url: &str, deadline: Duration, limit: u64) -> Result<String
 
 /// What this program calls itself to a server.
 ///
-/// One place, and derived: [`request_within`] sets it, and the test below is
-/// what keeps it from drifting back into a literal.
+/// One place, and derived: [`request_within`] and [`request_answer`] set it,
+/// and the test below is what keeps it from drifting back into a literal.
 pub fn user_agent() -> String {
     format!(
         "Aruna/{} (+https://github.com/sergeyssimonov-max/Aruna)",
@@ -459,8 +511,9 @@ pub fn user_agent() -> String {
     )
 }
 
-/// As [`request`], with the deadline given — the tests need one they can wait for.
-fn request_within(url: &str, deadline: Duration) -> Result<ureq::Response> {
+/// GET `url` under one overall deadline – for asking questions ([`fetch_text`]),
+/// where the answer is small and nobody is waiting to cancel it.
+fn request_answer(url: &str, deadline: Duration) -> Result<ureq::Response> {
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(Duration::from_secs(300))
@@ -472,7 +525,17 @@ fn request_within(url: &str, deadline: Duration) -> Result<ureq::Response> {
         // this shows, which is exactly why nobody would have noticed.
         .user_agent(&user_agent())
         .build();
+    call(&agent, url)
+}
 
+/// GET `url`, turning a refusal into the error that describes it.
+///
+/// ureq hands back every non-2xx as `Error::Status`, so the status has to be
+/// pulled out of the error rather than off a response. Mapping the whole error
+/// to `Network` — as this did — buried the status: a 404 was reported as a
+/// network failure and, because network failures are retried, fetched three
+/// times before the user heard about it.
+fn call(agent: &ureq::Agent, url: &str) -> Result<ureq::Response> {
     match agent.get(url).call() {
         Ok(response) => Ok(response),
         Err(ureq::Error::Status(status, response)) => Err(ArunaError::Http {
@@ -549,15 +612,27 @@ impl Transfer {
 ///
 /// Hashed in the same pass: a second read over 71 MiB just to digest the file
 /// would cost more than the check it feeds.
+///
+/// `from` is where the body comes from and when this attempt has to be over.
+/// A failure to read is the network's and is reported against that URL; only a
+/// failure to write is this machine's and is reported against `path`. Until
+/// 2026-09-22 both went out as [`ArunaError::Io`] with the scratch path, and a
+/// body the server cut short reached the window as "the disk could not take the
+/// file – usually no space or no permission".
 fn stream_to_file(
     reader: &mut impl Read,
     announced: Option<u64>,
     path: &Path,
+    (url, deadline): (&str, Instant),
     job: &Job<'_>,
 ) -> Result<Transfer> {
     let io = |source| ArunaError::Io {
         path: path.to_path_buf(),
         source,
+    };
+    let network = |source: std::io::Error| ArunaError::Network {
+        url: url.to_string(),
+        source: Box::new(source),
     };
 
     let mut file = File::create(path).map_err(io)?;
@@ -585,6 +660,14 @@ fn stream_to_file(
                 phase: Phase::Obtaining,
             });
         }
+        // The stall guard for a body that keeps arriving too slowly to finish:
+        // each read is bounded by the read timeout, the attempt by this.
+        if Instant::now() >= deadline {
+            return Err(network(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "the attempt ran past its deadline",
+            )));
+        }
         let n = match reader.read(&mut buf) {
             Ok(0) => break Ok(()),
             Ok(n) => n,
@@ -594,7 +677,7 @@ fn stream_to_file(
             // повтор стоял уровнем выше, чем нужно. Отмена при этом не
             // теряется – ее спрашивают в начале каждого круга.
             Err(source) if source.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(source) => break Err(source),
+            Err(source) => return Err(network(source)),
         };
         if let Err(source) = file.write_all(&buf[..n]) {
             break Err(source);
@@ -684,6 +767,12 @@ mod tests {
     use std::sync::Arc;
     use tempfile::tempdir;
 
+    /// A deadline no test here reaches, for the tests that are about something
+    /// other than time.
+    fn far_deadline() -> Instant {
+        Instant::now() + Duration::from_secs(3600)
+    }
+
     /// What the fake server should do for one request.
     enum Reply {
         /// Serve these bytes with a matching `Content-Length`.
@@ -699,6 +788,9 @@ mod tests {
         /// connection. The transport cannot bound this one, so it is the shape
         /// [`MAX_DOWNLOAD`] is the only limit on.
         Unannounced(Vec<u8>),
+        /// Hold the connection open and send nothing, not even a status line:
+        /// the server that has stopped answering.
+        Silent,
     }
 
     /// A one-shot HTTP server that serves `replies[i]` to request `i`, counting
@@ -785,6 +877,9 @@ mod tests {
                             let _ = stream.flush();
                             let _ = stream.shutdown(std::net::Shutdown::Write);
                         }
+                        Some(Reply::Silent) => {
+                            std::thread::sleep(std::time::Duration::from_secs(60));
+                        }
                         Some(Reply::Status(status, retry_after)) => {
                             let mut head =
                                 format!("HTTP/1.1 {status} Something\r\nContent-Length: 0\r\n");
@@ -851,9 +946,11 @@ mod tests {
     /// A body cut short must be rejected, not written out as a complete file.
     ///
     /// Either detector may fire first: `ureq` enforces `Content-Length` while
-    /// reading and reports a closed body as an I/O error, and our own count
-    /// catches the case where the reader ends cleanly instead. Both are
-    /// retryable and both must leave `dest` alone — that is what matters here.
+    /// reading and reports a closed body as a read error – a network failure
+    /// since 2026-09-22, an I/O error on the scratch file before that – and our
+    /// own count catches the case where the reader ends cleanly instead. Both
+    /// are retryable and both must leave `dest` alone — that is what matters
+    /// here.
     #[test]
     fn truncated_body_is_rejected() {
         let dir = tempdir().expect("tempdir");
@@ -862,7 +959,10 @@ mod tests {
 
         let err = download_file(&server.url(), &dest, &Job::unattended()).unwrap_err();
         assert!(
-            matches!(err, ArunaError::Truncated { .. } | ArunaError::Io { .. }),
+            matches!(
+                err,
+                ArunaError::Truncated { .. } | ArunaError::Network { .. }
+            ),
             "unexpected: {err}"
         );
         assert!(is_retryable(&err), "a short body deserves another attempt");
@@ -1133,6 +1233,7 @@ mod tests {
             limit,
             None,
             &scratch,
+            ("test://", far_deadline()),
             &Job::unattended(),
         )
         .expect("the write itself succeeds");
@@ -1191,6 +1292,7 @@ mod tests {
             MAX_DOWNLOAD,
             Some(body.len() as u64),
             &scratch,
+            ("test://", far_deadline()),
             &job,
         )
         .expect("the transfer succeeds");
@@ -1244,6 +1346,7 @@ mod tests {
             MAX_DOWNLOAD,
             Some(body.len() as u64),
             &scratch,
+            ("test://", far_deadline()),
             &Job::unattended(),
         )
         .expect("an interrupted read is not a failed transfer");
@@ -1455,13 +1558,10 @@ mod tests {
     /// there for as long as the server cared to dribble — for ever, in this
     /// test — and the only way out was killing the process.
     ///
-    /// The deadline is asked for as a whole and asserted on as a whole. It used
-    /// to be split: the request was `expect`ed to succeed and only the body was
-    /// allowed to fail, which reads as two steps but is one budget —
-    /// `request_within` sets ureq's overall timeout, and that covers the
-    /// headers and the body together. So a machine that did not schedule the
-    /// server's accept loop inside 400 ms failed the test on `expect`, and
-    /// under this suite's own parallelism that happened about one run in seven.
+    /// The deadline is asked for as a whole and asserted on as a whole: one
+    /// attempt, request and body, the way the program runs it. Since 2026-09-22
+    /// the attempt deadline is kept between reads of the body rather than by
+    /// ureq's overall timeout, which overrode the read timeout.
     ///
     /// Which step the deadline bites at is a fact about the machine. That it
     /// bites, and that the program is back in well under five seconds, is the
@@ -1471,12 +1571,13 @@ mod tests {
         let server = FakeServer::start(vec![Reply::Dribble]);
         let dir = tempdir().unwrap();
         let dest = dir.path().join("archive.zip");
+        let timeouts = Timeouts {
+            read: Duration::from_secs(1),
+            attempt: Duration::from_millis(400),
+        };
 
         let started = std::time::Instant::now();
-        let outcome =
-            request_within(&server.url(), Duration::from_millis(400)).and_then(|response| {
-                stream_to_file(&mut response.into_reader(), None, &dest, &Job::unattended())
-            });
+        let outcome = attempt_download(&server.url(), &dest, None, &Job::unattended(), timeouts);
         let waited = started.elapsed();
 
         assert!(
@@ -1487,6 +1588,110 @@ mod tests {
             waited < Duration::from_secs(5),
             "gave up after {waited:?}, which is not giving up"
         );
+    }
+
+    /// Отмена доходит до загрузки, чей сервер замолчал, не позже таймаута чтения.
+    ///
+    /// До 22.09.2026 не доходила до конца попытки. Агенту задавался и таймаут
+    /// чтения, и общий срок попытки, а в ureq 2 общий срок берет верх: таймаут
+    /// сокета ставится равным времени до конца попытки (`stream.rs` крейта),
+    /// и заявленные 300 секунд на одно чтение не действовали нигде. Отмену же
+    /// спрашивают только между кусками тела и между попытками. Сервер, который
+    /// принял соединение и молчит, держал кнопку «Остановить» до пятнадцати
+    /// минут – замерено макетом: отмена на пятой секунде не вернулась и за 120.
+    #[test]
+    fn a_cancel_reaches_a_download_whose_server_went_silent() {
+        let server = FakeServer::start(vec![Reply::Silent]);
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("archive.zip");
+        let cancel = crate::job::Cancel::new();
+        let job = Job::new(&crate::progress::Silent, &cancel);
+        let later = cancel.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(200));
+            later.cancel();
+        });
+        let timeouts = Timeouts {
+            read: Duration::from_secs(1),
+            attempt: Duration::from_secs(30),
+        };
+
+        let started = Instant::now();
+        let err = download_verified_within(&server.url(), &dest, None, &job, timeouts)
+            .expect_err("a silent server gives nothing to download");
+        let waited = started.elapsed();
+
+        assert!(
+            matches!(err, ArunaError::Cancelled { .. }),
+            "unexpected: {err}"
+        );
+        assert!(
+            waited < Duration::from_secs(5),
+            "the cancel was heard after {waited:?}, not within the read timeout"
+        );
+        assert!(!dest.exists());
+    }
+
+    /// Фаза заголовков ограничена и без общего срока попытки.
+    ///
+    /// Общий `timeout` агента снят 22.09.2026, и вместе с ним ушло то, что
+    /// ограничивало ожидание ответа целиком. Теперь его ограничивает таймаут
+    /// чтения: сервер, принявший соединение и не сказавший ни байта, отпускает
+    /// попытку через него, и отказ – сетевой, то есть повторяемый. Отрицательный
+    /// контроль сделан при добавлении: с возвращенным `.timeout(attempt)` тест
+    /// ждет весь срок попытки и падает.
+    #[test]
+    fn a_server_that_never_answers_is_given_up_on_within_the_read_timeout() {
+        let server = FakeServer::start(vec![Reply::Silent]);
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("archive.zip");
+        let timeouts = Timeouts {
+            read: Duration::from_secs(1),
+            attempt: Duration::from_secs(30),
+        };
+
+        let started = Instant::now();
+        let err = attempt_download(&server.url(), &dest, None, &Job::unattended(), timeouts)
+            .expect_err("a server that says nothing gives nothing to download");
+        let waited = started.elapsed();
+
+        assert!(
+            matches!(err, ArunaError::Network { .. }),
+            "unexpected: {err}"
+        );
+        assert!(
+            is_retryable(&err),
+            "a silent server deserves another attempt"
+        );
+        assert!(
+            waited < Duration::from_secs(5),
+            "the head was waited for {waited:?}, past the read timeout"
+        );
+        assert!(!dest.exists());
+    }
+
+    /// Сервер, оборвавший тело, – отказ сети, а не диска.
+    ///
+    /// Ошибка чтения из ответа и ошибка записи в файл шли одной дорогой, в
+    /// `ArunaError::Io` с путем черновика, и окно говорило читателю: «Диску не
+    /// удалось отдать или принять файл. Чаще всего это нехватка места или нет
+    /// прав на папку» – о передаче, которую оборвал сервер. Повтор при этом был
+    /// верным и остается: меняется только то, что сказано.
+    #[test]
+    fn a_body_cut_by_the_server_is_a_network_failure_not_a_disk_one() {
+        let server = FakeServer::with_bodies(vec![None]);
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("out.zip");
+
+        let err = download_file(&server.url(), &dest, &Job::unattended()).unwrap_err();
+
+        assert!(
+            !matches!(err, ArunaError::Io { .. }),
+            "a cut body was reported as a local file error: {err}"
+        );
+        assert_ne!(crate::app::Failure::of(&err).code, "io");
+        assert!(is_retryable(&err), "a short body deserves another attempt");
+        assert!(!dest.exists());
     }
 
     /// The deadline the program actually runs with is generous enough that no
