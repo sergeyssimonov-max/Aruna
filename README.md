@@ -50,8 +50,10 @@ Packaging, on macOS 13+ only:
 pnpm build                     # → target/universal-apple-darwin/release/bundle/{macos/Aruna.app,dmg/*.dmg}
 ```
 
-That is `tauri build --target universal-apple-darwin`: it builds the frontend,
-packs it into `Aruna.app` for both architectures and writes the DMG beside it.
+That is `scripts/build-release.sh`, which runs `tauri build --target universal-apple-darwin`: it builds the frontend,
+packs it into `Aruna.app` for both architectures and writes the DMG beside it. It refuses any Xcode but 15.2 and any
+Node but the one in `.node-version`, and it strips the building machine's paths, so the application it produces is
+byte-for-byte the one in the published release built from the same commit — checked with v2.5.11.
 The console binary above is unaffected — `cargo build -p aruna` still produces
 it, and that is still what a developer runs.
 

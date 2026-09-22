@@ -6,8 +6,10 @@
 ## Платформа
 
 - Целевая и единственная платформа – macOS 13 Ventura, Apple Silicon. Обновление ОС невозможно.
-- Сборка релиза – universal binary: `pnpm build` в корне, то есть
-  `tauri build --target universal-apple-darwin`.
+- Сборка релиза – universal binary: `pnpm build` в корне, то есть `scripts/build-release.sh`, который
+  запускает `tauri build --target universal-apple-darwin`. Скрипт отказывает при Xcode не 15.2 (15C500b),
+  SDK не 14.2, Node не из `.node-version` и заданных `RUSTFLAGS` и переназначает пути сборочной машины:
+  бинарник выпуска один на любой машине с тем же инструментарием (проверено выпуском v2.5.11).
 - **Распространяется приложение с окном, из пакета `aruna-desktop`** – с 04.09.2026.
   Бандл называется `Aruna.app`, идентификатор `com.sergeyssimonov.aruna`, версия равна
   версии ядра из `cli/Cargo.toml` и сторожится тестом `spec-guard`. Имя бинарника Cargo
