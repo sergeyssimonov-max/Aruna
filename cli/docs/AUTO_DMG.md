@@ -6,13 +6,14 @@
 
 | Файл | Описание |
 |------|----------|
-| `Aruna.app` | Universal Binary + `.icns` из `icon.png` |
-| `releases/Aruna-macos-universal.dmg` | UDIF DMG (drag to Applications) |
+| `target/universal-apple-darwin/release/bundle/macos/Aruna.app` | Universal Binary, иконки из `src-tauri/icons/` |
+| `target/universal-apple-darwin/release/bundle/dmg/Aruna_<version>_universal.dmg` | UDIF DMG (drag to Applications); конвейер переименовывает его в `releases/Aruna-macos-universal.dmg` и кладет рядом `SHA256SUMS` |
 
 ## Требования
 
 - macOS 13+ (локально) **или** GitHub Actions runner `macos-14`
-- Xcode CLT: `lipo`, `sips`, `iconutil`, `hdiutil`, `plutil`
+- Xcode 15.2 (выбрать через `DEVELOPER_DIR` или `xcode-select`) – с другим обертка сборки откажется
+- Node той версии, что в `.node-version`, и pnpm
 - Rust targets: `aarch64-apple-darwin`, `x86_64-apple-darwin`
 
 ## GitHub Actions
@@ -30,17 +31,20 @@
 gh workflow run release-dmg.yml
 
 # релиз: тег обязан совпадать с version в cli/Cargo.toml — CI это проверяет
-git tag v2.5.2
-git push origin v2.5.2
+git tag v2.5.11
+git push origin v2.5.11
 ```
 
 ## Локально
 
+Из корня репозитория, той же командой, что и в конвейере:
+
 ```bash
-cd cli
-bash scripts/make_release.sh
-open releases/Aruna-macos-universal.dmg
+pnpm build   # scripts/build-release.sh → tauri build --target universal-apple-darwin
+open target/universal-apple-darwin/release/bundle/dmg/Aruna_*_universal.dmg
 ```
+
+`cli/scripts/make_release.sh` в выпуск больше не входит.
 
 ## Подпись (опционально)
 

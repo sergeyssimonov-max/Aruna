@@ -81,8 +81,10 @@ jobs:
             echo "$tag is intact at $got"
           done
 
-      # `build_app.sh` reads `version` out of cli/Cargo.toml and writes it into
-      # the bundle's CFBundleShortVersionString, so a tag that disagrees with
+      # Tauri writes `version` from src-tauri/Cargo.toml (tauri.conf.json names
+      # none) into the bundle's CFBundleShortVersionString, and
+      # `frontend/tests/spec-guard.test.ts` holds it equal to cli/Cargo.toml,
+      # the manifest read here — so a tag that disagrees with
       # the manifest publishes a DMG whose application reports a different
       # version from the release it is attached to — quietly, and only visible
       # to someone who opens Get Info. cli/README.md has stated the rule from
@@ -210,13 +212,12 @@ jobs:
   # would mean installing a toolchain for a configuration nobody ships in order
   # to learn nothing about the one that is.
   #
-  # **It gates the release, and the reason is not the artifact.** What the DMG
-  # carries is still built by `cli/scripts/make_release.sh` from the console
-  # crate; the desktop shell ships in nothing, so a red job here says nothing
-  # about the bytes a reader downloads. What it says is about the tree the
-  # release is cut from, and that is worth a gate for one concrete reason: the
-  # shell depends on the core by path and consumes its public contract from
-  # outside. A public item removed or reshaped in a way only the shell uses
+  # **It gates the release, and the artifact is the reason.** The DMG is built
+  # by `pnpm build` (`scripts/build-release.sh`, `tauri build`), so the shell
+  # this job checks is the application a reader downloads; the console crate's
+  # `cli/scripts/make_release.sh` is no longer on the release path. There is a
+  # second reason besides: the shell depends on the core by path and consumes
+  # its public contract from outside. A public item removed or reshaped in a way only the shell uses
   # compiles fine in `check`, where the core is built with its own tests, and
   # fails here. That is a fact about the core, found by the only job that looks
   # at it from the outside.
@@ -483,7 +484,7 @@ jobs:
   # release consumes. It now runs when a release is actually being cut, or when
   # asked for by hand.
   #
-  # The trade is real: a break in make_release.sh surfaces at tag time instead
+  # The trade is real: a break in the release build surfaces at tag time instead
   # of on the push that caused it. Cutting a release therefore means running
   # this workflow by hand first, or being ready to move the tag.
   macos:

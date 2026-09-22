@@ -291,8 +291,10 @@ MIT
 
 ## macOS release (only)
 
+Образ собирает Tauri, из корня репозитория:
+
 ```bash
-bash scripts/make_release.sh   # Universal .app + UDIF DMG
+pnpm build   # scripts/build-release.sh → Universal .app + UDIF DMG
 ```
 
 CI / tags: [docs/AUTO_DMG.md](docs/AUTO_DMG.md)
