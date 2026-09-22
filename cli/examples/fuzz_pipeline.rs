@@ -3,7 +3,7 @@
 //! Three invariants the package rests on, checked against input nobody wrote by
 //! hand: normalising never distorts, the manifest is always valid JSON, and the
 //! inventory never lets a field escape into markup.
-use aruna::export::manifest::{render_manifest, FontContract};
+use aruna::export::manifest::{render_manifest, FontContract, Source};
 use aruna::export::{inventory::render_inventory, normalize_into, place, verify, Fragment, Placed};
 use aruna::parse::ManuscriptRecord;
 use std::collections::BTreeMap;
@@ -176,11 +176,16 @@ fn main() {
         applied.insert(text(&mut rng), 1usize);
         let mut fonts = FontContract::default();
         fonts.observe(&text(&mut rng));
+        let label = text(&mut rng);
+        let refused = [text(&mut rng), text(&mut rng)];
         let json = render_manifest(
             &recs,
             &placed,
-            &text(&mut rng),
-            "abc",
+            &Source {
+                label: &label,
+                archive_md5: "abc",
+                not_manuscripts: &refused,
+            },
             &applied,
             &fonts,
             &Default::default(),

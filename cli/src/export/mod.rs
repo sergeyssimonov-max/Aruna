@@ -349,7 +349,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // that half still happens before the parse.
     let archive_digest = crate::md5::md5_stream(&mut file).map_err(ArunaError::io(zip))?;
     let mut archive = crate::archive::zip_from_handle(file, zip)?;
-    let mut fragments = collect_fragments_from(&mut archive, job)?;
+    let (mut fragments, not_manuscripts) = collect_fragments_from(&mut archive, job)?;
     job.report(Event::HeadersRead {
         manuscripts: fragments.len(),
         groups: distinct_groups(&fragments),
@@ -435,8 +435,11 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     let manifest_json = manifest::render_manifest(
         &records,
         &placed,
-        source_label,
-        &archive_digest,
+        &manifest::Source {
+            label: source_label,
+            archive_md5: &archive_digest,
+            not_manuscripts: &not_manuscripts,
+        },
         &tallies.applied,
         &tallies.fonts,
         &tallies.xml,
@@ -948,7 +951,7 @@ pub fn collect_fragments(zip: &Path) -> Result<Vec<Fragment>> {
 /// `collect_fragments` is public and a caller that has no job should not have
 /// to invent one.
 pub fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>> {
-    collect_fragments_from(&mut open(zip)?, job)
+    collect_fragments_from(&mut open(zip)?, job).map(|(fragments, _)| fragments)
 }
 
 /// The same scan over an archive already open.
@@ -957,11 +960,16 @@ pub fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>
 /// wrappers: the build holds one handle for both passes and the digest, and a
 /// pass that takes a path would open a second file behind its back. A caller
 /// that has only a path gets the wrappers above.
+///
+/// The second half of the answer is the entries the content gate turned away,
+/// by name, for the manifest ([`manifest::Source::not_manuscripts`]); the
+/// wrappers drop it, their callers never asked.
 fn collect_fragments_from(
     archive: &mut ZipArchive<BufReader<File>>,
     job: &Job<'_>,
-) -> Result<Vec<Fragment>> {
+) -> Result<(Vec<Fragment>, Vec<String>)> {
     let mut fragments = Vec::new();
+    let mut not_manuscripts = Vec::new();
     let mut window = Vec::with_capacity(HEADER_READ_LIMIT);
     let mut path = String::new();
 
@@ -981,6 +989,7 @@ fn collect_fragments_from(
             .map_err(ArunaError::io(&path))?;
         let text = String::from_utf8_lossy(&window);
         if !looks_like_manuscript(&text) {
+            not_manuscripts.push(path.clone());
             continue;
         }
         fragments.push(Fragment {
@@ -992,7 +1001,7 @@ fn collect_fragments_from(
     if fragments.is_empty() {
         return Err(ArunaError::EmptyArchive);
     }
-    Ok(fragments)
+    Ok((fragments, not_manuscripts))
 }
 
 /// What one pass over the archive counts, in one place.

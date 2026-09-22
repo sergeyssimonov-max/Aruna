@@ -426,8 +426,11 @@ mod tests {
             manifest::render_manifest(
                 &records,
                 &placed,
-                "test",
-                "0",
+                &manifest::Source {
+                    label: "test",
+                    archive_md5: "0",
+                    not_manuscripts: &[],
+                },
                 &Default::default(),
                 &Default::default(),
                 &Default::default(),

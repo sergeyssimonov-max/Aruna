@@ -436,6 +436,30 @@ impl XmlReport {
     }
 }
 
+/// What the manifest says about the archive the package was built from.
+#[derive(Default)]
+pub struct Source<'a> {
+    /// Which edition of the corpus, in words.
+    pub label: &'a str,
+    /// The digest of the bytes the entries were read from.
+    pub archive_md5: &'a str,
+    /// Entries named like a manuscript that the content gate turned away, by
+    /// their name in the archive and in archive order.
+    ///
+    /// **Named, because a count alone hid the one that matters.** The gate is
+    /// [`crate::parse::looks_like_manuscript`], and on the pinned record it
+    /// refuses exactly one entry: `CTH 813_XML_TLH/KUB 37.25.xml`, 8 192 bytes
+    /// of an ownCloud encryption header and hyphens, no XML at all. Until
+    /// 22.09.2026 it left the build without a trace — the acceptance audit of
+    /// 21.09 found that a reader of the manifest could not learn that the
+    /// archive held 23 937 files named as manuscripts and the package 23 936.
+    ///
+    /// Structural junk — AppleDouble forks, `__MACOSX/`, hidden files — is not
+    /// listed: it is recognised by its path before anything is read, and 643
+    /// resource forks would bury the one entry that is news.
+    pub not_manuscripts: &'a [String],
+}
+
 /// Write the package manifest.
 ///
 /// `records` and `placed` are the same two slices the inventory is written
@@ -444,8 +468,7 @@ impl XmlReport {
 pub fn render_manifest(
     records: &[ManuscriptRecord],
     placed: &[Placed],
-    source: &str,
-    archive_md5: &str,
+    source: &Source<'_>,
     normalisation: &BTreeMap<String, usize>,
     fonts: &FontContract,
     xml: &XmlReport,
@@ -465,9 +488,32 @@ pub fn render_manifest(
     );
 
     let _ = writeln!(out, "  \"source\": {{");
-    let _ = writeln!(out, "    \"label\": {},", string(source));
-    let _ = writeln!(out, "    \"archive_md5\": {}", string(archive_md5));
-    out.push_str("  },\n");
+    let _ = writeln!(out, "    \"label\": {},", string(source.label));
+    let _ = writeln!(out, "    \"archive_md5\": {},", string(source.archive_md5));
+    out.push_str("    \"not_manuscripts\": {\n");
+    let _ = writeln!(
+        out,
+        "      \"note\": {},",
+        string(
+            "Archive entries named like a manuscript that are not one: no \
+             manuscript markup in their first 16 KiB. Listed by their name in \
+             the archive; they are not in the package. AppleDouble forks, \
+             __MACOSX/ and hidden files are recognised by path and not listed."
+        )
+    );
+    out.push_str("      \"entries\": [");
+    for (i, entry) in source.not_manuscripts.iter().enumerate() {
+        let _ = write!(
+            out,
+            "\n        {}{}",
+            string(entry),
+            comma(i, source.not_manuscripts.len())
+        );
+    }
+    if !source.not_manuscripts.is_empty() {
+        out.push_str("\n      ");
+    }
+    out.push_str("]\n    }\n  },\n");
 
     let _ = writeln!(out, "  \"counts\": {{");
     let _ = writeln!(out, "    \"groups\": {groups},");
@@ -980,7 +1026,13 @@ mod tests {
             };
             xml.examine(&place.relative, bytes);
         }
-        render_manifest(&records, &placed, "test", "abc123", &applied, &fonts, &xml)
+        let refused = ["corpus/CTH 813_XML_TLH/KUB 37.25.xml".to_string()];
+        let source = Source {
+            label: "test",
+            archive_md5: "abc123",
+            not_manuscripts: &refused,
+        };
+        render_manifest(&records, &placed, &source, &applied, &fonts, &xml)
     }
 
     /// The manifest has to be JSON before it has to be anything else.
@@ -999,6 +1051,28 @@ mod tests {
         assert!(text.contains("\"schema\": 1"));
         assert!(text.contains("\"groups\": 2"));
         assert!(text.contains("\"documents\": 3"));
+        assert!(
+            text.contains(
+                "\"entries\": [\n        \"corpus/CTH 813_XML_TLH/KUB 37.25.xml\"\n      ]"
+            ),
+            "{text}"
+        );
+    }
+
+    /// An archive with nothing turned away says so with an empty list, not by
+    /// leaving the key out: absence would read as «not counted».
+    #[test]
+    fn an_archive_with_nothing_turned_away_lists_nothing() {
+        let (records, placed) = built();
+        let text = render_manifest(
+            &records,
+            &placed,
+            &Source::default(),
+            &BTreeMap::new(),
+            &FontContract::default(),
+            &XmlReport::default(),
+        );
+        assert!(text.contains("\"entries\": []\n    }\n  },"), "{text}");
     }
 
     /// What the converter comes for: every document, its file, and the path its
@@ -1024,8 +1098,11 @@ mod tests {
         let text = render_manifest(
             &records,
             &placed,
-            "𒀀 source",
-            "x",
+            &Source {
+                label: "𒀀 source",
+                archive_md5: "x",
+                not_manuscripts: &[],
+            },
             &BTreeMap::new(),
             &fonts,
             &XmlReport::default(),

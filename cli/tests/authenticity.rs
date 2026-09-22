@@ -259,6 +259,15 @@ fn write_archive(path: &Path) {
     // Debris the gates keep out; none of it may reach the package.
     add("__MACOSX/root/CTH 5_XML_HFR/._KBo 1.1.xml", "resource fork");
     add("root/CTH 5_XML_HFR/HPMxml.css", "body { }");
+    // Named like a manuscript, and not one: the shape of KUB 37.25 in the
+    // pinned record, an ownCloud encryption header padded with hyphens.
+    add(
+        "root/CTH 813_XML_TLH/KUB 37.25.xml",
+        &format!(
+            "HBEGIN:oc_encryption_module:OC_DEFAULT_MODULE:cipher:AES-256-CTR:signed:true:HEND{}",
+            "-".repeat(8110)
+        ),
+    );
 
     zip.finish().expect("finish");
 }
@@ -293,6 +302,29 @@ fn a_package_holds_every_admitted_document_once_and_unchanged() {
     assert_same_documents(&archive, &root, 4, built.documents);
 }
 
+/// **The one entry the content gate turns away is named in the manifest.**
+///
+/// Finding of the acceptance audit of 21.09.2026: `KUB 37.25.xml` left the
+/// build without a trace, and a reader of the manifest could not learn that
+/// the archive held one more file named as a manuscript than the package does.
+/// The resource fork and the stylesheet beside it are recognised by path and
+/// stay unnamed.
+#[test]
+fn the_manifest_names_what_the_content_gate_turned_away() {
+    let dir = tempdir().expect("tempdir");
+    let archive = dir.path().join("corpus.zip");
+    write_archive(&archive);
+    let destination = dir.path().join("out");
+    std::fs::create_dir(&destination).expect("destination");
+
+    let (_, root) = build(&destination, &archive);
+
+    assert_eq!(
+        not_manuscripts(&root),
+        ["root/CTH 813_XML_TLH/KUB 37.25.xml"]
+    );
+}
+
 /// The same question, asked of the corpus this program exists for.
 ///
 /// Heavy on purpose — it builds the whole 384 MB package into a temporary
@@ -322,6 +354,27 @@ fn the_whole_corpus_reaches_the_package_once_and_unchanged() {
         files, FILES_IN_PACKAGE,
         "the package holds a different number of files than 3.6 records"
     );
+
+    // Measured by the acceptance audit of 21.09.2026: of the 23 937 entries
+    // named as manuscripts, this is the one that is not.
+    assert_eq!(
+        not_manuscripts(&root),
+        ["TLHbasisONLINE25_1_ZENODO_Beta_03/CTH 813_XML_TLH/KUB 37.25.xml"]
+    );
+}
+
+/// `source.not_manuscripts.entries` of the package's manifest, read as text:
+/// the crate's JSON reader is private, and the writer puts one entry per line.
+fn not_manuscripts(root: &Path) -> Vec<String> {
+    let manifest = std::fs::read_to_string(root.join(export::MANIFEST)).expect("manifest");
+    let section = &manifest[manifest.find("\"not_manuscripts\"").expect("section")..];
+    let list = &section[section.find("\"entries\": [").expect("entries") + 12..];
+    list[..list.find(']').expect("close")]
+        .lines()
+        .map(|line| line.trim().trim_end_matches(',').trim_matches('"'))
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// The archive, wherever this run keeps it — the same three names
