@@ -17,6 +17,7 @@ pub mod app;
 pub mod archive;
 pub mod cache;
 pub mod catalog;
+pub mod cth_titles;
 pub mod document;
 pub mod download;
 pub mod error;

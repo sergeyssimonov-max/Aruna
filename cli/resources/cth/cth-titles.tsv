@@ -1,0 +1,845 @@
+# Titles of the Catalog of Hittite Texts (CTH), one line per catalogue entry.
+# S. Košak – G.G.W. Müller – S. Görke – Ch.W. Steitler, 2001–2026, Hethitologie-Portal Mainz.
+# Licensed CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/ – see CTH-TITLES-TERMS.txt.
+# Written by `cargo run --locked --release -p aruna --example cth_titles`; do not edit by hand.
+# source: https://hethport.net/CTH/index.php?lang=EN
+# fetched: 2026-09-22 04:54:05 UTC
+# sha256: 31310a4e8dcd81140fa33f3a89bb820d05d48ca3c591c5fd4e74ef453ff2db86
+# entries: 837
+CTH 1	title	Proclamation of Anitta
+CTH 2	title	Fragments referring to Anum-Ḫirbi and the city of Zalpa
+CTH 3	title	Zalpa tale and other fragments mentioning the city of Zalpa
+CTH 4	title	Annals of Ḫattušili I
+CTH 5	title	Edict of Ḫattušili I
+CTH 6	title	Political Testament of Ḫattušili I
+CTH 7	title	Siege of Uršu
+CTH 8	title	Palace Chronicle
+CTH 9	title	Fragments of palace chronicles
+CTH 10	title	Fragments relating to the expedition of Muršili I against Babylon
+CTH 11	title	Campaign of Muršili I against Aleppo
+CTH 12	title	The Anatolian campaigns of Muršili I
+CTH 13	title	Campaigns of Muršili I? against the Hurrians
+CTH 14	title	Res gestae of Ḫattušili I
+CTH 15	unassigned	
+CTH 16	title	Legendary accounts of the Hurrian wars
+CTH 17	title	Fragments referring to the Hurrian wars
+CTH 18	title	Ammuna Chronicle
+CTH 19	title	Edict of Telipinu (.I Akkadian, .II Hittite)
+CTH 20	title	Campaign of Telipinu against Laḫḫa
+CTH 21	title	Treaty of Telipinu with Išputaḫšu of Kizzuwatna (.I Akkadian, .II Hittite)
+CTH 22	title	Fragment referring to Telipinu
+CTH 23	title	Fragment referring to Alluwamna
+CTH 24	title	Fragments referring to Pimpira
+CTH 25	title	Treaty of Zidanza II with Pilliya of Kizzuwatna
+CTH 26	title	Treaty of a Hittite king with Paddatiššu of Kizzuwatna
+CTH 27	title	Treaty with the Ḫabiru
+CTH 28	title	Middle Hittite Treaty
+CTH 29	title	Treaty of Taḫurwaili with Eḫeya of Kizzuwatna
+CTH 30	unassigned	
+CTH 31	unassigned	
+CTH 32	unassigned	
+CTH 33	unassigned	
+CTH 34	unassigned	
+CTH 35	unassigned	
+CTH 36	unassigned	
+CTH 37	unassigned	
+CTH 38	unassigned	
+CTH 39	title	Old Hittite historical fragments
+CTH 40	title	Deeds of Šuppiluliuma
+CTH 41	title	Treaty of Tutḫaliya I with Šunaššura of Kizzuwatna (.I Akkadian, .II Hittite)
+CTH 42	title	Treaty of Šuppiluliuma I with Ḫukkana of Ḫayaša
+CTH 43	unassigned	
+CTH 44	title	Edict of Šuppiluliuma concerning the priesthood of Telipinu in the land of Kizzuwatna
+CTH 45	title	Letter of Šuppiluliuma I to Niqmaddu II of Ugarit
+CTH 46	title	Treaty of Šuppiluliuma I with Niqmaddu II of Ugarit
+CTH 47	title	Decree of Šuppiluliuma I setting the tribute of Ugarit (.I Akkadian, .II Hittite)
+CTH 48	title	Inventory of the tribute of Ugarit to Šuppiluliuma I
+CTH 49	title	Treaty of Šuppiluliuma I with Aziru of Amurru (.I Akkadian, .II Hittite)
+CTH 50	title	Treaty of Šuppiluliuma I with Šarri-Kušuḫ of Karkamiš
+CTH 51	title	Treaty of Šuppiluliuma I with Šattiwaza of Mitanni (.I Akkadian, .II Hittite)
+CTH 52	title	Treaty of Šattiwaza of Mitanni with Šuppiluliuma I (.I Akkadian, .II Hittite)
+CTH 53	title	Treaty of Šuppiluliuma I with Tette of Nuḫašše
+CTH 54	title	Treaty between Niqmaddu II of Ugarit and Aziru of Amurru
+CTH 55	title	unassigned (formerly “Oracle mentioning Ḫukkana of Azzi”; see CTH 579)
+CTH 56	unassigned	
+CTH 57	title	Decree of Muršili II concerning the recognition of the status of his brother Piyaššili/Šarri-Kušuḫ in Karkamiš
+CTH 58	title	Report of Arnuwanda II of the deeds of his father Šuppiluliuma I
+CTH 59	unassigned	
+CTH 60	unassigned	
+CTH 61	title	Annals of Muršili II (.I Ten-year annals, .II Extensive annals, .III unclassified fragments)
+CTH 62	title	Treaty of Muršili II with Duppi-Teššup of Amurru (.I Akkadian, .II Hittite)
+CTH 63	title	Arbitration concerning a border conflict between Nuḫašše and Barga as well as an agreement with Duppi-Teššup of Amurru
+CTH 64	title	Edict of Muršili II concerning the border between Ugarit and Mukiš
+CTH 65	title	Edict of Muršili II concerning a conflict between Ugarit and Šiyannu
+CTH 66	title	Treaty of Muršili II with Niqmepa of Ugarit
+CTH 67	title	Treaty of Muršili II with Targašnalli of Ḫapalla
+CTH 68	title	Treaty of Muršili II with Kupanta-Kurunta of Mira and Kuwaliya
+CTH 69	title	Treaty of Muršili II with Manapa-Tarḫunta of Šēḫa
+CTH 70	title	Prayer of Mursili II concerning the affair of Tawannanna (the widow of Šuppiluliuma I) and her banishment
+CTH 71	unassigned	
+CTH 72	title	Report of Muršili II about the dispute with Egypt in Syria with a prayer to the assembly of gods
+CTH 73	unassigned	
+CTH 74	unassigned	
+CTH 75	title	Treaty of Muwatalli II with Talmi-Šarruma of Aleppo
+CTH 76	title	Treaty of Muwatalli II with Alakšandu of Wiluša
+CTH 77	title	Letter of Šarri-Kušuḫ of Karkamiš to Niqmaddu II of Ugarit
+CTH 78	title	Treaty with Ḫayaša
+CTH 79	title	Memorandum concerning Muršili III
+CTH 80	unassigned	
+CTH 81	title	Apology of Ḫattušili III
+CTH 82	title	Annals of Ḫattušili III
+CTH 83	title	Report of Ḫattušili III on the campaigns of Šuppiluliuma I
+CTH 84	title	Report of the deeds of Šuppiluliuma I and Muršili II
+CTH 85	title	Conflict between Muršili III (Urḫi-Teššup) and Ḫattušili III
+CTH 86	title	Edict of Ḫattušili III concerning the estate of Arma-Tarḫunta
+CTH 87	title	Decree of Ḫattušili III in favor of the sons of Mittannamuwa
+CTH 88	title	Decree of Ḫattušili III regarding the exemption of the ḫekur of Pirwa from taxation
+CTH 89	title	Decree of Ḫattušili III concerning the people of Tiliura
+CTH 90	title	Edict of Ḫattušili III regarding the Restoration of Nerik
+CTH 91	title	Treaty of Ḫattušili III with Ramses II of Egypt
+CTH 92	title	Treaty of Ḫattušili III with Bentešina of Amurru
+CTH 93	title	Edict of Ḫattušili III concerning the merchants of Ura
+CTH 94	title	Edict of Ḫattušili III concerning the fugitives from Ugarit
+CTH 95	title	Edict of Puduḫepa concerning a shipwreck in Ugarit
+CTH 96	title	Declaration of Kurunta of Tarḫuntašša
+CTH 97	unassigned	
+CTH 98	title	Letter? mentioning Bentešina and Egypt
+CTH 99	title	Historical report
+CTH 100	title	Agreement between Ini-Teššup of Karkamiš and Ugarit
+CTH 101	title	Fragments concerning the restoration of Nerik
+CTH 102	unassigned	
+CTH 103	unassigned	
+CTH 104	unassigned	
+CTH 105	title	Treaty of Tutḫaliya IV with Šaušgamuwa of Amurru
+CTH 106	title	Treaties with the kings of Tarḫuntašša
+CTH 107	title	Edict of Tutḫaliya IV concerning the Divorce of Ammištamru II of Ugarit from the daughter of Bentešina of Amurru
+CTH 108	title	Edict of Tutḫaliya IV concerning the exemption of Ammištamru of Ugarit from war with Assyria
+CTH 109	title	Decisions of Armaziti
+CTH 110	title	Letter of Piḫawalwi to Ibiranu of Ugarit
+CTH 111	title	Edict of Tutḫaliya IV concerning a territorial conflict between Ugarit and Šiyannu
+CTH 112	title	Letters of Aliḫesni and Armaziti concerning the border of Ugarit
+CTH 113	title	Letter of Hišmi-Kušuḫ to the prefects of Ugarit
+CTH 114	title	Letter concerning the battle of Niḫriya
+CTH 115	title	Edict of Tutḫaliya IV? concerning Šaušgamuwa of Amurru
+CTH 116	title	Edict of Tutḫaliya IV? settling the affair of the former wife of Ammištamru II of Ugarit
+CTH 117	unassigned	
+CTH 118	unassigned	
+CTH 119	unassigned	
+CTH 120	unassigned	
+CTH 121	title	Inscription of Šuppiluliuma II about the conquest of Alašiya
+CTH 122	title	Treaty of Šuppiluliuma II with Talmi-Teššup of Karkamiš
+CTH 123	title	Treaty of Tutḫaliya IV or Šuppiluliuma II with an unknown party
+CTH 124	title	Loyalty oath of a scribe (Tagi-Šarruma?)
+CTH 125	unassigned	
+CTH 126	title	Historical fragments referring to Šuppiluliuma II
+CTH 127	title	Letter about years of famine and deliveries of grain
+CTH 128	unassigned	
+CTH 129	unassigned	
+CTH 130	unassigned	
+CTH 131	unassigned	
+CTH 132	title	Treaty with Kizzuwatna
+CTH 133	title	Treaty of Arnuwanda I with the Išmirigaeans
+CTH 134	title	Treaty with Kuruštama
+CTH 135	title	Treaty of Tutḫaliya I? with Tunip
+CTH 136	title	Treaty of Šuppiluliuma I with Mukiš
+CTH 137	title	Treaty of Arnuwanda I with the Kaška
+CTH 138	title	Treaty of Arnuwanda I with the Kaška
+CTH 139	title	Treaty of Arnuwanda I with the Kaška
+CTH 140	title	Fragments of treaties of Arnuwanda I with the Kaška
+CTH 141	title	Treaty of Šuppiluliuma II with Alašiya
+CTH 142	title	Annals of Tutḫaliya I
+CTH 143	title	Annals of Arnuwanda I
+CTH 144	title	Agreement of Arnuwanda I with the people of Ura
+CTH 145	title	Oath text from the time of Šuppiluliuma II
+CTH 146	title	Mida of Paḫḫuwa
+CTH 147	title	Indictment of Madduwatta
+CTH 148	title	Historical report of Arnuwanda I
+CTH 149	unassigned	
+CTH 150	unassigned	
+CTH 151	title	Letter from Amenophis III to Tarḫundaradu of Arzawa
+CTH 152	title	Letter from Arzawa to Amenophis III
+CTH 153	title	Letter from Šuppiluliuma I to Ḫureya (sc. Amenophis IV/Echnaton, Tutanchamun or Semenchkare)
+CTH 154	title	Letter from Šuppiluliuma I to Ay?
+CTH 155	title	Letter from Ramses II to Ḫattušili III about Urḫi-Teššup
+CTH 156	title	Letters from Ramses II to Ḫattušili III about Urḫi-Teššup
+CTH 157	title	Marriage letters from Ramses II to Ḫattušili III
+CTH 158	title	Marriage letters from Ramses II to Puduḫepa
+CTH 159	title	Marriage letters from Ramses II to Ḫattušili III and Puduḫepa
+CTH 160	title	Letter from Puduḫepa to Ramses III
+CTH 161	title	Letter from Ramses II to Ḫattušili III
+CTH 162	title	Letters from Ramses II to Ḫattušili III and Puduḫepa
+CTH 163	title	Letters from Ramses II to Ḫattušili III
+CTH 164	title	Letters from Ramses II to Puduḫepa
+CTH 165	title	Letters from Ramses II to unknown addressees
+CTH 166	title	Letter from Ramses II to Kupanta-Kurunta of Mira
+CTH 167	title	Letter from Naptera, wife of Ramses II, to Puduḫepa
+CTH 168	title	Letters from the queen mother Tūya to Ḫattušili III
+CTH 169	title	Letters from prince Šutaḫapšap, son of Ramses II, to Ḫattušili III
+CTH 170	title	Fragments of Egyptian-Hittite correspondence
+CTH 171	title	Letter from Muwatalli II to Adad-nīrāri I
+CTH 172	title	Letter from Ḫattušili III to Kadašman-Enlil II
+CTH 173	title	Letter from Ḫattušili III to Adad-nīrāri I
+CTH 174	title	Letter from Kadašman-Turgu to Ḫattušili III
+CTH 175	title	Letter from Šalmaneser I? of Assyria to a Hittite King
+CTH 176	title	Letter from Puduḫepa to Ramses II
+CTH 177	title	Letter of Tutḫaliya IV to Tukultī-Ninurta I of Assyria
+CTH 178	title	Letters of Tutḫaliya IV to Baba-aḫ-iddina and other Assyrian addressees
+CTH 179	title	Letters to a king of Ḫanigalbat
+CTH 180	title	Letter from Puduḫepa to Tattamaru
+CTH 181	title	Letter from a Hittite king to the king of Aḫḫiyawa (Tawagalawa Letter)
+CTH 182	title	Milawata letter
+CTH 183	title	Letter from a king of Aḫḫiyawa to a Hittite king
+CTH 184	title	Letter from a king to Pirwannu
+CTH 185	title	Letter of Ḫattušili III to Zuwa
+CTH 186	title	Royal letters to vassals
+CTH 187	title	Fragments of royal letters
+CTH 188	title	Letter to the king or queen
+CTH 189	title	Letter from Puduḫepa to Niqmaddu III of Ugarit
+CTH 190	title	Correspondence of dignitaries
+CTH 191	title	Letter from Manapa-Tarḫunta to the Hittite king
+CTH 192	title	Letter from Tutḫaliya to a Queen
+CTH 193	title	Letter from Bentešina of Amurru to Ḫattušili III
+CTH 194	title	Letter from a Muwatalli to the king
+CTH 195	title	Letter from three augurs to the queen
+CTH 196	title	Letter from Lupakki to the king of Karkamiš
+CTH 197	title	Letter from Maša to his Lord
+CTH 198	title	Letter from a Tutḫaliya to the king
+CTH 199	title	Letter from Tarḫuntišša to Palla
+CTH 200	title	Letter from Kaššu(?) to the king
+CTH 201	title	Letter from Pazzu to the king
+CTH 202	title	Letter from Mašḫuiluwa of Mira-Kuwaliya to Muršili II
+CTH 203	title	Letter of a high-ranking official to the king
+CTH 204	title	Letter from the king to Alziyamuwa
+CTH 205	title	Letter from Tagi-Šarruma to the king
+CTH 206	unassigned	
+CTH 207	unassigned	
+CTH 208	title	Fragments of letters in Akkadian
+CTH 209	title	Fragments of letters in Hittite
+CTH 210	title	Diverse fragments of letters
+CTH 211	title	Fragments of annals
+CTH 212	title	Fragments of treaties or instructions
+CTH 213	title	Fragments of divine lists (of witnesses) in treaties and instructions
+CTH 214	title	Fragments of historical texts
+CTH 215	title	Undifferentiated fragments of historical texts
+CTH 216	title	Fragments of historical texts in Akkadian
+CTH 217	unassigned	
+CTH 218	unassigned	
+CTH 219	unassigned	
+CTH 220	unassigned	
+CTH 221	unassigned	
+CTH 222	title	Royal land donation tablets
+CTH 223	unassigned	
+CTH 224	title	Land donation of Ḫattušili III to Ura-Tarḫunta
+CTH 225	title	Land donation of Tutḫaliya IV to Šaḫurunuwa
+CTH 226	unassigned	
+CTH 227	unassigned	
+CTH 228	unassigned	
+CTH 229	title	Non-royal contracts
+CTH 230	title	Itineraries
+CTH 231	title	Lists of administrators (<sup>LÚ</sup>AGRIG)
+CTH 232	title	Lists of palace personnel
+CTH 233	title	Lists of families
+CTH 234	title	Lists of men
+CTH 235	title	Lists of women
+CTH 236	title	Lists of men and soldiers
+CTH 237	title	Lists of persons
+CTH 238	title	Lists of cities
+CTH 239	title	Lists of fields, cadaster
+CTH 240	title	Texts concerning sales, purchases, and exchange
+CTH 241	title	Inventories of chests (.I inventories, .II transportation texts (ŠA KASKAL))
+CTH 242	title	Texts concerning the crafting of metal objects (.I gold and silver, .II copper)
+CTH 243	title	Texts concerning textile and leather production (.I wool and hide processing, .II textile manufacture)
+CTH 244	title	Inventories of domestic tribute (MADDATTU) (.I metals and durable goods, .II wool and garments)
+CTH 245	title	Texts concerning distributions and handouts (.I under supervision (ĪDE), .II to named individuals, .III other)
+CTH 246	title	Complex inventories (.I named, .II other)
+CTH 247	title	Inventories concerned with condition and maintenance
+CTH 248	title	Inventories connected with the state cult (.I temple inventories with comment on provisioning, .II detailed descriptions of cult images, .III texts concerning votive objects, .IV inventory fragments of cult images and figurines)
+CTH 249	title	Inventories and inventory fragments (.I mixed inventories, .II textiles and garments, .III precious metal and stone objects and jewelry, .IV ivory and ebony objects, .V weapons and tools)
+CTH 250	title	Miscellaneous inventories and administrative fragments
+CTH 251	title	Instructions for dignitaries (<sup>LÚ.MEŠ</sup>DUGUD)
+CTH 252	title	Instructions of Ašmunikkal for the caretakers of the mausoleum (É.NA₄)
+CTH 253	title	Instructions of Šuppiluliuma I
+CTH 254	title	Military instructions of Ḫattušili III
+CTH 255	title	Instructions of Tutḫaliya IV to the princes, lords and courtiers (LÚ.MEŠ SAG)
+CTH 256	title	Instructions of Šuppiluliuma II
+CTH 257	title	Instructions of Arnuwanda I for the mayor (ḪAZANNU)
+CTH 258	title	Instructions of a Tutḫaliya for stabilization of legal administration
+CTH 259	title	Instructions of a Tutḫaliya for the military
+CTH 260	title	Instructions of Arnuwanda I and Ašmunikkal for the dignitaries (<sup>LÚ.MEŠ</sup>DUGUD)
+CTH 261	title	Instructions of Arnuwanda I for the frontier post governors (bēl madgalti)
+CTH 262	title	Instructions for the royal body guard (<sup>LÚ.MEŠ</sup>MEŠEDI)
+CTH 263	title	Instructions for the gatekeepers
+CTH 264	title	Instructions for the priests and temple officials
+CTH 265	title	Instructions for the palace servants
+CTH 266	title	Instructions for the palace personnel
+CTH 267	title	Instructions for the troops (<sup>LÚ.MEŠ</sup>UKU.UŠ)
+CTH 268	title	Instructions for military commanders
+CTH 269	title	Royal decree on social and economic reforms
+CTH 270	title	Oath of Ašḫapala
+CTH 271	title	Instructions on dynastic succession
+CTH 272	title	Royal edict
+CTH 273	unassigned	
+CTH 274	unassigned	
+CTH 275	title	Fragments of instructions and protocols
+CTH 276	title	Catalog type: DUB.x<sup>KAM</sup>
+CTH 277	title	Catalog type: x ṬUP-PU
+CTH 278	title	Catalog type: x DUB UMMA/mān
+CTH 279	title	Catalog type: mān/INIM, ohne DUB
+CTH 280	title	Catalog type: DUB.x.BI
+CTH 281	title	Catalog type: DUB.x<sup>KAM</sup> in left column
+CTH 282	title	Various tablet catalogs
+CTH 283	title	Shelf labels
+CTH 284	title	Hippological instructions of Kikkuli
+CTH 285	title	Hippological instructions with ritual introduction
+CTH 286	title	Hippological instructions (Hittite)
+CTH 287	title	Fragments of Hippological instructions
+CTH 288	unassigned	
+CTH 289	title	Chemical and glass recipes
+CTH 290	unassigned	
+CTH 291	title	Laws, first series: “If a man”
+CTH 292	title	Laws, second series: “If a grapevine”
+CTH 293	title	Deposition of Ukkura
+CTH 294	title	Deposition of Kuniyapiya
+CTH 295	title	Diverse depositions
+CTH 296	title	Deposition of Pallariya
+CTH 297	title	Uncertain identification as depositions
+CTH 298	unassigned	
+CTH 299	title	Sa
+CTH 300	title	Diri
+CTH 301	title	Erimḫuš
+CTH 302	title	Ura
+CTH 303	title	zi
+CTH 304	title	Kagal
+CTH 305	title	LU = ša
+CTH 306	title	Sign list
+CTH 307	unassigned	
+CTH 308	unassigned	
+CTH 309	title	Fragments of lexical lists
+CTH 310	title	Hittite fragments of šar tamḫāri “King of Battle”
+CTH 311	title	Naram-Sin in Anatolia
+CTH 312	title	Hymn to Ištar
+CTH 313	title	Hymn to Adad
+CTH 314	title	Trilingual Hymn to Iškur-Adad
+CTH 315	title	Message of Lú-dingir-ra to his mother
+CTH 316	title	Akkadian-Hittite wisdom literature
+CTH 317	unassigned	
+CTH 318	unassigned	
+CTH 319	unassigned	
+CTH 320	unassigned	
+CTH 321	title	Illuyanka myth
+CTH 322	title	Myth of Telipinu and the daughter of the sea
+CTH 323	title	Myth of the disappearance and return of the Sun-god
+CTH 324	title	Myth of Telipinu
+CTH 325	title	Myth of the disappearance and return of the Storm-god
+CTH 326	title	Myth of the disappearance and return of the Storm-god of Ašmunikkal
+CTH 327	title	Myth of the disappearance and return of the Storm-god of Ḫarapšili
+CTH 328	title	Myth of the disappearance and return of the Storm-god of the scribe Pirwa
+CTH 329	unassigned	
+CTH 330	title	Ritual for the Storm-god of Kuliwišna
+CTH 331	title	Myth of the Storm-god in Liḫzina
+CTH 332	title	Myth of the disappearance and return of the Storm-god: mugawar fragments
+CTH 333	title	Myth of the disappearance and return of Anzili and Zukki
+CTH 334	title	Myth of the disappearance and return of Ḫannaḫanna (DINGIR.MAḪ)
+CTH 335	title	Fragments of myths of disappearing and returning deities
+CTH 336	title	Myths of Inara (<sup>D</sup>KAL)
+CTH 337	title	Fragments of myths referring to Pirwa
+CTH 338	title	Lord of the Tongue: myth and ritual
+CTH 339	title	Myths of the Sun-god and the Ilaliyant-gods
+CTH 340	unassigned	
+CTH 341	title	Gilgameš (.I Akkadian, .II Hurrian, III. Hittite)
+CTH 342	title	Elkunirša and Ašertu
+CTH 343	title	Myth of kingship of the deity <sup>D</sup>KAL
+CTH 344	title	Song of Emergence (Kingship in Heaven, Theogony)
+CTH 345	title	Song of Ullikummi (.I Hittite, II. Hurrian)
+CTH 346	title	Fragments of the myth of Kumarbi
+CTH 347	title	Atramḫasis
+CTH 348	title	Song of Ḫedammu (.I Hittite, II. Hurrian)
+CTH 349	title	Cycle of Teššup
+CTH 350	title	Fragments of myths referring to Ištar
+CTH 351	title	Fragments of myths referring to Ea
+CTH 352	title	Fragments of myths referring to Ḫuranu
+CTH 353	title	Fragments of myths referring to the daughter of the Pleiades (<sup>D</sup>IMIN.IMIN.BI)
+CTH 354	unassigned	
+CTH 355	unassigned	
+CTH 356	unassigned	
+CTH 357	unassigned	
+CTH 358	unassigned	
+CTH 359	unassigned	
+CTH 360	title	Tale of Appu and his sons
+CTH 361	title	Tale of the hunter Kešši and his beautiful wife (.I Hittite, .II Hurrian, .III Akkadian)
+CTH 362	title	Heroic deeds of Gurparanzaḫ
+CTH 363	title	Tale of the Sun-god, the cow and the fisherman
+CTH 364	title	Song of Silver
+CTH 365	title	Ritual and myth concerning the Euphrates (Māla) River
+CTH 366	unassigned	
+CTH 367	unassigned	
+CTH 368	unassigned	
+CTH 369	unassigned	
+CTH 370	title	Fragments of myths (.I Hittite, .II Hurrian)
+CTH 371	title	Prayer to the Sun-goddess of the earth
+CTH 372	title	Hymn and prayer of a mortal to the Sun-god (Šamaš)
+CTH 373	title	Prayer of Kantuzzili to the Sun-god
+CTH 374	title	Prayer of a king to the Sun-god
+CTH 375	title	Prayer of Arnuwanda I and Ašmunikkal to the Sun-goddess of Arinna
+CTH 376	title	Hymns and prayers to the Sun-goddess of Arinna
+CTH 377	title	Hymn and prayer of Muršili II to Telipinu
+CTH 378	title	Plague prayers of Muršili II
+CTH 379	unassigned	
+CTH 380	title	Prayer to Lelwani for the recovery of Gaššuliyawiya
+CTH 381	title	Prayer of Muwatalli II to the assembly of gods
+CTH 382	title	Prayer of Muwatalli II to the Storm-god of Kummanni
+CTH 383	title	Prayer of Ḫattušili III and Puduḫepa to the Sun-goddess of Arinna
+CTH 384	title	Prayer of Puduḫepa to the Sun-goddess of Arinna
+CTH 385	title	Fragments of Prayers to the Sun-goddess of Arinna
+CTH 386	title	Fragments of Prayers to the Storm-god of Nerik
+CTH 387	title	Prayer of Muršili III
+CTH 388	unassigned	
+CTH 389	title	Fragments of prayers
+CTH 390	title	Rituals and incantations of Ayatarša, Wattiti and Šuššumaniga
+CTH 391	title	Ritual of Ambazzi
+CTH 392	title	Ritual of Anna of Kaplawiya against an unproductive vineyard
+CTH 393	title	Ritual of Anniwiyani for the <sup>D</sup>KAL-deities
+CTH 394	title	Ritual of Ašḫella of Ḫapalla against a plague in the army
+CTH 395	title	Ritual of Ḫantitaššu of Ḫurma
+CTH 396	title	Ritual of Ḫatiya of Kanzapida against the demonic Wišuriyant
+CTH 397	title	Ritual of Ḫebatarakki of Zuḫaruwa
+CTH 398	title	Ritual of Huwarlu, the augur
+CTH 399	title	Ritual of Yarri of Lallupiya against impurity
+CTH 400	title	Ritual of Iriya for the purification of a town
+CTH 401	title	Purification rituals
+CTH 402	title	Ritual of Alli of Arzawa
+CTH 403	title	Rituals of Mallidunna of Durmitta
+CTH 404	title	Rituals of Maštigga of Kizzuwatna
+CTH 405	unassigned	
+CTH 406	title	Ritual of Paškuwatti of Arzawa against effeminacy
+CTH 407	title	Ritual of Puliša against foreign plague
+CTH 408	title	Ritual of Pupuwanni against witchcraft
+CTH 409	title	Rituals of Tunnawiya
+CTH 410	title	Ritual of Uḫḫamuwa of Arzawa against plague
+CTH 411	title	Ritual of Uruwanda against the results of slander
+CTH 412	title	Ritual and myth of Zuwi
+CTH 413	title	Foundation ritual for a temple or house
+CTH 414	title	Foundation ritual for a palace
+CTH 415	title	Foundation ritual for a temple
+CTH 416	title	Four old Hittite rituals for the royal couple
+CTH 417	title	Rituals against the enemies of the king
+CTH 418	title	Ritual against a foreign enemy of the royal couple
+CTH 419	title	Substitution rituals for the king
+CTH 420	title	Fragments of substitution rituals
+CTH 421	title	Great substitution ritual
+CTH 422	title	Incantation at the enemy border
+CTH 423	title	Evocation of gods of an enemy city
+CTH 424	title	Rituals against pest
+CTH 425	title	Rituals against pest in the army
+CTH 426	title	Rituals for an army defeated in battle
+CTH 427	title	Military oaths
+CTH 428	title	Fragments of military oaths
+CTH 429	title	Ritual of Ambazzi against slander
+CTH 430	title	Birth rituals
+CTH 431	title	Ritual of Bappi
+CTH 432	title	Ritual against depression
+CTH 433	title	Ritual for the protective deity of the hunting bag (<sup>D</sup>KAL <sup>KUŠ</sup>kuršaš)
+CTH 434	title	Ritual for the fate goddesses (DINGIR.MAḪ, Gulšeš)
+CTH 435	title	Rituals and invocations of the Sun-god
+CTH 436	title	Ritual of the sea
+CTH 437	title	Ritual referring to the god Agni
+CTH 438	title	Advice for a king
+CTH 439	title	Ritual for Anzili and Zukki
+CTH 440	title	Ritual for Ḫamrišḫara
+CTH 441	title	Ritual for reconciliation of a child with its mother?
+CTH 442	title	Ritual for the Pleiades (<sup>D</sup>IMIN.IMIN.BI)
+CTH 443	title	Two rituals for the pacification of the Sun-god and the Storm-god referring to Ziplantawiya, Tutḫaliya and Nikkalmati
+CTH 444	title	Purification ritual
+CTH 445	title	Ritual for expiation of incest
+CTH 446	title	Purification of a House and incantation for the netherworld deities
+CTH 447	title	Ritual against an ominous bee
+CTH 448	title	Rituals for the Sun-goddess of the earth
+CTH 449	title	Rituals referring to the netherworld deities
+CTH 450	title	Funerary rituals (šalliš waštaiš)
+CTH 451	title	Two funerary rituals with interment of the bones
+CTH 452	title	Fragments of substitution rituals
+CTH 453	title	Fragments of rituals against witchcraft
+CTH 454	unassigned	
+CTH 455	title	Human sacrifice in a ritual
+CTH 456	title	Fragments of purification rituals
+CTH 457	title	Fragments of incantations and myths
+CTH 458	title	Fragments of incantations
+CTH 459	title	Fragments of mugawar
+CTH 460	title	Lists of magical substances
+CTH 461	title	Medical texts
+CTH 462	unassigned	
+CTH 463	title	Ritual of Ambazzi against bad omens
+CTH 464	unassigned	
+CTH 465	unassigned	
+CTH 466	unassigned	
+CTH 467	unassigned	
+CTH 468	unassigned	
+CTH 469	unassigned	
+CTH 470	title	Ritual fragments
+CTH 471	title	Ritual of Ammiḫatna of Kizzuwatna against impurity
+CTH 472	title	Ritual of Ammiḫatna, Tulpi and Mati against impurity
+CTH 473	title	Fragments of Ammihatna, Tulpi and Mati
+CTH 474	title	Ritual of Kuwanni
+CTH 475	title	Ritual of Pilliya, king of Kizzuwatna
+CTH 476	title	Birth ritual of Papanegri
+CTH 477	title	Birth rituals
+CTH 478	unassigned	
+CTH 479	title	Ritual of Kizzuwatna
+CTH 480	title	Ritual of Šamuḫa
+CTH 481	title	Expansion of the cult of the goddess of the night
+CTH 482	title	Reform of the cult of the goddess of the night of Šamuḫa by Muršili II
+CTH 483	title	Evocation rituals
+CTH 484	title	Evocation rituals for DINGIR.MAḪ and Gulšeš
+CTH 485	title	Evocation rituals for Teššup, Ḫebat and Šarruma
+CTH 486	title	Aphasia of Muršili II
+CTH 487	title	Rituals referring to Išḫara
+CTH 488	title	Ritual referring to Ḫamrišḫara
+CTH 489	title	Ritual “When a woman conceives”
+CTH 490	title	Ritual of Aštu, the Hurrian
+CTH 491	title	Purification rituals
+CTH 492	title	Ritual “When a man settles in an uninhabited place”
+CTH 493	title	Ritual of swearing an oath
+CTH 494	title	Ritual of the queen and her sons for the goddess NIN.GAL
+CTH 495	title	Purification rituals
+CTH 496	title	Ritual of Walkui
+CTH 497	unassigned	
+CTH 498	unassigned	
+CTH 499	unassigned	
+CTH 500	title	Fragments of Kizzuwatnaean festival and magical rituals
+CTH 501	title	unassigned (formerly “Inventory of Tarammeka, Kunkuniya, Wiyanawanta”; see CTH 526–530)
+CTH 502	title	unassigned (formerly “Inventory of Tiliura and other locations”; see CTH 526–530)
+CTH 503	title	unassigned (formerly “Inventory of the seal house (É.<sup>NA₄</sup>KIŠIB)”; see CTH 526–530)
+CTH 504	title	unassigned (formerly “Inventory of Manninni”; see CTH 526–530)
+CTH 505	title	unassigned (formerly “Cult inventory of the gods of Wiyanawanta, Mammananta, etc.”; see CTH 526–530)
+CTH 506	title	unassigned (formerly “Cult inventory of the gods of Takkupša, Ḫawarkina etc.”; see CTH 526–530)
+CTH 507	title	unassigned (formerly “Cult inventory of Mt. Ḫalalazipa”; see CTH 526–530)
+CTH 508	title	unassigned (formerly “Cult inventory of Mt. Ziwana”; see CTH 526–530)
+CTH 509	title	unassigned (formerly “Cult inventories of Storm-gods”; see CTH 526–530)
+CTH 510	title	unassigned (formerly “Cult inventories of local festivals”; see CTH 526–530)
+CTH 511	title	unassigned (formerly “List of Stelae (<sup>NA₄</sup>ZI.KIN)”; see CTH 526–530)
+CTH 512	title	unassigned (formerly “Furnishings of the Sun-goddess of Arinna”; see CTH 526–530)
+CTH 513	title	unassigned (formerly “Inventory of metal objects with the name of Muršili II”; see CTH 526–530)
+CTH 514	title	unassigned (formerly “Description of the deity Pirwa”; see CTH 526–530)
+CTH 515	title	unassigned (formerly “Description of the goddess Titiwatti/Tittiutti”; see CTH 526–530)
+CTH 516	title	unassigned (formerly “Description of Šulinkatte, god of Tamarmara”; see CTH 526–530)
+CTH 517	title	unassigned (formerly “Protective deity of Karaḫna”; see CTH 526–530)
+CTH 518	title	unassigned (formerly “Cult of Pirwa: inventory”; see CTH 526–530)
+CTH 519	title	unassigned (formerly “Goddess of the Night of Parnašša”; see CTH 526–530)
+CTH 520	title	unassigned (formerly “Goddess MUNUS.LUGAL”; see CTH 526–530)
+CTH 521	title	unassigned (formerly “Descriptions of images of deities”; see CTH 526–530)
+CTH 522	title	unassigned (formerly “Fragments of descriptions of images of deities and various objects”; see CTH 526–530)
+CTH 523	title	Provisions (melqētu) for local festivals
+CTH 524	title	unassigned (formerly “Cult of Nerik”; see CTH 526–530)
+CTH 525	title	unassigned (formerly “Inventory of sanctuaries by Tudḫaliya IV”; see CTH 526–530)
+CTH 526	title	Cult inventories with descriptions of festivals and cult images
+CTH 527	title	Cult inventories with descriptions of cult images
+CTH 528	title	Cult inventories with descriptions of festivals
+CTH 529	title	Cult inventories without descriptions of festivals or cult images
+CTH 530	title	Fragments of cult inventories without descriptions of festivals or cult images
+CTH 531	title	Hittite introduction to Enūma Anu Enlil
+CTH 532	title	Lunar eclipse (.I Akkadian, .II Hittite)
+CTH 533	title	Lunar omens
+CTH 534	title	Solar omens (.I Akkadian, .II Hittite)
+CTH 535	title	Astral omens
+CTH 536	title	Terrestrial omens (series šumma ālu)
+CTH 537	title	Medical omens (.I Akkadian, .II Hittite)
+CTH 538	title	Birth omens (šumma izbu) (.I Akkadian, .II Hittite)
+CTH 539	title	Series “If an omen”
+CTH 540	title	Series “If a woman gives birth” (.I Akkadian, .II Hittite)
+CTH 541	title	Earthquake omens
+CTH 542	title	Oil omens
+CTH 543	title	Physiognomic omens
+CTH 544	title	Animal omens
+CTH 545	title	Birth omens (.I Akkadian, .II Hittite)
+CTH 546	title	Hemerologies
+CTH 547	title	Liver models (.I Akkadian, .II Akkadian and Hittite)
+CTH 548	title	Gall bladder omens (ZÉ, martu)
+CTH 549	title	Liver omens: “position” (KI.GUB) (.a Akkadian, b. Akkadian-Hittite, c. Hittite)
+CTH 550	title	Liver omens: “yoke” (nīru)
+CTH 551	title	Entrail omens: coils of the instestines (tīrānu)
+CTH 552	title	Kidney omens (kallītu)
+CTH 553	title	Liver omens: “well-being” (šulmu)
+CTH 554	title	Liver omens: “weapon” (kakku)
+CTH 555	title	Liver omens: “palace gate” (bāb ekalli)
+CTH 556	title	Fragments of Akkadian liver omens
+CTH 557	title	Hittite ornithomantic instructions
+CTH 558	title	Dream omens
+CTH 559	title	šumma immeru
+CTH 560	title	Fragments of Hittite and Akkadian omens (.I Akkadian, .II Hittite)
+CTH 561	title	Oracles concerning the king's campaigns in the Kaška region
+CTH 562	title	Oracle itineraries in the Kaška region
+CTH 563	title	Oracles concerning the overwintering of the king
+CTH 564	title	Oracles concerning the festivals of the god of Aleppo
+CTH 565	title	Oracles concerning the cult of the deity Pirwa
+CTH 566	title	Oracles concerning the cult of the deity of Arušna
+CTH 567	title	Oracles concerning the cult of Ištar of Nineveh
+CTH 568	title	Oracles concerning the celebration of various festivals
+CTH 569	title	Oracles concerning Arma-Tarḫunta und Šaušgatti
+CTH 570	title	Liver (SU) oracles
+CTH 571	title	Liver (SU) oracles with unabbreviated terms
+CTH 572	title	Lot (KIN) oracles
+CTH 573	title	Bird (MUŠEN) oracles
+CTH 574	title	MUŠEN ḪURRI oracles
+CTH 575	title	Snake oracles
+CTH 576	title	Sheep behaviour and SU oracles
+CTH 577	title	Combined oracles I: SU, KIN, MUŠEN and/or MUŠEN ḪURRI
+CTH 578	title	Combined oracles II: SU and KIN
+CTH 579	title	Combined oracles III: SU, MUŠEN and/or MUŠEN ḪURRI
+CTH 580	title	Combined oracles IV: KIN, MUŠEN and/or MUŠEN ḪURRI
+CTH 581	title	Letters about oracles
+CTH 582	title	Oracle fragments
+CTH 583	title	Dreams of the king
+CTH 584	title	Dreams of the queen
+CTH 585	title	Vow of Puduḫepa
+CTH 586	title	Donation of fields and personnel
+CTH 587	unassigned	
+CTH 588	unassigned	
+CTH 589	unassigned	
+CTH 590	title	Fragments of dream and vow texts
+CTH 591	title	Festival of the Month
+CTH 592	title	Spring and Autumn festival in Zippalanda
+CTH 593	title	Spring festival on Mt. Tapala
+CTH 594	title	Spring festival at Tippuwa
+CTH 595	title	Spring festival fragments
+CTH 596	title	Autumn festival fragments
+CTH 597	title	Winter festival
+CTH 598	title	Winter festival for the Sun-goddess of Arinna
+CTH 599	title	Journey of the sacred hunting bag in winter
+CTH 600	title	New year's festival
+CTH 601	unassigned	
+CTH 602	unassigned	
+CTH 603	unassigned	
+CTH 604	title	AN.DAḪ.ŠUM<sup>SAR</sup>, outline tablets
+CTH 605	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 1
+CTH 606	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 2
+CTH 607	title	unassigned (formerly “AN.DAḪ.ŠUM<sup>SAR</sup>, day 6”; see CTH 625)
+CTH 608	title	AN.DAḪ.ŠUM<sup>SAR</sup>, days 7–8
+CTH 609	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 11
+CTH 610	title	AN.DAḪ.ŠUM<sup>SAR</sup>, days 12–13: temple of Ziparwa
+CTH 611	title	AN.DAḪ.ŠUM<sup>SAR</sup>, days 14–15: for the Sun-goddess of the earth
+CTH 612	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 16: temple of Zababa
+CTH 613	title	AN.DAḪ.ŠUM<sup>SAR</sup>, days 18–19: for the Storm-god of lightning
+CTH 614	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 21?: for the deity IB/URAŠ
+CTH 615	title	AN.DAḪ.ŠUM<sup>SAR</sup>, days 22–25: for Ištar of Ḫattarina
+CTH 616	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 29: for Ea and his circle
+CTH 617	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 32: for the protective deity of Tauriša
+CTH 618	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 33–34: on Mt. Puškurunuwa
+CTH 619	title	AN.DAḪ.ŠUM<sup>SAR</sup>, day 38: rain festival
+CTH 620	title	AN.DAḪ.ŠUM<sup>SAR</sup> in Ankuwa for the goddess Kataḫḫa
+CTH 621	title	unassigned (formerly “AN.DAḪ.ŠUM<sup>SAR</sup>, ‘first tablet’”; see CTH 608)
+CTH 622	unassigned	
+CTH 623	unassigned	
+CTH 624	unassigned	
+CTH 625	title	Fragments of the AN.DAḪ.ŠUM<sup>SAR</sup> festival
+CTH 626	title	Festival of haste (EZEN₄ nuntarriyašḫaš)
+CTH 627	title	KI.LAM festival
+CTH 628	title	(ḫ)išuwa- festival
+CTH 629	title	Regular festival (EZEN₄ SAG.UŠ)
+CTH 630	title	Moon and thunder festival
+CTH 631	title	Thunder festival
+CTH 632	title	Festival for the ancestors(?)
+CTH 633	title	Festival of the investiture of royal successor (EZEN₄ ḫaššumaš)
+CTH 634	title	Great festival of Arinna
+CTH 635	title	Fragments of festivals of Zippalanda and Mt. Daḫa
+CTH 636	title	Festival of Šarišša
+CTH 637	title	Festival for the God of Ḫiššašḫapa
+CTH 638	title	Festivals for Telipinu
+CTH 639	title	Fragments of the festival for Titiwatti
+CTH 640	title	Fragments of festivals for Luwian deities
+CTH 641	title	Cult of Išḫara
+CTH 642	title	Festival fragments referring to the vegetation god Zinkuruwa
+CTH 643	title	Festival fragments referring to the god Ziparwa
+CTH 644	title	Festival or ritual fragments referring to Pirinkir
+CTH 645	title	Fragments of festivals for the netherworld deities
+CTH 646	title	Fragments of festivals celebrated by the queen
+CTH 647	title	Festivals celebrated by the Prince (DUMU.LUGAL bzw. DUMU-aš)
+CTH 648	title	Festival fragments referring to competitions
+CTH 649	title	Festival fragments referring to a NIN.DINGIR priestess
+CTH 650	title	Festival fragments referring to the zintuḫi- women
+CTH 651	title	Festival fragments referring to the ḫazgarai women
+CTH 652	title	Festival fragments referring to the “Man of the Storm-god” (LÚ <sup>D</sup>10)
+CTH 653	title	Festival fragments referring to the “dog-men” (<sup>LÚ.MEŠ</sup>UR.GI7)
+CTH 654	title	unassigned (formerly “Festival fragments referring to the people of Kuruštama”; see CTH 668)
+CTH 655	title	Festival fragments referring to the king Ḫantili
+CTH 656	title	Various festivals: songs in Hattian, Hurrian, Hittite etc.
+CTH 657	title	Cultic Trip from Ḫattuša to Ankuwa
+CTH 658	title	Cult restoration?
+CTH 659	title	Fragments of an enthronement festival
+CTH 660	title	Offerings to royal images
+CTH 661	title	Royal lists
+CTH 662	title	Offerings from settlements for local cults
+CTH 663	title	Offerings with deity names at the beginning of the line
+CTH 664	title	Fragments of divine lists (festivals?)
+CTH 665	title	Festival fragments referring to the ašuša(tal)la- men -
+CTH 666	title	Texts from the cult of Arinna
+CTH 667	title	Texts from the cult of Zalpuwa
+CTH 668	title	Texts from the cult of Ḫanḫana
+CTH 669	title	Larger festival fragments
+CTH 670	title	Festival fragments
+CTH 671	title	Offering and prayer to the Storm-god of Nerik
+CTH 672	title	Monthly festival at Nerik
+CTH 673	title	unassigned (formerly “Tablet of forgiveness of the deities of Nerik”)
+CTH 674	title	Fragments of the purulliya- festival of Nerik
+CTH 675	title	Fragments of the festival in the ḫešta- house
+CTH 676	title	Fragments of a purification ritual in Nerik
+CTH 677	title	Ration lists (tarnatt-)
+CTH 678	title	Festival fragments concerning the cult of Nerik
+CTH 679	title	Festival of the journey to Nerik
+CTH 680	unassigned	
+CTH 681	title	Festivals of Karaḫna
+CTH 682	title	Festival for the protective deities
+CTH 683	title	Renewal of the hunting bag for the protective deities
+CTH 684	title	Festival for the protective deities of the river
+CTH 685	title	Fragments of festivals for the protective deities
+CTH 686	unassigned	
+CTH 687	unassigned	
+CTH 688	unassigned	
+CTH 689	unassigned	
+CTH 690	title	List of festivals for Ḫuwaššanna
+CTH 691	title	The witašš(iy)aš festival
+CTH 692	title	Fragments of the witašš(iy)aš festival
+CTH 693	title	The šaḫḫan festival
+CTH 694	title	Fragments of festivals for Ḫuwaššanna
+CTH 695	unassigned	
+CTH 696	unassigned	
+CTH 697	unassigned	
+CTH 698	title	Cults of Teššup and Ḫebat of Aleppo
+CTH 699	title	Festival for Teššup and Ḫebat of Lawazantiya
+CTH 700	title	Enthronement ritual for Teššup and Ḫebat
+CTH 701	title	Drink offering for the throne of Ḫebat
+CTH 702	title	Ritual after the renewal of a temple of Ḫebat
+CTH 703	title	Rituals of Muwalanni, priest of Kummanni, for Teššup of Manuziya
+CTH 704	title	Lists of Hurrian Gods in festivals
+CTH 705	title	Lists of Hurrian Gods in festivals
+CTH 706	title	Fragments of festivals for Teššup and Ḫebat
+CTH 707	unassigned	
+CTH 708	unassigned	
+CTH 709	title	šatlašša Festival
+CTH 710	unassigned	
+CTH 711	title	Autumn festival for Ištar of Šamuḫa
+CTH 712	title	Festival for Ištar of Šamuḫa
+CTH 713	title	Ritual for Ištar of Tamininga
+CTH 714	title	Festival for Ištar of Nineveh
+CTH 715	title	Winter festival for Ištar of Nineveh
+CTH 716	title	Ritual for Ištar of Nineveh
+CTH 717	title	Ritual and hymn to Ištar
+CTH 718	title	Ritual for Ištar-Pirinkir with recitations in Babylonian (pabilili)
+CTH 719	title	Festival for Ištar, Ḫu(r)dumana, Aruna
+CTH 720	title	Fragments of festivals for Ištar
+CTH 721	title	Festival for Ištar of Mt. Amana
+CTH 722	title	Ritual for the Great Sea and the tarmana- Sea
+CTH 723	unassigned	
+CTH 724	unassigned	
+CTH 725	title	Hattian-Hittite ritual for the consecration of a temple
+CTH 726	title	Hattian-Hittite foundation ritual
+CTH 727	title	Hattian-Hittite myth: “The moon that fell from heaven”
+CTH 728	title	Hattian-Hittite incantation referring to priests
+CTH 729	title	Hattian-Hittite sheep incantation
+CTH 730	title	Hattian incantations of the moon and wind
+CTH 731	title	Hattian-Hittite fragments
+CTH 732	title	Ritual of Ḫutuši on a campaign
+CTH 733	title	Invocations of Hattian deities: language of gods, language of men
+CTH 734	title	Fragments of Hattian rituals or incantations
+CTH 735	title	Hattian prayers or incantations
+CTH 736	title	Song of the zintuḫi-women for the Sun-goddess
+CTH 737	title	Festivals of Nerik (with Hattian recitations)
+CTH 738	title	Festival for the goddess Tetešḫapi
+CTH 739	title	Festivals of the city of Tuḫumiyara
+CTH 740	title	Hattian litanies
+CTH 741	title	Hattian songs of the women of Tiššaruliya
+CTH 742	title	Hattian songs (SÌR)
+CTH 743	title	Hattian antiphonal songs
+CTH 744	title	Festival fragments with Hattian recitations
+CTH 745	title	Hattian fragments
+CTH 746	title	Hattian strophic songs
+CTH 747	unassigned	
+CTH 748	unassigned	
+CTH 749	unassigned	
+CTH 750	title	Festivals for Ziparwa
+CTH 751	title	Festival for the Palaic pantheon – bread-, meat- and drink-offerings in Palaic
+CTH 752	title	Festival for the Palaic pantheon – ritual for the disappearing and returning deity
+CTH 753	title	Festival with Palaic recitations
+CTH 754	title	Palaic fragments
+CTH 755	unassigned	
+CTH 756	title	mugawar for the Storm-god of Zippalanda
+CTH 757	title	Ritual of Zarpiya from Kizzuwatna against pest
+CTH 758	title	Ritual of Puriyanni against impurity of a house
+CTH 759	title	dupaduparša- ritual
+CTH 760	title	The great ritual (šalli aniur) and dupaduparša- ritual
+CTH 761	title	The great ritual (šalli aniur)
+CTH 762	title	The great ritual (šalli aniur) and ḫalliyattanza- ritual
+CTH 763	title	Ritual fragments of the Kuwattalla Tradition
+CTH 764	title	Hittite-Luwian conjurations mentioning the divine triad of Tauriša
+CTH 765	title	Hittite-Luwian conjurations against disease
+CTH 766	title	Hittite-Luwian conjurations for parents and their child
+CTH 767	title	Hittite-Luwian ritual fragments
+CTH 768	title	Luwian mythological fragments
+CTH 769	title	Luwian letter fragment
+CTH 770	title	Luwian ritual fragments
+CTH 771	title	Tablet of Lallupiya (with Luwianisms)
+CTH 772	title	Festival(ritual)s of Ištanuwa
+CTH 773	title	Songs of Ištanuwa
+CTH 774	title	Hurrian omens
+CTH 775	title	Historical-mythological Hurrian texts
+CTH 776	title	Mythological texts
+CTH 777	title	Washing of the mouth ritual (itkaḫi-, itkalzi-) -
+CTH 778	title	Fragments of the washing of the mouth ritual referring to Tašmišarri and Taduḫepa
+CTH 779	title	Ritual of Ummaya
+CTH 780	title	Ritual of Allaituraḫḫi
+CTH 781	title	Fragments of the ritual of Allaituraḫḫi
+CTH 782	title	Ritual of the goddess Išḫara against perjury
+CTH 783	title	Medical ritual of Zelliya
+CTH 784	title	Hurrian ritual for the royal couple
+CTH 785	title	Ritual for Mt. Ḫazzi
+CTH 786	title	Hurrian deity lists
+CTH 787	title	Hurrian offering lists
+CTH 788	title	Ritual of Šalašu
+CTH 789	title	Song of release
+CTH 790	title	Fragments of Hittite-Hurrian rituals and incantations
+CTH 791	title	Hurrian fragments
+CTH 792	title	Akkadian hymn to Šamaš
+CTH 793	title	Incantation of Šamaš
+CTH 794	title	Sumerian-Akkadian Hymn and Prayer
+CTH 795	title	Fragments of Akkadian hymns
+CTH 796	title	Akkadian mythological narrative?
+CTH 797	unassigned	
+CTH 798	unassigned	
+CTH 799	unassigned	
+CTH 800	title	Sumerian incantations
+CTH 801	title	Sumerian-Akkadian incantations
+CTH 802	title	Ritual against impotence (type ŠÀ.ZI.GA)
+CTH 803	title	Akkadian incantation (šumma amīlu kašip)
+CTH 804	title	Akkadian incantation ana pišerti kišpī
+CTH 805	title	Sumerian-Akkadian incantation UDUG.ḪUL.A.MEŠ
+CTH 806	title	Incantations referring to AŠAR.LÚ.ḪI
+CTH 807	title	Akkadian prism fragments
+CTH 808	title	Akkadian medical texts with Hittite and Luwian glosses
+CTH 809	title	Akkadian recipes against diseases of the eyes
+CTH 810	title	Akkadian incantation “the Moon-god and the cow”
+CTH 811	title	Akkadian recipes against fever
+CTH 812	title	Akkadian incantations
+CTH 813	title	Akkadian fragments
+CTH 814	title	Akkadian wisdom texts
+CTH 815	title	Akkadian list of seeds
+CTH 816	title	Akkadian list of soldiers
+CTH 817	title	Akkadian list of eponyms (līmu)
+CTH 818	title	Akkadian list of prisoners
+CTH 819	title	Akkadian fragments
+CTH 820	title	Benedictions for Labarna
+CTH 821	title	Kingship and divine authority
+CTH 822	title	̣Narrative of the merchants
+CTH 823	title	Fire ordeal
+CTH 824	title	Itinerary fragments
+CTH 825	title	Colophons
+CTH 826	title	Tablet label: invocation in defective Hittite
+CTH 827	title	Oracles in archaic language
+CTH 828	title	Oracle inquiries
+CTH 829	unassigned	
+CTH 830	unassigned	
+CTH 831	title	Fragments in an unknown or unidentifiable language
+CTH 832	title	Hittite fragments with diverse content
+CTH 833	title	Old Assyrian, primarily from kārum Ḫattuš
+CTH 834	title	Offering provisions, pupil’s tablet?
+CTH 835	title	Musical notation from Ugarit
+CTH 999	title	Sammeltafeln
+CTH 1001	title	Egyptian inscription

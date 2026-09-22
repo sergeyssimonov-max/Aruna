@@ -1,0 +1,42 @@
+CTH titles in this inventory
+============================
+
+The title shown beside each CTH number in the inventory is the title the
+Catalog of Hittite Texts gives that number. The catalogue is
+
+    Catalog of Hittite Texts (CTH) | S. Košak – G.G.W. Müller – S. Görke –
+    Ch.W. Steitler, 2001–2026
+    Hethitologie-Portal Mainz | G.G.W. Müller 2002–2026, Ch.W. Steitler
+    2021–2026
+
+    https://hethport.net/CTH/index.php?lang=EN
+
+and the page states, quoted verbatim:
+
+    This work is licensed under a Creative Commons Attribution-ShareAlike 4.0
+    International License.
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+What is reproduced
+------------------
+
+The titles only: one line of text per CTH number, and the mark "unassigned"
+where the catalogue assigns no text to a number. Nothing else of the catalogue
+is copied. The titles as reproduced here are made available under the same
+licence, CC BY-SA 4.0.
+
+What was changed
+----------------
+
+The text of each title is the catalogue's, word for word. What was changed is
+its markup: the catalogue's italic and Sumerogram styling is dropped, the
+superscript is kept, and runs of whitespace are reduced to one space. No title
+is translated, shortened or reworded.
+
+Where the snapshot comes from
+-----------------------------
+
+The titles were read from the page on the date and with the SHA-256 recorded
+in the manifest of this package, section "cth_titles", and in the header of
+cli/resources/cth/cth-titles.tsv in the Aruna repository.
