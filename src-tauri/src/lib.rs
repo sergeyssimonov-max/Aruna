@@ -59,6 +59,9 @@ pub enum CommandError {
     /// Система отказалась открывать документ, и почему — знает только она.
     #[error("система не открыла опись")]
     Opening,
+    /// Окну назвали каталог, который пакетом не является.
+    #[error("это не пакет корпуса")]
+    NotPackage,
 }
 
 /// Сколько в собранном пакете рукописей и групп.
@@ -398,7 +401,9 @@ fn named_inventory(path: &std::path::Path) -> Result<(), CommandError> {
 #[tauri::command(async)]
 #[specta::specta]
 fn corpus_stats(path: String) -> Result<CorpusStats, String> {
-    read_stats(std::path::Path::new(&path)).map_err(said)
+    let package = std::path::Path::new(&path);
+    named_package(package).map_err(said)?;
+    read_stats(package).map_err(said)
 }
 
 /// Что разборщик сказал о документах пакета, лежащего по этому пути.
@@ -410,7 +415,26 @@ fn corpus_stats(path: String) -> Result<CorpusStats, String> {
 #[tauri::command(async)]
 #[specta::specta]
 fn corpus_xml(path: String) -> Result<XmlSummary, String> {
-    read_xml_summary(std::path::Path::new(&path)).map_err(said)
+    let package = std::path::Path::new(&path);
+    named_package(package).map_err(said)?;
+    read_xml_summary(package).map_err(said)
+}
+
+/// Граница двух читающих команд: каталог с тем именем, которое объявило ядро.
+///
+/// Сестра [`named_inventory`]. Путь приходит от окна, и до 22.09.2026 команды
+/// читали `manifest.json` в любом каталоге, названном строкой, – приемочный
+/// аудит 21.09 записал это находкой. Пакет же всегда лежит под одним именем,
+/// `aruna::export::PACKAGE`, куда бы его ни собрали: ядро кладет его как
+/// `destination.join(PACKAGE)`. Каталог с другим именем пакетом не бывает.
+///
+/// Есть ли каталог на месте, здесь не спрашивается: на это у читателей свой
+/// отказ, `Missing`, и окно различает «не пакет» и «пакета нет».
+fn named_package(path: &std::path::Path) -> Result<(), CommandError> {
+    if path.file_name() != Some(std::ffi::OsStr::new(aruna::export::PACKAGE)) {
+        return Err(CommandError::NotPackage);
+    }
+    Ok(())
 }
 
 /// Команда без Tauri, чтобы ветки проверялись тестом.
@@ -972,6 +996,15 @@ impl Building {
 /// стороны, и первое, что с ней делается, — проверка, что за ней есть каталог.
 /// Отказ на этом месте — предложение выбрать другую папку, а не ошибка сборки,
 /// которой не было. `None` означает папку загрузок, то есть поведение консоли.
+///
+/// **Уже этой границы не сделать, и это записано, а не упущено** (аудит
+/// 21.09.2026). Папку называет человек в системном диалоге, и назвать он вправе
+/// любую – в этом и смысл кнопки «Собрать в папку…». Имени, как у пакета и
+/// описи, у папки назначения нет, область путей свелась бы к `**`. Что держит
+/// запись: в выбранной папке ядро трогает только имена от `PACKAGE` – сам
+/// пакет, промежуточный `.{PACKAGE}.build.*` с меткой владельца и отложенный
+/// прежний `.{PACKAGE}.previous` (`aruna::export::build`); под другими именами
+/// там ничего не переписывается и не удаляется.
 fn chosen_destination(
     destination: Option<String>,
 ) -> Result<Option<std::path::PathBuf>, BuildFailure> {
@@ -1538,7 +1571,7 @@ mod wire {
 // `test`: обе отказные ветки проверяются и в сборке с `e2e`, и без нее.
 #[cfg(test)]
 mod opening {
-    use super::{named_inventory, CommandError};
+    use super::{named_inventory, named_package, CommandError};
     use std::fs;
 
     /// Опись — это файл с тем именем, которое объявило ядро, и лежать он может
@@ -1581,6 +1614,33 @@ mod opening {
         ));
     }
 
+    /// Пакет читается под своим именем, где бы он ни лежал: «Собрать в
+    /// папку…» кладет его в папку, названную человеком.
+    #[test]
+    fn the_package_is_the_directory_the_core_names_wherever_it_lies() {
+        let dir = tempfile::tempdir().unwrap();
+        let package = dir.path().join(aruna::export::PACKAGE);
+
+        assert!(named_package(&package).is_ok());
+    }
+
+    /// **Каталог с другим именем читающие команды не трогают.**
+    ///
+    /// Находка аудита 21.09.2026: `corpus_stats` и `corpus_xml` читали
+    /// `manifest.json` по любому пути, названному окном.
+    #[test]
+    fn nothing_but_the_package_is_read() {
+        for other in ["/", "/etc", "/Users/someone/Documents"] {
+            assert!(
+                matches!(
+                    named_package(std::path::Path::new(other)),
+                    Err(CommandError::NotPackage)
+                ),
+                "{other} прошел как пакет"
+            );
+        }
+    }
+
     /// **Ни в одном отказе команды нет пути файловой системы.**
     ///
     /// Правило §3 контракта, и до 07.09.2026 его нарушал плагин, а не наш код:
@@ -1594,6 +1654,7 @@ mod opening {
             CommandError::NotInventory,
             CommandError::InventoryGone,
             CommandError::Opening,
+            CommandError::NotPackage,
         ] {
             let said = failure.to_string();
             assert!(
