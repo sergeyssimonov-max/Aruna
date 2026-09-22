@@ -159,6 +159,22 @@ pub fn compare(source: &[u8], normalised: &[u8]) -> Result<Report, String> {
             ));
         }
     }
+    // The same holds for the version, and for the same reason: the canonical
+    // declaration says 1.0, and a document that declared 1.1 reads its line
+    // ends and its permitted characters differently. Until 2026-09-22 only the
+    // encoding was checked, and a 1.1 document went out declaring 1.0. None of
+    // the corpus's 442 declarations says anything but 1.0.
+    if let Some(version) = source_pis.iter().find_map(|pi| {
+        (target_of(pi).eq_ignore_ascii_case(b"xml")).then(|| pseudo_attribute(pi, b"version"))?
+    }) {
+        if version != b"1.0" {
+            return Err(format!(
+                "the source declares version=\"{}\" and the canonical declaration says 1.0; \
+                 the bytes would be kept and their meaning changed",
+                String::from_utf8_lossy(version)
+            ));
+        }
+    }
     let added_declaration = !source_pis
         .iter()
         .any(|pi| target_of(pi).eq_ignore_ascii_case(b"xml"));
@@ -245,10 +261,15 @@ fn leading_space(bytes: &[u8]) -> usize {
 /// prologue walk is: this module checks the normaliser, and a checker that
 /// reads a value with the normaliser's own code cannot disagree with it.
 fn declared_encoding(pi: &[u8]) -> Option<&[u8]> {
+    pseudo_attribute(pi, b"encoding")
+}
+
+/// The value of one pseudo-attribute of an XML declaration, if it has it.
+fn pseudo_attribute<'a>(pi: &'a [u8], name: &[u8]) -> Option<&'a [u8]> {
     let at = pi
-        .windows(b"encoding".len())
-        .position(|w| w.eq_ignore_ascii_case(b"encoding"))?;
-    let rest = &pi[at + b"encoding".len()..];
+        .windows(name.len())
+        .position(|w| w.eq_ignore_ascii_case(name))?;
+    let rest = &pi[at + name.len()..];
     let eq = rest.iter().position(|b| *b == b'=')?;
     let after = &rest[eq + 1..];
     let open = after.iter().position(|b| *b == b'"' || *b == b'\'')?;
@@ -477,6 +498,32 @@ mod tests {
             "the BOM was dropped and not counted: {:?}",
             report.applied()
         );
+    }
+
+    /// **Объявление версии 1.1 не переписывается в 1.0 молча.**
+    ///
+    /// Каноническое объявление говорит `version="1.0"`. Для документа,
+    /// объявившего 1.1, это та же подмена смысла при неизменных байтах, что и
+    /// с кодировкой: у 1.1 другие концы строк и другой набор допустимых знаков.
+    /// До 22.09.2026 сверка ловила только кодировку, и документ 1.1 выходил в
+    /// пакет с объявлением 1.0. В корпусе все 442 объявления – 1.0.
+    #[test]
+    fn a_declared_version_other_than_1_0_is_refused() {
+        let source = b"<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<AOxml/>";
+        let out = super::super::normalize::normalize_document(source);
+
+        let err = compare(source, &out).expect_err("1.1 must not be rewritten as 1.0");
+
+        assert!(err.contains("version=\"1.1\""), "unexpected: {err}");
+    }
+
+    /// And a document that declares 1.0 is not refused for it.
+    #[test]
+    fn a_declared_version_1_0_is_allowed_through() {
+        let source = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<AOxml/>";
+        let out = super::super::normalize::normalize_document(source);
+
+        compare(source, &out).expect("1.0 is what the canonical declaration says");
     }
 
     /// And a document without one is not counted under it.
