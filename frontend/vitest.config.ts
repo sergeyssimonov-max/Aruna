@@ -47,6 +47,18 @@ export default defineConfig({
       // tsconfig.app.json instead. An exclude that matches nothing is a claim
       // about the tree that stopped being true without anything failing.
       exclude: ['src/**/*.test.ts'],
+      // Floors, not targets: the measurement of 2026-09-22 (statements 82.48,
+      // branches 75.22, functions 59.57, lines 81.03), rounded down, less about
+      // a point — the same rule as `scripts/coverage.sh` for the two crates
+      // (docs/PROJECT-SPEC.ru.md, 3.3). Raise them when the numbers rise; a
+      // change that falls under one names why in its commit instead of
+      // lowering it. They bind only `pnpm test:coverage`, not `test:unit`.
+      thresholds: {
+        statements: 81,
+        branches: 74,
+        functions: 58,
+        lines: 80,
+      },
     },
   },
 })
