@@ -210,7 +210,7 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 
 ## Releases
 
-**[v2.5.11](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
+**[v2.6.0](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
 current release — the one to download.** It is what `Releases` marks *Latest*,
 and it is the only version this project asks anyone to install.
 
