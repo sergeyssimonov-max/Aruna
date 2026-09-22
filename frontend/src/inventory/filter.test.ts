@@ -9,7 +9,7 @@
  * the label, `ds` matching `CHDS` — was found by reading the corpus, and each
  * one has a test here now.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import documentHtml from '../../../cli/src/generated/document.html?raw'
 import groupHeadingHtml from '../../../cli/src/generated/group_heading.html?raw'
 import manuscriptRowHtml from '../../../cli/src/generated/manuscript_row.html?raw'
@@ -264,6 +264,39 @@ describe('folding', () => {
     expect(hint().textContent).toBe('Match: 2 · 0 shown')
     foldAll().click()
     expect(hint().textContent).toBe('Match: 2')
+  })
+})
+
+describe('numbers in the hint', () => {
+  /**
+   * The inventory is English throughout, and its numbers are English too.
+   *
+   * `toLocaleString()` with no locale formats by the reader's machine, so the
+   * same inventory said "Match: 1,234" on one and "Match: 1.234" or
+   * "Match: 1 234" on the next. The stub stands in for a reader whose default is
+   * German; a locale passed explicitly goes to the real implementation.
+   */
+  beforeEach(() => {
+    vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(function (
+      this: number,
+      locales?: Intl.LocalesArgument,
+      options?: Intl.NumberFormatOptions,
+    ) {
+      return new Intl.NumberFormat(locales ?? 'de-DE', options).format(this)
+    })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("are grouped the English way whatever the reader's locale", () => {
+    const rows = Array.from({ length: 1234 }, (_, i) => ({ siglum: `KBo ${i + 1}.1` }))
+    inventory([{ label: 'CTH 1', rows }])
+    attachInventoryFilter(document)
+
+    type('kbo')
+
+    expect(hint().textContent).toBe('Match: 1,234')
   })
 })
 

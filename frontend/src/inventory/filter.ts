@@ -91,6 +91,17 @@ function setFolded(group: Group, folded: boolean): void {
 }
 
 /**
+ * A count as the rest of this English inventory writes numbers.
+ *
+ * The locale is named rather than left to the reader's machine: with none,
+ * the same page said "Match: 1,234" on one machine and "Match: 1.234" or
+ * "Match: 1 234" on the next. Fixed 2026-09-22 at the owner's word.
+ */
+function count(n: number): string {
+  return n.toLocaleString('en-US')
+}
+
+/**
  * Wire the search box and the fold controls to the table.
  *
  * Does nothing at all if the document holds no search box or no table, which
@@ -174,13 +185,12 @@ export function attachInventoryFilter(doc: Document): void {
       } else if (!matches) {
         hint.textContent = 'No matches'
       } else if (onScreen === matches) {
-        hint.textContent = 'Match: ' + matches.toLocaleString()
+        hint.textContent = 'Match: ' + count(matches)
       } else {
         // Folding can hide rows this query found, and the count alone then
         // described a table the reader was not looking at: collapse
         // everything, search, and it said "Match: 84" over an empty list.
-        hint.textContent =
-          'Match: ' + matches.toLocaleString() + ' · ' + onScreen.toLocaleString() + ' shown'
+        hint.textContent = 'Match: ' + count(matches) + ' · ' + count(onScreen) + ' shown'
       }
     }
     syncFoldAll()

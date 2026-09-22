@@ -77,6 +77,16 @@
 		if (button) button.setAttribute("aria-expanded", folded ? "false" : "true");
 	}
 	/**
+	* A count as the rest of this English inventory writes numbers.
+	*
+	* The locale is named rather than left to the reader's machine: with none,
+	* the same page said "Match: 1,234" on one machine and "Match: 1.234" or
+	* "Match: 1 234" on the next. Fixed 2026-09-22 at the owner's word.
+	*/
+	function count(n) {
+		return n.toLocaleString("en-US");
+	}
+	/**
 	* Wire the search box and the fold controls to the table.
 	*
 	* Does nothing at all if the document holds no search box or no table, which
@@ -142,8 +152,8 @@
 			if (hint) {
 				if (q === "") hint.textContent = "";
 				else if (!matches) hint.textContent = "No matches";
-				else if (onScreen === matches) hint.textContent = "Match: " + matches.toLocaleString();
-				else hint.textContent = "Match: " + matches.toLocaleString() + " · " + onScreen.toLocaleString() + " shown";
+				else if (onScreen === matches) hint.textContent = "Match: " + count(matches);
+				else hint.textContent = "Match: " + count(matches) + " · " + count(onScreen) + " shown";
 			}
 			syncFoldAll();
 		}
