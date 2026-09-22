@@ -61,6 +61,47 @@ describe('Aruna window', () => {
     expect((refusal as Refusal).retryable).toBe(false)
   })
 
+  /**
+   * **Окну выдано только то, что оно зовет** (с 22.09.2026, находка аудита
+   * 21.09). Плагины, которыми пользуется одна Rust-сторона, из страницы
+   * недостижимы: проверка разрешений стоит в настоящем приложении, и jsdom ее
+   * не видит. Вызовы выбраны безвредными – если граница не держит, они только
+   * читают.
+   */
+  it('refuses the page the plugins only the shell uses', async () => {
+    const said = await browser.tauri.execute(({ core }) =>
+      Promise.all(
+        (
+          [
+            ['plugin:store|get_store', { path: 'e2e.json' }],
+            ['plugin:window-state|filename', {}],
+            ['plugin:opener|reveal_item_in_dir', { paths: ['/такого-пути-нет'] }],
+          ] as const
+        ).map(([command, args]) =>
+          core.invoke(command, args).then(
+            () => `${command}: resolved`,
+            (error: unknown) => `${command}: ${String(error)}`,
+          ),
+        ),
+      ),
+    )
+    expect(said).toHaveLength(3)
+    for (const line of said as string[]) {
+      expect(line).toMatch(/not allowed/i)
+    }
+  })
+
+  /** Читающие команды читают только каталог с именем пакета. */
+  it('reads nothing but a directory named as the package', async () => {
+    const said = await browser.tauri.execute(({ core }) =>
+      core.invoke('corpus_stats', { path: '/etc' }).then(
+        () => 'resolved',
+        (error: unknown) => String(error),
+      ),
+    )
+    expect(said).toBe('это не пакет корпуса')
+  })
+
   /** Остановить нечего — и это не ошибка. */
   it('takes a stop for a build that is not running', async () => {
     const stopped = await browser.tauri.execute(({ core }) =>
