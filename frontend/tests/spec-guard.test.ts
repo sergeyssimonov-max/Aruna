@@ -272,9 +272,23 @@ describe('the window is granted what it calls and nothing more', () => {
       'tauri_plugin_dialog',
       'tauri_plugin_opener',
       'tauri_plugin_window_state',
-      'tauri_plugin_store',
     ]) {
       expect(TAURI_LIB, `${plugin} is not registered`).toContain(plugin)
+    }
+  })
+
+  /**
+   * **The store is gone from both halves** (22.09.2026, owner's decision). It
+   * was registered with no caller on either side — dead code with a grant —
+   * and the window-state plugin's npm half had no importer either: the plugin
+   * works from its Rust hooks alone, like the opener, whose npm half left on
+   * 07.09.2026.
+   */
+  it('carries neither the store nor npm halves nobody imports', () => {
+    expect(CARGO).not.toMatch(/tauri-plugin-store/)
+    expect(TAURI_LIB).not.toMatch(/tauri_plugin_store/)
+    for (const pkg of ['@tauri-apps/plugin-store', '@tauri-apps/plugin-window-state']) {
+      expect(FRONTEND_PKG.dependencies).not.toHaveProperty(pkg)
     }
   })
 

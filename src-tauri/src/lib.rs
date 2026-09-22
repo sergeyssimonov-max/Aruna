@@ -1221,7 +1221,6 @@ pub fn run() {
                 .with_denylist(&["main"])
                 .build(),
         )
-        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(wdio_webdriver_plugin())
         .plugin(wdio_plugin())
         // Состояние заводится здесь, до `setup`: `spec-guard.test.ts` находит

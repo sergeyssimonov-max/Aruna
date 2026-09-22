@@ -66,14 +66,13 @@ describe('Aruna window', () => {
    * 21.09). Плагины, которыми пользуется одна Rust-сторона, из страницы
    * недостижимы: проверка разрешений стоит в настоящем приложении, и jsdom ее
    * не видит. Вызовы выбраны безвредными – если граница не держит, они только
-   * читают.
+   * читают. Хранилища здесь больше нет: плагин удален 22.09.2026 целиком.
    */
   it('refuses the page the plugins only the shell uses', async () => {
     const said = await browser.tauri.execute(({ core }) =>
       Promise.all(
         (
           [
-            ['plugin:store|get_store', { path: 'e2e.json' }],
             ['plugin:window-state|filename', {}],
             ['plugin:opener|reveal_item_in_dir', { paths: ['/такого-пути-нет'] }],
           ] as const
@@ -85,7 +84,7 @@ describe('Aruna window', () => {
         ),
       ),
     )
-    expect(said).toHaveLength(3)
+    expect(said).toHaveLength(2)
     for (const line of said as string[]) {
       expect(line).toMatch(/not allowed/i)
     }
