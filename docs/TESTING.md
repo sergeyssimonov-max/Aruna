@@ -2,16 +2,18 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **449 tests** across seventeen integration binaries plus the library
-and the binary's own tests. Since the crates were joined into one workspace on
-2026-08-30, `cargo nextest run` from the repository root runs both of them —
-**471** as of 2026-09-06, the other twenty-two being the desktop shell's — and
-`-p aruna` narrows it back to the console crate. It runs in about ten seconds and
-needs no network. Two are skipped by design: the core's whole-package round trip,
-which is expensive, and the shell's `regenerate_the_bindings`, which is not a
-check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **91 `vitest` tests** in
-`frontend/` — see *Frontend* below. Retries are deliberately absent from
+The suite is **586 tests** as of 2026-09-22: 553 in the console crate — nineteen
+integration binaries plus the library and the binary's own tests — and 33 in the
+desktop shell. The crates were joined into one workspace on 2026-08-30, so
+`cargo nextest run` from the repository root runs both, and `-p aruna` narrows it
+back to the console crate. It needs no network, and it runs **580**: six are
+behind `#[ignore]` by design and come in with `--run-ignored all` — three that
+read the whole corpus in the core (`authenticity`, `corpus`, `document_model`),
+two in the shell that build it, and the shell's `regenerate_the_bindings`, which
+is not a check but the way `frontend/src/bindings.ts` is refreshed.
+Beside it, and in a language of its own, are the **144 `vitest` tests** in
+`frontend/` — see *Frontend* below — and the six end-to-end scenarios of
+`frontend/e2e/smoke.e2e.ts`, run against the real window by `pnpm test:e2e`. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
 
 **A misspelled key in that file is a warning, not an error** — nextest prints
@@ -37,7 +39,7 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 cd cli
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 540
+cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 542
 ```
 
 ### Standard — about 25 s
@@ -201,10 +203,10 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 134
+pnpm test:unit      # 144
 ```
 
-`vitest` runs two projects. **`component`** is jsdom: the 14 tests of
+`vitest` runs two projects. **`component`** is jsdom: the 18 tests of
 `src/inventory/filter.test.ts`, which drive the search box and the fold controls
 against a document built out of the artifacts the crate compiles in —
 `document.html` and the row fragments beside it, filled the way `html.rs` fills
@@ -226,7 +228,8 @@ thing jsdom cannot answer for.
 | `tests/release-version.test.ts` | the release the README calls current is the version `cli/Cargo.toml` declares — CI holds the tag to the manifest, this holds the sentence a reader acts on |
 | `tests/one-frontend-stack.test.ts` | React is in no manifest, no lock file, no source file and no artifact — and the stack is Svelte without SvelteKit |
 | `tsconfig.e2e.json` | the E2E contour — `e2e/*.e2e.ts` and `wdio.conf.ts` — which no project covered until 2026-08-25. It found both a `wdio.conf.ts` annotated with `Options.Testrunner` (a standalone-session type with no `capabilities` key) and an import of `@wdio/types` that was never declared as a dependency and survived only because it is type-only |
-| `tests/spec-guard.test.ts` | the decisions [`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) fixed — the pnpm pin, the `safari16` floor, the identifier and bundle targets, matching window and document titles, a permission for every registered plugin, and the four gates that keep the E2E contour out of a release |
+| `tests/spec-guard.test.ts` | the decisions [`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) fixed — the pnpm pin, the `safari16` floor, the identifier and bundle targets, matching window and document titles, the window's permissions compared as a whole list (`core:default` and `dialog:allow-open`, since 2026-09-22) with `{ open }` from the dialog as the page's only plugin import, and the four gates that keep the E2E contour out of a release |
+| `tests/cth-title-style.test.ts` | the catalogue's title in a group heading: one line on screen, whole on hover, wrapped on a narrow screen, whole on paper |
 | `tests/inventory-artifact.test.ts` | everything in `cli/src/generated/` — the script and the three stylesheet sections — is byte-for-byte what `frontend/src/inventory/` now builds, builds the same twice, and carries none of the bundler's leavings |
 | `tests/failure-texts.test.ts` | every failure code `app::Failure::of` can send has a Russian sentence in the window, the failures the shell raises itself are Russian too, and all of them keep the project's typography — the guard that stops a new core code reaching the reader in English |
 
@@ -249,7 +252,7 @@ test.
 
 | binary | tests | what it holds |
 |---|---|---|
-| library and `bin/aruna` | 365 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
+| library and `bin/aruna` | 393 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
 | `tests/cli_process.rs` | 17 | the binary as a child process, cache versus network, and the two words it answers on the command line |
 | `tests/cache_lifecycle.rs` | 10 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
@@ -264,13 +267,35 @@ test.
 | `tests/reliability.rs` | 4 | two builds byte-identical, no descriptors accumulated, nothing left beside the package |
 | `tests/xml_contract.rs` | 11 | the fixture set: immutability, the permit list, field extraction |
 | `tests/xml_hostile.rs` | 10 | XXE, entity expansion, external DTD, XInclude, resource exhaustion — through the export and, since 2026-09-13, through the document model |
-| `tests/authenticity.rs` | 2 | the published package against the archive, as multisets of file contents: nothing lost, invented, altered or written twice. The second is `#[ignore]` and runs the whole corpus — `--run-ignored ignored-only` |
+| `tests/authenticity.rs` | 3 | the published package against the archive, as multisets of file contents: nothing lost, invented, altered or written twice; and, since 2026-09-22, that the manifest names the entry the content gate turned away. The whole-corpus one is `#[ignore]` — `--run-ignored ignored-only` — and holds that entry to exactly `KUB 37.25.xml` |
 | `tests/window_seams.rs` | 6 | the seams a window will drive: the build on a thread of its own stopped from the caller's, that the library neither prints nor ends the process, and that the destination is the caller's to name |
 | `tests/corpus.rs` | 6 | the whole archive: non-distortion, no writes, the malformed count, and that nothing the gates admit comes out of decoding damaged |
 | `tests/document_model.rs` | 4 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; and the whole corpus read twice and refused exactly where the manifest says |
 | `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory
 
-Counted on 2026-09-19 with `cargo nextest list --run-ignored all`: 524 in the `aruna` crate, as above, and 31 in `aruna-desktop`, which is 555 across 23 binaries. Without `--run-ignored` the run is 549: the six heavy ones stay behind `#[ignore]` and need the archive. The count moved by one that evening, when the console's advice got a guard on the project's Russian typography — it reads its own source, because the advice strings are multi-line and listing the error variants by hand is how a new one goes unchecked.
+Counted on 2026-09-22 with `cargo nextest list --workspace --run-ignored all`: 553 in the `aruna` crate, as above, and 33 in `aruna-desktop`, which is 586 across 22 binaries. Without `--run-ignored` the run is 580: the six heavy ones stay behind `#[ignore]` and need the archive. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts.
+
+## Coverage floors
+
+Since 2026-09-22 coverage has floors, and a run under one fails.
+
+```sh
+pnpm coverage                      # root: scripts/coverage.sh, cargo llvm-cov per crate
+cd frontend && pnpm test:coverage  # Vitest with thresholds
+```
+
+| part | measured 2026-09-22 | floor |
+|---|---|---|
+| core, `-p aruna` | regions 95.91 %, functions 97.13 %, lines 95.61 % | 95 / 96 / 95 |
+| shell, `-p aruna-desktop` | regions 65.39 %, functions 62.63 %, lines 66.52 % | 64 / 62 / 65 |
+| frontend | statements 82.48 %, branches 75.22 %, functions 59.57 %, lines 81.03 % | 81 / 74 / 58 / 80 |
+
+The floors bind the ordinary run, **without** the heavy `#[ignore]` tests: that
+run needs no archive and gives the same numbers on any machine, while the heavy
+one lifted the shell to 79.95 % of regions when last measured, on 2026-09-19. Each crate is measured alone, so
+the core's 18 767 regions cannot hide the shell's 1 303. The floors are a
+ratchet, not a target: raise them when the numbers rise, and a change that falls
+under one says why in its commit rather than lowering it.
 
 Fixtures are described in `cli/fixtures/xml/MANIFEST.md` with a SHA-256 for each.
 

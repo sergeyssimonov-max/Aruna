@@ -7,8 +7,9 @@
 #
 # **Which run they bind to: the ordinary one, without the heavy `#[ignore]`
 # tests.** That run needs no corpus archive, so it gives the same numbers on any
-# machine; the heavy run lifts the shell by fourteen points (65 → 80 % of
-# regions) and would make a floor that fails wherever the archive is absent.
+# machine; the heavy run lifted the shell by fourteen points (65 → 80 % of
+# regions, measured 2026-09-19) and would make a floor that fails wherever the
+# archive is absent.
 #
 # **The floors are the measurement of 2026-09-22, rounded down, less about a
 # point** (docs/PROJECT-SPEC.ru.md, 3.3). Measured: core 95.91 % regions,

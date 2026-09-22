@@ -275,16 +275,19 @@ and the rules the suite keeps. In short, from `cli/`:
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo nextest run --profile ci
-cargo llvm-cov nextest --summary-only
 cargo audit && cargo deny check && cargo machete
 ```
 
-`src-tauri/` takes the same battery. It holds **31 tests**, all of them in
-`src/lib.rs` — counted 2026-09-20 with `cargo nextest list --run-ignored all`,
+Coverage is run from the root, for both crates at once and held to floors:
+`pnpm coverage` (`scripts/coverage.sh`, see `docs/TESTING.md`).
+
+`src-tauri/` takes the same battery. It holds **33 tests**, all of them in
+`src/lib.rs` — counted 2026-09-22 with `cargo nextest list --run-ignored all`,
 the same way `docs/TESTING.md` counts the console crate. Eleven are in `wire`
 (the generated types the window receives, and the promises about what never
 crosses), seven in `counting`, six in `markup` (the manifest summary and its
-refusals), four in `opening` (opening the inventory), two in `cancelling` —
+refusals), six in `opening` (opening the inventory, and the name a package must
+carry before it is read), two in `cancelling` —
 and one stands alone: `a_build_without_the_feature_registers_no_webdriver`,
 the fourth and last of the gates keeping the end-to-end contour out of a
 release: the other three are declarations that
