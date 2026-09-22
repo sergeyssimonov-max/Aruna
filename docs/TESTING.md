@@ -11,7 +11,7 @@ behind `#[ignore]` by design and come in with `--run-ignored all` — three that
 read the whole corpus in the core (`authenticity`, `corpus`, `document_model`),
 two in the shell that build it, and the shell's `regenerate_the_bindings`, which
 is not a check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **144 `vitest` tests** in
+Beside it, and in a language of its own, are the **145 `vitest` tests** in
 `frontend/` — see *Frontend* below — and the six end-to-end scenarios of
 `frontend/e2e/smoke.e2e.ts`, run against the real window by `pnpm test:e2e`. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
@@ -203,7 +203,7 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 144
+pnpm test:unit      # 145
 ```
 
 `vitest` runs two projects. **`component`** is jsdom: the 18 tests of
