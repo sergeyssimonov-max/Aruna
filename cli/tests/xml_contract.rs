@@ -295,6 +295,38 @@ fn have(tool: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Есть ли инструмент сверки, и если нет – можно ли на этом остановиться.
+///
+/// Без `ARUNA_REQUIRE_FIXTURE` отсутствие программы пропускает проверку и
+/// говорит об этом, как было. С ней – это отказ: `docs/PDF-ACCEPTANCE.md`
+/// требует, чтобы отсутствие второго читателя никогда не читалось как успех,
+/// и `document_model.rs` уже держит `xsltproc` тем же правилом. Здесь его не
+/// было, и прогон, обещавший сверки, проходил без инструмента молча.
+fn instrument(tool: &str) -> bool {
+    let here = have(tool);
+    if !here {
+        assert!(
+            std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
+            "ARUNA_REQUIRE_FIXTURE is set but {tool} is not installed"
+        );
+        eprintln!("{tool} отсутствует — проверка пропущена");
+    }
+    here
+}
+
+/// Проверка наличия отличает программу от ее отсутствия: без этого
+/// `instrument` пропускал бы или требовал все подряд одинаково.
+#[test]
+fn a_missing_instrument_is_told_from_a_present_one() {
+    assert!(
+        !have("aruna-no-such-instrument"),
+        "an absent program was found"
+    );
+    // Положительный контроль: `/bin/sh` на macOS есть всегда и на `--version`
+    // отвечает успехом.
+    assert!(have("sh"), "a present program was not found");
+}
+
 /// Каноническая форма документа по `xmllint --c14n`, или `None`, если документ
 /// разборщику не дался.
 fn canonical(bytes: &[u8], at: &Path) -> Option<Vec<u8>> {
@@ -356,8 +388,7 @@ fn without_dropped(canonical: &[u8]) -> Vec<u8> {
 /// структурный, и второй здесь появляется впервые.
 #[test]
 fn the_package_copy_is_the_same_tree_as_the_source() {
-    if !have("xmllint") {
-        eprintln!("xmllint отсутствует — проверка пропущена");
+    if !instrument("xmllint") {
         return;
     }
     let dir = tempfile::tempdir().expect("tempdir");
@@ -409,8 +440,7 @@ fn the_package_copy_is_the_same_tree_as_the_source() {
 /// не спрашивая извлекатель о нем самом.
 #[test]
 fn the_siglum_is_what_an_independent_extractor_reads() {
-    if !have("xsltproc") {
-        eprintln!("xsltproc отсутствует — проверка пропущена");
+    if !instrument("xsltproc") {
         return;
     }
     let dir = tempfile::tempdir().expect("tempdir");

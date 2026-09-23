@@ -531,6 +531,114 @@ fn key(refusal: &Refusal) -> String {
     }
 }
 
+/// Whether the model's verdict on `bytes` is the manifest's: refused exactly
+/// when the classifier refuses the document or the scanner finds one of the
+/// two defects the classifier misses.
+///
+/// One function for the corpus test and for its negative control below, so
+/// the control exercises the check the corpus test makes and not a copy of it.
+fn agrees(bytes: &[u8], result: &Result<Document<'_>, Refusal>) -> bool {
+    let named = classify(bytes).is_some() || beyond_the_parser(bytes).is_some();
+    named == result.is_err()
+}
+
+/// How many borrowed strings of `document` do not point into `source`.
+///
+/// The model is a view of the bytes it was read from: every `Cow::Borrowed`
+/// must lie inside them. The one borrowed string that may lie elsewhere is the
+/// `xml` prefix's namespace, which XML binds without a declaration and the
+/// model therefore takes from a constant.
+fn borrowed_elsewhere(document: &Document<'_>, source: &[u8]) -> usize {
+    use std::borrow::Cow;
+    const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+    let range = source.as_ptr_range();
+    let mut elsewhere = 0usize;
+    let mut see = |text: &Cow<'_, str>| {
+        if let Cow::Borrowed(text) = text {
+            let inside = text.is_empty() || range.contains(&text.as_ptr());
+            if !inside && *text != XML_NAMESPACE {
+                elsewhere += 1;
+            }
+        }
+    };
+    for node in document.nodes() {
+        match &node.kind {
+            Kind::Element(element) => {
+                for name in
+                    std::iter::once(&element.name).chain(element.attributes.iter().map(|a| &a.name))
+                {
+                    see(&name.local);
+                    name.prefix.iter().for_each(&mut see);
+                    name.namespace.iter().for_each(&mut see);
+                }
+                element.attributes.iter().for_each(|a| see(&a.value));
+                for binding in &element.namespaces {
+                    see(&binding.uri);
+                    binding.prefix.iter().for_each(&mut see);
+                }
+            }
+            Kind::Text(text) | Kind::Comment(text) => see(text),
+            Kind::Instruction { target, data } => {
+                see(target);
+                see(data);
+            }
+        }
+    }
+    elsewhere
+}
+
+/// **The two corpus checks have teeth.**
+///
+/// The corpus test asserts that nothing disagrees and nothing is borrowed from
+/// elsewhere; on a corpus where both hold, a check that could never fire would
+/// pass the same way. So each is shown firing here, on fixtures, without the
+/// archive:
+///
+/// - a document with an internal DTD is accepted by the classifier and refused
+///   by the model (`Undecided`), which is exactly a disagreement — the known
+///   limit of 4.13, used here because it is the one real input that produces one;
+/// - a model read from a copy of the bytes is checked against the original, and
+///   every string it borrowed is reported as lying elsewhere.
+#[test]
+fn the_corpus_checks_catch_what_they_are_there_to_catch() {
+    let fixture = |name: &str| {
+        std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("fixtures/xml")
+                .join(name),
+        )
+        .expect("fixture")
+    };
+
+    let typical = fixture("valid/typical.xml");
+    assert!(
+        agrees(&typical, &Document::read(&typical)),
+        "a plain document disagrees"
+    );
+    let broken = fixture("malformed/tag-mismatch.xml");
+    assert!(
+        agrees(&broken, &Document::read(&broken)),
+        "a refused document disagrees"
+    );
+    let entities = fixture("valid/entities-internal.xml");
+    assert!(
+        !agrees(&entities, &Document::read(&entities)),
+        "a document the model refuses and the manifest does not name went unnoticed"
+    );
+
+    let copy = typical.clone();
+    let from_copy = Document::read(&copy).expect("typical is read");
+    assert_eq!(
+        borrowed_elsewhere(&from_copy, &copy),
+        0,
+        "the model copied text"
+    );
+    assert!(
+        borrowed_elsewhere(&from_copy, &typical) > 0,
+        "strings borrowed from another buffer went unnoticed"
+    );
+}
+
 const DOCUMENTS: usize = 23_936;
 
 #[test]
@@ -543,19 +651,22 @@ fn the_whole_corpus_reads_the_same_twice_and_refuses_what_the_manifest_names() {
     let (mut declarations_in_bytes, mut stylesheets_in_bytes) = (0usize, 0usize);
     let mut comment_documents = 0usize;
     let mut deepest: (usize, String) = (0, String::new());
+    let mut copied: Vec<String> = Vec::new();
 
     let admitted = each_document(&path, |name, bytes| {
         let result = Document::read(bytes);
         // The refusals are the manifest's: the classifier's 206, then the
         // scanner's seventeen among what the classifier accepts.
-        let named = classify(bytes).is_some() || beyond_the_parser(bytes).is_some();
-        if named != result.is_err() {
-            disagreements.push(format!(
-                "{name}: model {:?}, manifest names it: {named}",
-                result.as_ref().err()
-            ));
+        if !agrees(bytes, &result) {
+            disagreements.push(format!("{name}: model {:?}", result.as_ref().err()));
         }
         if let Ok(document) = &result {
+            // A view of the bytes, not a copy of them: the model holds the
+            // document once. Counted per document so a failure names it.
+            let elsewhere = borrowed_elsewhere(document, bytes);
+            if elsewhere > 0 {
+                copied.push(format!("{name}: {elsewhere} borrowed strings outside it"));
+            }
             // Nesting depth of elements, counted on the model: a node is one
             // deeper than its parent, and parents come first in the vector.
             let mut depth = vec![0usize; document.nodes().len()];
@@ -602,6 +713,11 @@ fn the_whole_corpus_reads_the_same_twice_and_refuses_what_the_manifest_names() {
         disagreements.is_empty(),
         "the model and the manifest disagree on {} documents: {disagreements:#?}",
         disagreements.len()
+    );
+    assert!(
+        copied.is_empty(),
+        "the model borrowed from outside its document in {} documents: {copied:#?}",
+        copied.len()
     );
     let moved: Vec<&String> = first
         .iter()

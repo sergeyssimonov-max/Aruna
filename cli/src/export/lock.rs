@@ -75,8 +75,20 @@ const MAX_LOCK: u64 = 4096;
 /// `None` значит «это не токен»: файла нет, он длиннее предела, или он не
 /// текст. Все три случая ведут туда же, куда вело несовпадение содержимого до
 /// появления предела, – разница только в том, сколько памяти на это уходит.
+///
+/// **Открывается только обычный файл.** Именованный канал под этим именем
+/// держал `open` без конца: вызов ждет писателя, и ни срок, ни отмена цикла
+/// ожидания до него не доходят. Токен эта программа кладет только обычным
+/// файлом, так что все остальное – канал, устройство, ссылка – токеном не
+/// бывает и ждется, как любой нечитаемый держатель. Между проверкой и
+/// открытием остается окно в два системных вызова; закрыть его целиком мог бы
+/// только неблокирующий `open`, а он требует флага, которого в стандартной
+/// библиотеке нет.
 fn read_token(path: &Path) -> Option<String> {
     use std::io::Read as _;
+    if !fs::symlink_metadata(path).ok()?.file_type().is_file() {
+        return None;
+    }
     let file = fs::File::open(path).ok()?;
     let mut text = String::new();
     // На один байт больше предела: длину читаем, чтобы отличить «ровно предел»
@@ -648,5 +660,65 @@ mod tests {
             Ok(other) => panic!("ожидался отказ по занятому замку, получено {other:?}"),
         }
         assert!(path.is_dir(), "каталог под именем блокировки снят");
+    }
+
+    /// **Именованный канал на месте файла блокировки кончается отказом, а не
+    /// вечным ожиданием.**
+    ///
+    /// `File::open` на канале без писателя не возвращается, пока писатель не
+    /// появится, – и это не цикл, который прерывают срок и отмена, а один
+    /// системный вызов, из которого не выпускает ничто. Канал под этим именем
+    /// кладет кто угодно: имя лежит в каталоге читателя. Прогон с окном вис
+    /// бы на «Публикации» без конца, и кнопка «Остановить» до него не доходила.
+    ///
+    /// Канал свежий, поэтому устаревшим он не признается и ожидание обязано
+    /// дойти до отказа по сроку. На коде с дефектом поток не возвращается
+    /// никогда: предохранитель – `recv_timeout`, а зависший поток умирает с
+    /// процессом теста.
+    #[test]
+    fn a_fifo_where_the_lock_belongs_ends_in_a_refusal_rather_than_a_hang() {
+        let dir = tempdir().expect("tempdir");
+        let path = lock_path(dir.path());
+        let made = std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .expect("mkfifo");
+        assert!(made.success(), "канал не создан");
+
+        let destination = dir.path().to_path_buf();
+        let cancel = crate::job::Cancel::new();
+        let worker_cancel = cancel.clone();
+        let (sent, received) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let job = Job::new(&crate::progress::Silent, &worker_cancel);
+            let outcome = acquire_within(
+                &destination,
+                &job,
+                Duration::from_secs(3600),
+                Duration::from_millis(60),
+                Duration::from_millis(5),
+            )
+            .map(|_| ());
+            let _ = sent.send(outcome);
+        });
+
+        let outcome = received.recv_timeout(Duration::from_secs(5));
+        cancel.cancel();
+
+        match outcome {
+            Ok(Err(ArunaError::PublishBusy { holder, .. })) => {
+                assert_eq!(holder, "an unnamed run", "канал назван держателем");
+            }
+            Err(_) => panic!("ожидание не кончилось за 5 с: чтение канала не вернулось"),
+            Ok(other) => panic!("ожидался отказ по занятому замку, получено {other:?}"),
+        }
+        use std::os::unix::fs::FileTypeExt as _;
+        assert!(
+            fs::symlink_metadata(&path)
+                .expect("канал на месте")
+                .file_type()
+                .is_fifo(),
+            "канал под именем блокировки тронут"
+        );
     }
 }

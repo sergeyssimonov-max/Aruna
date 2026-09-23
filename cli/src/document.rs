@@ -753,6 +753,16 @@ mod tests {
     #[test]
     fn the_model_names_no_output_format() {
         let source = include_str!("document.rs");
+        let found = output_formats_named_in(source);
+        assert!(
+            found.is_empty(),
+            "the model names an output format: {found:#?}"
+        );
+    }
+
+    /// The words the boundary forbids, as `document.rs:<line>: <word>`, for the
+    /// code above the tests in `source`.
+    fn output_formats_named_in(source: &str) -> Vec<String> {
         let code = source.split("#[cfg(test)]").next().unwrap_or(source);
         let forbidden = [
             "pdf",
@@ -763,6 +773,7 @@ mod tests {
             "layout",
             "export",
         ];
+        let mut found = Vec::new();
         for (number, line) in code.lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") {
@@ -770,13 +781,38 @@ mod tests {
             }
             let lower = trimmed.to_ascii_lowercase();
             for word in forbidden {
-                assert!(
-                    !lower.contains(word),
-                    "document.rs:{}: `{word}` in the model: {line}",
-                    number + 1
-                );
+                if lower.contains(word) {
+                    found.push(format!("document.rs:{}: {word}: {line}", number + 1));
+                }
             }
         }
+        found
+    }
+
+    /// **The boundary guard has teeth.** A source that passes it because the
+    /// guard reads nothing would look exactly like a model that keeps the
+    /// boundary; so the guard is run over the real source with one line of code
+    /// planted above the tests, and must name it. A comment naming the same
+    /// module must still pass, as the header's does.
+    #[test]
+    fn the_output_format_guard_names_a_planted_line() {
+        let source = include_str!("document.rs");
+        let at = source.find("#[cfg(test)]").expect("the tests");
+        let planted = format!(
+            "{}use crate::presentation::CorpusPresentation;\n{}",
+            &source[..at],
+            &source[at..]
+        );
+        let found = output_formats_named_in(&planted);
+        assert_eq!(found.len(), 1, "the planted line: {found:#?}");
+        assert!(found[0].contains("presentation"), "{found:#?}");
+
+        let commented = format!(
+            "{}// crate::presentation is where a page is made, not here\n{}",
+            &source[..at],
+            &source[at..]
+        );
+        assert!(output_formats_named_in(&commented).is_empty());
     }
 
     /// Siblings stay in the order written, and so do attributes — on a shape

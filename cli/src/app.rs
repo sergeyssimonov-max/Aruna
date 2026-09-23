@@ -314,10 +314,16 @@ impl Failure {
     }
 }
 
+/// The last component of `path`, which names a file and not a place.
+fn file_name(path: &std::path::Path) -> std::borrow::Cow<'_, str> {
+    path.file_name()
+        .map_or_else(|| "a font file".into(), |name| name.to_string_lossy())
+}
+
 /// The sentence, with no path from the machine's filesystem in it.
 ///
 /// [`Failure`] promises exactly that above, and for most errors `Display`
-/// already keeps the promise. Five variants do not, because they are read by
+/// already keeps the promise. Seven variants do not, because they are read by
 /// two audiences: `main` prints `ArunaError` itself to a terminal, where the
 /// path is the most useful thing in the line, and this crosses to a window,
 /// where it is a leak and a person can act on none of it. This is where the two
@@ -354,6 +360,23 @@ fn message_of(error: &ArunaError) -> String {
             ..
         } => format!("{group}: {fragment} is claimed by both {first} and {second}"),
         ArchiveDuplicateEntry { entry } => format!("the archive names {entry} twice"),
+        // The file's name and not where it lies: the name is the application's
+        // own and says which face is at fault, the directory is this machine's.
+        // Both variants had `Display` alone and so sent the whole path — kept
+        // from the window until now only because nothing yet hands them to
+        // one; `window_seams` builds every variant and found it.
+        FontMissing { path, covers } => format!(
+            "{} is not there, and it covers {covers}; the application is installed incompletely",
+            file_name(path)
+        ),
+        FontAltered {
+            path,
+            expected,
+            found,
+        } => format!(
+            "{} has been replaced or damaged: expected SHA-256 {expected}, found {found}",
+            file_name(path)
+        ),
         other => other.to_string(),
     }
 }

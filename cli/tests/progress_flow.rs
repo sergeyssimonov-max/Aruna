@@ -516,3 +516,85 @@ fn the_write_pass_ticks_are_a_fraction_that_only_grows() {
         "the run did not end on the whole: {ticks:?}"
     );
 }
+
+/// Every file under `root`, relative to it, sorted.
+fn files_under(root: &Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("read_dir").flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                out.push(path.strip_prefix(root).expect("under root").to_path_buf());
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// **A sink that listens changes nothing about what is built.**
+///
+/// `cancellation.rs` holds a cancellable run against an unattended one, but
+/// both of those report into `Silent`: the question "does a progress sink that
+/// actually records every event leave the package as it was" had no test. The
+/// window's sink records, counts and forwards; if reporting ever borrowed
+/// something the build then used differently — a buffer, an order, a count
+/// taken twice — this is where it would show.
+///
+/// The recording is checked to have heard the run, so a sink that was never
+/// called cannot pass by default.
+#[test]
+fn a_run_that_is_listened_to_builds_the_same_bytes_as_one_that_is_not() {
+    let dir = tempdir().expect("tempdir");
+    let zip = mixed_archive(dir.path());
+    let (heard, unheard) = (dir.path().join("heard"), dir.path().join("unheard"));
+    std::fs::create_dir(&heard).expect("heard");
+    std::fs::create_dir(&unheard).expect("unheard");
+
+    let sink = Recording(Mutex::new(Vec::new()));
+    let cancel = Cancel::new();
+    let a = export::build(&zip, &heard, "fixture", &Job::new(&sink, &cancel)).expect("heard");
+    let b = export::build(&zip, &unheard, "fixture", &Job::unattended()).expect("unheard");
+
+    assert!(
+        sink.ticks()
+            .last()
+            .is_some_and(|(done, total)| done == total && *total > 0),
+        "the sink heard no write pass: {:?}",
+        sink.stages()
+    );
+    assert_eq!((a.documents, a.groups), (b.documents, b.groups));
+    let (a, b) = (heard.join(export::PACKAGE), unheard.join(export::PACKAGE));
+    let listed = files_under(&a);
+    assert!(!listed.is_empty(), "nothing was built");
+    assert_eq!(
+        listed,
+        files_under(&b),
+        "the two packages hold different files"
+    );
+    for relative in &listed {
+        assert_eq!(
+            std::fs::read(a.join(relative)).expect("heard"),
+            std::fs::read(b.join(relative)).expect("unheard"),
+            "{} differs between a listened run and an unattended one",
+            relative.display()
+        );
+    }
+
+    // Negative control: the comparison sees a difference when there is one. A
+    // build under another source label differs in every document's attribution.
+    let other = dir.path().join("other");
+    std::fs::create_dir(&other).expect("other");
+    export::build(&zip, &other, "another label", &Job::unattended()).expect("other");
+    let other = other.join(export::PACKAGE);
+    assert!(
+        listed
+            .iter()
+            .any(|relative| std::fs::read(a.join(relative)).ok()
+                != std::fs::read(other.join(relative)).ok()),
+        "a package under another label compared equal: the comparison is blind"
+    );
+}

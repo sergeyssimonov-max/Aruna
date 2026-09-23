@@ -430,3 +430,61 @@ fn recovering_once_is_enough_and_running_again_changes_nothing() {
         beside(&destination)
     );
 }
+
+/// A marker that is not a file does not hold the build forever.
+///
+/// The sweep opens a staging directory's marker to ask whether its run is
+/// alive. A named pipe under that name — anything can put one in the reader's
+/// Downloads folder — made that `open` wait for a writer that never came: the
+/// build hung before writing a single document, and no cancel reaches a
+/// blocked system call. A marker is always a regular file this program
+/// created, so anything else is not a marker, and the directory beside it is
+/// left alone as one whose run cannot be asked about.
+///
+/// On the defective code the build never returns; the thread is the fuse, and
+/// a hung one dies with the test process.
+#[test]
+fn a_pipe_where_a_marker_belongs_does_not_hold_the_build() {
+    let (_dir, zip, destination) = published();
+
+    let staging = destination.join(format!(".{PACKAGE}.build.999999.1"));
+    std::fs::create_dir_all(&staging).expect("staging");
+    let marker = destination.join(format!(".{PACKAGE}.build.999999.1.owner"));
+    let made = Command::new("mkfifo")
+        .arg(&marker)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("mkfifo");
+    assert!(made.success(), "no pipe was made");
+
+    let (sent, received) = std::sync::mpsc::channel();
+    let (worker_zip, worker_destination) = (zip.clone(), destination.clone());
+    std::thread::spawn(move || {
+        let outcome = export::build(
+            &worker_zip,
+            &worker_destination,
+            "second",
+            &aruna::job::Job::unattended(),
+        )
+        .map(|_| ());
+        let _ = sent.send(outcome);
+    });
+
+    match received.recv_timeout(std::time::Duration::from_secs(20)) {
+        Ok(outcome) => outcome.expect("the build"),
+        Err(_) => panic!("the build did not return in 20 s: the sweep is waiting on the pipe"),
+    }
+    assert!(
+        staging.is_dir(),
+        "a directory whose run cannot be asked about was removed"
+    );
+    use std::os::unix::fs::FileTypeExt as _;
+    assert!(
+        std::fs::symlink_metadata(&marker)
+            .expect("the pipe")
+            .file_type()
+            .is_fifo(),
+        "the pipe was touched"
+    );
+}

@@ -400,11 +400,19 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // What every document shows, decided once. Both pages are written from
     // this and neither re-derives a name, a link or a fact of its own — see
     // [`crate::presentation`].
-    let corpus = crate::presentation::CorpusPresentation::linked(&records, &placed, source_label);
-
-    let html = crate::html::render_linked_html(&corpus, "");
-    let inventory = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
-    fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
+    //
+    // Written and let go in one block, the page and the manifest alike: the
+    // checks below read both back from disk, and nothing after the write reads
+    // the strings. Held to the end of the function they sat beside the
+    // validation's own sets for the whole of both read-backs — 14 MB of text
+    // on the real corpus that nobody would look at again.
+    {
+        let corpus =
+            crate::presentation::CorpusPresentation::linked(&records, &placed, source_label);
+        let html = crate::html::render_linked_html(&corpus, "");
+        let inventory = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
+        fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
+    }
 
     // The font the page needs and the terms it travels under, written from the
     // bytes compiled into this binary so that the console program and the
@@ -432,20 +440,22 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         fs::write(&path, bytes).map_err(ArunaError::io(path))?;
     }
 
-    let manifest_json = manifest::render_manifest(
-        &records,
-        &placed,
-        &manifest::Source {
-            label: source_label,
-            archive_md5: &archive_digest,
-            not_manuscripts: &not_manuscripts,
-        },
-        &tallies.applied,
-        &tallies.fonts,
-        &tallies.xml,
-    );
-    let manifest_path = staging.path().join(MANIFEST);
-    fs::write(&manifest_path, &manifest_json).map_err(ArunaError::io(manifest_path))?;
+    {
+        let manifest_json = manifest::render_manifest(
+            &records,
+            &placed,
+            &manifest::Source {
+                label: source_label,
+                archive_md5: &archive_digest,
+                not_manuscripts: &not_manuscripts,
+            },
+            &tallies.applied,
+            &tallies.fonts,
+            &tallies.xml,
+        );
+        let manifest_path = staging.path().join(MANIFEST);
+        fs::write(&manifest_path, &manifest_json).map_err(ArunaError::io(manifest_path))?;
+    }
 
     // Validation reads back everything just written; a run cancelled during
     // the write should not spend six more seconds proving it was written.
@@ -877,6 +887,15 @@ fn sweep_abandoned_staging(destination: &Path) {
         match kind {
             Leftover::Staging | Leftover::Legacy if file_type.is_dir() => {
                 let marker = owner_marker(&path);
+                // **Метка – только обычный файл.** Именованный канал под ее
+                // именем держал `open` до появления писателя, то есть без
+                // конца, и сборка висла здесь, до первого документа, где
+                // отмена ее уже не слышит. Метку эта программа создает только
+                // файлом; все остальное меткой не считается, и каталог рядом
+                // остается как тот, чей прогон спросить нельзя.
+                if fs::symlink_metadata(&marker).is_ok_and(|m| !m.file_type().is_file()) {
+                    continue;
+                }
                 match File::open(&marker) {
                     Ok(file) if kind == Leftover::Staging => {
                         if file.try_lock().is_ok() {

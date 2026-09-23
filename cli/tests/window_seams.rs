@@ -201,21 +201,75 @@ fn library_sources() -> Vec<(PathBuf, String)> {
 /// doing the work.
 #[test]
 fn the_library_neither_prints_nor_ends_the_process() {
-    for (path, source) in library_sources() {
-        let name = path.to_string_lossy();
-        for forbidden in ["println!", "print!", "process::exit", "process::abort"] {
-            assert!(
-                !calls(&source, forbidden) || name == "main.rs",
-                "{name} contains {forbidden}: a library that writes to a file \
-                 descriptor or ends the process cannot be driven by a window"
-            );
+    let found: Vec<String> = library_sources()
+        .iter()
+        .flat_map(|(path, source)| offences(&path.to_string_lossy(), source))
+        .collect();
+    assert!(
+        found.is_empty(),
+        "a library that writes to a file descriptor or ends the process cannot \
+         be driven by a window; report an Event through the job instead: {found:#?}"
+    );
+}
+
+/// What in `source` writes to a standard stream or ends the process, for the
+/// file `name`.
+///
+/// `main.rs` is the entry point and may do all of it. `progress.rs` holds the
+/// binary's `Stderr` sink, the one place an event becomes a line, and may
+/// write to standard error and nothing else. `dbg!`, `eprint!` and the streams
+/// taken directly were not looked for until 2026-09-23; none is used today,
+/// and this keeps it so.
+fn offences(name: &str, source: &str) -> Vec<String> {
+    let anywhere = [
+        "println!",
+        "print!",
+        "dbg!",
+        "io::stdout(",
+        "process::exit",
+        "process::abort",
+    ];
+    let stderr = ["eprintln!", "eprint!", "io::stderr("];
+    let mut found = Vec::new();
+    for forbidden in anywhere {
+        if calls(source, forbidden) && name != "main.rs" {
+            found.push(format!("{name}: {forbidden}"));
         }
+    }
+    for forbidden in stderr {
+        if calls(source, forbidden) && name != "main.rs" && name != "progress.rs" {
+            found.push(format!("{name}: {forbidden}"));
+        }
+    }
+    found
+}
+
+/// **The guard above has teeth.** Each thing it forbids, planted in a file of
+/// the library, is named; the same text in `main.rs` is not.
+#[test]
+fn the_print_guard_names_what_is_planted() {
+    for planted in [
+        "println!(\"x\")",
+        "print!(\"x\")",
+        "dbg!(x)",
+        "std::io::stdout()",
+        "std::process::exit(1)",
+        "eprintln!(\"x\")",
+        "eprint!(\"x\")",
+        "std::io::stderr()",
+    ] {
+        let source = format!("fn f() {{ {planted}; }}");
+        assert_eq!(
+            offences("export/mod.rs", &source).len(),
+            1,
+            "`{planted}` in the library went unnoticed"
+        );
         assert!(
-            !calls(&source, "eprintln!") || name == "main.rs" || name == "progress.rs",
-            "{name} contains eprintln!: report an Event through the job instead, \
-             and let the caller decide where it goes"
+            offences("main.rs", &source).is_empty(),
+            "main.rs may: {planted}"
         );
     }
+    assert!(offences("export/mod.rs", "fn f() { let printer = 1; }").is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -512,4 +566,241 @@ fn a_group_is_the_part_of_the_whole_that_belongs_to_it() {
             placement.relative
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// Every failure the core can report reaches the window as a Russian sentence
+// ---------------------------------------------------------------------------
+
+/// One value of every variant, with a path from the machine in each field that
+/// can carry one.
+///
+/// `covers` is a `match` with no wildcard: a variant added to `ArunaError`
+/// stops this file compiling until it is listed here too, which is the only
+/// way a list of "every variant" stays one.
+fn every_failure() -> Vec<ArunaError> {
+    use aruna::job::Phase;
+    let secret = PathBuf::from("/Users/nobody/Downloads/secret-corpus");
+    let io = || std::io::Error::other("busy");
+    let all = vec![
+        ArunaError::Network {
+            url: "https://example.invalid/a.zip".into(),
+            source: Box::new(io()),
+        },
+        ArunaError::Http {
+            url: "u".into(),
+            status: 503,
+            retry_after: None,
+        },
+        ArunaError::Http {
+            url: "u".into(),
+            status: 404,
+            retry_after: None,
+        },
+        ArunaError::Truncated {
+            url: "u".into(),
+            expected: 10,
+            got: 4,
+        },
+        ArunaError::Oversized {
+            url: "u".into(),
+            limit: 1,
+            got: 2,
+        },
+        ArunaError::FontMissing {
+            path: secret.join("fonts/UllikummiA.ttf"),
+            covers: "private use",
+        },
+        ArunaError::FontAltered {
+            path: secret.join("fonts/UllikummiA.ttf"),
+            expected: "00",
+            found: "ff".into(),
+        },
+        ArunaError::ChecksumMismatch {
+            url: "u".into(),
+            expected: "a".into(),
+            got: "b".into(),
+        },
+        ArunaError::Zip(zip::result::ZipError::FileNotFound),
+        ArunaError::EmptyArchive,
+        ArunaError::Cancelled {
+            phase: Phase::Exporting,
+        },
+        ArunaError::Io {
+            path: secret.clone(),
+            source: io(),
+        },
+        ArunaError::Replace {
+            path: secret.clone(),
+            scratch: secret.join("scratch"),
+            source: io(),
+        },
+        ArunaError::ExportCollision {
+            group: "CTH 5".into(),
+            fragment: "KBo 1.1".into(),
+            first: "a.xml".into(),
+            second: "b.xml".into(),
+            path: secret.join("CTH 5/KBo 1.1.xml"),
+        },
+        ArunaError::ArchiveDuplicateEntry {
+            entry: "CTH 5/KBo 1.1.xml".into(),
+        },
+        ArunaError::ExportDocumentTooLarge {
+            entry: "CTH 5/KBo 1.1.xml".into(),
+            limit: 1,
+        },
+        ArunaError::ExportDistorted {
+            entry: "CTH 5/KBo 1.1.xml".into(),
+            reason: "encoding".into(),
+        },
+        ArunaError::ExportIncomplete {
+            expected: 2,
+            written: 1,
+        },
+        ArunaError::ArchiveTooManyEntries {
+            entries: 2,
+            limit: 1,
+        },
+        ArunaError::ExportPackageTooLarge {
+            written: 2,
+            limit: 1,
+        },
+        ArunaError::ExportInvalid {
+            root: secret.clone(),
+            count: 1,
+            first: format!("{} is missing", secret.display()),
+        },
+        ArunaError::PublishBusy {
+            path: secret.clone(),
+            holder: "pid 1, since 1.0".into(),
+        },
+        ArunaError::ExportDestination {
+            path: secret.clone(),
+            reason: "it holds files this exporter did not write".into(),
+        },
+        ArunaError::DownloadsDir,
+    ];
+    for error in &all {
+        covers(error);
+    }
+    all
+}
+
+fn covers(error: &ArunaError) {
+    use ArunaError::*;
+    match error {
+        Network { .. }
+        | Http { .. }
+        | Truncated { .. }
+        | Oversized { .. }
+        | FontMissing { .. }
+        | FontAltered { .. }
+        | ChecksumMismatch { .. }
+        | Zip(_)
+        | EmptyArchive
+        | Cancelled { .. }
+        | Io { .. }
+        | Replace { .. }
+        | ExportCollision { .. }
+        | ArchiveDuplicateEntry { .. }
+        | ExportDocumentTooLarge { .. }
+        | ExportDistorted { .. }
+        | ExportIncomplete { .. }
+        | ArchiveTooManyEntries { .. }
+        | ExportPackageTooLarge { .. }
+        | ExportInvalid { .. }
+        | PublishBusy { .. }
+        | ExportDestination { .. }
+        | DownloadsDir => {}
+    }
+}
+
+/// The keys of the window's table of failure sentences, read from its source.
+///
+/// Read rather than restated: the table lives in `App.svelte`, and a copy here
+/// would be a third description of one contract. The block is found by its
+/// declaration and ends at the first line that closes it.
+fn window_sentences() -> std::collections::BTreeSet<String> {
+    let source = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/src/App.svelte"),
+    )
+    .expect("App.svelte");
+    let start = source
+        .find("const FAILED: Record<string, string | undefined> = {")
+        .expect("the window's table of failure sentences");
+    let body = &source[start..];
+    let body = &body[..body.find("\n  }\n").expect("the end of the table")];
+    body.lines()
+        .filter_map(|line| {
+            let line = line.trim_start();
+            let (key, _) = line.split_once(':')?;
+            (!key.is_empty() && key.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'))
+                .then(|| key.to_string())
+        })
+        .collect()
+}
+
+/// Whether `message` carries anything that reads as a path on this machine.
+fn carries_a_path(message: &str) -> bool {
+    message.contains("/Users/") || message.contains("secret-corpus")
+}
+
+/// **Every code the core reports has a Russian sentence in the window, and no
+/// two variants that mean different things share one.**
+///
+/// The window shows `FAILED[code]` and falls back to the core's English
+/// sentence for a code it does not know. That fallback is deliberate — an
+/// English line is visible and gets fixed — but it is also how a new code
+/// reaches a Russian screen in English without any test noticing: the
+/// window's own test lists the codes by hand. This reads the list from the
+/// core and the sentences from the window, so the two cannot drift apart.
+///
+/// `cancelled` is the exception the window makes on purpose: its sentence is
+/// chosen by phase, not by code.
+#[test]
+fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
+    let sentences = window_sentences();
+    let mut codes = std::collections::BTreeMap::<&str, Vec<String>>::new();
+    for error in every_failure() {
+        let failure = app::Failure::of(&error);
+        assert!(
+            !carries_a_path(&failure.message),
+            "{} carries a path to the window: {}",
+            failure.code,
+            failure.message
+        );
+        assert!(
+            failure.code == "cancelled" || sentences.contains(failure.code),
+            "the window has no sentence for `{}`; it would show the core's English",
+            failure.code
+        );
+        codes.entry(failure.code).or_default().push(
+            format!("{error:?}")
+                .split([' ', '(', '{'])
+                .next()
+                .unwrap_or("")
+                .to_string(),
+        );
+    }
+    // One code, one kind of failure. `Http` answers to two codes by status,
+    // never the other way round.
+    for (code, variants) in &codes {
+        let mut kinds = variants.clone();
+        kinds.dedup();
+        assert_eq!(kinds.len(), 1, "`{code}` is shared by {kinds:?}");
+    }
+
+    // Negative controls: the two checks above have teeth.
+    assert!(
+        !sentences.contains("quantum_flux"),
+        "the table reader accepts a code the window does not have"
+    );
+    assert!(
+        sentences.len() >= 20,
+        "the table reader found {} keys; it is not reading the table",
+        sentences.len()
+    );
+    assert!(carries_a_path(
+        "I/O error at /Users/nobody/Downloads/secret-corpus: busy"
+    ));
 }
