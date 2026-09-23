@@ -294,14 +294,15 @@ release: the other three are declarations that
 `frontend/tests/spec-guard.test.ts` reads, and this one is the compiler's own
 answer about what the builder registers when the feature is off.
 
-Three of the thirty-one carry `#[ignore]` and run only when asked explicitly:
+Three of the thirty-three carry `#[ignore]` and run only when asked explicitly:
 `regenerate_the_bindings`, which writes `frontend/src/bindings.ts`, and both
-`cancelling` tests, which read the corpus archive. A default run is **28**.
+`cancelling` tests, which read the corpus archive. A default run is **30**,
+and **29** under `--features e2e`, where the gate test is compiled out.
 
 Two flags need care here. `nextest` runs **without** `--all-features`: that flag
 turns on `e2e`, and the gate test is compiled out under the feature
 (`cfg(all(test, not(feature = "e2e")))`) — the very thing it exists to check.
 Clippy, by contrast, takes `--all-features`, because that branch must be checked
-too. `--no-tests=pass` is no longer a necessity: the other thirty tests sit in
+too. `--no-tests=pass` is no longer a necessity: the other thirty-two tests sit in
 modules gated on `test` alone and run under the feature as well. It stays as
 insurance for a crate that temporarily has no tests at all.

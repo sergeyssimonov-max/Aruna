@@ -2,11 +2,11 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **591 tests** as of 2026-09-23: 558 in the console crate — nineteen
+The suite is **600 tests** as of 2026-09-24: 567 in the console crate — twenty
 integration binaries plus the library and the binary's own tests — and 33 in the
 desktop shell. The crates were joined into one workspace on 2026-08-30, so
 `cargo nextest run` from the repository root runs both, and `-p aruna` narrows it
-back to the console crate. It needs no network, and it runs **585**: six are
+back to the console crate. It needs no network, and it runs **594**: six are
 behind `#[ignore]` by design and come in with `--run-ignored all` — three that
 read the whole corpus in the core (`authenticity`, `corpus`, `document_model`),
 two in the shell that build it, and the shell's `regenerate_the_bindings`, which
@@ -273,7 +273,7 @@ test.
 | `tests/document_model.rs` | 4 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; and the whole corpus read twice and refused exactly where the manifest says |
 | `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory
 
-Counted on 2026-09-23 with `cargo nextest list --workspace --run-ignored all`: 558 in the `aruna` crate, as above, and 33 in `aruna-desktop`, which is 591 across 22 binaries. Without `--run-ignored` the run is 585: the six heavy ones stay behind `#[ignore]` and need the archive. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts; on 2026-09-23 three download tests (the read timeout in force, a cancel reaching a silent server, a cut body reported as the network's) and two for the declared XML version, 586 and 580 before them.
+Counted on 2026-09-24 with `cargo nextest list --run-ignored all`: 567 in the `aruna` crate, as above, and 33 in `aruna-desktop`, which is 600. Without `--run-ignored` the run is 594: the six heavy ones stay behind `#[ignore]` and need the archive. The nine since 2026-09-23 came with `ede953a` – a named pipe where the publish lock or a staging marker belongs, the window's font-error sentences, the model's boundary guard, and the new `pdf_acceptance.rs`; 591 and 585 before them. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts; on 2026-09-23 three download tests (the read timeout in force, a cancel reaching a silent server, a cut body reported as the network's) and two for the declared XML version, 586 and 580 before them.
 
 ## Coverage floors
 
