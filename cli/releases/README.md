@@ -1,22 +1,36 @@
 # Aruna — macOS releases only
 
 Build output lands here and is **not committed** — with one exception, taken
-deliberately on 2026-09-06 by the owner's decision: **the published image of the
-current release is kept here as well as on the Releases page.**
+deliberately on 2026-09-06 by the owner's decision and widened on 2026-09-23:
+**the published image of every reference release is kept here as well as on
+the Releases page**, each under its own version number.
 
 The exception is narrow, and the rule around it is what keeps it from going
 stale. What is committed is the file downloaded back from the release, not the
 one the build left behind, and it is verified against the digest recorded in
-`.github/reference-release.json` before it goes in. Exactly one image lives
-here — the one whose version `cli/Cargo.toml` declares — and the commit that
-publishes a new release removes the previous one. Everything else a build
-produces is still ignored: that copy did go stale the moment the next build
-ran, which is why the rule exists.
+`.github/reference-release.json` before it goes in. Each image lives here as
+`Aruna_<version>-macos-universal.dmg`, beside the release's own checksum file,
+kept verbatim as `Aruna_<version>-SHA256SUMS.txt`. The commit that records a new
+reference adds its pair; it no longer removes the previous one, because since
+2026-09-23 a new release no longer retires the reference before it. An image
+that stops being a reference leaves with its entry in the reference record.
+Everything else a build produces is still ignored, including a stray
+`Aruna-macos-universal.dmg` without a version: that copy went stale the moment
+the next build ran, which is why the rule exists.
 
-| Committed | Digest |
-|---|---|
-| `Aruna-macos-universal.dmg` | `cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410` |
-| `SHA256SUMS` | the line above, as the contour wrote it |
+| Committed | Release | Digest of the image |
+|---|---|---|
+| `Aruna_2.6.0-macos-universal.dmg` | v2.6.0, current | `455314688cc9bc845d48163d8c106894edef22656e78aa86fc07d7a86bf3cad9` |
+| `Aruna_2.5.11-macos-universal.dmg` | v2.5.11 | `cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410` |
+
+The references v1.0.5 and v1.0.9 predate the rule; their images are on the
+Releases page only.
+
+The checksum files name the image as the release publishes it,
+`Aruna-macos-universal.dmg`, so `shasum -c` works on a download from the
+Releases page, not on the copies here. To check a copy here, compare
+`shasum -a 256 Aruna_<version>-macos-universal.dmg` with the line in its
+`Aruna_<version>-SHA256SUMS.txt`.
 
 Download them from [Releases](https://github.com/sergeyssimonov-max/Aruna/releases):
 
@@ -49,7 +63,7 @@ Or CI:
 ```bash
 gh workflow run release-dmg.yml
 # tag release:
-git tag v2.5.11 && git push origin v2.5.11   # the tag must match version in cli/Cargo.toml
+git tag v<version> && git push origin v<version>   # the tag must match version in cli/Cargo.toml
 ```
 
 See [docs/AUTO_DMG.md](../docs/AUTO_DMG.md).

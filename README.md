@@ -214,19 +214,20 @@ The corpus job is the one that runs the parser against the real 71 MiB archive r
 current release — the one to download.** It is what `Releases` marks *Latest*,
 and it is the only version this project asks anyone to install.
 
-**Three releases are published, and no others.** Two are kept as **references**:
-states this project measures itself against and can fall back to when a fault
-has to be bracketed in time. They are baselines for the people working on it,
-not versions to run — a reference is by definition behind. The third is the
-release above, the one to install.
+**Four releases are published, and no others.** Three are kept as
+**references** only: states this project measures itself against and can fall
+back to when a fault has to be bracketed in time. They are baselines for the
+people working on it, not versions to run — a reference is by definition
+behind. The fourth is the release above, the one to install, and it is a
+reference too.
 
 [v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.5.11](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.11) is the third reference, and is the release named at the top of this section: the current one.
+[v2.5.11](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.11) is the release before the current one, and the first whose binary is reproducible across machines. It stays a reference: v2.6.0 was added beside it, not in its place.
 
-**What that costs, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
+**What that cost until 2026-09-23, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
 withdrawn on 2026-08-30 — tags and DMGs both — and v2.5.0 followed on
 2026-09-01, when v2.5.1 replaced it as the third reference, v2.5.1 itself on
 2026-09-04, when v2.5.2 replaced it in turn — the release that carries the
@@ -236,16 +237,15 @@ replaced by v2.5.5, v2.5.5 on 2026-09-12, replaced by v2.5.6, v2.5.6 on
 2026-09-13, replaced by v2.5.7, v2.5.7 later the same day, replaced by v2.5.8, v2.5.8
 on 2026-09-20, replaced by v2.5.9, v2.5.9 hours later the same day, replaced by
 v2.5.10 — which carried no code change over it, only documentation — and v2.5.10 on
-2026-09-22, replaced by v2.5.11, the first release whose binary is reproducible across machines. A reference cannot
-be re-cut, so work that lands after one takes a number of its own; keeping the
-list at three then means retiring the release it replaces rather than letting
-both stand. Until 2026-08-30 the three references were deliberately spread
-across the project, and v2.1.0 was what bracketed a fault introduced recently
-from below; nothing between v1.0.9 and v2.5.11 does that now. The floor still holds, and the history of what changed when is in the
-commits, which were not touched. The next reference worth adding is the first
-2.x state after this one that is worth falling back to.
+2026-09-22, replaced by v2.5.11. A reference cannot be re-cut, so work that
+lands after one takes a number of its own; keeping the list at three meant
+retiring the release it replaced rather than letting both stand, and left
+nothing between v1.0.9 and the newest release to bracket a recent fault from
+below. v2.6.0 is the first release since 2026-08-30 that did not retire the one
+before it: by the owner's decision of 2026-09-23 v2.5.11 stays, and brackets it.
+The history of what changed when is in the commits, which were not touched.
 
-All three are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if any tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to point at.
+All four are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if any tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to point at. The images of v2.5.11 and v2.6.0 are also kept in the tree, under [`cli/releases/`](cli/releases/README.md), each under its own version number.
 
 ## Documentation
 

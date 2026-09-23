@@ -10,10 +10,12 @@ Aruna.app/
 # assets, not committed. A copy in the tree went stale immediately — the one
 # that used to live here did not match the artifact of any release.
 releases/*.dmg
-# …кроме образа действующего выпуска. Решение владельца 06.09.2026: копия
-# опубликованного DMG хранится в репозитории наравне с ассетом релиза. Хранится
-# ровно один – образ той версии, что названа в `cli/Cargo.toml`; предыдущий
-# снимается тем же коммитом, что и выпуск, который его заменил.
+# …кроме образов опорных выпусков. Решение владельца 06.09.2026: копия
+# опубликованного DMG хранится в репозитории наравне с ассетом релиза. С
+# 23.09.2026 хранятся все опорные образы, каждый под номером своей версии, –
+# `Aruna_<версия>-macos-universal.dmg` и `Aruna_<версия>-SHA256SUMS.txt`; новый
+# выпуск добавляет свою пару, а не заменяет прежнюю. Образ под прежним именем
+# без номера – локальная копия и игнорируется.
 releases/SHA256SUMS
-!releases/Aruna-macos-universal.dmg
-!releases/SHA256SUMS
+!releases/Aruna_*-macos-universal.dmg
+!releases/Aruna_*-SHA256SUMS.txt
