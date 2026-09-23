@@ -322,9 +322,10 @@ fn a_missing_instrument_is_told_from_a_present_one() {
         !have("aruna-no-such-instrument"),
         "an absent program was found"
     );
-    // Положительный контроль: `/bin/sh` на macOS есть всегда и на `--version`
-    // отвечает успехом.
-    assert!(have("sh"), "a present program was not found");
+    // Положительный контроль: `cargo` есть везде, где идут эти тесты, и на
+    // `--version` отвечает успехом. Не `sh`: на конвейере это `dash`, а он
+    // `--version` не знает и отвечает отказом.
+    assert!(have("cargo"), "a present program was not found");
 }
 
 /// Каноническая форма документа по `xmllint --c14n`, или `None`, если документ
