@@ -5,6 +5,8 @@
 #![forbid(unsafe_code)]
 
 use aruna::error::ArunaError;
+
+mod console;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -16,7 +18,7 @@ fn main() -> ExitCode {
     // §7.3 of the specification, which recorded that as an open position and
     // named this as the minimal answer.
     if asks_what_this_is() {
-        print!("{}", usage());
+        say(&usage());
         return ExitCode::SUCCESS;
     }
 
@@ -47,13 +49,13 @@ fn main() -> ExitCode {
             // inside it to open. The inventory sits under the package root
             // rather than beside it, and a reader should not have to guess
             // which of the files in there is the one to open.
-            println!("Готово.");
-            println!("  Корпус: {}", report.package.root.display());
-            println!("  Опись:  {}", report.inventory.display());
-            println!(
-                "  рукописей: {}, групп: {}",
-                report.package.documents, report.package.groups
-            );
+            say(&format!(
+                "Готово.\n  Корпус: {}\n  Опись:  {}\n  рукописей: {}, групп: {}\n",
+                report.package.root.display(),
+                report.inventory.display(),
+                report.package.documents,
+                report.package.groups
+            ));
             ExitCode::SUCCESS
         }
         Err(err) => {
@@ -115,16 +117,39 @@ fn usage() -> String {
 /// the wording is where the two are told apart.
 fn report(err: &ArunaError) {
     if let ArunaError::Cancelled { phase } = err {
-        eprintln!("Остановлено на этапе: {phase}");
+        complain(&format!(
+            "Остановлено на этапе: {}\n",
+            console::phase(*phase)
+        ));
         return;
     }
-    eprintln!("Ошибка: {err}");
-    if let Some(src) = std::error::Error::source(err) {
-        eprintln!("  причина: {src}");
+    // По-русски целиком: `Display` ошибки английский и остается таким для
+    // журналов и провода, а здесь его пересказывает `console`.
+    let mut text = format!("Ошибка: {}\n", console::headline(err));
+    if let Some(why) = console::cause(err) {
+        text.push_str(&format!("  причина: {why}\n"));
     }
     if let Some(advice) = advice(err) {
-        eprintln!("{advice}");
+        text.push_str(&format!("{advice}\n"));
     }
+    complain(&text);
+}
+
+/// Write `text` to standard output, and lose it if nobody is reading.
+///
+/// Not `print!`: it panics when the write fails, and `aruna | head -1` or a
+/// terminal that went away would turn a finished build into exit code 101.
+/// The package is the result; the lines about it are a courtesy.
+fn say(text: &str) {
+    use std::io::Write as _;
+    let _ = std::io::stdout().write_all(text.as_bytes());
+}
+
+/// The same for standard error: a failure with nowhere to be told is still a
+/// failure, and the exit code says so.
+fn complain(text: &str) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(text.as_bytes());
 }
 
 /// What to try next, for the failures where there is something to try.

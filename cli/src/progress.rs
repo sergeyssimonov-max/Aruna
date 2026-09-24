@@ -221,7 +221,12 @@ impl Progress for Stderr {
         if event.is_tick() {
             return;
         }
-        eprintln!("{event}");
+        // Not `eprintln!`: it panics when the write fails, and a closed stderr
+        // – `aruna 2>&-`, a terminal that went away – would then stop the
+        // build at its first line of progress. A line nobody can read is lost,
+        // and the work goes on.
+        use std::io::Write as _;
+        let _ = writeln!(std::io::stderr(), "{event}");
     }
 }
 

@@ -834,3 +834,62 @@ fn repeated_runs_do_not_accumulate_anything() {
         );
     }
 }
+
+/// Run the binary with one of its output streams going to a pipe nobody reads.
+///
+/// `which` is 1 for stdout, 2 for stderr. The read end is dropped before the
+/// child writes, so every write it makes to that stream fails with `EPIPE` —
+/// Rust ignores `SIGPIPE`, so the write returns the error rather than killing
+/// the process.
+fn run_with_a_closed(sandbox: &Sandbox, archive: &Path, which: u8) -> std::process::ExitStatus {
+    let (reader, writer) = std::io::pipe().expect("pipe");
+    drop(reader);
+    let mut command = Command::new(env!("CARGO_BIN_EXE_aruna"));
+    command
+        .env("HOME", sandbox.path())
+        .env("ARUNA_ZIP", archive)
+        .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
+        .env_remove("XDG_CACHE_HOME")
+        .stdin(Stdio::null());
+    if which == 1 {
+        command.stdout(writer).stderr(Stdio::null());
+    } else {
+        command.stdout(Stdio::null()).stderr(writer);
+    }
+    command.status().expect("the binary runs")
+}
+
+/// **A reader who closed the output does not turn a finished build into a
+/// crash.**
+///
+/// `aruna | head -1`, or a terminal that went away: the package is written,
+/// and only the lines saying so have nowhere to go. `println!` and `eprintln!`
+/// panic when the write fails, which is exit code 101 after a build that
+/// succeeded — and a script checking the code would conclude it did not. The
+/// package is the result; the report of it is a courtesy, and a failed
+/// courtesy is not a failed run.
+#[test]
+fn a_closed_stdout_does_not_turn_a_finished_build_into_a_crash() {
+    let sandbox = Sandbox::new();
+    let status = run_with_a_closed(&sandbox, &sandbox.corpus(), 1);
+    assert_eq!(status.code(), Some(0), "exit status {status}");
+    assert!(sandbox.output().is_file(), "the package is not there");
+}
+
+/// The same for the progress and the diagnosis, which go to stderr.
+#[test]
+fn a_closed_stderr_does_not_turn_a_finished_build_into_a_crash() {
+    let sandbox = Sandbox::new();
+    let status = run_with_a_closed(&sandbox, &sandbox.corpus(), 2);
+    assert_eq!(status.code(), Some(0), "exit status {status}");
+    assert!(sandbox.output().is_file(), "the package is not there");
+}
+
+/// A failed run with nowhere to say so still fails, and does not panic.
+#[test]
+fn a_closed_stderr_leaves_a_failure_a_failure() {
+    let sandbox = Sandbox::new();
+    let missing = sandbox.path().join("no-such.zip");
+    let status = run_with_a_closed(&sandbox, &missing, 2);
+    assert_eq!(status.code(), Some(1), "exit status {status}");
+}
