@@ -44,11 +44,37 @@ pub fn path_component(raw: &str) -> String {
     }
     let trimmed = out.trim_end_matches([' ', '.']);
     let out = if trimmed.is_empty() { &out } else { trimmed }.to_string();
-    if out.is_empty() || out.starts_with('.') {
+    let out = if out.is_empty() || out.starts_with('.') {
         format!("_{out}")
     } else {
         out
+    };
+    within_name_limit(out)
+}
+
+/// The longest a component may be, in bytes, leaving room for `.xml` or
+/// `.pdf` within the 255 bytes Linux, exFAT and most filesystems allow one
+/// name. APFS counts characters rather than bytes and would take more, but a
+/// package is copied off the machine it was built on, and a name that fits
+/// only here is a package that does not open elsewhere.
+pub const MAX_COMPONENT: usize = 255 - ".xml".len();
+
+/// `name` cut on a character boundary to [`MAX_COMPONENT`] bytes, and trimmed
+/// again so the cut does not leave a trailing space or dot.
+///
+/// No siglum in the corpus comes near – the longest document name is 108
+/// bytes – so the package is unchanged; a longer one used to stop the build
+/// with a bare I/O error. Two names cut to the same prefix meet the ordinary
+/// collision check, which names both.
+fn within_name_limit(name: String) -> String {
+    if name.len() <= MAX_COMPONENT {
+        return name;
     }
+    let mut end = MAX_COMPONENT;
+    while !name.is_char_boundary(end) {
+        end -= 1;
+    }
+    name[..end].trim_end_matches([' ', '.']).to_string()
 }
 
 /// Where this document's PDF will go, from the path its XML took.
@@ -170,6 +196,25 @@ pub fn resolve(href: &str) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+
+    /// A name past [`MAX_COMPONENT`] is cut on a character boundary, without
+    /// a trailing space or dot, and one within it is left alone.
+    #[test]
+    fn a_long_name_is_cut_to_fit_on_a_character_boundary() {
+        let long = format!("KBo {} end", "ш".repeat(200));
+        let cut = path_component(&long);
+        assert!(cut.len() <= MAX_COMPONENT, "{} bytes", cut.len());
+        assert!(long.starts_with(&cut), "the cut is not a prefix");
+        assert!(!cut.ends_with([' ', '.']));
+
+        let spaced = format!("{}. x", "a".repeat(MAX_COMPONENT - 1));
+        let cut = path_component(&spaced);
+        assert!(!cut.ends_with([' ', '.']), "{:?}", &cut[cut.len() - 3..]);
+
+        assert_eq!(path_component("KBo 26.25"), "KBo 26.25");
+        let exactly = "a".repeat(MAX_COMPONENT);
+        assert_eq!(path_component(&exactly), exactly);
+    }
     use super::*;
 
     #[test]

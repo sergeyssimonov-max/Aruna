@@ -589,15 +589,17 @@ fn an_archive_that_changes_between_the_two_passes_stops_the_build() {
     }
 }
 
-/// A siglum longer than a filesystem component allows.
+/// **A siglum longer than a file name may be still makes a document.**
 ///
-/// The real corpus's longest file name is 108 bytes and its longest relative
-/// path 118, against the 255 a component may be on APFS — better than twice the
-/// headroom. Nothing in the export bounds the name before it is written, so what
-/// happens on an archive that does not respect that headroom is a question the
-/// filesystem answers, and the answer has to be the same bar as every other
-/// hostile input: the package is either correct or it is not built, and nothing
-/// is left behind.
+/// The real corpus's longest file name is 108 bytes, against the 255 a name
+/// may be on Linux, exFAT and most filesystems. APFS counts characters and
+/// would take more, which is why the old answer – the package is correct with
+/// the name intact, or refused and nothing left behind – depended on the
+/// machine: here it was built, on a disk it was copied to it did not open, and
+/// on Linux it stopped with a bare I/O error the window called a disk problem.
+/// Since 2026-09-24 the name is cut on a character boundary to fit with its
+/// extension, and nothing of the siglum is lost: the inventory shows it whole,
+/// and its link follows the file.
 #[test]
 fn a_siglum_longer_than_a_filesystem_component_leaves_nothing_behind() {
     let dir = tempdir().expect("tempdir");
@@ -612,38 +614,33 @@ fn a_siglum_longer_than_a_filesystem_component_leaves_nothing_behind() {
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
 
-    let outcome = export::build(
+    let built = export::build(
         &zip,
         &destination,
         "hostile",
         &aruna::job::Job::unattended(),
-    );
+    )
+    .unwrap_or_else(|e| panic!("a long siglum stopped the build: {e}"));
 
-    match outcome {
-        Ok(built) => {
-            // The filesystem accepted it. Then the package must be whole and
-            // the long name must have survived intact rather than been cut.
-            assert_eq!(built.documents, 2, "a document went missing");
-            let names = files(&destination.join(PACKAGE));
-            assert!(
-                names.iter().any(|p| p
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with(&long))),
-                "the long name was silently shortened: {names:?}"
-            );
-        }
-        Err(ArunaError::Io { .. }) => {
-            // The filesystem refused it. Then nothing may remain: no staging
-            // directory, no half package under the final name.
-            assert_eq!(
-                files(&destination),
-                Vec::<PathBuf>::new(),
-                "a refused build left something behind"
-            );
-        }
-        Err(other) => panic!("neither built nor an I/O refusal: {other}"),
-    }
+    assert_eq!(built.documents, 2, "a document went missing");
+    let names = files(&destination.join(PACKAGE));
+    let cut = names
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
+        .find(|n| n.starts_with("KKKK"))
+        .unwrap_or_else(|| panic!("the long document is not in the package: {names:?}"));
+    assert!(cut.len() <= 255, "{} bytes: {cut}", cut.len());
+    assert!(cut.ends_with(".xml"), "{cut}");
+    let inventory = fs::read_to_string(
+        destination
+            .join(PACKAGE)
+            .join(aruna::paths::OUTPUT_FILE_NAME),
+    )
+    .expect("inventory");
+    assert!(
+        inventory.contains(&long),
+        "the siglum is not whole in the inventory"
+    );
 }
 
 /// **The archive is read through one handle, so it cannot be exchanged under
@@ -870,4 +867,45 @@ fn every_document_the_normalisation_check_refuses_is_named() {
         Vec::<PathBuf>::new(),
         "a refused build left staging behind"
     );
+}
+
+/// **Two sigla that differ only in Unicode form are a collision, not a disk
+/// failure.**
+///
+/// APFS does not tell NFC from NFD, so `Çorum 1` written both ways names one
+/// file there, and the second write met «already exists» – which reached the
+/// window as a disk problem. Where the filesystem tells them apart (Linux,
+/// where CI runs this) both are written; where it does not, the refusal is the
+/// collision it is, naming both archive entries.
+#[test]
+fn two_sigla_that_differ_only_in_unicode_form_are_a_collision_not_a_disk_failure() {
+    let dir = tempdir().expect("tempdir");
+    let entries = [
+        text("root/CTH 5_XML_HFR/nfc.xml", "\u{c7}orum 1"),
+        text("root/CTH 5_XML_HFR/nfd.xml", "C\u{327}orum 1"),
+    ];
+    let zip = archive(dir.path(), &entries);
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
+        Ok(built) => assert_eq!(built.documents, 2),
+        Err(ArunaError::ExportCollision { first, second, .. }) => {
+            let both = format!("{first} {second}");
+            assert!(
+                both.contains("nfc.xml") && both.contains("nfd.xml"),
+                "{both}"
+            );
+            assert!(
+                !destination.join(PACKAGE).exists(),
+                "a refused build left a package"
+            );
+        }
+        Err(other) => panic!("the twin was reported as {other:?}"),
+    }
 }

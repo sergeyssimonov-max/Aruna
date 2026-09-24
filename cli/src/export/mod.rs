@@ -1192,11 +1192,21 @@ fn write_documents(
         // `create_new` rather than `create`: if anything ever computed the same
         // path twice, the filesystem says so instead of the second silently
         // replacing the first.
-        let mut handle = fs::OpenOptions::new()
+        let mut handle = match fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&out)
-            .map_err(ArunaError::io(&out))?;
+        {
+            Ok(handle) => handle,
+            // The placement found no two names alike, and the filesystem found
+            // one: APFS does not tell NFC from NFD, and `collision_key` only
+            // folds case. That is a collision between two archive entries,
+            // not a disk failure, and it is named as one.
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                return Err(twin_of(relative, &name, staging, fragments, placed));
+            }
+            Err(err) => return Err(ArunaError::io(&out)(err)),
+        };
         handle.write_all(&normalised).map_err(ArunaError::io(out))?;
         written += 1;
         if written.is_multiple_of(DOCUMENTS_PER_TICK) {
@@ -1230,6 +1240,54 @@ fn write_documents(
         });
     }
     Ok(())
+}
+
+/// The collision the filesystem found and the placement did not.
+///
+/// `relative` is where `second` was to be written, and a file is already
+/// there under a name the filesystem takes for the same one. The first is the
+/// document already written to that file – found by its identity on disk,
+/// which is the only thing the filesystem and this program agree on. Only on
+/// this path, so the walk over the placements costs nothing on a good run.
+fn twin_of(
+    relative: &Path,
+    second: &str,
+    staging: &Path,
+    fragments: &[Fragment],
+    placed: &[Placed],
+) -> ArunaError {
+    use std::os::unix::fs::MetadataExt as _;
+    let held = fs::metadata(staging.join(relative))
+        .ok()
+        .map(|meta| (meta.dev(), meta.ino()));
+    let first = fragments
+        .iter()
+        .zip(placed)
+        .filter(|(fragment, placement)| placement.relative != relative && fragment.source != second)
+        .find(|(_, placement)| {
+            fs::metadata(staging.join(&placement.relative))
+                .ok()
+                .map(|meta| (meta.dev(), meta.ino()))
+                == held
+        })
+        .map(|(fragment, _)| fragment.source.clone())
+        .unwrap_or_else(|| "(unknown)".to_string());
+    let fragment = placed
+        .iter()
+        .find(|placement| placement.relative == relative)
+        .map(|placement| placement.label.clone())
+        .unwrap_or_default();
+    ArunaError::ExportCollision {
+        group: relative
+            .parent()
+            .and_then(Path::file_name)
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        fragment,
+        first,
+        second: second.to_string(),
+        path: relative.to_path_buf(),
+    }
 }
 
 /// One refusal for every document the normalisation check turned away.
