@@ -378,6 +378,11 @@ fn named_inventory(path: &std::path::Path) -> Result<(), CommandError> {
     if path.file_name() != Some(std::ffi::OsStr::new(aruna::paths::OUTPUT_FILE_NAME)) {
         return Err(CommandError::NotInventory);
     }
+    // Ссылка под именем описи – не опись: opener открыл бы то, на что она
+    // указывает. Ядро опись ссылкой не пишет.
+    if is_link(path) {
+        return Err(CommandError::NotInventory);
+    }
     if !path.is_file() {
         return Err(CommandError::InventoryGone);
     }
@@ -434,7 +439,18 @@ fn named_package(path: &std::path::Path) -> Result<(), CommandError> {
     if path.file_name() != Some(std::ffi::OsStr::new(aruna::export::PACKAGE)) {
         return Err(CommandError::NotPackage);
     }
+    // И не ссылка под этим именем: она увела бы чтение манифеста куда угодно.
+    // Ядро пакет ссылкой не пишет, и его собственная проверка назначения
+    // ссылку под этим именем отвергает тоже.
+    if is_link(path) {
+        return Err(CommandError::NotPackage);
+    }
     Ok(())
+}
+
+/// Символьная ли ссылка стоит под этим именем – сама, а не то, на что она ведет.
+fn is_link(path: &std::path::Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink())
 }
 
 /// Команда без Tauri, чтобы ветки проверялись тестом.
@@ -1625,6 +1641,34 @@ mod opening {
         let package = dir.path().join(aruna::export::PACKAGE);
 
         assert!(named_package(&package).is_ok());
+    }
+
+    /// **Символьная ссылка под именем пакета или описи – не пакет и не опись.**
+    ///
+    /// Р4 прогона 23.09.2026: граница сверяла только имя, и ссылка
+    /// `TLHdig_Beta_0.3`, положенная в папку загрузок, уводила чтение манифеста
+    /// куда угодно, а ссылка под именем описи отдавала opener'у то, на что она
+    /// указывает, – хоть приложение. Ядро ни пакет, ни опись ссылкой не пишет.
+    #[test]
+    fn a_link_under_the_package_or_inventory_name_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let elsewhere = dir.path().join("elsewhere");
+        std::fs::create_dir(&elsewhere).unwrap();
+        std::fs::write(elsewhere.join("page.html"), "<p>x</p>").unwrap();
+
+        let package = dir.path().join(aruna::export::PACKAGE);
+        std::os::unix::fs::symlink(&elsewhere, &package).unwrap();
+        assert!(
+            matches!(named_package(&package), Err(CommandError::NotPackage)),
+            "ссылка под именем пакета прошла как пакет"
+        );
+
+        let inventory = dir.path().join(aruna::paths::OUTPUT_FILE_NAME);
+        std::os::unix::fs::symlink(elsewhere.join("page.html"), &inventory).unwrap();
+        assert!(
+            matches!(named_inventory(&inventory), Err(CommandError::NotInventory)),
+            "ссылка под именем описи прошла как опись"
+        );
     }
 
     /// **Каталог с другим именем читающие команды не трогают.**
