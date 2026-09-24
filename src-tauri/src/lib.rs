@@ -788,7 +788,7 @@ impl BuildFailure {
 /// `#[non_exhaustive]`.
 ///
 /// Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
-/// собственность, а не ядра. Их семнадцать против девятнадцати вариантов
+/// собственность, а не ядра. Их восемнадцать против двадцати вариантов
 /// события, потому что две пары — объявление стадии и ее тик — это одна стадия.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
@@ -808,6 +808,9 @@ pub enum Stage {
     HeadersRead,
     Writing,
     CheckingPackage,
+    /// Другой запуск публикует в ту же папку, и этот его ждет. С 24.09.2026:
+    /// до того ожидание шло молча, а за брошенной блокировкой – пять минут.
+    WaitingForPublication,
     CheckingPublished,
     PreviousPackageLeft,
 }
@@ -917,6 +920,7 @@ impl BuildProgress {
                 Stage::Writing
             }
             Core::CheckingPackage => Stage::CheckingPackage,
+            Core::WaitingForPublication => Stage::WaitingForPublication,
             Core::CheckingPublished => Stage::CheckingPublished,
             Core::PreviousPackageLeft { .. } => Stage::PreviousPackageLeft,
         };

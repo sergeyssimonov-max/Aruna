@@ -256,10 +256,15 @@ export type Spread = {
  *  `#[non_exhaustive]`.
  * 
  *  Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
- *  собственность, а не ядра. Их семнадцать против девятнадцати вариантов
+ *  собственность, а не ядра. Их восемнадцать против двадцати вариантов
  *  события, потому что две пары — объявление стадии и ее тик — это одна стадия.
  */
-export type Stage = "cache-unusable" | "cached-archive-rejected" | "archive-from-cache" | "zenodo-notice" | "zenodo-unreachable" | "downloading" | "download-retrying" | "archive-kept" | "parsing" | "entries-skipped" | "indexed" | "reading-headers" | "headers-read" | "writing" | "checking-package" | "checking-published" | "previous-package-left";
+export type Stage = "cache-unusable" | "cached-archive-rejected" | "archive-from-cache" | "zenodo-notice" | "zenodo-unreachable" | "downloading" | "download-retrying" | "archive-kept" | "parsing" | "entries-skipped" | "indexed" | "reading-headers" | "headers-read" | "writing" | "checking-package" | 
+/**
+ *  Другой запуск публикует в ту же папку, и этот его ждет. С 24.09.2026:
+ *  до того ожидание шло молча, а за брошенной блокировкой – пять минут.
+ */
+"waiting-for-publication" | "checking-published" | "previous-package-left";
 
 /**
  *  Откуда взяты числа.
