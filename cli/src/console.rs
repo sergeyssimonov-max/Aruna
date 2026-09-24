@@ -109,7 +109,13 @@ pub fn headline(err: &ArunaError) -> String {
         ExportInvalid { root, count, first } => format!(
             "{} не прошел проверку: расхождений {count}, первое – {}",
             root.display(),
-            translated(first)
+            // До десяти расхождений через «; » – каждое переводится само:
+            // целиком строка не совпадет ни с одним шаблоном.
+            first
+                .split("; ")
+                .map(translated)
+                .collect::<Vec<_>>()
+                .join("; ")
         ),
         PublishBusy { path, holder } => format!(
             "в эту папку публикует другой запуск: {} ({})",
@@ -174,6 +180,17 @@ fn network(source: &(dyn std::error::Error + 'static)) -> String {
     if let Some(err) = source.downcast_ref::<std::io::Error>() {
         return io(err);
     }
+    // Прокси – по виду ошибки `ureq`, а не по тексту: с 24.09 запрос может
+    // идти через прокси из окружения, и его отказ назывался «сетевым сбоем»,
+    // а совет посылал проверять Zenodo (ревью 25.09).
+    if let Some(ureq::Error::Transport(transport)) = source.downcast_ref::<ureq::Error>() {
+        match transport.kind() {
+            ureq::ErrorKind::ProxyConnect => return "прокси не пропустил соединение".into(),
+            ureq::ErrorKind::ProxyUnauthorized => return "прокси не принял учетные данные".into(),
+            ureq::ErrorKind::InvalidProxyUrl => return "адрес прокси записан неверно".into(),
+            _ => {}
+        }
+    }
     let text = source.to_string();
     let lower = text.to_ascii_lowercase();
     let what = if lower.contains("ran past its deadline") {
@@ -229,6 +246,18 @@ pub const PHRASES: &[(&str, &str)] = &[
         "instruction <?{}…?> was dropped and is not on the permit list",
         "инструкция <?{}…?> снята, а в списке разрешенных ее нет",
     ),
+    (
+        "content differs at byte {} (source {} bytes, output {} bytes)\n      source: …{}…\n      output: …{}…",
+        "содержимое расходится с байта {} (в источнике {} байт, на выходе {})\n      источник: …{}…\n      выход: …{}…",
+    ),
+    (
+        "the output does not begin with the canonical declaration",
+        "выход начинается не с канонического объявления",
+    ),
+    (
+        "an instruction appears in the output that was not in the source",
+        "на выходе появилась инструкция, которой в источнике не было",
+    ),
     // export::validate – проверка пакета
     ("link is not a relative path inside the package: {}", "ссылка ведет не внутрь пакета: {}"),
     ("fragment link points at nothing: {}", "ссылка на документ ведет в пустоту: {}"),
@@ -240,6 +269,10 @@ pub const PHRASES: &[(&str, &str)] = &[
     ("expected document missing: {}", "нет ожидаемого документа: {}"),
     ("group without a folder: {}", "у группы нет папки: {}"),
     ("the manifest cannot be read: {}", "манифест не читается: {}"),
+    (
+        "{} is larger than the {} byte limit for this file, so it is not one this program wrote",
+        "{} больше предела в {} байт для этого файла – значит, писала его не эта программа",
+    ),
     ("the manifest has no {} entry for {}", "в манифесте нет записи {} для {}"),
     (
         "the manifest has a {} entry for {}, which is not in the package",
@@ -479,6 +512,17 @@ mod tests {
                 count: 3,
                 first: "fragment link points at nothing: ./Х".into(),
             },
+            // Несколько расхождений через «; », как их сводит проверка пакета.
+            ArunaError::ExportInvalid {
+                root: p(),
+                count: 2,
+                first: "placed but not linked: ./Х; the manifest cannot be read: Ш".into(),
+            },
+            ArunaError::ExportInvalid {
+                root: p(),
+                count: 1,
+                first: "content differs at byte 7 (source 9 bytes, output 8 bytes)\n      source: …Х…\n      output: …Ш…".into(),
+            },
             ArunaError::PublishBusy {
                 path: p(),
                 holder: "an unnamed run".into(),
@@ -531,6 +575,37 @@ mod tests {
         assert_eq!(translated("никакой шаблон"), "никакой шаблон");
     }
 
+    /// **Отказ прокси называется отказом прокси**, а не сетевым сбоем.
+    #[test]
+    fn a_proxy_refusal_is_named_as_one() {
+        use std::io::{Read as _, Write as _};
+        use std::net::TcpListener;
+        // Прокси, который на CONNECT отвечает отказом.
+        let refused_by = |status: &'static str| {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+            let port = listener.local_addr().expect("addr").port();
+            let proxy = std::thread::spawn(move || {
+                let (mut conn, _) = listener.accept().expect("accept");
+                let mut buf = [0u8; 1024];
+                let _ = conn.read(&mut buf);
+                let _ = conn.write_all(format!("HTTP/1.1 {status}\r\n\r\n").as_bytes());
+            });
+            let agent = ureq::AgentBuilder::new()
+                .proxy(ureq::Proxy::new(format!("http://127.0.0.1:{port}")).expect("proxy"))
+                .build();
+            let err = agent
+                .get("https://aruna-proxy-test.invalid/")
+                .call()
+                .expect_err("the proxy lets nothing through");
+            let _ = proxy.join();
+            (network(&err), err.to_string())
+        };
+        let (told, err) = refused_by("502 Bad Gateway");
+        assert_eq!(told, "прокси не пропустил соединение", "for {err}");
+        let (told, err) = refused_by("407 Proxy Authentication Required");
+        assert_eq!(told, "прокси не принял учетные данные", "for {err}");
+    }
+
     /// Литералы в первом аргументе вызовов `names` в файле `source`.
     fn literals_after(source: &str, calls: &[&str]) -> Vec<String> {
         let code = source.split("#[cfg(test)]").next().unwrap_or(source);
@@ -550,6 +625,7 @@ mod tests {
                         '"' => break,
                         '\\' => match chars.next() {
                             Some('"') => literal.push('"'),
+                            Some('n') => literal.push('\n'),
                             Some('\n') => {
                                 // строка продолжается: пробелы начала следующей не считаются
                                 while chars.clone().next().is_some_and(char::is_whitespace) {
@@ -598,13 +674,13 @@ mod tests {
     #[test]
     fn every_phrase_the_core_writes_has_a_translation() {
         let sources = [
-            (
-                include_str!("export/verify.rs"),
-                &["Err(format!(", "return Err(format!("][..],
-            ),
+            // Каждый `format!` и каждый литерал в `Err(` этих двух файлов, а не
+            // только известные формы вызова: 25.09 четыре формулировки прошли
+            // мимо – `Err(distortion(…))`, `Err("…".into())` и `first: format!(`.
+            (include_str!("export/verify.rs"), &["format!(", "Err("][..]),
             (
                 include_str!("export/validate.rs"),
-                &["errors.push(format!(", "refuse(format!(", "refuse("][..],
+                &["format!(", "refuse(", "Err("][..],
             ),
             (
                 include_str!("export/lock.rs"),
@@ -613,7 +689,13 @@ mod tests {
             (include_str!("fonts.rs"), &["covers: "][..]),
             (include_str!("export/mod.rs"), &["first: "][..]),
         ];
-        let known: Vec<&str> = PHRASES.iter().map(|(english, _)| *english).collect();
+        // Не отказы: команды для нормализатора, а не текст для человека.
+        let not_refusals = ["DROP_PI {}"];
+        let known: Vec<&str> = PHRASES
+            .iter()
+            .map(|(english, _)| *english)
+            .chain(not_refusals)
+            .collect();
         let mut missing = Vec::new();
         let mut seen = 0;
         for (source, calls) in sources {

@@ -190,7 +190,9 @@ fn complain(text: &str) {
 fn advice(err: &ArunaError) -> Option<String> {
     Some(match err {
         ArunaError::Network { .. } => {
-            "Проверьте сетевое соединение и доступность Zenodo.".to_string()
+            "Проверьте сетевое соединение и доступность Zenodo, а если в окружении\n\
+             назван прокси (HTTPS_PROXY, ALL_PROXY, HTTP_PROXY) – и его."
+                .to_string()
         }
         // A republished record is not something the reader can fix, and this
         // used to tell them to edit a source file they may well not have:
