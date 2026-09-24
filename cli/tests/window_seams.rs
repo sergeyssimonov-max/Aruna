@@ -740,6 +740,43 @@ fn window_sentences() -> std::collections::BTreeSet<String> {
         .collect()
 }
 
+/// The codes whose core message the window shows under its own sentence –
+/// `DETAILED` in `App.svelte`, read from there so the two cannot drift.
+fn detailed_codes() -> std::collections::BTreeSet<String> {
+    let source = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/src/App.svelte"),
+    )
+    .expect("App.svelte");
+    let start = source
+        .find("const DETAILED: ReadonlySet<string> = new Set([")
+        .expect("the window's set of detailed codes");
+    let body = &source[start..];
+    let body = &body[body.find('[').expect("[") + 1..body.find(']').expect("]")];
+    body.split(',')
+        .map(|code| code.trim().trim_matches('\'').to_string())
+        .filter(|code| !code.is_empty())
+        .collect()
+}
+
+/// English words a line under a Russian sentence may not carry. The data in
+/// [`every_failure`] – group, sigla, entry names – has none of them.
+fn english_words_in(message: &str) -> Vec<&'static str> {
+    let padded = format!(" {} ", message.to_lowercase());
+    [
+        " is ",
+        " by ",
+        " both ",
+        " and ",
+        " the ",
+        " names ",
+        " twice",
+        " claimed ",
+    ]
+    .into_iter()
+    .filter(|word| padded.contains(word))
+    .collect()
+}
+
 /// Whether `message` carries anything that reads as a path on this machine.
 fn carries_a_path(message: &str) -> bool {
     message.contains("/Users/") || message.contains("secret-corpus")
@@ -782,6 +819,31 @@ fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
                 .to_string(),
         );
     }
+    // A line the window shows as it came: names, and not an English sentence
+    // around them. Rule 4.9 of the specification – no English line on the
+    // screen on any path – was kept everywhere but here until 2026-09-24.
+    let detailed = detailed_codes();
+    assert!(
+        detailed.contains("collision") && detailed.contains("archive_duplicate"),
+        "the reader of DETAILED found {detailed:?}"
+    );
+    for error in every_failure() {
+        let failure = app::Failure::of(&error);
+        if detailed.contains(failure.code) {
+            let found = english_words_in(&failure.message);
+            assert!(
+                found.is_empty(),
+                "`{}` puts English on the window's screen: {:?} {found:?}",
+                failure.code,
+                failure.message
+            );
+        }
+    }
+    assert!(
+        !english_words_in("CTH 1: KBo 1 is claimed by both a and b").is_empty(),
+        "the English check has no teeth"
+    );
+
     // One code, one kind of failure. `Http` answers to two codes by status,
     // never the other way round.
     for (code, variants) in &codes {

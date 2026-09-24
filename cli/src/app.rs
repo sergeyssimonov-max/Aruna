@@ -352,14 +352,19 @@ fn message_of(error: &ArunaError) -> String {
         // a reader who has to decide which of two documents keeps the name
         // needs to know which two, and both of those are entries inside the
         // archive rather than anywhere on this machine.
+        //
+        // Names only, and no English around them: the window shows this line
+        // as it came, under its own Russian sentence (`DETAILED` in
+        // `App.svelte`), and until 2026-09-24 it read «… is claimed by both …»
+        // on a screen that promises no English on any path.
         ExportCollision {
             group,
             fragment,
             first,
             second,
             ..
-        } => format!("{group}: {fragment} is claimed by both {first} and {second}"),
-        ArchiveDuplicateEntry { entry } => format!("the archive names {entry} twice"),
+        } => format!("{group}: {fragment} – {first}, {second}"),
+        ArchiveDuplicateEntry { entry } => entry.clone(),
         // The file's name and not where it lies: the name is the application's
         // own and says which face is at fault, the directory is this machine's.
         // Both variants had `Display` alone and so sent the whole path — kept
