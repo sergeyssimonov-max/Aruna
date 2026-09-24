@@ -1091,13 +1091,9 @@ describe('кончилось', () => {
     [
       'collision',
       /Два документа претендуют на одно место в пакете/,
-      'CTH 1: KBo 22.5 is claimed by both a.xml and b.xml',
+      'CTH 1: KBo 22.5 – a.xml, b.xml',
     ],
-    [
-      'archive_duplicate',
-      /В архиве два документа с одним и тем же именем/,
-      'the archive names KBo 22.5.xml twice',
-    ],
+    ['archive_duplicate', /В архиве два документа с одним и тем же именем/, 'KBo 22.5.xml'],
   ])(
     'на отказе %s говорит по-русски и дает подробность второй строкой',
     async (code, said, detail) => {
