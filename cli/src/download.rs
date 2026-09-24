@@ -434,11 +434,17 @@ fn create_parent(dest: &Path) -> Result<()> {
 /// that went silent held the attempt, and a cancel with it, until the attempt
 /// deadline, fifteen minutes. The attempt deadline is kept by
 /// [`stream_to_file`] between reads instead.
+///
+/// A proxy named in `ALL_PROXY`, `HTTPS_PROXY` or `HTTP_PROXY` is used, in
+/// that order – `ureq` 2 reads them only when asked, and until 2026-09-24
+/// nothing asked. `NO_PROXY` is not supported by `ureq` 2. An application
+/// started from Finder sees no shell variables, so this serves the console.
 fn request_within(url: &str, timeouts: Timeouts) -> Result<ureq::Response> {
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(timeouts.read)
         .user_agent(&user_agent())
+        .try_proxy_from_env(true)
         .build();
     call(&agent, url)
 }
@@ -524,6 +530,9 @@ fn request_answer(url: &str, deadline: Duration) -> Result<ureq::Response> {
         // because nothing ever fails when it is. Zenodo's logs are the one place
         // this shows, which is exactly why nobody would have noticed.
         .user_agent(&user_agent())
+        // `ALL_PROXY`, `HTTPS_PROXY` or `HTTP_PROXY`, as for the download:
+        // behind a proxy the question and the archive go the same way.
+        .try_proxy_from_env(true)
         .build();
     call(&agent, url)
 }
@@ -1020,6 +1029,50 @@ mod tests {
             server.hits(),
             1,
             "a digest mismatch is deterministic; re-downloading cannot fix it"
+        );
+    }
+
+    /// **A proxy named in the environment carries the request.**
+    ///
+    /// `ureq` 2 reads `ALL_PROXY`, `HTTPS_PROXY` and `HTTP_PROXY` only when
+    /// asked, and until 2026-09-24 nothing asked: behind a proxy the download
+    /// could not go anywhere, and there was nothing to set. The host here does
+    /// not resolve, so without the proxy the request fails at DNS; with it the
+    /// request line reaches the proxy in absolute form. nextest runs each test
+    /// in its own process, so the variable set here reaches no other test.
+    #[test]
+    fn a_proxy_named_in_the_environment_carries_the_request() {
+        use std::io::{Read as _, Write as _};
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let proxy = std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 4096];
+            let n = conn.read(&mut buf).expect("read");
+            let line = String::from_utf8_lossy(&buf[..n])
+                .lines()
+                .next()
+                .unwrap_or_default()
+                .to_string();
+            conn.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+                .expect("reply");
+            line
+        });
+
+        std::env::set_var("HTTP_PROXY", format!("http://127.0.0.1:{port}"));
+        let answer = fetch_text(
+            "http://aruna-proxy-test.invalid/record",
+            Duration::from_secs(10),
+        );
+        std::env::remove_var("HTTP_PROXY");
+
+        assert_eq!(answer.expect("the answer through the proxy"), "ok");
+        assert!(
+            proxy
+                .join()
+                .expect("proxy")
+                .starts_with("GET http://aruna-proxy-test.invalid/record"),
+            "the request did not go through the proxy"
         );
     }
 
