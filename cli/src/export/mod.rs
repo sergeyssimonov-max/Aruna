@@ -217,7 +217,7 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
             // Stable, and derived from the one thing that is unique per
             // document: where it sits in the archive.
             let suffix = disambiguator(&fragment.source);
-            relative = output_path(group, &format!("{base} ({suffix})"));
+            relative = naming::twin_path(group, base, &suffix);
         }
 
         if let Some(first) = taken.get(&collision_key(&relative)) {
@@ -500,8 +500,9 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // публикацией не может вклиниться другой прогон Aruna.
     validate::check_destination(&final_root)?;
 
-    let previous = Replaced::aside(&final_root, destination)?;
+    let mut previous = Replaced::aside(&final_root, destination)?;
     staging.publish(&final_root)?;
+    previous.published();
 
     job.report(Event::CheckingPublished);
     let published = validate(&final_root, &records, &placed)?;
@@ -573,6 +574,9 @@ struct Replaced {
     /// published and never before — and [`Drop`] must not rename it onto
     /// `target`, which would be restoring something this run did not move.
     stale: Option<PathBuf>,
+    /// This run's tree stands under `target`: a refusal from here on takes it
+    /// down again, whether or not there was a reader's copy to put back.
+    published: bool,
     committed: bool,
 }
 
@@ -586,6 +590,7 @@ impl Replaced {
             target: target.to_path_buf(),
             aside: None,
             stale: None,
+            published: false,
             committed: false,
         };
         let aside = destination.join(format!(".{PACKAGE}.previous"));
@@ -603,6 +608,11 @@ impl Replaced {
         fs::rename(target, &aside).map_err(ArunaError::io(&target))?;
         held.aside = Some(aside);
         Ok(held)
+    }
+
+    /// This run's tree has just taken `target`, and is not yet confirmed.
+    fn published(&mut self) {
+        self.published = true;
     }
 
     /// The replacement is in place; the old copy is now only occupying space.
@@ -653,6 +663,14 @@ impl Drop for Replaced {
             // already failed, and putting the reader's package back matters
             // more than reporting why the restore failed too.
             let _ = fs::rename(aside, &self.target);
+        } else if self.published {
+            // **Первая сборка, и она отказала после публикации.** Возвращать
+            // нечего, но и оставлять нечего: под именем пакета стоит дерево,
+            // которое проверка только что отвергла, и читатель принял бы его за
+            // пакет. До 25.09.2026 оно так и оставалось – `Drop` действовал
+            // лишь при `aside`. Копию, брошенную убитым прогоном (`stale`), это
+            // не трогает: она остается ждать следующей удачной сборки.
+            let _ = fs::remove_dir_all(&self.target);
         }
     }
 }
@@ -1493,6 +1511,38 @@ mod tests {
             !dir.path().join(format!(".{PACKAGE}.previous")).exists(),
             "копия осталась лежать под точечным именем"
         );
+    }
+
+    /// **Первая сборка, отказавшая после публикации, не оставляет отвергнутое
+    /// под именем пакета.** Копии читателя нет, возвращать нечего – и все же
+    /// имя должно остаться пустым, как до прогона.
+    #[test]
+    fn a_first_build_refused_after_publishing_leaves_no_package() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join(PACKAGE);
+
+        let mut held = Replaced::aside(&target, dir.path()).expect("nothing to move");
+        fs::create_dir_all(target.join("CTH 9")).expect("create");
+        fs::write(target.join("CTH 9/KBo 2.1.xml"), b"new").expect("write");
+        held.published();
+        drop(held);
+
+        assert!(
+            fs::symlink_metadata(&target).is_err(),
+            "отвергнутое дерево осталось под именем пакета"
+        );
+    }
+
+    /// Без публикации `Drop` первой сборки не трогает имени: там может стоять
+    /// то, что положил не этот прогон.
+    #[test]
+    fn a_first_build_refused_before_publishing_touches_nothing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join(PACKAGE);
+        let held = Replaced::aside(&target, dir.path()).expect("nothing to move");
+        fs::create_dir_all(&target).expect("someone else's");
+        drop(held);
+        assert!(target.is_dir(), "снято то, что этот прогон не публиковал");
     }
 
     /// **An archive that names one entry twice is stopped by name.**

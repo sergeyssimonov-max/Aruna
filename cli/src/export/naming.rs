@@ -34,6 +34,30 @@ pub fn dir_component(group: &str) -> String {
 /// a hidden directory is not what a group of manuscripts should be, and `..` is
 /// how a path escapes the folder it belongs in.
 pub fn path_component(raw: &str) -> String {
+    finish(&escape(raw), MAX_COMPONENT)
+}
+
+/// The path of a twin: `base (suffix)`, with the suffix kept whole.
+///
+/// Built as one component, the way [`output_path`] builds any name, as long as
+/// that fits. Past [`MAX_COMPONENT`] the cut took the end of the string – the
+/// suffix – and the twin came out under its sibling's name, so two documents
+/// the suffix exists to tell apart stopped the build as a collision (review of
+/// 4d6bee1, 25.09.2026). The base is cut instead, and the suffix stays.
+pub fn twin_path(group: &str, base: &str, suffix: &str) -> PathBuf {
+    let whole = escape(&format!("{base} ({suffix})"));
+    let tail = escape(&format!(" ({suffix})"));
+    let name = if whole.len() <= MAX_COMPONENT || tail.len() * 2 > MAX_COMPONENT {
+        finish(&whole, MAX_COMPONENT)
+    } else {
+        let head = finish(&escape(base), MAX_COMPONENT - tail.len());
+        format!("{head}{tail}")
+    };
+    PathBuf::from(dir_component(group)).join(format!("{name}.xml"))
+}
+
+/// `raw` with everything a filesystem or a shell could misread escaped.
+fn escape(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len() + 8);
     for ch in raw.chars() {
         match ch {
@@ -42,14 +66,24 @@ pub fn path_component(raw: &str) -> String {
             c => out.push(c),
         }
     }
-    let trimmed = out.trim_end_matches([' ', '.']);
-    let out = if trimmed.is_empty() { &out } else { trimmed }.to_string();
-    let out = if out.is_empty() || out.starts_with('.') {
-        format!("_{out}")
+    out
+}
+
+/// An escaped name cut to `limit` bytes, then trimmed and guarded.
+///
+/// Cut first and guarded after: the other way round, a name of 300 spaces and
+/// an `x` passed the guard as itself, lost the `x` to the cut and the spaces to
+/// the trim, and came out empty – `CTH 5/.xml` (review of 4d6bee1, 25.09.2026;
+/// no siglum reaches it, the parser trims them).
+fn finish(escaped: &str, limit: usize) -> String {
+    let cut = within(escaped, limit);
+    let trimmed = cut.trim_end_matches([' ', '.']);
+    let kept = if trimmed.is_empty() { cut } else { trimmed };
+    if kept.is_empty() || kept.starts_with('.') {
+        format!("_{}", within(kept, limit.saturating_sub(1)))
     } else {
-        out
-    };
-    within_name_limit(out)
+        kept.to_string()
+    }
 }
 
 /// The longest a component may be, in bytes, leaving room for `.xml` or
@@ -59,22 +93,21 @@ pub fn path_component(raw: &str) -> String {
 /// only here is a package that does not open elsewhere.
 pub const MAX_COMPONENT: usize = 255 - ".xml".len();
 
-/// `name` cut on a character boundary to [`MAX_COMPONENT`] bytes, and trimmed
-/// again so the cut does not leave a trailing space or dot.
+/// `name` cut on a character boundary to `limit` bytes.
 ///
-/// No siglum in the corpus comes near – the longest document name is 108
-/// bytes – so the package is unchanged; a longer one used to stop the build
-/// with a bare I/O error. Two names cut to the same prefix meet the ordinary
-/// collision check, which names both.
-fn within_name_limit(name: String) -> String {
-    if name.len() <= MAX_COMPONENT {
+/// No siglum in the corpus comes near [`MAX_COMPONENT`] – the longest document
+/// name is 108 bytes – so the package is unchanged; a longer one used to stop
+/// the build with a bare I/O error. Two names cut to the same prefix meet the
+/// ordinary collision check, which names both.
+fn within(name: &str, limit: usize) -> &str {
+    if name.len() <= limit {
         return name;
     }
-    let mut end = MAX_COMPONENT;
+    let mut end = limit;
     while !name.is_char_boundary(end) {
         end -= 1;
     }
-    name[..end].trim_end_matches([' ', '.']).to_string()
+    &name[..end]
 }
 
 /// Where this document's PDF will go, from the path its XML took.
@@ -196,6 +229,47 @@ pub fn resolve(href: &str) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+
+    /// **A twin of a long name keeps its suffix**, and so a name of its own.
+    #[test]
+    fn a_twin_of_a_long_name_keeps_its_suffix() {
+        let base = format!("KBo {}", "ш".repeat(140));
+        let first = output_path("CTH 5", &base);
+        let twin = twin_path("CTH 5", &base, "CTH 5_XML_TLH");
+        let name = twin.file_name().and_then(|n| n.to_str()).expect("utf-8");
+        assert!(name.ends_with(" (CTH 5_XML_TLH).xml"), "{name}");
+        assert!(
+            name.len() - ".xml".len() <= MAX_COMPONENT,
+            "{} bytes",
+            name.len()
+        );
+        assert_ne!(twin, first, "the twin came out under its sibling's name");
+    }
+
+    /// Within the limit a twin is named exactly as it always was, so the
+    /// package does not move.
+    #[test]
+    fn a_twin_within_the_limit_is_named_as_before() {
+        for (base, suffix) in [
+            ("KBo 1.1", "CTH 5_XML_HFR"),
+            ("Bo 2023/23", "x:y"),
+            ("", "z"),
+        ] {
+            assert_eq!(
+                twin_path("CTH 5", base, suffix),
+                output_path("CTH 5", &format!("{base} ({suffix})"))
+            );
+        }
+    }
+
+    /// A cut never leaves a name empty: it is guarded after the cut.
+    #[test]
+    fn a_name_the_cut_would_empty_is_still_a_name() {
+        let spaces = format!("{}x", " ".repeat(300));
+        let name = path_component(&spaces);
+        assert!(!name.is_empty() && !name.starts_with('.'), "{name:?}");
+        assert!(name.len() <= MAX_COMPONENT);
+    }
 
     /// A name past [`MAX_COMPONENT`] is cut on a character boundary, without
     /// a trailing space or dot, and one within it is left alone.
