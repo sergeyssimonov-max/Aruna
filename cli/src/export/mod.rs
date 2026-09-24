@@ -154,24 +154,6 @@ pub struct Placed {
     pub label: String,
 }
 
-/// Decide where every fragment goes, refusing to put two in one place.
-///
-/// Sigla repeat: 34 pairs share a siglum inside one CTH group, and they are
-/// different documents. The second and later get a suffix taken from the
-/// archive path they came from, so both survive and the choice does not depend
-/// on the order the archive happened to be read in.
-///
-/// A collision that survives that is a build error rather than a file quietly
-/// overwritten.
-///
-/// Only the XML path is checked. There was a second map for the PDF name each
-/// document will take, but [`naming::output_path`] always ends a name with
-/// `.xml` and [`naming::pdf_path`] only replaces that fixed suffix, so two
-/// distinct XML paths cannot become one PDF path: the check could never fire on
-/// its own. Because it ran first it did fire — naming the `.pdf` path in every
-/// collision error for a clash that was between two `.xml` files. The manifest
-/// is still held to distinct PDF names by [`validate`], which reads them back
-/// from the published file rather than trusting the rule.
 /// The key two paths collide under.
 ///
 /// **Case-folded, because the filesystem this package is written to usually is.**
@@ -179,8 +161,10 @@ pub struct Placed {
 /// and `KBo 1.XML` are one file there and two on ext4. Comparing exact paths
 /// meant the export's own model said two documents and the disk held one — and
 /// what stopped that from being a silent overwrite was `create_new`, three
-/// hundred lines later, reporting `AlreadyExists` as an I/O error that named a
-/// path and no reason.
+/// hundred lines later, reporting `AlreadyExists`. It still stands behind this
+/// key for what the key does not fold – APFS takes an NFC and an NFD name for
+/// one – and since 2026-09-24 it names that as the collision it is
+/// ([`twin_of`]) rather than as an I/O error.
 ///
 /// Folding here decides it in one place instead, for every platform alike: the
 /// second document is disambiguated exactly as an exact clash is, so the package
@@ -193,6 +177,33 @@ fn collision_key(relative: &Path) -> String {
     relative.to_string_lossy().to_lowercase()
 }
 
+/// Decide where every fragment goes, refusing to put two in one place.
+///
+/// Sigla repeat: 34 pairs share a siglum inside one CTH group, and they are
+/// different documents. The second and later get a suffix taken from the
+/// archive path they came from, so both survive.
+///
+/// **Which one is "the second" is archive order**, and so is the order of the
+/// manifest's lists, which follow the documents. The archive is pinned by its
+/// Zenodo record and its MD5, so the same archive gives the same package byte
+/// for byte; an archive with the same entries in another order would not –
+/// measured 23.09.2026 on the corpus reversed: the twin of `CTH 999/KUB 46.39+`
+/// swapped its suffix, and the 206 and the 17 were listed in the other order,
+/// the sets equal. Sorting both would move the package's bytes, and the owner
+/// decided on 24.09.2026 to keep them; until then this said the choice did not
+/// depend on the order, which was not so.
+///
+/// A collision that survives that is a build error rather than a file quietly
+/// overwritten.
+///
+/// Only the XML path is checked. There was a second map for the PDF name each
+/// document will take, but [`naming::output_path`] always ends a name with
+/// `.xml` and [`naming::pdf_path`] only replaces that fixed suffix, so two
+/// distinct XML paths cannot become one PDF path: the check could never fire on
+/// its own. Because it ran first it did fire — naming the `.pdf` path in every
+/// collision error for a clash that was between two `.xml` files. The manifest
+/// is still held to distinct PDF names by [`validate`], which reads them back
+/// from the published file rather than trusting the rule.
 pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
     let mut taken: HashMap<String, String> = HashMap::with_capacity(fragments.len());
     let mut placed = Vec::with_capacity(fragments.len());
