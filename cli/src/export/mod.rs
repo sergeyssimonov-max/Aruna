@@ -495,6 +495,20 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     job.report(Event::CheckingPublished);
     let published = validate(&final_root, &records, &placed)?;
 
+    // Опубликованное обязано совпасть с собранным – и проверяется это здесь,
+    // пока копия читателя еще в `Replaced`, и отказом, а не паникой. Стоял тут
+    // `assert_eq!` после `committed()`: расхождение, которое могло дать только
+    // вмешательство извне между переименованием и повторным чтением, роняло
+    // прогон, когда прежней копии уже не было. Сравнение двух описей стоит
+    // микросекунды и работает в выпуске, не только в отладочной сборке.
+    if published != staged {
+        return Err(ArunaError::ExportInvalid {
+            root: final_root,
+            count: 1,
+            first: "the published package differs from the one that was built and checked".into(),
+        });
+    }
+
     // **Только теперь, и не строкой раньше.** Прежний пакет снимался сразу
     // после переименования, то есть до того, как опубликованное дерево было
     // прочитано заново: отказ этой проверки заставал читателя без его копии и
@@ -503,11 +517,6 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     for left in previous.committed() {
         job.report(Event::PreviousPackageLeft { path: &left });
     }
-    // `assert_eq!`, а не `debug_assert_eq!`: сравнение двух уже собранных
-    // описей стоит микросекунды, а обещание «опубликованное равно собранному»
-    // до сих пор держалось только в отладочной сборке — то есть нигде, где
-    // работает читатель.
-    assert_eq!(staged, published, "the rename changed the package");
 
     Ok(Built {
         groups: crate::parse::group_runs(&records).count(),
@@ -1085,6 +1094,10 @@ fn write_documents(
     let mut normalised = Vec::new();
     // See the write below: the directory this loop made last.
     let mut last_dir: Option<PathBuf> = None;
+    // Every document the normalisation check refused, in archive order. The
+    // build stops on them all the same, but after looking at every one, so the
+    // reader hears of each in one run rather than one per run.
+    let mut distorted: Vec<(String, String)> = Vec::new();
 
     for i in 0..archive.len() {
         // Between documents. Each one is inflated, normalised, checked against
@@ -1124,7 +1137,8 @@ fn write_documents(
 
         // Before it is written, not after. A document whose non-distortion is
         // not proven does not reach the package, and the build stops rather
-        // than publishing the rest around it.
+        // than publishing the rest around it – once every document has been
+        // looked at, so that all of them are named.
         match verify::compare(&bytes, &normalised) {
             Ok(report) => {
                 // Named by `verify`, which also renders the manifest's list of
@@ -1138,10 +1152,8 @@ fn write_documents(
                 }
             }
             Err(reason) => {
-                return Err(ArunaError::ExportDistorted {
-                    entry: name.clone(),
-                    reason,
-                })
+                distorted.push((name.clone(), reason));
+                continue;
             }
         }
 
@@ -1197,6 +1209,10 @@ fn write_documents(
         within_package_ceiling(package_bytes, MAX_PACKAGE)?;
     }
 
+    if let Some(refusal) = refusal_of(distorted) {
+        return Err(refusal);
+    }
+
     // The remainder, so the last thing a window hears is the whole of it. A run
     // of 23 936 documents ticks 47 times on the multiple and once here; a run
     // that divides exactly says so already and is not told twice.
@@ -1214,6 +1230,22 @@ fn write_documents(
         });
     }
     Ok(())
+}
+
+/// One refusal for every document the normalisation check turned away.
+///
+/// The first keeps its place in `entry`, so the code on the wire and the
+/// window's sentence are what they were; each of the rest follows its reason
+/// as ` | <entry>: <reason>`. No words join them, so the console can put the
+/// whole of it into Russian without leaving a phrase behind. `None` when there
+/// is nothing to refuse.
+fn refusal_of(distorted: Vec<(String, String)>) -> Option<ArunaError> {
+    let mut all = distorted.into_iter();
+    let (entry, mut reason) = all.next()?;
+    for (name, why) in all {
+        reason.push_str(&format!(" | {name}: {why}"));
+    }
+    Some(ArunaError::ExportDistorted { entry, reason })
 }
 
 /// The same gate the inventory pass opens through.
@@ -1303,6 +1335,39 @@ mod tests {
         assert!(
             read_again < let_go,
             "прежняя копия читателя снимается до повторного чтения дерева: отказ проверки застанет его без копии и с непроверенным деревом под ее именем"
+        );
+    }
+
+    /// **Опубликованное, не совпавшее с собранным, – отказ до снятия копии, а
+    /// не паника после.**
+    ///
+    /// `assert_eq!(staged, published)` стоял после `previous.committed()`: если
+    /// между переименованием и повторным чтением дерево кто-то менял, прогон
+    /// падал паникой, когда прежней копии читателя уже не было, и окно
+    /// говорило «сборка оборвалась» о пакете, который лежал под своим именем
+    /// непроверенным. Сравнение – отказ `ExportInvalid`, и стоит оно до
+    /// `committed`: `Replaced` при выходе с отказом возвращает копию читателя.
+    /// Воспроизвести расхождение прогоном нельзя – для этого чужой процесс
+    /// должен успеть переписать дерево в окне из одной проверки, – поэтому
+    /// держится порядок в исходнике, как у теста выше.
+    #[test]
+    fn a_package_changed_on_publishing_is_refused_before_the_copy_is_let_go() {
+        let source = include_str!("mod.rs");
+        let code = source.split("#[cfg(test)]").next().unwrap_or(source);
+
+        assert!(
+            !code.contains("assert_eq!(staged, published"),
+            "расхождение опубликованного с собранным все еще паника"
+        );
+        let compare = code
+            .find("if published != staged")
+            .expect("опубликованное больше не сверяется с собранным");
+        let let_go = code
+            .find("previous.committed()")
+            .expect("прежняя копия больше не снимается");
+        assert!(
+            compare < let_go,
+            "сверка опубликованного с собранным стоит после снятия копии читателя"
         );
     }
     use super::tests_support::fragment;

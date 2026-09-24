@@ -811,3 +811,63 @@ fn a_siglum_that_is_not_utf8_names_no_file_with_invented_characters() {
         "дефект кодировки ушел в общую причину"
     );
 }
+
+/// **Every document the normalisation check refuses is named, not only the
+/// first.**
+///
+/// The build stops on a declaration that would change the meaning of the
+/// bytes – an encoding other than UTF-8, a version other than 1.0 – and it
+/// used to stop at the first such document in archive order. A reader told
+/// about one, who removes it and runs again, met the second only then. The
+/// check now runs over all of them, writes none of them, and the refusal names
+/// each; the first stays in `entry`, so the code on the wire and the window's
+/// sentence are the same as before.
+#[test]
+fn every_document_the_normalisation_check_refuses_is_named() {
+    let dir = tempdir().expect("tempdir");
+    let latin1 = {
+        let mut body = b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>".to_vec();
+        body.extend_from_slice(manuscript("KBo 2.2").as_bytes());
+        body.extend_from_slice(b"<!-- caf\xe9 -->");
+        body
+    };
+    let version = format!("<?xml version=\"1.1\"?>{}", manuscript("KBo 3.3")).into_bytes();
+    let entries = [
+        text("root/CTH 5_XML_HFR/fine.xml", "KBo 1.1"),
+        ("root/CTH 5_XML_HFR/latin1.xml", latin1),
+        ("root/CTH 5_XML_HFR/version.xml", version),
+    ];
+    let zip = archive(dir.path(), &entries);
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+
+    match export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    ) {
+        Err(ArunaError::ExportDistorted { entry, reason }) => {
+            let told = format!("{entry} {reason}");
+            assert!(
+                told.contains("latin1.xml"),
+                "the first is not named: {told}"
+            );
+            assert!(
+                told.contains("version.xml"),
+                "the second is not named: {told}"
+            );
+        }
+        Err(other) => panic!("wrong error: {other}"),
+        Ok(built) => panic!("built {} documents", built.documents),
+    }
+    assert!(
+        !destination.join(PACKAGE).exists(),
+        "a refused build left a package behind"
+    );
+    assert_eq!(
+        files(&destination),
+        Vec::<PathBuf>::new(),
+        "a refused build left staging behind"
+    );
+}
