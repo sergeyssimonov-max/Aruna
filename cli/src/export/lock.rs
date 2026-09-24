@@ -158,8 +158,19 @@ fn acquire_within(
                 // that finished removes the file while holding the lock, and a
                 // waiter that had opened it before then locks a file with no
                 // name: it holds nothing anyone else can see. The same inode
-                // under the name is the proof; anything else is another try.
+                // under the name is the proof; anything else is another try –
+                // after a pause and within the same wait, so a filesystem whose
+                // inode numbers do not hold still is a refusal in the end and
+                // not a loop at full speed.
                 if !same_file(&file, &path) {
+                    drop(file);
+                    if started.elapsed() >= wait {
+                        return Err(ArunaError::PublishBusy {
+                            path: path.clone(),
+                            holder: holder(&path),
+                        });
+                    }
+                    std::thread::sleep(poll);
                     continue;
                 }
                 write_token(&file).map_err(ArunaError::io(&path))?;
@@ -455,6 +466,43 @@ mod tests {
         let taken =
             acquire_within(dir.path(), &Job::unattended(), wait, poll).expect("the name is free");
         assert!(same_file(&taken.file, &path));
+    }
+
+    /// **Runs racing for the lock never hold it two at once.**
+    ///
+    /// The test above shows the inode check fires; this one that it is needed.
+    /// `flock` conflicts per open file, so threads of one process race as runs
+    /// do. Without the check – measured 2026-09-25 by disabling it – a waiter
+    /// that locked the file its holder had just removed went ahead beside the
+    /// next holder, and this test failed in three runs of three.
+    #[test]
+    fn runs_racing_for_the_lock_never_hold_it_two_at_once() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let dir = tempdir().expect("tempdir");
+        let inside = AtomicUsize::new(0);
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                scope.spawn(|| {
+                    for _ in 0..300 {
+                        let guard = acquire_within(
+                            dir.path(),
+                            &Job::unattended(),
+                            Duration::from_secs(60),
+                            Duration::from_micros(200),
+                        )
+                        .expect("the lock is taken in the end");
+                        assert_eq!(
+                            inside.fetch_add(1, Ordering::SeqCst),
+                            0,
+                            "two holders at once"
+                        );
+                        std::thread::yield_now();
+                        inside.fetch_sub(1, Ordering::SeqCst);
+                        drop(guard);
+                    }
+                });
+            }
+        });
     }
 
     /// Waiting is not a place a cancelled run gets stuck in, and the stop it

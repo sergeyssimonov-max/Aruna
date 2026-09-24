@@ -755,10 +755,11 @@ fn owner_marker(staging: &Path) -> PathBuf {
 
 /// A staging directory's claim to be alive: an exclusive lock on its marker.
 ///
-/// **Asking the operating system rather than the clock.** The publish lock in
-/// [`lock`] judges a holder dead by the age of a file, because asking whether
-/// a process id is alive is `kill(pid, 0)` and this crate forbids `unsafe`.
-/// Staging cannot use age: a live run's directory goes minutes without its
+/// **Asking the operating system rather than the clock.** Asking whether a
+/// process id is alive is `kill(pid, 0)`, and this crate forbids `unsafe`.
+/// The publish lock in [`lock`] once judged a holder dead by the age of a file
+/// instead, and since 2026-09-24 asks the kernel the way this marker does.
+/// Staging could never use age: a live run's directory goes minutes without its
 /// modification time moving — longest while it waits up to ten minutes for
 /// someone else's publication — and a guess wrong in that direction deletes
 /// a package being built. A lock held by an open file answers the actual
