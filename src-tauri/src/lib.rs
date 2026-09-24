@@ -449,8 +449,38 @@ fn named_package(path: &std::path::Path) -> Result<(), CommandError> {
 }
 
 /// Символьная ли ссылка стоит под этим именем – сама, а не то, на что она ведет.
+///
+/// Путь сначала пересобирается из составных частей: `lstat` пути с косой чертой
+/// на конце идет по ссылке, а `file_name` ту черту не видит, так что
+/// `…/TLHdig_Beta_0.3/` проходил и как пакет, и как не ссылка (ревью 25.09).
 fn is_link(path: &std::path::Path) -> bool {
+    let path: std::path::PathBuf = path.components().collect();
     std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink())
+}
+
+/// Предел манифеста, как у проверки пакета в ядре: 64 МиБ при настоящих девяти.
+const MANIFEST_LIMIT: u64 = 64 * 1024 * 1024;
+
+/// Текст манифеста пакета – только обычного файла и не больше предела.
+///
+/// `read_to_string` шел за ссылкой и читал без конца: манифест-ссылка на
+/// `/dev/zero` или именованный канал вместо него держали команду вечно
+/// (ревью 25.09). Вид проверяется до открытия – открытие канала на чтение
+/// само ждет пишущего.
+fn read_manifest(package: &std::path::Path) -> Option<String> {
+    use std::io::Read as _;
+    let path = package.join(aruna::export::MANIFEST);
+    let meta = std::fs::symlink_metadata(&path).ok()?;
+    if !meta.is_file() || meta.len() > MANIFEST_LIMIT {
+        return None;
+    }
+    let mut text = String::new();
+    std::fs::File::open(&path)
+        .ok()?
+        .take(MANIFEST_LIMIT + 1)
+        .read_to_string(&mut text)
+        .ok()?;
+    (text.len() as u64 <= MANIFEST_LIMIT).then_some(text)
 }
 
 /// Команда без Tauri, чтобы ветки проверялись тестом.
@@ -529,8 +559,7 @@ fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryE
     if !package.is_dir() {
         return Err(XmlSummaryError::Missing);
     }
-    let text = std::fs::read_to_string(package.join(aruna::export::MANIFEST))
-        .map_err(|_| XmlSummaryError::Unreadable)?;
+    let text = read_manifest(package).ok_or(XmlSummaryError::Unreadable)?;
     let manifest: Manifest =
         serde_json::from_str(&text).map_err(|_| XmlSummaryError::Unreadable)?;
     // Манифест старого пакета секции не несет, и это не поломка: собран он был
@@ -673,7 +702,7 @@ fn counts_from_manifest(package: &std::path::Path) -> Option<CorpusStats> {
         fonts: Option<FontsEntry>,
     }
 
-    let text = std::fs::read_to_string(package.join(aruna::export::MANIFEST)).ok()?;
+    let text = read_manifest(package)?;
     let manifest: Manifest = serde_json::from_str(&text).ok()?;
     Some(CorpusStats {
         manuscripts: counted(manifest.counts.documents),
@@ -1590,7 +1619,10 @@ mod wire {
 // `test`: обе отказные ветки проверяются и в сборке с `e2e`, и без нее.
 #[cfg(test)]
 mod opening {
-    use super::{named_inventory, named_package, CommandError};
+    use super::{
+        named_inventory, named_package, read_manifest, read_xml_summary, CommandError,
+        XmlSummaryError,
+    };
     use std::fs;
 
     /// Опись — это файл с тем именем, которое объявило ядро, и лежать он может
@@ -1669,6 +1701,57 @@ mod opening {
             matches!(named_inventory(&inventory), Err(CommandError::NotInventory)),
             "ссылка под именем описи прошла как опись"
         );
+    }
+
+    /// **Косая черта на конце не проводит ссылку за пакет.**
+    #[test]
+    fn a_link_under_the_package_name_is_refused_with_a_trailing_slash() {
+        let dir = tempfile::tempdir().unwrap();
+        let elsewhere = dir.path().join("elsewhere");
+        std::fs::create_dir(&elsewhere).unwrap();
+        let package = dir.path().join(aruna::export::PACKAGE);
+        std::os::unix::fs::symlink(&elsewhere, &package).unwrap();
+        let slashed = std::path::PathBuf::from(format!("{}/", package.display()));
+        assert!(
+            matches!(named_package(&slashed), Err(CommandError::NotPackage)),
+            "ссылка с чертой на конце прошла как пакет"
+        );
+    }
+
+    /// **Манифест, который не обычный файл, не читается – и не держит команду.**
+    ///
+    /// Ссылка ведет куда угодно, а канал без пишущего заставил бы чтение ждать
+    /// вечно. Без проверки вида тест падает уже на ссылке.
+    #[test]
+    fn a_manifest_that_is_not_a_plain_file_is_not_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let package = dir.path().join(aruna::export::PACKAGE);
+        std::fs::create_dir(&package).unwrap();
+        let manifest = package.join(aruna::export::MANIFEST);
+
+        let real = dir.path().join("real.json");
+        std::fs::write(&real, "{}").unwrap();
+        std::os::unix::fs::symlink(&real, &manifest).unwrap();
+        assert!(
+            read_manifest(&package).is_none(),
+            "манифест-ссылка прочитан"
+        );
+
+        std::fs::remove_file(&manifest).unwrap();
+        let made = std::process::Command::new("mkfifo")
+            .arg(&manifest)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        assert!(read_manifest(&package).is_none(), "канал прочитан");
+        assert!(matches!(
+            read_xml_summary(&package),
+            Err(XmlSummaryError::Unreadable)
+        ));
+
+        std::fs::remove_file(&manifest).unwrap();
+        std::fs::write(&manifest, "{}").unwrap();
+        assert_eq!(read_manifest(&package).as_deref(), Some("{}"));
     }
 
     /// **Каталог с другим именем читающие команды не трогают.**
