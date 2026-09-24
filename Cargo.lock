@@ -113,6 +113,7 @@ dependencies = [
  "tauri-specta",
  "tempfile",
  "thiserror 2.0.20",
+ "zip",
 ]
 
 [[package]]

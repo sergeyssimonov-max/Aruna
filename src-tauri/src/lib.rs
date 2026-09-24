@@ -2262,6 +2262,93 @@ mod cancelling {
 
     /// **Нажатие в окне останавливает идущую сборку, и пакета под окончательным
     /// именем не остается.**
+    /// Малый архив в форме корпуса: `count` рукописей в одной группе.
+    fn small_archive(dir: &std::path::Path, count: usize) -> std::path::PathBuf {
+        use std::io::Write as _;
+        let path = dir.join("small.zip");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).expect("архив"));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for i in 1..=count {
+            zip.start_file(format!("root/CTH 5_XML_HFR/KBo {i}.xml"), options)
+                .expect("запись");
+            write!(
+                zip,
+                r#"<AOxml xml:space="preserve"><AOHeader><docID>KBo 1.{i}</docID><meta><uebern editor="FB" date="2017-03-28"/></meta></AOHeader><body><text><l lg="Hit"/>text</text></body></AOxml>"#
+            )
+            .expect("тело");
+        }
+        zip.finish().expect("финиш");
+        path
+    }
+
+    /// Один прогон окна на `zip`: окно нажимает «Отменить» на стадии `at`.
+    fn run_pressing_at(
+        zip: std::path::PathBuf,
+        at: &'static str,
+    ) -> (
+        Result<BuildReport, BuildFailure>,
+        usize,
+        Vec<String>,
+        tempfile::TempDir,
+    ) {
+        let destination = tempfile::tempdir().expect("каталог назначения");
+        let building = Building::default();
+        let cancel = aruna::job::Cancel::new();
+        building.claim(cancel.clone()).expect("место свободно");
+        let window = WindowThatStops {
+            at,
+            building: &building,
+            seen: Mutex::new(Vec::new()),
+            presses: AtomicUsize::new(0),
+        };
+        let request = aruna::app::CorpusRequest {
+            local_archive: Some(zip),
+        };
+        let outcome = build_once(
+            aruna::job::JobId::next(),
+            &request,
+            Some(destination.path()),
+            &cancel,
+            &window,
+        );
+        building.release();
+        building
+            .claim(aruna::job::Cancel::new())
+            .expect("после прогона место снова свободно");
+        let presses = window.presses.load(Ordering::SeqCst);
+        let left = entries(destination.path());
+        (outcome, presses, left, destination)
+    }
+
+    /// **Нажатие в окне останавливает идущую сборку – в обычном наборе.**
+    ///
+    /// Тест ниже делает то же на архиве корпуса и потому стоит под `#[ignore]`:
+    /// без фикстуры он молча проходил, и доказательство отмены из окна жило
+    /// только в явном прогоне (Р8 прогона 23.09.2026). Этот строит архив сам и
+    /// идет всегда. Окно нажимает на стадии записи документов; сборка обязана
+    /// кончиться отменой, ничего не оставив в папке назначения, а прогон без
+    /// нажатия на том же архиве – целым пакетом под своим именем.
+    #[test]
+    fn a_running_build_stops_when_the_window_asks_on_a_small_archive() {
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        let (outcome, presses, left, _keep) =
+            run_pressing_at(small_archive(dir.path(), 5), "WritingDocuments");
+        let refusal = outcome.expect_err("сборка обязана была остановиться");
+        assert_eq!(refusal.code, "cancelled", "отказ не назвался отменой");
+        assert!(refusal.cancelled);
+        assert_eq!(presses, 1, "окно не нажало ровно один раз");
+        assert_eq!(left, Vec::<String>::new(), "после отмены что-то осталось");
+
+        let (outcome, presses, left, _keep) =
+            run_pressing_at(small_archive(dir.path(), 5), "НетТакойСтадии");
+        let report = outcome.expect("без нажатия сборка обязана дойти до конца");
+        assert_eq!(presses, 0);
+        assert_eq!(report.documents, 5);
+        assert_eq!(left, vec![aruna::export::PACKAGE.to_string()]);
+    }
+
     #[test]
     #[ignore = "читает архив корпуса; запускать явно"]
     fn a_running_build_stops_when_the_window_asks() {
