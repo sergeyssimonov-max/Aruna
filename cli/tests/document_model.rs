@@ -768,3 +768,79 @@ fn the_whole_corpus_reads_the_same_twice_and_refuses_what_the_manifest_names() {
         deepest.0, deepest.1
     );
 }
+
+/// **Input the model is not meant to read is refused, never read wrongly and
+/// never a panic.**
+///
+/// xml-layer-hardening, planned 22.09.2026 and done 24.09.2026: the corpus has
+/// none of these, and the model's contract (4.13) is about what it does when it
+/// meets them anyway. UTF-16 with its byte-order mark, a document whose bytes
+/// are Latin-1, and a prolog cut off in the middle of the declaration or of a
+/// processing instruction. Each is refused; and the refusal agrees with the
+/// classifier and the scanner by the same [`agrees`] the corpus test uses –
+/// except where it cannot, which is named: bytes that are not UTF-8 are a
+/// refusal the classifier also makes, as `invalid-encoding`.
+#[test]
+fn what_is_not_the_models_to_read_is_refused_and_never_a_panic() {
+    let body = r#"<AOxml><AOHeader><docID>KBo 1.1</docID></AOHeader><text>ok</text></AOxml>"#;
+    let utf16 = |bom: [u8; 2], little: bool| {
+        let mut bytes = bom.to_vec();
+        let text = format!(r#"<?xml version="1.0" encoding="UTF-16"?>{body}"#);
+        for unit in text.encode_utf16() {
+            let pair = if little {
+                unit.to_le_bytes()
+            } else {
+                unit.to_be_bytes()
+            };
+            bytes.extend_from_slice(&pair);
+        }
+        bytes
+    };
+    let mut latin1 = br#"<?xml version="1.0" encoding="ISO-8859-1"?><AOxml><text>caf"#.to_vec();
+    latin1.push(0xE9);
+    latin1.extend_from_slice(b"</text></AOxml>");
+
+    let cases: Vec<(&str, Vec<u8>)> = vec![
+        ("utf-16 le", utf16([0xFF, 0xFE], true)),
+        ("utf-16 be", utf16([0xFE, 0xFF], false)),
+        ("latin-1 bytes", latin1),
+        (
+            "cut in the declaration",
+            br#"<?xml version="1.0" encod"#.to_vec(),
+        ),
+        ("cut after the declaration's name", b"<?xml".to_vec()),
+        (
+            "cut in a processing instruction",
+            br#"<?xml version="1.0"?><?xml-stylesheet href="HPMxml.css""#.to_vec(),
+        ),
+        (
+            "cut before the root closes",
+            format!("<?xml version=\"1.0\"?>{}", &body[..40]).into_bytes(),
+        ),
+    ];
+
+    for (what, bytes) in cases {
+        let read = std::panic::catch_unwind(|| Document::read(&bytes).map(|_| ()))
+            .unwrap_or_else(|_| panic!("{what}: the model panicked"));
+        let refusal = match read {
+            Ok(()) => panic!("{what}: the model read it"),
+            Err(refusal) => refusal,
+        };
+        let classified = std::panic::catch_unwind(|| classify(&bytes).is_some())
+            .unwrap_or_else(|_| panic!("{what}: the classifier panicked"));
+        std::panic::catch_unwind(|| beyond_the_parser(&bytes))
+            .unwrap_or_else(|_| panic!("{what}: the scanner panicked"));
+        match refusal {
+            Refusal::NotUtf8 { .. } => {
+                assert!(
+                    classified,
+                    "{what}: not UTF-8 to the model, fine to the classifier"
+                )
+            }
+            Refusal::Unexplained { .. } => {
+                panic!("{what}: the parser refused and nothing explains it: {refusal}")
+            }
+            _ => {}
+        }
+    }
+}

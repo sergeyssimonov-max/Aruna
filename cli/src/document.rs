@@ -175,9 +175,15 @@ pub enum Refusal {
     /// Accepted by the parser and forbidden by XML or by *Namespaces in XML*.
     #[error("beyond this parser: {} at line {}, column {}", .0.limit.key(), .0.line, .0.column)]
     BeyondTheParser(Beyond),
-    /// The parser refused and the classifier saw nothing wrong. Never expected:
-    /// the two share one reader configuration, and this variant exists so that
-    /// a disagreement is reported rather than folded into the other two.
+    /// The parser refused and the classifier saw nothing wrong. Never on the
+    /// corpus: the two share one reader configuration, and this variant exists
+    /// so that a disagreement is reported rather than folded into the other two.
+    ///
+    /// Off the corpus it is expected, and for one known reason: the model
+    /// unescapes attribute values and the classifier never does, so a broken
+    /// reference in a value – `xmlns:xi="http://www.w&3.org/"` – is refused
+    /// here and named by nothing. Found by `examples/fuzz_xml.rs` on
+    /// 2026-09-25; widening the classifier would add a reason to the manifest.
     #[error(
         "the parser refused at line {line}, column {column} and the classifier did not: {message}"
     )]
