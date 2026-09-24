@@ -122,6 +122,7 @@ impl Progress for Recording {
             Event::DownloadRetrying { .. } => Seen::Other("DownloadRetrying"),
             Event::ArchiveKept { .. } => Seen::Other("ArchiveKept"),
             Event::PreviousPackageLeft { .. } => Seen::Other("PreviousPackageLeft"),
+            Event::WaitingForPublication => Seen::Other("WaitingForPublication"),
             // Ticks, and this file is about the order of the stages. They are
             // kept apart by name so `the_stages_come_in_the_one_order` reads a
             // sequence of milestones rather than one interleaved with however

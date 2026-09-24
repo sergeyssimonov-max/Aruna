@@ -83,6 +83,10 @@ pub enum Event<'a> {
     DocumentsWritten { done: usize, total: usize },
     /// The staged package is being checked against the model it came from.
     CheckingPackage,
+    /// Another run is publishing into the same folder, and this one waits for
+    /// it. Said once, when the wait begins: until 2026-09-24 a run could wait
+    /// here five minutes without a word.
+    WaitingForPublication,
     /// The same check again, on the copy that was published.
     CheckingPublished,
     /// The package this build replaced could not be removed and is still there.
@@ -181,6 +185,10 @@ impl fmt::Display for Event<'_> {
             Event::WritingDocuments { documents } => write!(f, "Writing {documents} documents…"),
             Event::DocumentsWritten { done, total } => write!(f, "  {done} of {total} documents"),
             Event::CheckingPackage => write!(f, "Checking the package…"),
+            Event::WaitingForPublication => write!(
+                f,
+                "Waiting for another run to finish publishing into this folder…"
+            ),
             Event::CheckingPublished => write!(f, "Checking the published copy…"),
             Event::PreviousPackageLeft { path } => write!(
                 f,
@@ -271,7 +279,7 @@ mod tests {
             expected: 10,
             got: 4,
         };
-        let cases: [(Event<'_>, &str); 17] = [
+        let cases: [(Event<'_>, &str); 18] = [
             (
                 Event::CacheUnusable { dir: &dir },
                 "Cannot write to the cache directory (/cache/aruna); downloading for this run only.",
@@ -336,6 +344,10 @@ mod tests {
                 "Writing 24501 documents…",
             ),
             (Event::CheckingPackage, "Checking the package…"),
+            (
+                Event::WaitingForPublication,
+                "Waiting for another run to finish publishing into this folder…",
+            ),
             (Event::CheckingPublished, "Checking the published copy…"),
             (
                 Event::PreviousPackageLeft { path: &dir },

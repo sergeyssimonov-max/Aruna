@@ -23,35 +23,18 @@ use crate::error::{ArunaError, Result};
 use crate::job::{Job, Phase};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::PACKAGE;
 
-/// How long a lock may exist before it is assumed abandoned.
-///
-/// Nothing here asks whether a process is alive. Asking by process id is
-/// `kill(pid, 0)`, and this crate forbids `unsafe`; asking by a lock the kernel
-/// releases on exit is safe and is what staging does since 13.09.2026 (see
-/// `Owner` in the parent module), but this lock is a file whose content is its
-/// token and has not been moved onto that. Age is what it uses, and it is enough because
-/// the interval it bounds is short and known — moving a directory, renaming
-/// another onto its name, and reading back 23 936 files, measured at two to six
-/// seconds on the real corpus. Five minutes is fifty times that.
-///
-/// The cost of the choice, stated rather than hidden: a publication that
-/// genuinely takes longer than this — a filesystem stalled, a corpus an order of
-/// magnitude larger — can have its lock taken by a run that has been waiting.
-/// Both then publish, and the package is still whichever finished last; what is
-/// lost is the guarantee, not the data.
-const STALE: Duration = Duration::from_secs(300);
-
 /// How long a run waits for someone else's publication before giving up.
 ///
-/// Deliberately longer than [`STALE`]: a waiter that reaches this has not lost
-/// a race to a run that was working — it has been sitting behind a lock nobody
-/// is refreshing and nobody has released, which is a wedged filesystem or a
-/// directory somebody else's program is writing. That deserves a message, not
-/// more patience.
+/// A publication moves a directory, renames another onto its name and reads
+/// back 23 936 files – two to six seconds on the real corpus. A holder that is
+/// still alive after ten minutes is not publishing: it is a wedged filesystem
+/// or a run stopped in a debugger, and that deserves a message, not more
+/// patience. A holder that is dead is not waited for at all – see
+/// [`Publication`].
 const WAIT: Duration = Duration::from_secs(600);
 
 /// How often the wait looks again.
@@ -65,24 +48,17 @@ const POLL: Duration = Duration::from_millis(100);
 /// Токен – одна короткая строка. Файл длиннее предела не может быть токеном
 /// этого прогона ни при каком содержимом, поэтому дочитывать его незачем: имя
 /// `.{PACKAGE}.publish.lock` лежит в каталоге назначения, положить туда файл
-/// произвольного размера может любой процесс, а цикл ожидания перечитывает это
-/// имя каждые сто миллисекунд до десяти минут и кладет прочитанное в текст
+/// произвольного размера может любой процесс, а прочитанное идет в текст
 /// отказа. Предел с большим запасом: настоящий токен – около сорока байт.
 const MAX_LOCK: u64 = 4096;
 
 /// Файл блокировки, прочитанный не дальше [`MAX_LOCK`].
 ///
-/// `None` значит «это не токен»: файла нет, он длиннее предела, или он не
-/// текст. Все три случая ведут туда же, куда вело несовпадение содержимого до
-/// появления предела, – разница только в том, сколько памяти на это уходит.
-///
-/// **Открывается только обычный файл.** Именованный канал под этим именем
-/// держал `open` без конца: вызов ждет писателя, и ни срок, ни отмена цикла
-/// ожидания до него не доходят. Токен эта программа кладет только обычным
-/// файлом, так что все остальное – канал, устройство, ссылка – токеном не
-/// бывает и ждется, как любой нечитаемый держатель. Между проверкой и
-/// открытием остается окно в два системных вызова; закрыть его целиком мог бы
-/// только неблокирующий `open`, а он требует флага, которого в стандартной
+/// `None` значит «это не токен»: файла нет, он длиннее предела, он не текст
+/// или это не обычный файл. **Открывается только обычный файл**: именованный
+/// канал под этим именем держал бы `open` до появления писателя. Между
+/// проверкой и открытием остается окно в два системных вызова; закрыть его
+/// целиком мог бы только неблокирующий `open`, а его флага в стандартной
 /// библиотеке нет.
 fn read_token(path: &Path) -> Option<String> {
     use std::io::Read as _;
@@ -108,33 +84,45 @@ fn lock_path(destination: &Path) -> PathBuf {
 }
 
 /// Held for the whole of a publication; released when it is dropped.
+///
+/// **The lock is the kernel's, not the file's.** The guard holds the file open
+/// under an exclusive `flock`, and the kernel releases that when the process
+/// ends, however it ends. Until 2026-09-24 the lock was the file's existence,
+/// judged abandoned by its age: a run killed while publishing – or between
+/// creating the file and writing it – left a file every later run waited five
+/// silent minutes for (measured 300,4 and 301,8 s on 24.09), and a directory
+/// under the name was waited for ten. Now a file nobody holds is free at once,
+/// whatever it says, and anything under the name that is not a regular file is
+/// refused at once. The same mechanism has held the staging marker since
+/// 13.09.2026 (`Owner` in the parent module).
+///
+/// The token written into the file is diagnosis only: it is what turns "busy"
+/// into "process 4711", a question `ps` can answer.
 #[derive(Debug)]
 pub(super) struct Publication {
     path: PathBuf,
-    /// What this run wrote into the file, so the guard can tell its own lock
-    /// from one that replaced it.
-    token: String,
+    /// Held open for as long as the guard lives: closing it releases the lock.
+    file: fs::File,
 }
 
 impl Publication {
     /// Take the lock in `destination`, waiting for whoever holds it.
     pub(super) fn acquire(destination: &Path, job: &Job<'_>) -> Result<Self> {
-        acquire_within(destination, job, STALE, WAIT, POLL)
+        acquire_within(destination, job, WAIT, POLL)
     }
 }
 
-/// The three durations as arguments, so the waiting can be tested in
+/// The two durations as arguments, so the waiting can be tested in
 /// milliseconds rather than minutes.
 fn acquire_within(
     destination: &Path,
     job: &Job<'_>,
-    stale: Duration,
     wait: Duration,
     poll: Duration,
 ) -> Result<Publication> {
     let path = lock_path(destination);
-    let token = token();
-    let deadline = SystemTime::now() + wait;
+    let started = Instant::now();
+    let mut told = false;
 
     loop {
         // Cancellation is checked before each attempt, so a run stopped while
@@ -142,165 +130,80 @@ fn acquire_within(
         // lock failure, which is what it would look like from the outside.
         job.check(Phase::Publishing)?;
 
-        // **The lock file is not left empty by a kill.**
-        //
-        // It used to be created with `create_new` and written a line later, and
-        // a run killed between those two calls left a nameless zero-byte lock:
-        // `holder` had nothing to report, and every other run waited out the
-        // full five-minute staleness before it could publish. The token is now
-        // written into a scratch file beside the destination and moved into
-        // place with `rename`, which is atomic on one filesystem — the same
-        // move the export uses for everything else it publishes.
-        match write_token(&path, &token) {
-            Ok(()) => {
-                // Read back what is on disk. Two runs that both judged an
-                // abandoned lock stale in the same poll can each remove a file
-                // and each create one — and one of the removals may be of the
-                // other's fresh lock. The window is small and the situation is
-                // rare, but the check that closes it is one read of a file this
-                // run has just written: if it does not say what this run said,
-                // this run does not hold the lock.
-                match read_token(&path) {
-                    Some(found) if found == token => {
-                        return Ok(Publication { path, token });
-                    }
-                    _ => continue,
-                }
+        // Not a regular file under the name – a directory, a pipe, a link –
+        // is nothing this program put there and nothing that will ever be
+        // released: refused now rather than after the whole wait.
+        if let Ok(meta) = fs::symlink_metadata(&path) {
+            if !meta.file_type().is_file() {
+                return Err(ArunaError::ExportDestination {
+                    path,
+                    reason:
+                        "something that is not a lock file stands where the publish lock belongs"
+                            .to_string(),
+                });
             }
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-                // Read the holder *before* judging its age, so that what is
-                // removed is the file that was judged. Between the judgement
-                // and the removal the holder can finish and a third run can
-                // take the lock: removing then would hand the directory to two
-                // runs at once. Comparing what is on disk with what was read a
-                // moment ago does not close that window — nothing short of an
-                // atomic compare-and-delete would — but it turns it from the
-                // whole staleness check into two adjacent syscalls, and a lock
-                // that was replaced in between survives.
-                let seen = read_token(&path);
-                if abandoned(&path, stale) {
-                    // Not `?` in either arm: a removal that fails because
-                    // someone else got there first is the normal outcome of two
-                    // waiters, and the next attempt is what settles it.
-                    match seen {
-                        Some(seen) => remove_if_unchanged(&path, &seen),
-                        // Unreadable, which is the case `abandoned` already
-                        // treats as abandoned: either not ours or broken, and
-                        // there is nothing to compare it against.
-                        None => {
-                            let _ = fs::remove_file(&path);
-                        }
-                    }
-                    // **Straight to the next attempt only if the name is free.**
-                    // A removal that did not happen — a directory at the lock
-                    // path, a file this user may not delete — used to `continue`
-                    // here as well, past both the deadline and the pause: the
-                    // release gate of 2026-09-13 watched a run spin at 95–99 %
-                    // CPU for 720 s and never refuse. Whatever is still there
-                    // is waited for like a live holder, and refused like one.
-                    if fs::symlink_metadata(&path).is_err() {
-                        continue;
-                    }
+        }
+
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(ArunaError::io(&path))?;
+
+        match file.try_lock() {
+            Ok(()) => {
+                // **The name must still be the file this run locked.** A holder
+                // that finished removes the file while holding the lock, and a
+                // waiter that had opened it before then locks a file with no
+                // name: it holds nothing anyone else can see. The same inode
+                // under the name is the proof; anything else is another try.
+                if !same_file(&file, &path) {
+                    continue;
                 }
-                if SystemTime::now() >= deadline {
+                write_token(&file).map_err(ArunaError::io(&path))?;
+                return Ok(Publication { path, file });
+            }
+            Err(fs::TryLockError::WouldBlock) => {
+                if !told {
+                    job.report(crate::progress::Event::WaitingForPublication);
+                    told = true;
+                }
+                if started.elapsed() >= wait {
                     return Err(ArunaError::PublishBusy {
                         path: path.clone(),
                         holder: holder(&path),
                     });
                 }
+                drop(file);
                 std::thread::sleep(poll);
             }
-            Err(source) => {
-                return Err(ArunaError::Io {
-                    path: path.clone(),
-                    source,
-                })
+            Err(fs::TryLockError::Error(source)) => {
+                return Err(ArunaError::Io { path, source });
             }
         }
     }
 }
 
-/// Whether the lock on disk is old enough to be treated as left behind.
-///
-/// Put `token` at `path`, atomically, failing if something is already there.
-///
-/// `create_new` on the scratch file keeps two runs from sharing it, and the
-/// rename is what makes the lock appear whole or not at all. `rename` replaces
-/// an existing file silently, so the `create_new` that decides who holds the
-/// lock has to be the one on the destination — hence the check below it: a
-/// scratch file that renames over somebody else's lock would hand the directory
-/// to two runs.
-fn write_token(path: &Path, token: &str) -> std::io::Result<()> {
-    let scratch = crate::paths::scratch_sibling(path);
-    {
-        use std::io::Write as _;
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&scratch)?;
-        file.write_all(token.as_bytes())?;
-    }
-    // The gate: whoever creates this empty marker owns the name. Only then is
-    // the token moved onto it.
-    //
-    // One thing this shape does not promise, said here rather than left to be
-    // discovered: between this line and the rename the file exists and is
-    // empty, so a reader in that window learns nothing from `holder` — it waits
-    // and retries, which is correct, but the message it would print is blank.
-    // The window is two syscalls wide and costs a blank line in a diagnostic,
-    // not a wait.
-    //
-    // What it does promise is that nothing is left behind. A rename that fails
-    // used to leave the empty marker in place, and every other run then waited
-    // out the full staleness on a lock nobody held — the very failure this
-    // function exists to prevent, moved to a rarer path. Both files go now.
-    match fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-    {
-        Ok(_) => {}
-        Err(err) => {
-            let _ = fs::remove_file(&scratch);
-            return Err(err);
-        }
-    }
-    let renamed = fs::rename(&scratch, path);
-    if renamed.is_err() {
-        // Both, and in this order: the marker is what would block other runs,
-        // the scratch file is only litter.
-        let _ = fs::remove_file(path);
-        let _ = fs::remove_file(&scratch);
-    }
-    renamed
-}
-
-/// Remove `path` only if it still holds what was read from it.
-///
-/// The narrow half of the race above: a lock that was replaced between the
-/// staleness judgement and this call belongs to whoever holds it now, and
-/// removing it would let two runs publish at once. The read here is not atomic
-/// with the removal, so this narrows the window rather than closing it — which
-/// is the honest description and the reason it is a named function with a test
-/// rather than three lines inside the loop.
-fn remove_if_unchanged(path: &Path, seen: &str) {
-    if matches!(read_token(path), Some(found) if found == seen) {
-        let _ = fs::remove_file(path);
+/// Whether `path` names the file `file` has open.
+#[cfg(unix)]
+fn same_file(file: &fs::File, path: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt as _;
+    match (file.metadata(), fs::symlink_metadata(path)) {
+        (Ok(held), Ok(named)) => held.dev() == named.dev() && held.ino() == named.ino(),
+        _ => false,
     }
 }
 
-/// A file whose age cannot be read at all is treated as abandoned: it is either
-/// gone — in which case the next attempt takes it — or on a filesystem that
-/// cannot answer, where waiting for an answer that never comes is worse than
-/// proceeding.
-fn abandoned(path: &Path, stale: Duration) -> bool {
-    let Ok(meta) = fs::metadata(path) else {
-        return true;
-    };
-    let Ok(modified) = meta.modified() else {
-        return true;
-    };
-    modified.elapsed().map(|age| age >= stale).unwrap_or(false)
+/// This run's token into the file it has just locked, replacing whatever was
+/// there – a token of a run that is gone, or nothing.
+fn write_token(file: &fs::File) -> std::io::Result<()> {
+    use std::io::{Seek as _, Write as _};
+    let mut file = file;
+    file.set_len(0)?;
+    file.seek(std::io::SeekFrom::Start(0))?;
+    file.write_all(token().as_bytes())
 }
 
 /// What the lock file says about who holds it, for the error message.
@@ -336,12 +239,6 @@ fn is_token(text: &str) -> bool {
 }
 
 /// This run, in a form a person reading the file can act on.
-///
-/// The process id is not used for a liveness check — nothing here can make one
-/// — but it is what turns "something holds the lock" into "process 4711 does",
-/// which is a question `ps` can answer and a person can decide about. The
-/// second half makes the string unique per attempt, which is what the read-back
-/// above compares.
 fn token() -> String {
     let pid = std::process::id();
     let now = SystemTime::now()
@@ -356,12 +253,13 @@ fn token() -> String {
 
 impl Drop for Publication {
     fn drop(&mut self) {
-        // Only if it is still this run's lock. A stale lock this run's own file
-        // replaced has the same name, and removing one that belongs to whoever
-        // holds it now would hand the directory to a third run mid-publication.
-        if matches!(read_token(&self.path), Some(found) if found == self.token) {
+        // Removed while still held, and only if the name is still this file:
+        // a waiter that locks the removed file afterwards sees that it has no
+        // name and tries again. Nothing is removed that another run holds.
+        if same_file(&self.file, &self.path) {
             let _ = fs::remove_file(&self.path);
         }
+        // The lock goes with the descriptor, when `file` is dropped after this.
     }
 }
 
@@ -370,128 +268,129 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    fn instant() -> (Duration, Duration, Duration) {
-        // A stale threshold no lock reaches, a wait short enough to fail a test
-        // quickly, and a poll shorter still.
-        (
-            Duration::from_secs(3600),
-            Duration::from_millis(60),
-            Duration::from_millis(5),
-        )
+    /// A wait short enough to fail a test quickly, and a poll shorter still.
+    fn instant() -> (Duration, Duration) {
+        (Duration::from_millis(60), Duration::from_millis(5))
+    }
+
+    /// Someone else's hold on the lock file: the file open under an exclusive
+    /// `flock`, with `content` in it, for as long as the returned file lives.
+    fn held_by_another(destination: &Path, content: &str) -> fs::File {
+        let path = lock_path(destination);
+        fs::write(&path, content).expect("write");
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .expect("open");
+        file.try_lock().expect("lock");
+        file
+    }
+
+    /// A sink that remembers how often it heard that the run is waiting.
+    #[derive(Default)]
+    struct Heard(std::sync::atomic::AtomicUsize);
+
+    impl crate::progress::Progress for Heard {
+        fn report(&self, event: crate::progress::Event<'_>) {
+            if matches!(event, crate::progress::Event::WaitingForPublication) {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
     }
 
     /// One run publishes at a time, and the one that cannot say so names who
     /// can. `holder` is the whole point of the message: "busy" is not a
     /// diagnosis, "pid 4711 since …" is.
-    /// **Убийство между созданием и записью не оставляет пустого файла, а
-    /// попытка занять чужой не оставляет следов.**
-    ///
-    /// Отказ, ради которого сделана правка, наблюдается только под убийством
-    /// процесса между созданием файла и записью токена, и тестом это не
-    /// разыгрывается. Разыгрывается то, что правка добавила и что можно
-    /// проверить: имя занято – отказ, и рядом не остается ни одного рабочего
-    /// файла, а занятое имя содержит токен целиком, а не пустоту.
-    #[test]
-    fn a_lock_is_written_whole_or_not_at_all() {
-        let dir = tempdir().expect("tempdir");
-        let path = dir.path().join(".aruna-publish.lock");
-
-        write_token(&path, "pid 1, since 1.0\n").expect("free name is taken");
-        assert_eq!(
-            fs::read_to_string(&path).expect("read"),
-            "pid 1, since 1.0\n",
-            "имя занято, но токена в файле нет"
-        );
-
-        let taken = write_token(&path, "pid 2, since 2.0\n");
-        assert!(taken.is_err(), "занятое имя было перезаписано");
-        assert_eq!(
-            fs::read_to_string(&path).expect("read"),
-            "pid 1, since 1.0\n",
-            "чужой токен был затерт"
-        );
-
-        let leftovers: Vec<_> = fs::read_dir(dir.path())
-            .expect("read_dir")
-            .flatten()
-            .map(|e| e.file_name().to_string_lossy().to_string())
-            .filter(|n| n != ".aruna-publish.lock")
-            .collect();
-        assert!(
-            leftovers.is_empty(),
-            "неудачная попытка оставила после себя {leftovers:?}"
-        );
-    }
-
-    /// **A lock replaced under our feet is not removed.**
-    ///
-    /// The whole point of [`remove_if_unchanged`]: the run that judged a lock
-    /// stale must not delete the fresh one that took its place while it was
-    /// deciding.
-    #[test]
-    fn a_lock_that_changed_hands_is_left_alone() {
-        let dir = tempdir().expect("tempdir");
-        let path = dir.path().join(".aruna-publish.lock");
-
-        fs::write(&path, "pid 1, since 1.0\n").expect("write");
-        remove_if_unchanged(&path, "pid 1, since 1.0\n");
-        assert!(!path.exists(), "the lock we read is the lock we remove");
-
-        fs::write(&path, "pid 2, since 2.0\n").expect("write");
-        remove_if_unchanged(&path, "pid 1, since 1.0\n");
-        assert!(
-            path.exists(),
-            "a lock taken by another run between the judgement and the removal was deleted"
-        );
-    }
-
     #[test]
     fn a_second_publication_waits_and_then_says_who_holds_it() {
         let dir = tempdir().expect("tempdir");
-        let (stale, wait, poll) = instant();
+        let (wait, poll) = instant();
 
-        let held = acquire_within(dir.path(), &Job::unattended(), stale, wait, poll)
+        let held = acquire_within(dir.path(), &Job::unattended(), wait, poll)
             .expect("the first run takes it");
 
-        match acquire_within(dir.path(), &Job::unattended(), stale, wait, poll) {
+        match acquire_within(dir.path(), &Job::unattended(), wait, poll) {
             Err(ArunaError::PublishBusy { path, holder }) => {
                 assert_eq!(path, lock_path(dir.path()));
-                assert!(holder.contains("pid"), "no diagnosis in {holder:?}");
+                assert!(is_token(&holder), "no diagnosis in {holder:?}");
             }
             other => panic!("expected a busy lock, got {other:?}"),
         }
 
         drop(held);
-        acquire_within(dir.path(), &Job::unattended(), stale, wait, poll)
+        assert!(
+            !lock_path(dir.path()).exists(),
+            "the lock file outlived its publication"
+        );
+        acquire_within(dir.path(), &Job::unattended(), wait, poll)
             .expect("released when the first run is done");
+    }
+
+    /// **A run that waits says so, once.**
+    ///
+    /// Until 2026-09-24 a waiting run said nothing for as long as it waited –
+    /// five minutes behind a lock left by a killed run. The wait is short now,
+    /// but a live holder can still be waited for, and the reader hears it.
+    #[test]
+    fn a_run_that_waits_says_so_once() {
+        let dir = tempdir().expect("tempdir");
+        let _other = held_by_another(dir.path(), "pid 1, since 1.0\n");
+        let heard = Heard::default();
+        let cancel = crate::job::Cancel::new();
+        let job = Job::new(&heard, &cancel);
+
+        let (wait, poll) = instant();
+        let outcome = acquire_within(dir.path(), &job, wait, poll);
+        assert!(matches!(outcome, Err(ArunaError::PublishBusy { .. })));
+        assert_eq!(
+            heard.0.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the wait was announced other than once"
+        );
+    }
+
+    /// **A lock whose run is gone is taken at once, whatever the file says.**
+    ///
+    /// C2 and C3 of the reliability runs: a run killed while publishing left its
+    /// token, and one killed between creating the file and writing it left an
+    /// empty file; the next run waited out a five-minute staleness either way
+    /// (300,4 and 301,8 s, measured 24.09.2026). Nobody holds the kernel's lock
+    /// on either file, so either is free now. On the old code both waited – here
+    /// the wait is 60 ms, and the old code refused with `PublishBusy`.
+    #[test]
+    fn a_lock_whose_run_is_gone_is_taken_at_once() {
+        for left in ["pid 1, since 1.0\n", "", "(not a token at all)"] {
+            let dir = tempdir().expect("tempdir");
+            let path = lock_path(dir.path());
+            fs::write(&path, left).expect("left behind");
+
+            let (wait, poll) = instant();
+            let taken = acquire_within(dir.path(), &Job::unattended(), wait, poll)
+                .unwrap_or_else(|e| panic!("a lock nobody holds ({left:?}) was waited for: {e}"));
+
+            let now = fs::read_to_string(&path).expect("read");
+            assert!(
+                is_token(now.trim()),
+                "the lock does not say who holds it: {now:?}"
+            );
+            drop(taken);
+        }
     }
 
     /// **Файл под именем блокировки читается не дальше предела.**
     ///
-    /// Имя `.TLHdig_Beta_0.3.publish.lock` лежит в пользовательском каталоге
-    /// назначения, и положить туда файл любого размера может что угодно –
-    /// чужая программа, распакованный архив, ошибка скрипта. Цикл ожидания
-    /// перечитывает это имя каждые сто миллисекунд до десяти минут, а `holder`
-    /// кладет прочитанное в текст отказа. Без предела это шесть тысяч чтений
-    /// файла произвольного размера и он же целиком в сообщении об ошибке:
-    /// прогон умирает не от того, что кто-то держит блокировку, а от памяти.
-    ///
-    /// Проверяется наблюдаемое следствие – длина того, что доехало до
-    /// вызывающего. Токен – одна строка; все, что длиннее предела, этим
-    /// прогоном не писалось.
+    /// Имя лежит в пользовательском каталоге назначения, и держатель, чей файл
+    /// длиннее любого токена, – не эта программа. В отказ из такого файла
+    /// уходит не больше предела и не его содержимое.
     #[test]
     fn a_lock_file_of_any_size_is_read_no_further_than_the_limit() {
         let dir = tempdir().expect("tempdir");
-        let (stale, wait, poll) = instant();
-        let path = lock_path(dir.path());
-
-        // Заметно больше предела и заметно больше любого токена. Свежий по
-        // времени изменения, потому что записан сейчас, – значит `abandoned`
-        // его не снимет и ожидание дойдет до отказа.
         let huge = "x".repeat(2 * 1024 * 1024);
-        fs::write(&path, &huge).expect("write");
+        let _other = held_by_another(dir.path(), &huge);
 
-        match acquire_within(dir.path(), &Job::unattended(), stale, wait, poll) {
+        let (wait, poll) = instant();
+        match acquire_within(dir.path(), &Job::unattended(), wait, poll) {
             Err(ArunaError::PublishBusy { holder, .. }) => {
                 assert!(
                     holder.len() <= MAX_LOCK as usize,
@@ -501,61 +400,61 @@ mod tests {
             }
             other => panic!("ожидался занятый замок, получено {other:?}"),
         }
-
-        // И сам файл не тронут: снимать чужое этот код не вправе.
         assert_eq!(
-            fs::metadata(&path).expect("metadata").len(),
+            fs::metadata(lock_path(dir.path())).expect("metadata").len(),
             huge.len() as u64,
-            "файл под именем блокировки изменен"
+            "файл держателя изменен"
         );
     }
 
-    /// A run killed mid-publication leaves its lock behind, and the next run
-    /// must not wait for a process that will never release it.
-    #[test]
-    fn a_lock_left_behind_is_taken_once_it_goes_stale() {
-        let dir = tempdir().expect("tempdir");
-        let path = lock_path(dir.path());
-        fs::write(&path, "pid 1, since long ago\n").expect("an abandoned lock");
-
-        let (_, wait, poll) = instant();
-        let taken = acquire_within(
-            dir.path(),
-            &Job::unattended(),
-            // Everything already written is old enough.
-            Duration::ZERO,
-            wait,
-            poll,
-        )
-        .expect("an abandoned lock is taken");
-
-        assert_eq!(
-            fs::read_to_string(&path).expect("read"),
-            taken.token,
-            "the lock now says who holds it"
-        );
-    }
-
-    /// The guard removes its own lock and nobody else's.
+    /// The guard removes its own lock file and nobody else's.
     ///
-    /// The distinction matters exactly once: when this run's lock has already
-    /// been taken over by another, and dropping the guard would otherwise hand
-    /// the directory to a third run in the middle of a publication.
+    /// When the name no longer points at the file this run locked – replaced
+    /// by another file – the guard leaves the new one alone.
     #[test]
-    fn dropping_a_guard_whose_lock_was_replaced_leaves_the_new_one_alone() {
+    fn dropping_a_guard_whose_file_was_replaced_leaves_the_new_one_alone() {
         let dir = tempdir().expect("tempdir");
-        let (stale, wait, poll) = instant();
+        let (wait, poll) = instant();
         let path = lock_path(dir.path());
 
-        let held =
-            acquire_within(dir.path(), &Job::unattended(), stale, wait, poll).expect("acquire");
-        fs::write(&path, "pid 999, someone else\n").expect("replaced");
+        let held = acquire_within(dir.path(), &Job::unattended(), wait, poll).expect("acquire");
+        let other = dir.path().join("other");
+        fs::write(&other, "pid 999, since 9.0\n").expect("write");
+        fs::rename(&other, &path).expect("replaced");
         drop(held);
 
         assert!(
             path.exists(),
-            "a guard removed a lock that was no longer its own"
+            "a guard removed a lock file that was no longer its own"
         );
+    }
+
+    /// **A waiter that locked a file its holder removed tries again.**
+    ///
+    /// The holder removes the file while it still holds the lock; a waiter
+    /// that had it open locks a file with no name. The inode check sends it
+    /// back to the name, where it takes the lock properly.
+    #[test]
+    fn a_lock_on_a_removed_file_is_not_taken_for_the_lock() {
+        let dir = tempdir().expect("tempdir");
+        let path = lock_path(dir.path());
+        fs::write(&path, "").expect("write");
+        let stale = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .expect("open");
+        fs::remove_file(&path).expect("removed by its holder");
+        stale.try_lock().expect("the nameless file locks");
+        assert!(
+            !same_file(&stale, &path),
+            "a nameless file passed for the lock"
+        );
+
+        let (wait, poll) = instant();
+        let taken =
+            acquire_within(dir.path(), &Job::unattended(), wait, poll).expect("the name is free");
+        assert!(same_file(&taken.file, &path));
     }
 
     /// Waiting is not a place a cancelled run gets stuck in, and the stop it
@@ -563,15 +462,14 @@ mod tests {
     #[test]
     fn a_run_cancelled_while_waiting_reports_the_stop() {
         let dir = tempdir().expect("tempdir");
-        let (stale, wait, poll) = instant();
-        let _held = acquire_within(dir.path(), &Job::unattended(), stale, wait, poll)
-            .expect("the lock is held by someone");
+        let (_, poll) = instant();
+        let _other = held_by_another(dir.path(), "pid 1, since 1.0\n");
 
         let cancel = crate::job::Cancel::new();
         cancel.cancel();
         let job = Job::new(&crate::progress::Silent, &cancel);
 
-        match acquire_within(dir.path(), &job, stale, Duration::from_secs(30), poll) {
+        match acquire_within(dir.path(), &job, Duration::from_secs(30), poll) {
             Err(ArunaError::Cancelled { phase }) => assert_eq!(phase, Phase::Publishing),
             other => panic!("expected a stop, got {other:?}"),
         }
@@ -579,22 +477,17 @@ mod tests {
 
     /// **Отказ не повторяет содержимое чужого файла.**
     ///
-    /// Заслон 13.09.2026, позиция 3: файл под именем блокировки с ESC, BEL,
-    /// BS и NUL внутри уехал в текст отказа целиком, и терминал читателя
-    /// исполнил цветовые последовательности. Имя лежит в каталоге читателя, и
-    /// что в нем, решает кто угодно; в отказ идет только то, что написала эта
-    /// программа, – собственный токен. Токен той же проверкой проходит:
-    /// `a_second_publication_waits_and_then_says_who_holds_it` по-прежнему
-    /// находит в отказе `pid`.
+    /// Заслон 13.09.2026, позиция 3: файл с ESC, BEL, BS и NUL внутри уехал в
+    /// текст отказа целиком, и терминал читателя исполнил цветовые
+    /// последовательности. В отказ идет только собственный токен программы.
     #[test]
     fn a_foreign_lock_file_is_not_repeated_into_the_refusal() {
         let dir = tempdir().expect("tempdir");
-        let (stale, wait, poll) = instant();
-        let path = lock_path(dir.path());
         let foreign = "(FOREIGN-CONTENT-3f9a\u{1b}[31mRED\u{1b}[0m\u{7}\u{8}\u{0}tail)";
-        fs::write(&path, foreign).expect("write");
+        let _other = held_by_another(dir.path(), foreign);
 
-        match acquire_within(dir.path(), &Job::unattended(), stale, wait, poll) {
+        let (wait, poll) = instant();
+        match acquire_within(dir.path(), &Job::unattended(), wait, poll) {
             Err(ArunaError::PublishBusy { holder, .. }) => {
                 assert!(
                     !holder.chars().any(char::is_control),
@@ -608,117 +501,67 @@ mod tests {
             other => panic!("ожидался занятый замок, получено {other:?}"),
         }
         assert_eq!(
-            fs::read_to_string(&path).expect("read"),
+            fs::read_to_string(lock_path(dir.path())).expect("read"),
             foreign,
-            "чужой файл тронут"
+            "файл держателя тронут"
         );
     }
 
-    /// **Каталог на месте файла блокировки кончается отказом, а не вечным
-    /// циклом.**
+    /// **Не файл под именем блокировки – отказ сразу, а не ожидание.**
     ///
-    /// Заслон 13.09.2026, позиция 4: каталог старше порога устаревания
-    /// признавался брошенным, `remove_file` на нем молча не удавался, и
-    /// `continue` уводил мимо и срока, и паузы – 720 с при 95–99 % процессора,
-    /// пока прогон не убили. Любая неудача снятия подчиняется тому же сроку и
-    /// той же паузе, что и живой держатель.
+    /// Каталог ждался десять минут (610 с на заслоне 23.09.2026), канал держал
+    /// `open` без конца до 23.09.2026, ссылка вела бы запись туда, куда она
+    /// указывает. Ни одно из них этой программой не положено и никогда не
+    /// освободится; отказ называет место и ничего не трогает.
     ///
-    /// На коде с дефектом вызов не возвращается никогда, поэтому он идет в
-    /// своем потоке с предохранителем: не дождались – это и есть отказ теста,
-    /// а флаг отмены затем выпускает поток из цикла, чтобы набор не повис.
+    /// Вызов идет в своем потоке с предохранителем: на коде с дефектом канал не
+    /// возвращается никогда, а каталог – только через весь срок.
     #[test]
-    fn a_directory_where_the_lock_belongs_ends_in_a_refusal_rather_than_a_spin() {
-        let dir = tempdir().expect("tempdir");
-        let path = lock_path(dir.path());
-        fs::create_dir(&path).expect("a directory at the lock path");
-
-        let destination = dir.path().to_path_buf();
-        let cancel = crate::job::Cancel::new();
-        let worker_cancel = cancel.clone();
-        let (sent, received) = std::sync::mpsc::channel();
-        let worker = std::thread::spawn(move || {
-            let job = Job::new(&crate::progress::Silent, &worker_cancel);
-            let outcome = acquire_within(
-                &destination,
-                &job,
-                // Все, что уже лежит, достаточно старо: ровно случай заслона.
-                Duration::ZERO,
-                Duration::from_millis(60),
-                Duration::from_millis(5),
-            )
-            .map(|_| ());
-            let _ = sent.send(outcome);
-        });
-
-        let outcome = received.recv_timeout(Duration::from_secs(5));
-        cancel.cancel();
-        let _ = worker.join();
-
-        match outcome {
-            Ok(Err(ArunaError::PublishBusy { .. })) => {}
-            Err(_) => panic!("ожидание не кончилось за 5 с: цикл без паузы и срока"),
-            Ok(other) => panic!("ожидался отказ по занятому замку, получено {other:?}"),
-        }
-        assert!(path.is_dir(), "каталог под именем блокировки снят");
-    }
-
-    /// **Именованный канал на месте файла блокировки кончается отказом, а не
-    /// вечным ожиданием.**
-    ///
-    /// `File::open` на канале без писателя не возвращается, пока писатель не
-    /// появится, – и это не цикл, который прерывают срок и отмена, а один
-    /// системный вызов, из которого не выпускает ничто. Канал под этим именем
-    /// кладет кто угодно: имя лежит в каталоге читателя. Прогон с окном вис
-    /// бы на «Публикации» без конца, и кнопка «Остановить» до него не доходила.
-    ///
-    /// Канал свежий, поэтому устаревшим он не признается и ожидание обязано
-    /// дойти до отказа по сроку. На коде с дефектом поток не возвращается
-    /// никогда: предохранитель – `recv_timeout`, а зависший поток умирает с
-    /// процессом теста.
-    #[test]
-    fn a_fifo_where_the_lock_belongs_ends_in_a_refusal_rather_than_a_hang() {
-        let dir = tempdir().expect("tempdir");
-        let path = lock_path(dir.path());
-        let made = std::process::Command::new("mkfifo")
-            .arg(&path)
-            .status()
-            .expect("mkfifo");
-        assert!(made.success(), "канал не создан");
-
-        let destination = dir.path().to_path_buf();
-        let cancel = crate::job::Cancel::new();
-        let worker_cancel = cancel.clone();
-        let (sent, received) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let job = Job::new(&crate::progress::Silent, &worker_cancel);
-            let outcome = acquire_within(
-                &destination,
-                &job,
-                Duration::from_secs(3600),
-                Duration::from_millis(60),
-                Duration::from_millis(5),
-            )
-            .map(|_| ());
-            let _ = sent.send(outcome);
-        });
-
-        let outcome = received.recv_timeout(Duration::from_secs(5));
-        cancel.cancel();
-
-        match outcome {
-            Ok(Err(ArunaError::PublishBusy { holder, .. })) => {
-                assert_eq!(holder, "an unnamed run", "канал назван держателем");
+    fn something_that_is_not_a_lock_file_is_refused_at_once() {
+        for kind in ["directory", "fifo", "symlink"] {
+            let dir = tempdir().expect("tempdir");
+            let path = lock_path(dir.path());
+            match kind {
+                "directory" => fs::create_dir(&path).expect("dir"),
+                "fifo" => {
+                    let made = std::process::Command::new("mkfifo")
+                        .arg(&path)
+                        .status()
+                        .expect("mkfifo");
+                    assert!(made.success(), "канал не создан");
+                }
+                _ => std::os::unix::fs::symlink(dir.path().join("elsewhere"), &path)
+                    .expect("symlink"),
             }
-            Err(_) => panic!("ожидание не кончилось за 5 с: чтение канала не вернулось"),
-            Ok(other) => panic!("ожидался отказ по занятому замку, получено {other:?}"),
+
+            let destination = dir.path().to_path_buf();
+            let (sent, received) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                let outcome = acquire_within(
+                    &destination,
+                    &Job::unattended(),
+                    Duration::from_secs(3600),
+                    Duration::from_millis(5),
+                )
+                .map(|_| ());
+                let _ = sent.send(outcome);
+            });
+
+            match received.recv_timeout(Duration::from_secs(5)) {
+                Ok(Err(ArunaError::ExportDestination { path: named, .. })) => {
+                    assert_eq!(named, path, "{kind}: the refusal names another place");
+                }
+                Err(_) => panic!("{kind}: no answer within 5 s"),
+                Ok(other) => panic!("{kind}: expected a refusal, got {other:?}"),
+            }
+            assert!(
+                fs::symlink_metadata(&path).is_ok(),
+                "{kind} under the lock's name was removed"
+            );
+            assert!(
+                !dir.path().join("elsewhere").exists(),
+                "{kind}: something was written where the link points"
+            );
         }
-        use std::os::unix::fs::FileTypeExt as _;
-        assert!(
-            fs::symlink_metadata(&path)
-                .expect("канал на месте")
-                .file_type()
-                .is_fifo(),
-            "канал под именем блокировки тронут"
-        );
     }
 }

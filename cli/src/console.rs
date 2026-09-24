@@ -272,7 +272,11 @@ pub const PHRASES: &[(&str, &str)] = &[
         "the published package differs from the one that was built and checked",
         "опубликованный пакет отличается от собранного и проверенного",
     ),
-    // export::lock – держатель блокировки
+    // export::lock – держатель блокировки и то, что стоит на ее месте
+    (
+        "something that is not a lock file stands where the publish lock belongs",
+        "на месте блокировки публикации стоит не файл блокировки",
+    ),
     ("pid {}, since {}", "процесс {}, с {}"),
     ("a lock file this program did not write", "файл блокировки, который эта программа не писала"),
     ("an unnamed run", "запуск без имени"),
@@ -604,7 +608,7 @@ mod tests {
             ),
             (
                 include_str!("export/lock.rs"),
-                &["Some(_) => ", "None => "][..],
+                &["Some(_) => ", "None => ", "reason:"][..],
             ),
             (include_str!("fonts.rs"), &["covers: "][..]),
             (include_str!("export/mod.rs"), &["first: "][..]),
