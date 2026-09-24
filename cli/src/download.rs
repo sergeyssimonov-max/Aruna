@@ -435,17 +435,17 @@ fn create_parent(dest: &Path) -> Result<()> {
 /// deadline, fifteen minutes. The attempt deadline is kept by
 /// [`stream_to_file`] between reads instead.
 ///
-/// A proxy named in `ALL_PROXY`, `HTTPS_PROXY` or `HTTP_PROXY` is used, in
-/// that order – `ureq` 2 reads them only when asked, and until 2026-09-24
-/// nothing asked. `NO_PROXY` is not supported by `ureq` 2. An application
-/// started from Finder sees no shell variables, so this serves the console.
+/// A proxy named in the environment is used – see [`proxy_from_env`].
+/// `NO_PROXY` is not supported by `ureq` 2. An application started from
+/// Finder sees no shell variables, so this serves the console.
 fn request_within(url: &str, timeouts: Timeouts) -> Result<ureq::Response> {
-    let agent = ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_secs(30))
-        .timeout_read(timeouts.read)
-        .user_agent(&user_agent())
-        .try_proxy_from_env(true)
-        .build();
+    let agent = with_proxy(
+        ureq::AgentBuilder::new()
+            .timeout_connect(Duration::from_secs(30))
+            .timeout_read(timeouts.read)
+            .user_agent(&user_agent()),
+    )
+    .build();
     call(&agent, url)
 }
 
@@ -517,10 +517,51 @@ pub fn user_agent() -> String {
     )
 }
 
+/// The agent with the environment's proxy, if one is named and usable.
+///
+/// Both agents take it, as the download and the question about it must go the
+/// same way behind a proxy.
+fn with_proxy(builder: ureq::AgentBuilder) -> ureq::AgentBuilder {
+    match proxy_among(|name| std::env::var(name).ok()).map(ureq::Proxy::new) {
+        Some(Ok(proxy)) => builder.proxy(proxy),
+        _ => builder,
+    }
+}
+
+/// Which proxy the environment names for a request, as `curl` would choose it.
+///
+/// Chosen here rather than by `ureq`'s `try_proxy_from_env`, which asked
+/// `ALL_PROXY` first and took the first value it could parse. Clash and Surge
+/// export `https_proxy=http://…` beside `all_proxy=socks5://…`, and this crate
+/// is built without SOCKS: every connection failed "SOCKS feature disabled",
+/// where before T7 (2b24bf8) it had gone direct (review, 25.09.2026). Now the
+/// order is `curl`'s for an `https` address – `HTTPS_PROXY`, then `ALL_PROXY` –
+/// with `HTTP_PROXY` last, and only a proxy this crate can speak is taken: an
+/// `http://` address or one written with no scheme. A SOCKS address is passed
+/// over for the next variable.
+fn proxy_among(var: impl Fn(&str) -> Option<String>) -> Option<String> {
+    const NAMES: [&str; 6] = [
+        "HTTPS_PROXY",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+    ];
+    NAMES
+        .iter()
+        .filter_map(|name| var(name))
+        .map(|value| value.trim().to_string())
+        .find(|value| match value.split_once("://") {
+            Some((scheme, _)) => scheme.eq_ignore_ascii_case("http"),
+            None => !value.is_empty(),
+        })
+}
+
 /// GET `url` under one overall deadline – for asking questions ([`fetch_text`]),
 /// where the answer is small and nobody is waiting to cancel it.
 fn request_answer(url: &str, deadline: Duration) -> Result<ureq::Response> {
-    let agent = ureq::AgentBuilder::new()
+    let agent = with_proxy(ureq::AgentBuilder::new())
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(Duration::from_secs(300))
         .timeout(deadline)
@@ -530,9 +571,6 @@ fn request_answer(url: &str, deadline: Duration) -> Result<ureq::Response> {
         // because nothing ever fails when it is. Zenodo's logs are the one place
         // this shows, which is exactly why nobody would have noticed.
         .user_agent(&user_agent())
-        // `ALL_PROXY`, `HTTPS_PROXY` or `HTTP_PROXY`, as for the download:
-        // behind a proxy the question and the archive go the same way.
-        .try_proxy_from_env(true)
         .build();
     call(&agent, url)
 }
@@ -1034,8 +1072,7 @@ mod tests {
 
     /// **A proxy named in the environment carries the request.**
     ///
-    /// `ureq` 2 reads `ALL_PROXY`, `HTTPS_PROXY` and `HTTP_PROXY` only when
-    /// asked, and until 2026-09-24 nothing asked: behind a proxy the download
+    /// Until 2026-09-24 nothing read the proxy variables: behind a proxy the download
     /// could not go anywhere, and there was nothing to set. The host here does
     /// not resolve, so without the proxy the request fails at DNS; with it the
     /// request line reaches the proxy in absolute form. nextest runs each test
@@ -1059,12 +1096,14 @@ mod tests {
             line
         });
 
-        std::env::set_var("HTTP_PROXY", format!("http://127.0.0.1:{port}"));
+        // `HTTPS_PROXY`, the first one asked: a proxy the developer's own
+        // shell names in any other variable cannot take the request instead.
+        std::env::set_var("HTTPS_PROXY", format!("http://127.0.0.1:{port}"));
         let answer = fetch_text(
             "http://aruna-proxy-test.invalid/record",
             Duration::from_secs(10),
         );
-        std::env::remove_var("HTTP_PROXY");
+        std::env::remove_var("HTTPS_PROXY");
 
         assert_eq!(answer.expect("the answer through the proxy"), "ok");
         assert!(
@@ -1074,6 +1113,48 @@ mod tests {
                 .starts_with("GET http://aruna-proxy-test.invalid/record"),
             "the request did not go through the proxy"
         );
+    }
+
+    /// **The proxy is chosen as `curl` chooses it, and SOCKS is passed over.**
+    #[test]
+    fn the_proxy_is_chosen_as_curl_chooses_it() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| (*v).to_string())
+            }
+        };
+        // Clash and Surge: both set, and the SOCKS one must not win.
+        assert_eq!(
+            proxy_among(env(&[
+                ("all_proxy", "socks5://127.0.0.1:7890"),
+                ("https_proxy", "http://127.0.0.1:7890"),
+            ])),
+            Some("http://127.0.0.1:7890".into())
+        );
+        // `HTTPS_PROXY` before `ALL_PROXY`, and both before `HTTP_PROXY`.
+        assert_eq!(
+            proxy_among(env(&[
+                ("HTTP_PROXY", "http://c:3"),
+                ("ALL_PROXY", "http://b:2"),
+                ("HTTPS_PROXY", "a:1"),
+            ])),
+            Some("a:1".into())
+        );
+        // SOCKS alone: no proxy, as before T7, rather than no connection.
+        assert_eq!(proxy_among(env(&[("ALL_PROXY", "socks5://x:1")])), None);
+        // A scheme this crate cannot speak is passed over for the next.
+        assert_eq!(
+            proxy_among(env(&[
+                ("https_proxy", "https://p:3128"),
+                ("http_proxy", "http://q:8080")
+            ])),
+            Some("http://q:8080".into())
+        );
+        assert_eq!(proxy_among(env(&[("HTTPS_PROXY", "  ")])), None);
+        assert_eq!(proxy_among(env(&[])), None);
     }
 
     /// 503 is the server saying "busy", so the next attempt gets the archive.
