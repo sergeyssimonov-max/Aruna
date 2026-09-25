@@ -137,16 +137,25 @@ fn acquire_within(
 
 /// Whether the disk has refused `flock` itself, rather than someone holding it.
 ///
-/// Asked by number, macOS's: std gives `ENOTSUP` and `EOPNOTSUPP` no kind of
-/// their own (measured – `Unsupported` is `ENOSYS`), and `ENOLCK` – an NFS
-/// mount with `nolocks`, or a server without a lock manager – none either.
+/// Asked by number: std gives `ENOTSUP` and `EOPNOTSUPP` no kind of their own
+/// (measured – `Unsupported` is `ENOSYS`), and `ENOLCK` – an NFS mount with
+/// `nolocks`, or a server without a lock manager – none either.
 fn unsupported(err: &std::io::Error) -> bool {
-    const ENOTSUP: i32 = 45;
-    const ENOLCK: i32 = 77;
-    const EOPNOTSUPP: i32 = 102;
     err.kind() == std::io::ErrorKind::Unsupported
-        || matches!(err.raw_os_error(), Some(ENOTSUP | ENOLCK | EOPNOTSUPP))
+        || err
+            .raw_os_error()
+            .is_some_and(|errno| NO_LOCKS.contains(&errno))
 }
+
+/// `ENOTSUP`, `ENOLCK`, `EOPNOTSUPP` – the numbers are the kernel's own:
+/// macOS ships, and the tests also run on Linux, where 78 is not `ENOSYS`
+/// but `EREMCHG`.
+#[cfg(target_os = "macos")]
+const NO_LOCKS: [i32; 3] = [45, 77, 102];
+#[cfg(target_os = "linux")]
+const NO_LOCKS: [i32; 3] = [95, 37, 95];
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+const NO_LOCKS: [i32; 0] = [];
 
 /// [`acquire_within`] with the kernel's two answers as arguments, so that a
 /// disk without `flock` and one whose inode numbers drift can be tested on a
@@ -532,8 +541,13 @@ mod tests {
     #[test]
     fn a_disk_without_flock_is_published_to_unguarded_and_says_so() {
         let dir = tempdir().expect("tempdir");
-        // ENOTSUP, ENOLCK, EOPNOTSUPP, ENOSYS.
-        for errno in [45, 77, 102, 78] {
+        // ENOTSUP, ENOLCK, EOPNOTSUPP, ENOSYS – written out apart from
+        // `NO_LOCKS`, so that a wrong number there is caught here.
+        #[cfg(target_os = "macos")]
+        let refusals = [45, 77, 102, 78];
+        #[cfg(target_os = "linux")]
+        let refusals = [95, 37, 95, 38];
+        for errno in refusals {
             let heard = Told(std::sync::Mutex::new(Vec::new()));
             let cancel = crate::job::Cancel::new();
             let job = Job::new(&heard, &cancel);
