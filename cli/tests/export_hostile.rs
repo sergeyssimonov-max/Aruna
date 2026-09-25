@@ -869,6 +869,51 @@ fn every_document_the_normalisation_check_refuses_is_named() {
     );
 }
 
+/// **Two groups whose folders differ only in Unicode form are refused on a
+/// disk that takes them for one**, not merged into one folder.
+///
+/// Case is folded when the documents are placed; NFC and NFD are not – the
+/// crate has no normaliser – and on APFS the second group's folder is the
+/// first's. The write loop asks `create_dir` and names the collision.
+#[test]
+fn two_groups_that_differ_only_in_unicode_form_are_not_merged() {
+    let dir = tempdir().expect("tempdir");
+    let body = |cth: &str, siglum: &str| {
+        manuscript(siglum)
+            .replace("<meta>", &format!(r#"<meta><cth n="{cth}"/>"#))
+            .into_bytes()
+    };
+    let entries = [
+        ("root/x/nfc.xml", body("5\u{c7}", "KBo 1.1")),
+        ("root/x/nfd.xml", body("5C\u{327}", "KBo 2.2")),
+    ];
+    let zip = archive(dir.path(), &entries);
+    let destination = dir.path().join("out");
+    fs::create_dir(&destination).expect("destination");
+
+    let built = export::build(
+        &zip,
+        &destination,
+        "hostile",
+        &aruna::job::Job::unattended(),
+    );
+    if cfg!(target_os = "macos") {
+        match built {
+            Err(ArunaError::ExportCollision { first, second, .. }) => {
+                assert!(first.ends_with("nfc.xml"), "{first}");
+                assert!(second.ends_with("nfd.xml"), "{second}");
+                assert!(
+                    !destination.join(PACKAGE).exists(),
+                    "a refused build left a package"
+                );
+            }
+            other => panic!("two spellings of one folder were merged: {other:?}"),
+        }
+    } else {
+        assert!(matches!(built, Ok(ref b) if b.documents == 2), "{built:?}");
+    }
+}
+
 /// **Two sigla that differ only in Unicode form are a collision, not a disk
 /// failure.**
 ///
@@ -888,12 +933,24 @@ fn two_sigla_that_differ_only_in_unicode_form_are_a_collision_not_a_disk_failure
     let destination = dir.path().join("out");
     fs::create_dir(&destination).expect("destination");
 
-    match export::build(
+    let built = export::build(
         &zip,
         &destination,
         "hostile",
         &aruna::job::Job::unattended(),
-    ) {
+    );
+    // Which answer is due is the filesystem's, and a test that took either
+    // passed on Linux CI without ever reaching the collision (review,
+    // 25.09.2026): APFS on macOS must refuse, a Linux filesystem must write both.
+    if cfg!(target_os = "macos") {
+        assert!(
+            matches!(built, Err(ArunaError::ExportCollision { .. })),
+            "APFS takes the two for one, and the build said {built:?}"
+        );
+    } else {
+        assert!(matches!(built, Ok(ref b) if b.documents == 2), "{built:?}");
+    }
+    match built {
         Ok(built) => assert_eq!(built.documents, 2),
         Err(ArunaError::ExportCollision { first, second, .. }) => {
             let both = format!("{first} {second}");

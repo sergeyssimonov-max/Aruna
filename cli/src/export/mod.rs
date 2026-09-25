@@ -206,11 +206,35 @@ fn collision_key(relative: &Path) -> String {
 /// from the published file rather than trusting the rule.
 pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
     let mut taken: HashMap<String, String> = HashMap::with_capacity(fragments.len());
+    // A group's folder by its folded name: the name as written and the first
+    // document filed there.
+    let mut folders: HashMap<String, (String, String)> = HashMap::new();
     let mut placed = Vec::with_capacity(fragments.len());
 
     for fragment in fragments {
         let group = group_label(&fragment.record);
         let base = fragment.record.sigla.as_str();
+
+        // **Two groups whose folders differ only in case are one folder** on
+        // APFS and on most disks a package is copied to, and their documents
+        // would merge into it silently – the inventory linking each under its
+        // own spelling, half the links broken after a copy to Linux (review,
+        // 25.09.2026). Decided here, alike on every platform; no two groups of
+        // the corpus meet it. What case folding does not see – an NFC and an
+        // NFD spelling – the write loop catches on the disk.
+        let folder = naming::dir_component(group);
+        let (written, first) = folders
+            .entry(folder.to_lowercase())
+            .or_insert_with(|| (folder.clone(), fragment.source.clone()));
+        if *written != folder {
+            return Err(ArunaError::ExportCollision {
+                group: group.to_string(),
+                fragment: base.to_string(),
+                first: first.clone(),
+                second: fragment.source.clone(),
+                path: PathBuf::from(written.as_str()),
+            });
+        }
 
         let mut relative = output_path(group, base);
         if taken.contains_key(&collision_key(&relative)) {
@@ -1122,8 +1146,10 @@ fn write_documents(
     // allocation for all 24 000 of them.
     let mut bytes = Vec::new();
     let mut normalised = Vec::new();
-    // See the write below: the directory this loop made last.
+    // See the write below: the directory this loop made last, and every one it
+    // made, with the first document it made it for.
     let mut last_dir: Option<PathBuf> = None;
+    let mut made: HashMap<PathBuf, String> = HashMap::new();
     // Every document the normalisation check refused, in archive order. The
     // build stops on them all the same, but after looking at every one, so the
     // reader hears of each in one run rather than one per run.
@@ -1215,7 +1241,21 @@ fn write_documents(
             // is wrong is a cache that is stale, and there is nothing here to
             // go stale against.
             if last_dir.as_deref() != Some(parent) {
-                create_dir(parent)?;
+                if !made.contains_key(parent) {
+                    // `create_dir`, not `_all`: a group's folder is one level
+                    // under staging, and one that already exists without this
+                    // loop having made it is a folder the disk takes for
+                    // another – APFS does not tell NFC from NFD. The documents
+                    // of two groups would merge into it silently.
+                    match fs::create_dir(parent) {
+                        Ok(()) => {}
+                        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                            return Err(folder_twin_of(parent, &name, &made, relative));
+                        }
+                        Err(err) => return Err(ArunaError::io(parent)(err)),
+                    }
+                    made.insert(parent.to_path_buf(), name.clone());
+                }
                 last_dir = Some(parent.to_path_buf());
             }
         }
@@ -1279,6 +1319,38 @@ fn write_documents(
 /// document already written to that file – found by its identity on disk,
 /// which is the only thing the filesystem and this program agree on. Only on
 /// this path, so the walk over the placements costs nothing on a good run.
+/// The collision behind a group folder the disk already had: which folder this
+/// run made that the disk takes for `parent`, and the first document filed in
+/// it.
+fn folder_twin_of(
+    parent: &Path,
+    second: &str,
+    made: &HashMap<PathBuf, String>,
+    relative: &Path,
+) -> ArunaError {
+    use std::os::unix::fs::MetadataExt as _;
+    let identity = |path: &Path| fs::metadata(path).ok().map(|m| (m.dev(), m.ino()));
+    let held = identity(parent);
+    let (path, first) = made
+        .iter()
+        .find(|(folder, _)| held.is_some() && identity(folder) == held)
+        .map(|(folder, first)| (folder.clone(), first.clone()))
+        .unwrap_or_else(|| (parent.to_path_buf(), "(unknown)".to_string()));
+    ArunaError::ExportCollision {
+        group: relative
+            .parent()
+            .map(|group| group.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        fragment: relative
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        first,
+        second: second.to_string(),
+        path: path.file_name().map(PathBuf::from).unwrap_or(path),
+    }
+}
+
 fn twin_of(
     relative: &Path,
     second: &str,
@@ -1685,6 +1757,31 @@ mod tests {
         let placed = place(&fragments).expect("two groups, two files");
         assert_eq!(placed[0].relative, PathBuf::from("CTH 1/KUB 26.71.xml"));
         assert_eq!(placed[1].relative, PathBuf::from("CTH 18/KUB 26.71.xml"));
+    }
+
+    /// **Two groups whose folders differ only in case are a collision**, not
+    /// one folder their documents merge into.
+    #[test]
+    fn two_groups_that_differ_only_in_case_are_a_collision() {
+        let fragments = vec![
+            fragment("KBo 1.1", "CTH 5a", "root/x/a.xml"),
+            fragment("KBo 2.2", "CTH 5A", "root/x/b.xml"),
+        ];
+        match place(&fragments) {
+            Err(ArunaError::ExportCollision {
+                first,
+                second,
+                path,
+                ..
+            }) => {
+                assert_eq!(
+                    (first.as_str(), second.as_str()),
+                    ("root/x/a.xml", "root/x/b.xml")
+                );
+                assert_eq!(path, PathBuf::from("CTH 5a"));
+            }
+            other => panic!("two spellings of one folder were placed: {other:?}"),
+        }
     }
 
     /// Three of a kind: the suffix is taken from the archive directory, so a
