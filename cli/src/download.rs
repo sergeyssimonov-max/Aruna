@@ -619,9 +619,13 @@ pub fn unusable_proxy() -> Option<&'static str> {
 /// GET `url` under one overall deadline – for asking questions ([`fetch_text`]),
 /// where the answer is small and nobody is waiting to cancel it.
 fn request_answer(url: &str, deadline: Duration) -> Result<ureq::Response> {
+    // Every wait is held to the deadline as well, not only the whole: ureq 2
+    // does not keep the overall timeout over a TLS handshake through a proxy,
+    // and there the read timeout was what applied – 300 s against a 10 s
+    // question (release gate 25.09.2026, Н1).
     let agent = with_proxy(ureq::AgentBuilder::new())
-        .timeout_connect(Duration::from_secs(30))
-        .timeout_read(Duration::from_secs(300))
+        .timeout_connect(deadline.min(Duration::from_secs(30)))
+        .timeout_read(deadline)
         .timeout(deadline)
         // Built from the manifest rather than written out. It said `Aruna/1.0`
         // through every release of the 2.x line — a version string that stopped
@@ -1125,6 +1129,46 @@ mod tests {
             server.hits(),
             1,
             "a digest mismatch is deterministic; re-downloading cannot fix it"
+        );
+    }
+
+    /// **A question behind a proxy that went silent is given up on by its own
+    /// deadline.**
+    ///
+    /// The proxy answers CONNECT and then says nothing, so the TLS handshake
+    /// waits on a read. ureq 2 does not hold the overall timeout over that
+    /// handshake: the read timeout is what applies there, and it was 300 s
+    /// against the 10 s the Zenodo question asks for – measured 300 s by the
+    /// release gate of 25.09.2026 (Н1), with a cancel unable to reach it. The
+    /// proxy here holds the line for 20 s, so the old code fails in 20 s
+    /// rather than 300.
+    #[test]
+    fn a_question_behind_a_silent_proxy_ends_by_its_deadline() {
+        use std::io::{Read as _, Write as _};
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 4096];
+            let _ = conn.read(&mut buf).expect("read");
+            conn.write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                .expect("reply");
+            std::thread::sleep(Duration::from_secs(20));
+        });
+
+        std::env::set_var("HTTPS_PROXY", format!("http://127.0.0.1:{port}"));
+        let started = std::time::Instant::now();
+        let answer = fetch_text(
+            "https://aruna-proxy-test.invalid/record",
+            Duration::from_secs(1),
+        );
+        let waited = started.elapsed();
+        std::env::remove_var("HTTPS_PROXY");
+
+        assert!(answer.is_err(), "a silent proxy gave an answer");
+        assert!(
+            waited < Duration::from_secs(5),
+            "a 1 s question waited {waited:?}"
         );
     }
 
