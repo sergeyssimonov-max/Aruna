@@ -135,6 +135,15 @@ bundle itself, and clearing only the top one leaves the copy that stops it
 opening. Point it wherever the `.app` actually is — `/Applications` is where
 this project suggests putting it, not where macOS requires it.
 
+**Clear the flag before the first attempt to open the app, not after.** Once
+macOS 13 has checked a quarantined bundle at launch, it protects it: `xattr -dr`
+on a copy that has already been opened answers *"Operation not permitted"* for
+every file in the bundle (22 of them, measured on the release gate of
+2026-09-23), while the same command on a fresh copy, before its first launch,
+clears every flag and leaves the signature intact. If the app has already been
+tried, the way left is **System Settings → Privacy & Security → Open Anyway**,
+below, or a fresh copy from the DMG.
+
 Finder's route to the same exception: right-click the app → **Open** → **Open**
 in the dialog. On Ventura and later a blocked app can also be allowed under
 **System Settings → Privacy & Security**, where an *"Open Anyway"* button

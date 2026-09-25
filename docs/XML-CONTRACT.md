@@ -252,6 +252,25 @@ none. Such a document is now refused. No document in this corpus declares
 anything but UTF-8 (442 do; 23 494 declare nothing, which XML already reads as
 UTF-8), so the rule costs nothing today and closes the guarantee.
 
+**The version is held the same way since 2026-09-22** (`47dbf1e`): a source
+declaring any version other than `1.0` is refused, because the canonical
+declaration would silently change what its line ends and permitted characters
+mean. All 442 declarations in the corpus say `1.0`.
+
+**Two exceptions to "the document stays in the package", neither of them a
+parse defect** (owner's decision, recorded 2026-09-25; findings T2 and T3 of the
+reliability run of 2026-09-22). A document whose declaration contradicts the
+canonical one, an encoding other than UTF-8 or a version other than 1.0, is not
+copied under the canonical declaration: `verify::compare` refuses it and the
+whole build stops with `ArunaError::ExportDistorted`, so nothing is published.
+Since 2026-09-24 (`e297f15`) every document is checked, none of the refused ones
+is written, and the refusal names each of them, not only the first in archive
+order. And an entry whose first 16 KiB carry no manuscript markup in ASCII, a
+well-formed UTF-16 document among them, is not a package document and is listed
+under `source.not_manuscripts`. Neither occurs in TLHdig Beta 0.3 (442
+declarations, all `1.0` and UTF-8; no UTF-16). The decision is revisited with
+the first such document.
+
 ### 3.3 The future PDF
 
 §4. This level does not exist yet and must not be faked.
@@ -369,6 +388,20 @@ Open questions, each of which changes what the converter does:
    word. They are now scanned for, listed in the manifest under
    `beyond_this_parser` with file, line and column, and the converter is to
    treat them exactly as the 206: refuse and report.
+
+   **A known limit, recorded 2026-09-25.** "The model refuses a document if and
+   only if the manifest names it" is proven on the corpus, not on any input. A
+   document with a `DOCTYPE` or an entity reference is refused by the model and
+   accepted by the classifier, so the manifest does not name it (finding T4,
+   2026-09-22). `examples/fuzz_xml.rs` (`9c0fa32`) measured the limit wider: of
+   200 000 byte-level mutations of a well-formed manuscript, fixed seed, the
+   model alone refuses 6 879, in five classes: no root, content outside the
+   root, an undeclared prefix, a construct with no policy, and 2 132 with a
+   broken reference in an attribute value, which the model unescapes and the
+   classifier does not (`Refusal::Unexplained`). No document of the corpus
+   falls in any of them. **Owner's decision, 2026-09-25: widening the
+   classifier waits for a release that moves the package's checksum anyway.** A
+   new class is a new manifest key, and the manifest is part of the checksum.
 2. **Entity expansion.** None appear today. When one does: expand and record,
    or refuse?
 3. **Comments.** Three documents carry them. Editorial or incidental?

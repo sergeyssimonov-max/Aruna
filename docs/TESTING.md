@@ -2,14 +2,16 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **600 tests** as of 2026-09-24: 567 in the console crate — twenty
-integration binaries plus the library and the binary's own tests — and 33 in the
+The suite is **633 tests** as of 2026-09-25: 594 in the console crate – twenty
+integration binaries plus the library and the binary's own tests – and 39 in the
 desktop shell. The crates were joined into one workspace on 2026-08-30, so
 `cargo nextest run` from the repository root runs both, and `-p aruna` narrows it
-back to the console crate. It needs no network, and it runs **594**: six are
+back to the console crate. It needs no network, and it runs **626**: seven are
 behind `#[ignore]` by design and come in with `--run-ignored all` — three that
 read the whole corpus in the core (`authenticity`, `corpus`, `document_model`),
-two in the shell that build it, and the shell's `regenerate_the_bindings`, which
+three in the shell that build it or read a package built from it (the two
+corpus `cancelling` tests and `markup::every_name_of_a_real_package_reaches_the_window_byte_for_byte`),
+and the shell's `regenerate_the_bindings`, which
 is not a check but the way `frontend/src/bindings.ts` is refreshed.
 Beside it, and in a language of its own, are the **146 `vitest` tests** in
 `frontend/` — see *Frontend* below — and the six end-to-end scenarios of
@@ -39,7 +41,7 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 cd cli
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 542
+cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 581
 ```
 
 ### Standard — about 25 s
@@ -64,7 +66,7 @@ to make its absence a failure, which is what CI does after downloading it.
 ```sh
 cd cli
 ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(corpus)'   # 5
-ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(document_model)'   # 3, 30 s, needs xsltproc
+ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(document_model)'   # 5, 30 s, needs xsltproc
 cargo nextest run --profile ci -E 'binary(document_model)' --run-ignored ignored-only   # the whole corpus against xsltproc, 67 s
 cargo run --release --example corpus_inventory -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 cargo run --release --example verify_normalization -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
@@ -83,11 +85,12 @@ swapped for a different one between the two passes the build makes over it.
 
 ```sh
 cd cli
-cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 25
-cargo nextest run --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 12
+cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 28
+cargo nextest run --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 13
 cargo run --release --example fuzz_naming
 cargo run --release --example fuzz_pipeline   # 200 000 documents
 cargo run --release --example fuzz_layers     # 300 000 inputs
+cargo run --release --example fuzz_xml        # 200 000 inputs
 ```
 
 ### Soak — minutes, run by hand
@@ -252,28 +255,29 @@ test.
 
 | binary | tests | what it holds |
 |---|---|---|
-| library and `bin/aruna` | 398 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
+| library and `bin/aruna` | 420 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
-| `tests/cli_process.rs` | 17 | the binary as a child process, cache versus network, and the two words it answers on the command line |
+| `tests/cli_process.rs` | 20 | the binary as a child process, cache versus network, and the two words it answers on the command line |
 | `tests/cache_lifecycle.rs` | 10 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
 | `tests/export_integration.rs` | 8 | the export against an archive shaped like the corpus |
-| `tests/export_hostile.rs` | 15 | archives written to break the export, and destinations that refuse it |
-| `tests/export_recovery.rs` | 8 | building again over what a killed run left behind, including a staging directory whose owner is gone |
+| `tests/export_hostile.rs` | 18 | archives written to break the export, and destinations that refuse it |
+| `tests/export_recovery.rs` | 9 | building again over what a killed run left behind, including a staging directory whose owner is gone |
 | `tests/package_pages.rs` | 13 | the inventory against the package it describes, and that no CTH folder has a page |
 | `tests/cancellation.rs` | 11 | stopping a run, that it leaves the reader's package alone, and that a run stopped half way is followed by a complete one in the same process |
 | `tests/cache_concurrency.rs` | 4 | several runs competing for one cache: the race, the sweep, the sockets |
 | `tests/catalog_contract.rs` | 12 | the shape of the JSON catalog, held steady now that its former reader is gone |
-| `tests/progress_flow.rs` | 8 | which stages a run reports, in what order, with what numbers |
+| `tests/progress_flow.rs` | 9 | which stages a run reports, in what order, with what numbers |
 | `tests/reliability.rs` | 4 | two builds byte-identical, no descriptors accumulated, nothing left beside the package |
-| `tests/xml_contract.rs` | 11 | the fixture set: immutability, the permit list, field extraction |
+| `tests/xml_contract.rs` | 12 | the fixture set: immutability, the permit list, field extraction |
 | `tests/xml_hostile.rs` | 10 | XXE, entity expansion, external DTD, XInclude, resource exhaustion — through the export and, since 2026-09-13, through the document model |
 | `tests/authenticity.rs` | 3 | the published package against the archive, as multisets of file contents: nothing lost, invented, altered or written twice; and, since 2026-09-22, that the manifest names the entry the content gate turned away. The whole-corpus one is `#[ignore]` — `--run-ignored ignored-only` — and holds that entry to exactly `KUB 37.25.xml` |
-| `tests/window_seams.rs` | 6 | the seams a window will drive: the build on a thread of its own stopped from the caller's, that the library neither prints nor ends the process, and that the destination is the caller's to name |
+| `tests/window_seams.rs` | 8 | the seams a window will drive: the build on a thread of its own stopped from the caller's, that the library neither prints nor ends the process, and that the destination is the caller's to name |
 | `tests/corpus.rs` | 6 | the whole archive: non-distortion, no writes, the malformed count, and that nothing the gates admit comes out of decoding damaged |
-| `tests/document_model.rs` | 4 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; and the whole corpus read twice and refused exactly where the manifest says |
-| `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory
+| `tests/document_model.rs` | 6 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; the whole corpus read twice and refused exactly where the manifest says; and, since 2026-09-25, UTF-16 in both byte orders, Latin-1 bytes and a prolog cut in three places refused, never read and never a panic |
+| `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory |
+| `tests/pdf_acceptance.rs` | 1 | the instruments a PDF will be held to, run before there is a PDF: `sips` turns a hand-written one-page PDF into pixels |
 
-Counted on 2026-09-24 with `cargo nextest list --run-ignored all`: 567 in the `aruna` crate, as above, and 33 in `aruna-desktop`, which is 600. Without `--run-ignored` the run is 594: the six heavy ones stay behind `#[ignore]` and need the archive. The nine since 2026-09-23 came with `ede953a` – a named pipe where the publish lock or a staging marker belongs, the window's font-error sentences, the model's boundary guard, and the new `pdf_acceptance.rs`; 591 and 585 before them. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts; on 2026-09-23 three download tests (the read timeout in force, a cancel reaching a silent server, a cut body reported as the network's) and two for the declared XML version, 586 and 580 before them.
+Counted on 2026-09-25 with `cargo nextest list --run-ignored all`: 594 in the `aruna` crate, as above, and 39 in `aruna-desktop`, which is 633. Without `--run-ignored` the run is 626: the seven heavy ones stay behind `#[ignore]` and need the archive. The thirty-three since 2026-09-24 came with the polish block for 2.6.1, `eef9f4e` to `ed8f48d` – a console that survives a closed stream and refuses in Russian, the published copy checked before the reader's goes, the proxy from the environment, the publish lock on `flock` and its race, a link under the package's name, long names cut to fit and names or group folders the disk takes for one, a cancel from the window on a small archive, the manifest's names reaching the window, and the model refusing what is not its to read; 600 and 594 before them. The nine since 2026-09-23 came with `ede953a` – a named pipe where the publish lock or a staging marker belongs, the window's font-error sentences, the model's boundary guard, and the new `pdf_acceptance.rs`; 591 and 585 before them. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts; on 2026-09-23 three download tests (the read timeout in force, a cancel reaching a silent server, a cut body reported as the network's) and two for the declared XML version, 586 and 580 before them.
 
 ## Coverage floors
 
@@ -296,6 +300,24 @@ one lifted the shell to 79.95 % of regions when last measured, on 2026-09-19. Ea
 the core's 18 767 regions cannot hide the shell's 1 303. The floors are a
 ratchet, not a target: raise them when the numbers rise, and a change that falls
 under one says why in its commit rather than lowering it.
+
+Measured again on 2026-09-25, after `cargo llvm-cov clean --workspace`: core
+95.80 / 97.00 / 95.67 %, shell 76.14 / 73.17 / 75.91 % (regions / functions /
+lines).
+
+**A heavy test in the shell costs coverage it does not earn – a trap met on
+2026-09-24 and defused the same day.** The body of a test under `#[ignore]` in
+`src-tauri/src/lib.rs` is counted in the shell's denominator, and the ordinary
+`pnpm coverage` never runs it. On 2026-09-24 the shell stood 0.63 points over
+its functions floor (62.63 against 62), and the reliability run of that day
+measured what one such test of about a hundred lines does: 60.13 / 56.36 /
+61.81, under all three floors. The probe it wanted to add was kept as a patch
+for that reason. `110f3fc` then proved the cancel from the window in the
+ordinary suite, on an archive the test builds itself, and lifted the shell to
+73.74 / 70.48 / 74.23; the probe landed with `9b15172` as an ordinary test with
+a heavy twin. **The rule stays:** a heavy shell test comes with an ordinary
+one that runs its code, or with a decision on how it enters the coverage run –
+not alone.
 
 Fixtures are described in `cli/fixtures/xml/MANIFEST.md` with a SHA-256 for each.
 

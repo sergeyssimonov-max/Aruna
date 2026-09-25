@@ -686,10 +686,17 @@ stripped it. And no count crosses as a 64-bit integer: specta refuses `usize` an
 `archive::MAX_ENTRIES` (500 000), a download by the gibibyte the client will
 accept, and a length above that is not shown as a denominator at all.
 
-**`Stage` is a union, not a string.** Seventeen literals generated from a Rust
+**`Stage` is a union, not a string.** Twenty literals generated from a Rust
 enum, so `svelte-check` fails when the core gains a stage and the window forgets
 it — the same guarantee, one language further on, that `progress::Event` gets
-from not being `#[non_exhaustive]`.
+from not being `#[non_exhaustive]`. Twenty against the core's twenty-two events,
+because two pairs – a stage announced and its tick – are one stage each. The
+last three came with the polish block for 2.6.1: `waiting-for-publication`
+(2026-09-24, another run is publishing into the same folder),
+`publishing-without-lock` (2026-09-25, the disk cannot hold the publish lock)
+and `proxy-unusable` (2026-09-25, a proxy is named but this program cannot use
+it; the note carries the variable's name, never its value). This document said
+seventeen until 2026-09-25.
 
 ---
 

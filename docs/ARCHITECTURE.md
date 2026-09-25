@@ -219,7 +219,8 @@ the collision at its source: the dependency is now an ordinary one, and there
 is no second name for a reader to keep in their head.
 
 What that adapter owns, and the core does not: job identifiers, IPC events, the
-dialog and opener plugins, the store, the window. What it needed from the core
+dialog and opener plugins, the window (the store plugin went on 2026-09-22,
+`825bfd2`: nothing ever called it). What it needed from the core
 was already there — a typed request, a progress sink, a cancel flag, a typed
 report — and on 2026-09-02 it was connected: `build_corpus` and `cancel_build`
 are commands, `Progress` is implemented by a sink that emits `build-progress`
@@ -281,28 +282,32 @@ cargo audit && cargo deny check && cargo machete
 Coverage is run from the root, for both crates at once and held to floors:
 `pnpm coverage` (`scripts/coverage.sh`, see `docs/TESTING.md`).
 
-`src-tauri/` takes the same battery. It holds **33 tests**, all of them in
-`src/lib.rs` — counted 2026-09-22 with `cargo nextest list --run-ignored all`,
+`src-tauri/` takes the same battery. It holds **39 tests**, all of them in
+`src/lib.rs` – counted 2026-09-25 with `cargo nextest list --run-ignored all`,
 the same way `docs/TESTING.md` counts the console crate. Eleven are in `wire`
 (the generated types the window receives, and the promises about what never
-crosses), seven in `counting`, six in `markup` (the manifest summary and its
-refusals), six in `opening` (opening the inventory, and the name a package must
-carry before it is read), two in `cancelling` —
+crosses), seven in `counting`, eight in `markup` (the manifest summary and its
+refusals, and every name it gives reaching the window byte for byte), nine in
+`opening` (opening the inventory, the name a package must carry before it is
+read, and that a link under that name, or a manifest that is not a plain file,
+is refused), three in `cancelling` –
 and one stands alone: `a_build_without_the_feature_registers_no_webdriver`,
 the fourth and last of the gates keeping the end-to-end contour out of a
 release: the other three are declarations that
 `frontend/tests/spec-guard.test.ts` reads, and this one is the compiler's own
 answer about what the builder registers when the feature is off.
 
-Three of the thirty-three carry `#[ignore]` and run only when asked explicitly:
-`regenerate_the_bindings`, which writes `frontend/src/bindings.ts`, and both
-`cancelling` tests, which read the corpus archive. A default run is **30**,
-and **29** under `--features e2e`, where the gate test is compiled out.
+Four of the thirty-nine carry `#[ignore]` and run only when asked explicitly:
+`regenerate_the_bindings`, which writes `frontend/src/bindings.ts`, the two
+`cancelling` tests that read the corpus archive, and the `markup` test that
+reads a package built from it. Since 2026-09-24 the cancel from the window is
+also proven in the ordinary run, on an archive the test builds. A default run
+is **35**, and **34** under `--features e2e`, where the gate test is compiled out.
 
 Two flags need care here. `nextest` runs **without** `--all-features`: that flag
 turns on `e2e`, and the gate test is compiled out under the feature
 (`cfg(all(test, not(feature = "e2e")))`) — the very thing it exists to check.
 Clippy, by contrast, takes `--all-features`, because that branch must be checked
-too. `--no-tests=pass` is no longer a necessity: the other thirty-two tests sit in
+too. `--no-tests=pass` is no longer a necessity: the other thirty-eight tests sit in
 modules gated on `test` alone and run under the feature as well. It stays as
 insurance for a crate that temporarily has no tests at all.
