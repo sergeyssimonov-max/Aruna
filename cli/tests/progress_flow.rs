@@ -124,6 +124,7 @@ impl Progress for Recording {
             Event::PreviousPackageLeft { .. } => Seen::Other("PreviousPackageLeft"),
             Event::WaitingForPublication => Seen::Other("WaitingForPublication"),
             Event::PublishingWithoutLock => Seen::Other("PublishingWithoutLock"),
+            Event::ProxyUnusable { .. } => Seen::Other("ProxyUnusable"),
             // Ticks, and this file is about the order of the stages. They are
             // kept apart by name so `the_stages_come_in_the_one_order` reads a
             // sequence of milestones rather than one interleaved with however

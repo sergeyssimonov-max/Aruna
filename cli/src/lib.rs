@@ -289,6 +289,9 @@ fn download_archive(
     job: &Job<'_>,
     releases: ReleaseLookup,
 ) -> Result<()> {
+    if let Some(variable) = download::unusable_proxy() {
+        job.report(Event::ProxyUnusable { variable });
+    }
     announce_release(job, releases);
     job.report(Event::DownloadStarted);
     // The download lands through a scratch file and a rename, so an interrupted
@@ -370,6 +373,47 @@ fn civil_from_unix(secs: u64) -> (i32, u32, u32, u32, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// **A proxy the run cannot use is said before anything is fetched.**
+    ///
+    /// nextest runs each test in its own process, so the variable set here
+    /// reaches no other test. The address is a closed port: the download
+    /// fails, and what matters is what was said first.
+    #[test]
+    fn an_unusable_proxy_is_said_before_the_download() {
+        struct Told(std::sync::Mutex<Vec<String>>);
+        impl crate::progress::Progress for Told {
+            fn report(&self, event: Event<'_>) {
+                if let Ok(mut told) = self.0.lock() {
+                    told.push(event.to_string());
+                }
+            }
+        }
+        fn unreachable(_: u64) -> Result<zenodo::Release> {
+            Err(ArunaError::EmptyArchive)
+        }
+        for name in download::PROXY_VARIABLES {
+            std::env::remove_var(name);
+        }
+        std::env::set_var("ALL_PROXY", "socks5://127.0.0.1:9");
+        let told = Told(std::sync::Mutex::new(Vec::new()));
+        let cancel = crate::job::Cancel::new();
+        let dir = tempfile::tempdir().expect("tempdir");
+        let _ = download_archive(
+            "http://127.0.0.1:9/archive.zip",
+            "0",
+            &dir.path().join("a.zip"),
+            &Job::new(&told, &cancel),
+            unreachable,
+        );
+        std::env::remove_var("ALL_PROXY");
+        let told = told.0.into_inner().expect("told");
+        assert_eq!(
+            told.first().map(String::as_str),
+            Some("The proxy named in ALL_PROXY cannot be used; connecting directly."),
+            "{told:#?}"
+        );
+    }
 
     /// Two runs must never share a scratch directory — that is the whole point
     /// of putting the process id in the name.

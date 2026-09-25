@@ -520,7 +520,9 @@ pub fn user_agent() -> String {
 /// The agent with the environment's proxy, if one is named and usable.
 ///
 /// Both agents take it, as the download and the question about it must go the
-/// same way behind a proxy.
+/// same way behind a proxy. One that is named and not usable is passed over
+/// here and reported by the caller that has a job to report to
+/// ([`unusable_proxy`]).
 fn with_proxy(builder: ureq::AgentBuilder) -> ureq::AgentBuilder {
     match proxy_among(|name| std::env::var(name).ok()).map(ureq::Proxy::new) {
         Some(Ok(proxy)) => builder.proxy(proxy),
@@ -540,22 +542,78 @@ fn with_proxy(builder: ureq::AgentBuilder) -> ureq::AgentBuilder {
 /// `http://` address or one written with no scheme. A SOCKS address is passed
 /// over for the next variable.
 fn proxy_among(var: impl Fn(&str) -> Option<String>) -> Option<String> {
-    const NAMES: [&str; 6] = [
-        "HTTPS_PROXY",
-        "https_proxy",
-        "ALL_PROXY",
-        "all_proxy",
-        "HTTP_PROXY",
-        "http_proxy",
-    ];
-    NAMES
+    match proxy_choice(var) {
+        ProxyChoice::Use(value) => Some(value),
+        ProxyChoice::Unusable(_) | ProxyChoice::Direct => None,
+    }
+}
+
+/// The variables a proxy is asked of, in the order they are asked.
+pub const PROXY_VARIABLES: [&str; 6] = [
+    "HTTPS_PROXY",
+    "https_proxy",
+    "ALL_PROXY",
+    "all_proxy",
+    "HTTP_PROXY",
+    "http_proxy",
+];
+
+/// What the environment says about a proxy.
+#[derive(Debug, PartialEq, Eq)]
+enum ProxyChoice {
+    /// This address, the first usable one in [`PROXY_VARIABLES`] order.
+    Use(String),
+    /// Something is named, nothing of it usable: requests go direct, and the
+    /// run says which variable it passed over.
+    Unusable(&'static str),
+    /// Nothing is named.
+    Direct,
+}
+
+fn proxy_choice(var: impl Fn(&str) -> Option<String>) -> ProxyChoice {
+    let named: Vec<(&'static str, String)> = PROXY_VARIABLES
         .iter()
-        .filter_map(|name| var(name))
-        .map(|value| value.trim().to_string())
-        .find(|value| match value.split_once("://") {
-            Some((scheme, _)) => scheme.eq_ignore_ascii_case("http"),
-            None => !value.is_empty(),
-        })
+        .filter_map(|name| Some((*name, var(name)?.trim().to_string())))
+        .filter(|(_, value)| !value.is_empty())
+        .collect();
+    match named.iter().find(|(_, value)| usable_proxy(value)) {
+        Some((_, value)) => ProxyChoice::Use(value.clone()),
+        None => match named.first() {
+            Some((name, _)) => ProxyChoice::Unusable(name),
+            None => ProxyChoice::Direct,
+        },
+    }
+}
+
+/// Whether this crate can reach a proxy at `value`: `http://` or no scheme,
+/// an address `ureq` parses, and a port that is a number. `ureq` reads a port
+/// that is not one as 80 without a word, and does not take an IPv6 literal.
+fn usable_proxy(value: &str) -> bool {
+    let rest = match value.split_once("://") {
+        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("http") => rest,
+        Some(_) => return false,
+        None => value,
+    };
+    let host = rest
+        .rsplit('@')
+        .next()
+        .unwrap_or(rest)
+        .trim_end_matches('/');
+    let port_ok = match host.rsplit_once(':') {
+        Some((_, port)) => !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()),
+        None => true,
+    };
+    !host.starts_with('[') && port_ok && ureq::Proxy::new(value).is_ok()
+}
+
+/// The proxy variable the environment names and this crate cannot use, when
+/// it names no usable one – so the run can say it goes direct (owner's
+/// decision, 25.09.2026: direct, and said, rather than refused).
+pub fn unusable_proxy() -> Option<&'static str> {
+    match proxy_choice(|name| std::env::var(name).ok()) {
+        ProxyChoice::Unusable(name) => Some(name),
+        ProxyChoice::Use(_) | ProxyChoice::Direct => None,
+    }
 }
 
 /// GET `url` under one overall deadline – for asking questions ([`fetch_text`]),
@@ -1155,6 +1213,51 @@ mod tests {
         );
         assert_eq!(proxy_among(env(&[("HTTPS_PROXY", "  ")])), None);
         assert_eq!(proxy_among(env(&[])), None);
+    }
+
+    /// **A proxy that is named and cannot be used is said, not hidden**, and
+    /// the variable is named; one that can be used says nothing.
+    #[test]
+    fn a_proxy_that_cannot_be_used_is_named() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| (*v).to_string())
+            }
+        };
+        for (pairs, expected) in [
+            (
+                &[("ALL_PROXY", "socks5://x:1")][..],
+                ProxyChoice::Unusable("ALL_PROXY"),
+            ),
+            (
+                &[("https_proxy", "https://p:3128")][..],
+                ProxyChoice::Unusable("https_proxy"),
+            ),
+            (
+                &[("HTTPS_PROXY", "http://p:eighty")][..],
+                ProxyChoice::Unusable("HTTPS_PROXY"),
+            ),
+            (
+                &[("HTTPS_PROXY", "http://[::1]:3128")][..],
+                ProxyChoice::Unusable("HTTPS_PROXY"),
+            ),
+            (
+                &[("HTTPS_PROXY", "http://user:pw@p:3128/")][..],
+                ProxyChoice::Use("http://user:pw@p:3128/".into()),
+            ),
+            (
+                &[("ALL_PROXY", "socks5://x:1"), ("http_proxy", "q:8080")][..],
+                ProxyChoice::Use("q:8080".into()),
+            ),
+            (&[("HTTPS_PROXY", " ")][..], ProxyChoice::Direct),
+            (&[][..], ProxyChoice::Direct),
+        ] {
+            let pairs: &'static [(&'static str, &'static str)] = pairs;
+            assert_eq!(proxy_choice(env(pairs)), expected, "{pairs:?}");
+        }
     }
 
     /// 503 is the server saying "busy", so the next attempt gets the archive.

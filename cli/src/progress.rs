@@ -44,6 +44,11 @@ pub enum Event<'a> {
     ZenodoNotice { message: &'a str },
     /// The record could not be checked. Advisory: the download goes ahead.
     ZenodoUnreachable { cause: &'a str },
+    /// The environment names a proxy this crate cannot use – SOCKS, `https://`,
+    /// a port that is not a number – and nothing usable besides, so requests go
+    /// direct. Said rather than refused or hidden (owner, 25.09.2026). Carries
+    /// the variable's name only: its value may hold credentials.
+    ProxyUnusable { variable: &'static str },
     /// The 71 MiB are on their way.
     DownloadStarted,
     /// How much of the archive has arrived. A tick, not a stage — see
@@ -148,6 +153,10 @@ impl fmt::Display for Event<'_> {
                 )
             }
             Event::ZenodoNotice { message } => write!(f, "{message}"),
+            Event::ProxyUnusable { variable } => write!(
+                f,
+                "The proxy named in {variable} cannot be used; connecting directly."
+            ),
             Event::ZenodoUnreachable { cause } => {
                 write!(
                     f,
@@ -288,7 +297,7 @@ mod tests {
             expected: 10,
             got: 4,
         };
-        let cases: [(Event<'_>, &str); 19] = [
+        let cases: [(Event<'_>, &str); 20] = [
             (
                 Event::CacheUnusable { dir: &dir },
                 "Cannot write to the cache directory (/cache/aruna); downloading for this run only.",
@@ -310,6 +319,12 @@ mod tests {
             (
                 Event::ZenodoUnreachable { cause: "timed out" },
                 "Could not check the record on Zenodo (timed out); continuing.",
+            ),
+            (
+                Event::ProxyUnusable {
+                    variable: "ALL_PROXY",
+                },
+                "The proxy named in ALL_PROXY cannot be used; connecting directly.",
             ),
             (
                 Event::DownloadStarted,
