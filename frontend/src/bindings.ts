@@ -256,10 +256,16 @@ export type Spread = {
  *  `#[non_exhaustive]`.
  * 
  *  Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
- *  собственность, а не ядра. Их девятнадцать против двадцати одного варианта
+ *  собственность, а не ядра. Их двадцать против двадцати двух вариантов
  *  события, потому что две пары — объявление стадии и ее тик — это одна стадия.
  */
-export type Stage = "cache-unusable" | "cached-archive-rejected" | "archive-from-cache" | "zenodo-notice" | "zenodo-unreachable" | "downloading" | "download-retrying" | "archive-kept" | "parsing" | "entries-skipped" | "indexed" | "reading-headers" | "headers-read" | "writing" | "checking-package" | 
+export type Stage = "cache-unusable" | "cached-archive-rejected" | "archive-from-cache" | "zenodo-notice" | "zenodo-unreachable" | 
+/**
+ *  Прокси из окружения назван, но этой программе не годится – SOCKS,
+ *  `https://`, порт не числом, – и запрос идет напрямую. В заметке – имя
+ *  переменной, не значение: в значении бывают учетные данные. С 25.09.2026.
+ */
+"proxy-unusable" | "downloading" | "download-retrying" | "archive-kept" | "parsing" | "entries-skipped" | "indexed" | "reading-headers" | "headers-read" | "writing" | "checking-package" | 
 /**
  *  Другой запуск публикует в ту же папку, и этот его ждет. С 24.09.2026:
  *  до того ожидание шло молча, а за брошенной блокировкой – пять минут.

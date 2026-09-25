@@ -833,7 +833,7 @@ impl BuildFailure {
 /// `#[non_exhaustive]`.
 ///
 /// Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
-/// собственность, а не ядра. Их девятнадцать против двадцати одного варианта
+/// собственность, а не ядра. Их двадцать против двадцати двух вариантов
 /// события, потому что две пары — объявление стадии и ее тик — это одна стадия.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
@@ -843,6 +843,10 @@ pub enum Stage {
     ArchiveFromCache,
     ZenodoNotice,
     ZenodoUnreachable,
+    /// Прокси из окружения назван, но этой программе не годится – SOCKS,
+    /// `https://`, порт не числом, – и запрос идет напрямую. В заметке – имя
+    /// переменной, не значение: в значении бывают учетные данные. С 25.09.2026.
+    ProxyUnusable,
     Downloading,
     DownloadRetrying,
     ArchiveKept,
@@ -920,6 +924,10 @@ impl BuildProgress {
             Core::ZenodoUnreachable { cause } => {
                 progress.note = Some((*cause).to_string());
                 Stage::ZenodoUnreachable
+            }
+            Core::ProxyUnusable { variable } => {
+                progress.note = Some((*variable).to_string());
+                Stage::ProxyUnusable
             }
             // Стадия объявляет знаменатель, тик заполняет числитель. Ноль в
             // начале — чтобы полоса появилась сразу, а не после первой четверти
