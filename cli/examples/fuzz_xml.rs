@@ -16,7 +16,8 @@
 //! it, a prefix never declared, a construct with no policy, and a broken
 //! reference in an attribute value, which the model unescapes and the
 //! classifier does not (`Refusal::Unexplained`). First run, 2026-09-25, seed
-//! below: 2 132 of the last, 6 879 disagreements in all, no panic.
+//! below: 2 132 refusals of the last kind, 2 107 of them named by neither of
+//! the other two; 6 879 disagreements in all; no panic.
 use aruna::document::{Document, Refusal};
 use aruna::parse::looks_like_manuscript;
 use aruna::xml_wellformed::{beyond_the_parser, classify};
