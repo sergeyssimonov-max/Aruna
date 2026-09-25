@@ -164,16 +164,23 @@ jobs:
       # opens local sockets, and a test that waits on either of those forever
       # takes the job with it — `cargo test` has no timeout and would sit there
       # until the workflow's own limit killed it, with no output saying which
-      # test was stuck. `cli/.config/nextest.toml` sets the deadline; the `ci`
+      # test was stuck. `.config/nextest.toml` sets the deadline; the `ci`
       # profile says more on the way past.
       #
       # It also runs each test in its own process, which is a stricter check
       # than `cargo test` gives: a test that depended on another one's leftover
       # state fails here and passes there.
+      #
+      # The exact version the owner's machine runs, raised in the same commit
+      # as the spec's 3.4 (5.1 there). Unpinned, the tool followed this action's
+      # own manifest, which at the commit above stops at 0.9.143 – a version
+      # whose false LEAK reports 0.9.145 fixed, and `.config/nextest.toml`'s
+      # 100 ms leak-timeout rests on the fix. 0.9.145 is newer than that
+      # manifest, so the action installs it through its cargo-binstall fallback.
       - name: Install nextest
         uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
         with:
-          tool: nextest
+          tool: cargo-nextest@0.9.145
 
       - name: Test (CLI)
         run: cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml
@@ -274,7 +281,7 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
         with:
-          tool: nextest
+          tool: cargo-nextest@0.9.145
 
       # Without `--all-features`, and that is the condition of the test running
       # at all: the one test in this crate asserts what a build *without* `e2e`
@@ -390,7 +397,7 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
         with:
-          tool: nextest
+          tool: cargo-nextest@0.9.145
 
       # nextest rather than `cargo test`, for the reason the `check` job gives
       # at length: it can stop a test that hangs, and `cargo test` cannot. This
