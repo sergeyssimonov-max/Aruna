@@ -256,7 +256,7 @@ export type Spread = {
  *  `#[non_exhaustive]`.
  * 
  *  Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
- *  собственность, а не ядра. Их восемнадцать против двадцати вариантов
+ *  собственность, а не ядра. Их девятнадцать против двадцати одного варианта
  *  события, потому что две пары — объявление стадии и ее тик — это одна стадия.
  */
 export type Stage = "cache-unusable" | "cached-archive-rejected" | "archive-from-cache" | "zenodo-notice" | "zenodo-unreachable" | "downloading" | "download-retrying" | "archive-kept" | "parsing" | "entries-skipped" | "indexed" | "reading-headers" | "headers-read" | "writing" | "checking-package" | 
@@ -264,7 +264,13 @@ export type Stage = "cache-unusable" | "cached-archive-rejected" | "archive-from
  *  Другой запуск публикует в ту же папку, и этот его ждет. С 24.09.2026:
  *  до того ожидание шло молча, а за брошенной блокировкой – пять минут.
  */
-"waiting-for-publication" | "checking-published" | "previous-package-left";
+"waiting-for-publication" | 
+/**
+ *  Диск не держит блокировку публикации – нет `flock` или номера файлов не
+ *  стоят на месте, – и прогон публикует без нее. С 25.09.2026, решение
+ *  владельца: сказать, а не отказать и не ждать.
+ */
+"publishing-without-lock" | "checking-published" | "previous-package-left";
 
 /**
  *  Откуда взяты числа.

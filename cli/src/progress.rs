@@ -87,6 +87,11 @@ pub enum Event<'a> {
     /// it. Said once, when the wait begins: until 2026-09-24 a run could wait
     /// here five minutes without a word.
     WaitingForPublication,
+    /// The disk cannot hold the publish lock – it has no `flock`, or its inode
+    /// numbers do not hold still – and the run publishes without it. Said
+    /// rather than refused, by the owner's decision of 2026-09-25: a second run
+    /// at the same moment is then not kept out.
+    PublishingWithoutLock,
     /// The same check again, on the copy that was published.
     CheckingPublished,
     /// The package this build replaced could not be removed and is still there.
@@ -189,6 +194,10 @@ impl fmt::Display for Event<'_> {
                 f,
                 "Waiting for another run to finish publishing into this folder…"
             ),
+            Event::PublishingWithoutLock => write!(
+                f,
+                "This disk cannot hold the publish lock; publishing without protection against another run at the same moment."
+            ),
             Event::CheckingPublished => write!(f, "Checking the published copy…"),
             Event::PreviousPackageLeft { path } => write!(
                 f,
@@ -279,7 +288,7 @@ mod tests {
             expected: 10,
             got: 4,
         };
-        let cases: [(Event<'_>, &str); 18] = [
+        let cases: [(Event<'_>, &str); 19] = [
             (
                 Event::CacheUnusable { dir: &dir },
                 "Cannot write to the cache directory (/cache/aruna); downloading for this run only.",
@@ -347,6 +356,10 @@ mod tests {
             (
                 Event::WaitingForPublication,
                 "Waiting for another run to finish publishing into this folder…",
+            ),
+            (
+                Event::PublishingWithoutLock,
+                "This disk cannot hold the publish lock; publishing without protection against another run at the same moment.",
             ),
             (Event::CheckingPublished, "Checking the published copy…"),
             (

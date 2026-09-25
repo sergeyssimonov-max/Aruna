@@ -112,6 +112,12 @@ impl Publication {
     }
 }
 
+/// How many times the name may turn out to be a different file from the one
+/// just locked before the disk is taken not to keep inode numbers still – the
+/// same count `Owner::claim` gives the staging marker. A holder that finishes
+/// in the gap costs one; eight in a row is not a race any more.
+const ATTEMPTS: u32 = 8;
+
 /// The two durations as arguments, so the waiting can be tested in
 /// milliseconds rather than minutes.
 fn acquire_within(
@@ -120,9 +126,42 @@ fn acquire_within(
     wait: Duration,
     poll: Duration,
 ) -> Result<Publication> {
+    acquire_with(
+        destination,
+        job,
+        (wait, poll),
+        fs::File::try_lock,
+        same_file,
+    )
+}
+
+/// Whether the disk has refused `flock` itself, rather than someone holding it.
+///
+/// Asked by number, macOS's: std gives `ENOTSUP` and `EOPNOTSUPP` no kind of
+/// their own (measured – `Unsupported` is `ENOSYS`), and `ENOLCK` – an NFS
+/// mount with `nolocks`, or a server without a lock manager – none either.
+fn unsupported(err: &std::io::Error) -> bool {
+    const ENOTSUP: i32 = 45;
+    const ENOLCK: i32 = 77;
+    const EOPNOTSUPP: i32 = 102;
+    err.kind() == std::io::ErrorKind::Unsupported
+        || matches!(err.raw_os_error(), Some(ENOTSUP | ENOLCK | EOPNOTSUPP))
+}
+
+/// [`acquire_within`] with the kernel's two answers as arguments, so that a
+/// disk without `flock` and one whose inode numbers drift can be tested on a
+/// disk that has neither fault.
+fn acquire_with(
+    destination: &Path,
+    job: &Job<'_>,
+    (wait, poll): (Duration, Duration),
+    try_lock: impl Fn(&fs::File) -> std::result::Result<(), fs::TryLockError>,
+    same_file: impl Fn(&fs::File, &Path) -> bool,
+) -> Result<Publication> {
     let path = lock_path(destination);
     let started = Instant::now();
     let mut told = false;
+    let mut drifted = 0u32;
 
     loop {
         // Cancellation is checked before each attempt, so a run stopped while
@@ -152,24 +191,24 @@ fn acquire_within(
             .open(&path)
             .map_err(ArunaError::io(&path))?;
 
-        match file.try_lock() {
+        match try_lock(&file) {
             Ok(()) => {
                 // **The name must still be the file this run locked.** A holder
                 // that finished removes the file while holding the lock, and a
                 // waiter that had opened it before then locks a file with no
                 // name: it holds nothing anyone else can see. The same inode
-                // under the name is the proof; anything else is another try –
-                // after a pause and within the same wait, so a filesystem whose
-                // inode numbers do not hold still is a refusal in the end and
-                // not a loop at full speed.
+                // under the name is the proof; anything else is another try,
+                // after a pause. [`ATTEMPTS`] in a row is a disk whose inode
+                // numbers do not hold still, where the proof cannot be had:
+                // the run publishes without it and says so (owner's decision,
+                // 25.09.2026 – not a refusal, not a wait).
                 if !same_file(&file, &path) {
-                    drop(file);
-                    if started.elapsed() >= wait {
-                        return Err(ArunaError::PublishBusy {
-                            path: path.clone(),
-                            holder: holder(&path),
-                        });
+                    drifted += 1;
+                    if drifted >= ATTEMPTS {
+                        job.report(crate::progress::Event::PublishingWithoutLock);
+                        return Ok(Publication { path, file });
                     }
+                    drop(file);
                     std::thread::sleep(poll);
                     continue;
                 }
@@ -189,6 +228,17 @@ fn acquire_within(
                 }
                 drop(file);
                 std::thread::sleep(poll);
+            }
+            // A disk that has no `flock` at all – an NFS mount with `nolocks`.
+            // Under 2.6.0, whose lock was the file's existence, publishing
+            // there worked; refusing it now would take that away to guard
+            // against a second run at the same moment, which on such a disk is
+            // rare. The run publishes unguarded and says so; the check that
+            // the published copy is the one built still stands behind it
+            // (owner's decision, 25.09.2026).
+            Err(fs::TryLockError::Error(source)) if unsupported(&source) => {
+                job.report(crate::progress::Event::PublishingWithoutLock);
+                return Ok(Publication { path, file });
             }
             Err(fs::TryLockError::Error(source)) => {
                 return Err(ArunaError::Io { path, source });
@@ -466,6 +516,100 @@ mod tests {
         let taken =
             acquire_within(dir.path(), &Job::unattended(), wait, poll).expect("the name is free");
         assert!(same_file(&taken.file, &path));
+    }
+
+    /// What the job was told, event by event, as the console would print it.
+    struct Told(std::sync::Mutex<Vec<String>>);
+    impl crate::progress::Progress for Told {
+        fn report(&self, event: crate::progress::Event<'_>) {
+            if let Ok(mut heard) = self.0.lock() {
+                heard.push(event.to_string());
+            }
+        }
+    }
+
+    /// **A disk without `flock` is published to, and the run says so.**
+    #[test]
+    fn a_disk_without_flock_is_published_to_unguarded_and_says_so() {
+        let dir = tempdir().expect("tempdir");
+        // ENOTSUP, ENOLCK, EOPNOTSUPP, ENOSYS.
+        for errno in [45, 77, 102, 78] {
+            let heard = Told(std::sync::Mutex::new(Vec::new()));
+            let cancel = crate::job::Cancel::new();
+            let job = Job::new(&heard, &cancel);
+            let taken = acquire_with(
+                dir.path(),
+                &job,
+                instant(),
+                |_| {
+                    Err(fs::TryLockError::Error(std::io::Error::from_raw_os_error(
+                        errno,
+                    )))
+                },
+                same_file,
+            )
+            .unwrap_or_else(|err| panic!("errno {errno}: refused: {err}"));
+            drop(taken);
+            let heard = heard.0.into_inner().expect("heard");
+            assert_eq!(
+                heard,
+                [crate::progress::Event::PublishingWithoutLock.to_string()],
+                "errno {errno}"
+            );
+            assert!(
+                !lock_path(dir.path()).exists(),
+                "the lock file was left behind"
+            );
+        }
+    }
+
+    /// Any other failure of `flock` is still a refusal: only a disk that has
+    /// no locks is published to without one.
+    #[test]
+    fn another_failure_of_flock_is_still_a_refusal() {
+        let dir = tempdir().expect("tempdir");
+        let refused = acquire_with(
+            dir.path(),
+            &Job::unattended(),
+            instant(),
+            |_| {
+                Err(fs::TryLockError::Error(std::io::Error::from_raw_os_error(
+                    5,
+                )))
+            },
+            same_file,
+        );
+        assert!(matches!(refused, Err(ArunaError::Io { .. })), "{refused:?}");
+    }
+
+    /// **A disk whose inode numbers drift is published to after a bounded
+    /// number of tries, not after the whole wait, and the run says so.**
+    #[test]
+    fn a_disk_whose_inodes_drift_is_published_to_after_bounded_tries() {
+        let dir = tempdir().expect("tempdir");
+        let heard = Told(std::sync::Mutex::new(Vec::new()));
+        let cancel = crate::job::Cancel::new();
+        let job = Job::new(&heard, &cancel);
+        let tries = std::sync::atomic::AtomicU32::new(0);
+        let started = Instant::now();
+        let taken = acquire_with(
+            dir.path(),
+            &job,
+            (Duration::from_secs(600), Duration::from_millis(1)),
+            fs::File::try_lock,
+            |_, _| {
+                tries.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                false
+            },
+        )
+        .expect("published unguarded");
+        drop(taken);
+        assert!(started.elapsed() < Duration::from_secs(5), "it waited");
+        assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), ATTEMPTS);
+        assert_eq!(
+            heard.0.into_inner().expect("heard"),
+            [crate::progress::Event::PublishingWithoutLock.to_string()]
+        );
     }
 
     /// **Runs racing for the lock never hold it two at once.**

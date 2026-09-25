@@ -833,7 +833,7 @@ impl BuildFailure {
 /// `#[non_exhaustive]`.
 ///
 /// Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
-/// собственность, а не ядра. Их восемнадцать против двадцати вариантов
+/// собственность, а не ядра. Их девятнадцать против двадцати одного варианта
 /// события, потому что две пары — объявление стадии и ее тик — это одна стадия.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
@@ -856,6 +856,10 @@ pub enum Stage {
     /// Другой запуск публикует в ту же папку, и этот его ждет. С 24.09.2026:
     /// до того ожидание шло молча, а за брошенной блокировкой – пять минут.
     WaitingForPublication,
+    /// Диск не держит блокировку публикации – нет `flock` или номера файлов не
+    /// стоят на месте, – и прогон публикует без нее. С 25.09.2026, решение
+    /// владельца: сказать, а не отказать и не ждать.
+    PublishingWithoutLock,
     CheckingPublished,
     PreviousPackageLeft,
 }
@@ -966,6 +970,7 @@ impl BuildProgress {
             }
             Core::CheckingPackage => Stage::CheckingPackage,
             Core::WaitingForPublication => Stage::WaitingForPublication,
+            Core::PublishingWithoutLock => Stage::PublishingWithoutLock,
             Core::CheckingPublished => Stage::CheckingPublished,
             Core::PreviousPackageLeft { .. } => Stage::PreviousPackageLeft,
         };
