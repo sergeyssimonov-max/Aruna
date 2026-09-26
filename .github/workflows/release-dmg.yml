@@ -183,10 +183,17 @@ jobs:
       # the changelog differ – and the 0.9.146 checksums it carries were checked
       # against nextest's own release on 26.09.2026. Raised then, short of the
       # seven days of the spec's 5.1, and recorded there.
+      #
+      # `fallback: none` on every step of this action: a tool or version the
+      # pinned manifest does not list fails the job instead of being fetched
+      # unchecked, so raising nextest without raising the pin is caught on the
+      # first run rather than warned about. It also keeps the GitHub token out
+      # of the action's environment, which its README calls the best practice.
       - name: Install nextest
         uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-nextest@0.9.146
+          fallback: none
 
       - name: Test (CLI)
         run: cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml
@@ -206,6 +213,7 @@ jobs:
         uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-deny
+          fallback: none
 
       - name: Dependency policy
         run: cargo deny check
@@ -288,6 +296,7 @@ jobs:
         uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-nextest@0.9.146
+          fallback: none
 
       # Without `--all-features`, and that is the condition of the test running
       # at all: the one test in this crate asserts what a build *without* `e2e`
@@ -404,6 +413,7 @@ jobs:
         uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-nextest@0.9.146
+          fallback: none
 
       # nextest rather than `cargo test`, for the reason the `check` job gives
       # at length: it can stop a test that hangs, and `cargo test` cannot. This
