@@ -12,23 +12,22 @@
     "is actually made of, and they live here.",
     "",
     "Four references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, v2.5.11 is the",
-    "previous 2.x release and v2.6.0 the current one, published on 2026-09-23. A release",
+    "previous 2.x release and v2.6.1 the current one, published on 2026-09-26. A release",
     "cannot record itself — the commit it names is the commit that carries it, and no file",
     "can contain its own hash — so each entry here is added by the commit after the release",
     "it describes.",
     "",
-    "v2.6.0 is the first release since 2026-08-30 that did not displace the one before it:",
-    "by the owner's decision of 2026-09-23, v2.5.11 stays a reference, and a new release adds",
-    "an entry rather than replacing one. The cost the list at three used to name — a fault",
-    "introduced recently not bracketed from below by anything nearer than v1.0.9 — is paid",
-    "back: v2.5.11 brackets v2.6.0. Before that the list was kept at three, and the release a",
-    "new one replaced was withdrawn — release, tag and DMG: v2.5.10 on 2026-09-22, v2.5.9 on",
-    "2026-09-20, hours after it was published, v2.5.8 earlier that day, v2.5.7 on 2026-09-13,",
-    "v2.5.6 earlier the same day, v2.5.5 on 2026-09-12, v2.5.4 on 2026-09-10, v2.5.3 on",
-    "2026-09-07, v2.5.2 on 2026-09-06, v2.5.1 on 2026-09-04, v2.5.0 on 2026-09-01 and v2.1.0",
-    "through v2.4.0 on 2026-08-30. A reference cannot be re-cut, so the work that follows one",
-    "takes a number of its own. Whether a release that follows v2.6.0 retires anything is a",
-    "decision rather than a consequence of publishing.",
+    "v2.6.1 replaced v2.6.0 by the owner's decision of 2026-09-26: v2.6.0 was withdrawn —",
+    "release, tag and DMG — and v2.5.11 stays, as it did when v2.6.0 was published on",
+    "2026-09-23, the first release since 2026-08-30 not to displace the one before it. Before",
+    "that the list was kept at three, and the release a new one replaced was withdrawn:",
+    "v2.5.10 on 2026-09-22, v2.5.9 on 2026-09-20, hours after it was published, v2.5.8",
+    "earlier that day, v2.5.7 on 2026-09-13, v2.5.6 earlier the same day, v2.5.5 on",
+    "2026-09-12, v2.5.4 on 2026-09-10, v2.5.3 on 2026-09-07, v2.5.2 on 2026-09-06, v2.5.1",
+    "on 2026-09-04, v2.5.0 on 2026-09-01 and v2.1.0 through v2.4.0 on 2026-08-30. A",
+    "reference cannot be re-cut, so the work that follows one takes a number of its own.",
+    "Whether a new release retires anything is a decision rather than a consequence of",
+    "publishing.",
     "",
     "Adding or changing any value below is a deliberate act and shows up in the diff as one."
   ],
@@ -52,14 +51,14 @@
       "commit": "79fe35ae89161cdb5a3f68acb52469d420283e1c",
       "published": "2026-09-21T23:33:47Z",
       "dmg_sha256": "cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410",
-      "why": "The third reference, and the release before v2.6.0, which did not retire it. It replaced v2.5.10, and unlike that one it carries code: the inventory's search field is labelled in English, a CTH group is one run even when its labels share a number, a dropped BOM is counted under DROP_BOM, and two cache tests no longer leave a working directory in TMPDIR. The package it builds hashes to dfe12b37…adff over 23 940 files, the byte mirror to the unchanged 7cfcdce4…35d0 over 23 936 documents in 663 folders. It is the first release whose binary is reproducible across machines: the application the runner built, 4e2786bc…a594, is byte-for-byte the one the owner's machine builds from the same commit, because the release build remaps the building machine's paths, keeps the debug map out of LC_UUID, and holds Xcode 15.2 (SDK 14.2) and Node 22.23.2 on both sides. Revisions 80 and 81."
+      "why": "The third reference, kept by v2.6.0 and again by v2.6.1. It replaced v2.5.10, and unlike that one it carries code: the inventory's search field is labelled in English, a CTH group is one run even when its labels share a number, a dropped BOM is counted under DROP_BOM, and two cache tests no longer leave a working directory in TMPDIR. The package it builds hashes to dfe12b37…adff over 23 940 files, the byte mirror to the unchanged 7cfcdce4…35d0 over 23 936 documents in 663 folders. It is the first release whose binary is reproducible across machines: the application the runner built, 4e2786bc…a594, is byte-for-byte the one the owner's machine builds from the same commit, because the release build remaps the building machine's paths, keeps the debug map out of LC_UUID, and holds Xcode 15.2 (SDK 14.2) and Node 22.23.2 on both sides. Revisions 80 and 81."
     },
     {
-      "tag": "v2.6.0",
-      "commit": "539d034915073de635e44b64c6ec3505d088aa0c",
-      "published": "2026-09-22T23:00:49Z",
-      "dmg_sha256": "455314688cc9bc845d48163d8c106894edef22656e78aa86fc07d7a86bf3cad9",
-      "why": "The current release and the fourth reference, added beside v2.5.11 rather than in its place. Each CTH heading of the inventory carries the catalogue's title for its number; the download's read timeout is in force, 30 s, and a cancel reaches a silent server within it; a body the server cut short is a network failure, not a disk one; a declared XML version other than 1.0 is refused; the search hint writes its numbers the English way on any machine; the window is granted core:default and dialog:allow-open only and the store plugin is gone. The package it builds hashes to 83392544…3dc99 over 23 941 files, the byte mirror to the unchanged 7cfcdce4…35d0. The application the runner built, e9fcdb38…3aea, is byte-for-byte the one two local builds of the same commit gave on the owner's machine. Revisions 86 and 87."
+      "tag": "v2.6.1",
+      "commit": "94da3dfa7c5f7db1e996b962bc49147611e9ef32",
+      "published": "2026-09-26T11:03:19Z",
+      "dmg_sha256": "cf9f05545fbb943cb626641bdb093d90dfae6204225eb2e1ca67f75aec87265d",
+      "why": "The current release and the fourth reference, in the place of v2.6.0, withdrawn the same day by the owner's decision. It publishes into a folder under a flock lock and says when it waits for another run; checks the staged copy against the published one before the reader's goes; takes the proxy from the environment and goes direct, saying so, when it cannot use it; ends a question to Zenodo behind a silent proxy by its own deadline, and names an expired deadline as one; refuses two CTH groups the disk would file as one folder and names their code points when only Unicode form differs; refuses in Russian in the console; reads the archive through an 8 KiB buffer, 10.8 % fewer instructions than 256 KiB. The package it builds hashes to 83392544…3dc99 over 23 941 files, the byte mirror to the unchanged 7cfcdce4…35d0. The application the runner built, 6976fbf2…a5e7, is byte-for-byte the one the release gate built twice on the owner's machine. Revisions 90–99."
     }
   ]
 }

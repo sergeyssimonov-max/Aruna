@@ -20,11 +20,14 @@ the next build ran, which is why the rule exists.
 
 | Committed | Release | Digest of the image |
 |---|---|---|
-| `Aruna_2.6.0-macos-universal.dmg` | v2.6.0, current | `455314688cc9bc845d48163d8c106894edef22656e78aa86fc07d7a86bf3cad9` |
+| `Aruna_2.6.1-macos-universal.dmg` | v2.6.1, current | `cf9f05545fbb943cb626641bdb093d90dfae6204225eb2e1ca67f75aec87265d` |
 | `Aruna_2.5.11-macos-universal.dmg` | v2.5.11 | `cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410` |
 
 The references v1.0.5 and v1.0.9 predate the rule; their images are on the
 Releases page only.
+
+v2.6.0 was withdrawn on 2026-09-26, when v2.6.1 took its place: its pair left
+the tree with its entry in the reference record, as the rule above says.
 
 The checksum files name the image as the release publishes it,
 `Aruna-macos-universal.dmg`, so `shasum -c` works on a download from the
