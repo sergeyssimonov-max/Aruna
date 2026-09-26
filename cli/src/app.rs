@@ -365,12 +365,19 @@ fn message_of(error: &ArunaError) -> String {
             second,
             ..
         } => format!("{group}: {fragment} – {first}, {second}"),
+        // Code points when the two names print the same – a difference in
+        // Unicode form; names only, as the rest of this line.
         ExportFolderCollision {
             first_group,
             second_group,
             first,
             second,
-        } => format!("{first_group} / {second_group} – {first}, {second}"),
+        } => match crate::error::spelled_apart(first_group, second_group) {
+            Some((a, b)) => {
+                format!("{first_group} / {second_group} ({a} / {b}) – {first}, {second}")
+            }
+            None => format!("{first_group} / {second_group} – {first}, {second}"),
+        },
         ArchiveDuplicateEntry { entry } => entry.clone(),
         // The file's name and not where it lies: the name is the application's
         // own and says which face is at fault, the directory is this machine's.
@@ -403,6 +410,26 @@ impl From<&ArunaError> for Failure {
 mod tests {
     use super::*;
     use crate::job::Cancel;
+
+    /// The window's second line for a folder collision in Unicode form names
+    /// the code points, as the console does; a case collision's stays as it was.
+    #[test]
+    fn a_folder_collision_in_unicode_form_reaches_the_window_with_its_code_points() {
+        let err = |a: &str, b: &str| ArunaError::ExportFolderCollision {
+            first_group: a.into(),
+            second_group: b.into(),
+            first: "a.xml".into(),
+            second: "b.xml".into(),
+        };
+        assert_eq!(
+            Failure::of(&err("CTH 5\u{c7}", "CTH 5C\u{327}")).message,
+            "CTH 5\u{c7} / CTH 5C\u{327} (U+00C7 / U+0043 U+0327) – a.xml, b.xml"
+        );
+        assert_eq!(
+            Failure::of(&err("CTH 5a", "CTH 5A")).message,
+            "CTH 5a / CTH 5A – a.xml, b.xml"
+        );
+    }
     use crate::progress::Silent;
     use std::path::Path;
     use tempfile::tempdir;

@@ -80,9 +80,16 @@ pub fn headline(err: &ArunaError) -> String {
             second_group,
             first,
             second,
-        } => format!(
-            "папки групп {first_group} и {second_group} на этом диске – одна папка: в первую ложится {first}, во вторую – {second}"
-        ),
+        } => {
+            // Регистр виден на экране сам; форма Unicode – нет, и два имени
+            // печатаются одинаково. Тогда называется то, чем они различаются.
+            let apart = aruna::error::spelled_apart(first_group, second_group)
+                .map(|(a, b)| format!(" (различаются формой Unicode: {a} против {b})"))
+                .unwrap_or_default();
+            format!(
+                "папки групп {first_group} и {second_group}{apart} на этом диске – одна папка: в первую ложится {first}, во вторую – {second}"
+            )
+        }
         ArchiveDuplicateEntry { entry } => {
             format!("архив называет {entry} дважды; документ может встречаться в нем один раз")
         }
@@ -588,6 +595,27 @@ mod tests {
             let found = english_in(&text);
             assert!(found.is_empty(), "{err:?} → {text:?}: {found:?}");
         }
+    }
+
+    /// **Папки, которые на экране не различить, различены кодовыми точками.**
+    /// Заслон 26.09.2026 (З1) видел «папки групп CTH 5Ç и CTH 5Ç»: два имени,
+    /// одинаковые на вид. Регистр виден и так – у такой пары добавки нет.
+    #[test]
+    fn a_folder_collision_in_unicode_form_names_the_code_points() {
+        let err = |a: &str, b: &str| ArunaError::ExportFolderCollision {
+            first_group: a.into(),
+            second_group: b.into(),
+            first: "root/x/nfc.xml".into(),
+            second: "root/x/nfd.xml".into(),
+        };
+        let form = headline(&err("CTH 5\u{c7}", "CTH 5C\u{327}"));
+        assert!(
+            form.contains("различаются формой Unicode: U+00C7 против U+0043 U+0327"),
+            "{form}"
+        );
+        let case = headline(&err("CTH 5a", "CTH 5A"));
+        assert!(!case.contains("U+"), "{case}");
+        assert!(!case.contains("Unicode"), "{case}");
     }
 
     /// Ошибка-обертка с источником – так ureq отдает отказ рукопожатия TLS:

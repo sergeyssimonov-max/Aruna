@@ -252,10 +252,62 @@ impl ArunaError {
 
 pub type Result<T> = std::result::Result<T, ArunaError>;
 
+/// Where two spellings of one name part ways, as code points: the part of
+/// each between what they share at the start and at the end, as `U+XXXX`.
+///
+/// For [`ArunaError::ExportFolderCollision`]: two group folders that differ in
+/// Unicode form – `Ç` against `C` and a combining cedilla – print the same, and
+/// «папки групп CTH 5Ç и CTH 5Ç» told the reader nothing (release gate
+/// 26.09.2026, З1). `None` when the two differ only in case, which the screen
+/// shows by itself, or not at all.
+pub fn spelled_apart(first: &str, second: &str) -> Option<(String, String)> {
+    if first.to_lowercase() == second.to_lowercase() {
+        return None;
+    }
+    let a: Vec<char> = first.chars().collect();
+    let b: Vec<char> = second.chars().collect();
+    let head = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+    let tail = a[head..]
+        .iter()
+        .rev()
+        .zip(b[head..].iter().rev())
+        .take_while(|(x, y)| x == y)
+        .count();
+    let points = |part: &[char]| {
+        part.iter()
+            .map(|c| format!("U+{:04X}", u32::from(*c)))
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    Some((
+        points(&a[head..a.len() - tail]),
+        points(&b[head..b.len() - tail]),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    /// **Where two spellings of one name part ways, in code points** – for a
+    /// pair the screen shows the same (release gate 26.09.2026, З1: «CTH 5Ç и
+    /// CTH 5Ç»). Case shows by itself, so a pair that differs only in case gets
+    /// nothing, and neither does one name twice.
+    #[test]
+    fn spellings_a_reader_cannot_tell_apart_are_told_apart_in_code_points() {
+        assert_eq!(
+            spelled_apart("CTH 5\u{c7}", "CTH 5C\u{327}"),
+            Some(("U+00C7".to_string(), "U+0043 U+0327".to_string()))
+        );
+        // Only the part that differs, not the whole name.
+        assert_eq!(
+            spelled_apart("CTH 5\u{c7}a", "CTH 5C\u{327}a"),
+            Some(("U+00C7".to_string(), "U+0043 U+0327".to_string()))
+        );
+        assert_eq!(spelled_apart("CTH 5a", "CTH 5A"), None);
+        assert_eq!(spelled_apart("CTH 5a", "CTH 5a"), None);
+    }
 
     /// Every error must name what it is about.
     ///
