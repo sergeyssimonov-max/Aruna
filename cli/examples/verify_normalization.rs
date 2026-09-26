@@ -52,7 +52,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let mut archive = match zip::ZipArchive::new(std::io::BufReader::with_capacity(1 << 18, file)) {
+    let mut archive = match zip::ZipArchive::new(std::io::BufReader::new(file)) {
         Ok(archive) => archive,
         Err(err) => {
             eprintln!("cannot read {}: {err}", zip.display());

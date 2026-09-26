@@ -185,11 +185,10 @@ fn code_points(zip: &Path) -> BTreeSet<u32> {
         eprintln!("{}: {e}", zip.display());
         std::process::exit(1);
     });
-    let mut archive = zip::ZipArchive::new(std::io::BufReader::with_capacity(1 << 18, file))
-        .unwrap_or_else(|e| {
-            eprintln!("{}: {e}", zip.display());
-            std::process::exit(1);
-        });
+    let mut archive = zip::ZipArchive::new(std::io::BufReader::new(file)).unwrap_or_else(|e| {
+        eprintln!("{}: {e}", zip.display());
+        std::process::exit(1);
+    });
 
     let mut used = BTreeSet::new();
     let mut bytes = Vec::new();

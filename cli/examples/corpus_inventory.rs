@@ -336,8 +336,7 @@ fn main() {
 
     let before = aruna::md5::md5_file(&zip).expect("read archive");
     let file = std::fs::File::open(&zip).expect("open archive");
-    let mut archive = zip::ZipArchive::new(std::io::BufReader::with_capacity(1 << 18, file))
-        .expect("read archive");
+    let mut archive = zip::ZipArchive::new(std::io::BufReader::new(file)).expect("read archive");
 
     let mut code_points: HashMap<u32, usize> = HashMap::new();
     let mut sizes: Vec<usize> = Vec::new();

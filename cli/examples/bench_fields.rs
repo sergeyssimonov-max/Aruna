@@ -249,8 +249,8 @@ fn collect(zip: &std::path::Path) -> std::io::Result<Vec<Document>> {
     use aruna::parse::{is_manuscript_xml, looks_like_manuscript};
 
     let file = std::fs::File::open(zip)?;
-    let mut archive = zip::ZipArchive::new(std::io::BufReader::with_capacity(256 * 1024, file))
-        .map_err(std::io::Error::other)?;
+    let mut archive =
+        zip::ZipArchive::new(std::io::BufReader::new(file)).map_err(std::io::Error::other)?;
 
     let mut out = Vec::new();
     let mut window = Vec::with_capacity(HEADER_READ_LIMIT);

@@ -17,8 +17,7 @@ fn main() {
         return;
     };
     let file = std::fs::File::open(&zip).expect("open");
-    let mut archive =
-        zip::ZipArchive::new(std::io::BufReader::with_capacity(1 << 18, file)).expect("zip");
+    let mut archive = zip::ZipArchive::new(std::io::BufReader::new(file)).expect("zip");
 
     // Read everything first, so the measurement is the counting and not the
     // unzipping.
