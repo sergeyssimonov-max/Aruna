@@ -234,7 +234,7 @@ reference too.
 
 [v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
 
-[v2.5.11](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.11) is the release before the current one, and the first whose binary is reproducible across machines. It stays a reference: v2.6.0 was added beside it, not in its place.
+[v2.5.11](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.11) is the release before the current one, and the first whose binary is reproducible across machines. It stays a reference: v2.6.0 was added beside it, not in its place, and v2.6.1 took v2.6.0's place, not its.
 
 **What that cost until 2026-09-23, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
 withdrawn on 2026-08-30 — tags and DMGs both — and v2.5.0 followed on
@@ -252,9 +252,11 @@ retiring the release it replaced rather than letting both stand, and left
 nothing between v1.0.9 and the newest release to bracket a recent fault from
 below. v2.6.0 is the first release since 2026-08-30 that did not retire the one
 before it: by the owner's decision of 2026-09-23 v2.5.11 stays, and brackets it.
+v2.6.0 itself was withdrawn on 2026-09-26, by the owner's decision, when v2.6.1
+took its place; v2.5.11 stayed.
 The history of what changed when is in the commits, which were not touched.
 
-All four are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if any tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to point at. The images of v2.5.11 and v2.6.0 are also kept in the tree, under [`cli/releases/`](cli/releases/README.md), each under its own version number.
+All four are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if any tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to point at. The images of v2.5.11 and v2.6.1 are also kept in the tree, under [`cli/releases/`](cli/releases/README.md), each under its own version number.
 
 ## Documentation
 
