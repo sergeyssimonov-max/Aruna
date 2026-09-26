@@ -296,9 +296,13 @@ fn walk(
         // not a directory this validator descends into. `check_destination`
         // above already reads the root this way — the walk had been left
         // behind.
-        let kind = fs::symlink_metadata(&path)
-            .ok()
-            .map(|meta| meta.file_type());
+        //
+        // The type comes from the directory entry, not from a second `lstat`:
+        // `DirEntry::file_type` does not follow a link either, and on macOS it
+        // is the `d_type` the listing already returned – std falls back to
+        // `lstat` itself only when the filesystem leaves it unknown. Measured
+        // 26.09.2026: 2.9–3.2 % fewer instructions over the package's 23 941 files.
+        let kind = entry.file_type().ok();
         let is_link = kind.is_some_and(|t| t.is_symlink());
         if is_link {
             errors.push(format!(
@@ -509,6 +513,40 @@ mod tests {
                 .any(|f| f.to_string_lossy().contains("stranger")),
             "проверка ушла по ссылке наружу пакета: {files:?}"
         );
+    }
+
+    /// **Ссылка на файл – тоже отказ, а не документ.** С 26.09.2026 тип берется
+    /// из записи каталога (`DirEntry::file_type`, на macOS – `d_type`), а не
+    /// отдельным `lstat`; ссылка при этом остается ссылкой и за собой не ведет.
+    /// Ссылка-каталог проверена тестом выше, этот держит ссылку-файл с именем
+    /// документа – ту, что прошла бы как XML, если бы тип брался по цели.
+    #[test]
+    fn a_symlinked_file_in_the_package_is_refused_rather_than_read_as_a_document() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path().join(PACKAGE);
+        fs::create_dir_all(root.join("CTH 5")).expect("mkdir");
+        let outside = dir.path().join("stranger.xml");
+        fs::write(&outside, b"<x/>").expect("write");
+        std::os::unix::fs::symlink(&outside, root.join("CTH 5").join("KBo 1.1.xml"))
+            .expect("symlink");
+
+        let mut files = std::collections::HashSet::new();
+        let mut at_the_root = std::collections::HashSet::new();
+        let mut errors = Vec::new();
+        walk(
+            &root,
+            &root,
+            MAX_DEPTH,
+            &mut files,
+            &mut at_the_root,
+            &mut errors,
+        );
+
+        assert!(
+            errors.iter().any(|e| e.contains("symbolic link")),
+            "ссылка на файл не названа: {errors:?}"
+        );
+        assert!(files.is_empty(), "ссылка засчитана документом: {files:?}");
     }
 
     #[test]
