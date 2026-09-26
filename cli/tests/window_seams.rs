@@ -642,6 +642,12 @@ fn every_failure() -> Vec<ArunaError> {
             second: "b.xml".into(),
             path: secret.join("CTH 5/KBo 1.1.xml"),
         },
+        ArunaError::ExportFolderCollision {
+            first_group: "CTH 5a".into(),
+            second_group: "CTH 5A".into(),
+            first: "a.xml".into(),
+            second: "b.xml".into(),
+        },
         ArunaError::ArchiveDuplicateEntry {
             entry: "CTH 5/KBo 1.1.xml".into(),
         },
@@ -702,6 +708,7 @@ fn covers(error: &ArunaError) {
         | Io { .. }
         | Replace { .. }
         | ExportCollision { .. }
+        | ExportFolderCollision { .. }
         | ArchiveDuplicateEntry { .. }
         | ExportDocumentTooLarge { .. }
         | ExportDistorted { .. }

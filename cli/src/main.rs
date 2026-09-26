@@ -260,6 +260,14 @@ fn advice(err: &ArunaError) -> Option<String> {
              Это расхождение в исходных данных, а не сбой сборки –\n\
              сверьте оба исходных пути, названных выше."
             .to_string(),
+        // Two groups spelled apart that the disk files as one: the same kind
+        // of disagreement in the corpus, and the same answer.
+        ArunaError::ExportFolderCollision { .. } => {
+            "Две группы CTH записаны по-разному, а на диске легли бы в одну папку.\n\
+             Это расхождение в исходных данных, а не сбой сборки –\n\
+             сверьте оба исходных пути, названных выше."
+                .to_string()
+        }
         // Same shape as the collision above and the same answer: the archive
         // says two things at once, and only whoever built it can say which was
         // meant.
@@ -381,16 +389,17 @@ mod tests {
         );
     }
 
-    /// **Оба расхождения в исходных данных советуют одно и то же и говорят
+    /// **Все три расхождения в исходных данных советуют одно и то же и говорят
     /// это по-разному.**
     ///
-    /// Два отказа – два документа на одно место и одно имя записи дважды –
-    /// одинаковы для читателя по действию: чинить надо не программу, а корпус.
+    /// Три отказа – два документа на одно место, одно имя записи дважды и две
+    /// группы в одной папке диска (с 26.09.2026) – одинаковы для читателя по
+    /// действию: чинить надо не программу, а корпус.
     /// Ветка для второго появилась 30.08.2026 и до этого теста не выполнялась
     /// ни разу: `llvm-cov` показывал ее непокрытой. Совет, который никто не
     /// читал, легко удалить незаметно.
     #[test]
-    fn both_kinds_of_corpus_disagreement_are_advised_and_not_confused() {
+    fn every_kind_of_corpus_disagreement_is_advised_and_not_confused() {
         let duplicate = advice(&ArunaError::ArchiveDuplicateEntry {
             entry: "xml/KBo 1.1.xml".into(),
         })
@@ -403,17 +412,27 @@ mod tests {
             path: std::path::PathBuf::from("CTH 5/KBo 1.1.xml"),
         })
         .expect("a collision has advice");
+        let folders = advice(&ArunaError::ExportFolderCollision {
+            first_group: "CTH 5a".into(),
+            second_group: "CTH 5A".into(),
+            first: "a.xml".into(),
+            second: "b.xml".into(),
+        })
+        .expect("a folder collision has advice");
 
-        for text in [&duplicate, &collision] {
+        for text in [&duplicate, &collision, &folders] {
             assert!(
                 text.contains("исходных данных"),
                 "the reader is not told this is the corpus, not the program: {text}"
             );
         }
-        assert_ne!(
-            duplicate, collision,
-            "two different faults must not read as one"
-        );
+        for (one, other) in [
+            (&duplicate, &collision),
+            (&duplicate, &folders),
+            (&collision, &folders),
+        ] {
+            assert_ne!(one, other, "two different faults must not read as one");
+        }
     }
 
     /// The two cases that are advised differently by status must stay

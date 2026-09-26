@@ -75,6 +75,14 @@ pub fn headline(err: &ArunaError) -> String {
             "совпадение имен в {group}: {fragment} ведет к {}, и на него претендуют и {first}, и {second}",
             path.display()
         ),
+        ExportFolderCollision {
+            first_group,
+            second_group,
+            first,
+            second,
+        } => format!(
+            "папки групп {first_group} и {second_group} на этом диске – одна папка: в первую ложится {first}, во вторую – {second}"
+        ),
         ArchiveDuplicateEntry { entry } => {
             format!("архив называет {entry} дважды; документ может встречаться в нем один раз")
         }
@@ -177,6 +185,15 @@ fn io(err: &std::io::Error) -> String {
 /// Сетевой отказ словами. Источник – ошибка `ureq`, системная ошибка или
 /// собственная строка загрузчика; вид узнается по ним, текст не переносится.
 fn network(source: &(dyn std::error::Error + 'static)) -> String {
+    // Истекший срок – по виду системной ошибки где угодно в цепочке, раньше
+    // текста: ureq 2 переводит EAGAIN в `TimedOut` только на своих чтениях, а
+    // рукопожатие TLS читает голый сокет, и там истекший срок чтения на macOS –
+    // EAGAIN (код 35) под словами «tls connection init failed». По тексту это
+    // становилось «не удалось установить защищенное соединение» (заслон
+    // 26.09.2026, замолчавший прокси).
+    if waited_out(source) {
+        return "сервер не ответил вовремя".into();
+    }
     if let Some(err) = source.downcast_ref::<std::io::Error>() {
         return io(err);
     }
@@ -213,6 +230,25 @@ fn network(source: &(dyn std::error::Error + 'static)) -> String {
         "сетевой сбой"
     };
     what.to_string()
+}
+
+/// Есть ли в цепочке ошибки системная ошибка истекшего срока. На сетевом
+/// сокете `WouldBlock` значит ровно это: сокеты блокирующие, и EAGAIN
+/// возвращается только по сроку чтения или записи.
+fn waited_out(source: &(dyn std::error::Error + 'static)) -> bool {
+    let mut next = Some(source);
+    while let Some(err) = next {
+        if let Some(io) = err.downcast_ref::<std::io::Error>() {
+            if matches!(
+                io.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ) {
+                return true;
+            }
+        }
+        next = err.source();
+    }
+    false
 }
 
 /// Отказ библиотеки ZIP словами.
@@ -482,6 +518,12 @@ mod tests {
                 second: "Б".into(),
                 path: p(),
             },
+            ArunaError::ExportFolderCollision {
+                first_group: "Г".into(),
+                second_group: "г".into(),
+                first: "А".into(),
+                second: "Б".into(),
+            },
             ArunaError::ArchiveDuplicateEntry { entry: "А".into() },
             ArunaError::ExportDocumentTooLarge {
                 entry: "А".into(),
@@ -546,6 +588,47 @@ mod tests {
             let found = english_in(&text);
             assert!(found.is_empty(), "{err:?} → {text:?}: {found:?}");
         }
+    }
+
+    /// Ошибка-обертка с источником – так ureq отдает отказ рукопожатия TLS:
+    /// «tls connection init failed» поверх системной ошибки сокета.
+    #[derive(Debug)]
+    struct Wrapped(std::io::Error);
+    impl std::fmt::Display for Wrapped {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "Connection Failed: tls connection init failed: {}",
+                self.0
+            )
+        }
+    }
+    impl std::error::Error for Wrapped {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            Some(&self.0)
+        }
+    }
+
+    /// **Истекший срок под рукопожатием TLS называется сроком, а не отказом
+    /// защищенного соединения.** ureq 2 переводит EAGAIN в `TimedOut` только
+    /// на тех чтениях, которые оборачивает сам; рукопожатие читает голый сокет,
+    /// и истекший срок чтения на macOS приходит как EAGAIN (код 35). Заслон
+    /// 26.09.2026 увидел за замолчавшим прокси «не удалось установить
+    /// защищенное соединение» – слово «tls» в тексте брало верх.
+    #[test]
+    fn a_deadline_under_the_tls_handshake_is_named_as_a_deadline() {
+        for kind in [std::io::ErrorKind::WouldBlock, std::io::ErrorKind::TimedOut] {
+            let wrapped = Wrapped(std::io::Error::from(kind));
+            assert_eq!(network(&wrapped), "сервер не ответил вовремя", "{kind:?}");
+            let bare = std::io::Error::from(kind);
+            assert_eq!(network(&bare), "сервер не ответил вовремя", "{kind:?}");
+        }
+        // Настоящий отказ TLS – без истекшего срока в цепочке – остается собой.
+        let refused = Wrapped(std::io::Error::other("invalid peer certificate"));
+        assert_eq!(
+            network(&refused),
+            "не удалось установить защищенное соединение"
+        );
     }
 
     /// Страж со своим отрицательным контролем: английский текст ядра, не

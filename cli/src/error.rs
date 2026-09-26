@@ -125,6 +125,21 @@ pub enum ArunaError {
         path: std::path::PathBuf,
     },
 
+    /// Two groups whose folders the disk takes for one – spellings that differ
+    /// only in case or only in Unicode form. Their documents would merge into
+    /// one folder silently, so the build stops and names both groups and the
+    /// first document of each. Its own variant, not `ExportCollision`: that one
+    /// is about one place for a document, and a sentence built for it read
+    /// «KBo 1.1 maps to "CTH 5A"» – a document's siglum against another group's
+    /// folder (release gate 25.09.2026, З2).
+    #[error("the folders of {first_group} and {second_group} are one folder on this disk; {first} is filed in the first and {second} in the second")]
+    ExportFolderCollision {
+        first_group: String,
+        second_group: String,
+        first: String,
+        second: String,
+    },
+
     /// The archive names two entries the same. ZIP permits it; this exporter
     /// cannot answer it, because the map from an entry's name to the place it
     /// is written has one slot per name — the second document would silently
@@ -309,6 +324,15 @@ mod tests {
                     path: PathBuf::from("CTH 5/KBo 1.1.xml"),
                 },
                 "KBo 1.1",
+            ),
+            (
+                ArunaError::ExportFolderCollision {
+                    first_group: "CTH 5a".into(),
+                    second_group: "CTH 5A".into(),
+                    first: "a.xml".into(),
+                    second: "b.xml".into(),
+                },
+                "CTH 5A",
             ),
             (
                 ArunaError::ExportDocumentTooLarge {

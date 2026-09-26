@@ -227,12 +227,11 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
             .entry(folder.to_lowercase())
             .or_insert_with(|| (folder.clone(), fragment.source.clone()));
         if *written != folder {
-            return Err(ArunaError::ExportCollision {
-                group: group.to_string(),
-                fragment: base.to_string(),
+            return Err(ArunaError::ExportFolderCollision {
+                first_group: written.clone(),
+                second_group: folder,
                 first: first.clone(),
                 second: fragment.source.clone(),
-                path: PathBuf::from(written.as_str()),
             });
         }
 
@@ -1312,13 +1311,6 @@ fn write_documents(
     Ok(())
 }
 
-/// The collision the filesystem found and the placement did not.
-///
-/// `relative` is where `second` was to be written, and a file is already
-/// there under a name the filesystem takes for the same one. The first is the
-/// document already written to that file – found by its identity on disk,
-/// which is the only thing the filesystem and this program agree on. Only on
-/// this path, so the walk over the placements costs nothing on a good run.
 /// The collision behind a group folder the disk already had: which folder this
 /// run made that the disk takes for `parent`, and the first document filed in
 /// it.
@@ -1336,21 +1328,26 @@ fn folder_twin_of(
         .find(|(folder, _)| held.is_some() && identity(folder) == held)
         .map(|(folder, first)| (folder.clone(), first.clone()))
         .unwrap_or_else(|| (parent.to_path_buf(), "(unknown)".to_string()));
-    ArunaError::ExportCollision {
-        group: relative
-            .parent()
-            .map(|group| group.to_string_lossy().into_owned())
-            .unwrap_or_default(),
-        fragment: relative
-            .file_stem()
-            .map(|stem| stem.to_string_lossy().into_owned())
-            .unwrap_or_default(),
+    let name = |path: &Path| {
+        path.file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+    ArunaError::ExportFolderCollision {
+        first_group: name(&path),
+        second_group: relative.parent().map(name).unwrap_or_default(),
         first,
         second: second.to_string(),
-        path: path.file_name().map(PathBuf::from).unwrap_or(path),
     }
 }
 
+/// The collision the filesystem found and the placement did not.
+///
+/// `relative` is where `second` was to be written, and a file is already
+/// there under a name the filesystem takes for the same one. The first is the
+/// document already written to that file – found by its identity on disk,
+/// which is the only thing the filesystem and this program agree on. Only on
+/// this path, so the walk over the placements costs nothing on a good run.
 fn twin_of(
     relative: &Path,
     second: &str,
@@ -1768,17 +1765,20 @@ mod tests {
             fragment("KBo 2.2", "CTH 5A", "root/x/b.xml"),
         ];
         match place(&fragments) {
-            Err(ArunaError::ExportCollision {
+            Err(ArunaError::ExportFolderCollision {
+                first_group,
+                second_group,
                 first,
                 second,
-                path,
-                ..
             }) => {
+                assert_eq!(
+                    (first_group.as_str(), second_group.as_str()),
+                    ("CTH 5a", "CTH 5A")
+                );
                 assert_eq!(
                     (first.as_str(), second.as_str()),
                     ("root/x/a.xml", "root/x/b.xml")
                 );
-                assert_eq!(path, PathBuf::from("CTH 5a"));
             }
             other => panic!("two spellings of one folder were placed: {other:?}"),
         }

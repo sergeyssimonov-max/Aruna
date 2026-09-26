@@ -282,6 +282,7 @@ impl Failure {
 
             // The export refusing to do something wrong.
             ExportCollision { .. } => ("collision", Some(Phase::Exporting), false),
+            ExportFolderCollision { .. } => ("folder_collision", Some(Phase::Exporting), false),
             // A property of the archive, not of this run: the same archive will
             // fail the same way, so there is nothing to try again.
             ArchiveDuplicateEntry { .. } => ("archive_duplicate", Some(Phase::Exporting), false),
@@ -364,6 +365,12 @@ fn message_of(error: &ArunaError) -> String {
             second,
             ..
         } => format!("{group}: {fragment} – {first}, {second}"),
+        ExportFolderCollision {
+            first_group,
+            second_group,
+            first,
+            second,
+        } => format!("{first_group} / {second_group} – {first}, {second}"),
         ArchiveDuplicateEntry { entry } => entry.clone(),
         // The file's name and not where it lies: the name is the application's
         // own and says which face is at fault, the directory is this machine's.

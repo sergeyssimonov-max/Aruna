@@ -899,7 +899,13 @@ fn two_groups_that_differ_only_in_unicode_form_are_not_merged() {
     );
     if cfg!(target_os = "macos") {
         match built {
-            Err(ArunaError::ExportCollision { first, second, .. }) => {
+            Err(ArunaError::ExportFolderCollision {
+                first_group,
+                second_group,
+                first,
+                second,
+            }) => {
+                assert_ne!(first_group, second_group);
                 assert!(first.ends_with("nfc.xml"), "{first}");
                 assert!(second.ends_with("nfd.xml"), "{second}");
                 assert!(
