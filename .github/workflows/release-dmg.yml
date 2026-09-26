@@ -175,13 +175,16 @@ jobs:
       # spec's 3.4 (5.1 there). Unpinned, the tool followed this action's own
       # manifest, which at the action's earlier pin (v2.86.7) stopped at 0.9.143
       # – a version whose false LEAK reports 0.9.145 fixed, and
-      # `.config/nextest.toml`'s 100 ms leak-timeout rests on the fix. The
-      # manifest of the v2.87.16 pin knows 0.9.145 but not 0.9.146 (26.09.2026),
-      # so 0.9.146 comes through the action's cargo-binstall fallback again, with
-      # its warning on each of the three steps; they go when the pin is raised to
-      # a release whose manifest lists 0.9.146 and has had its seven days.
+      # `.config/nextest.toml`'s 100 ms leak-timeout rests on the fix. The pin
+      # must be a release whose manifest lists the version: otherwise the action
+      # falls back to cargo-binstall, which fetches the binary from GitHub with
+      # no checksum to hold it to, and warns on every step. v2.87.18 is the
+      # first that lists 0.9.146; its code is v2.87.16's – only manifests and
+      # the changelog differ – and the 0.9.146 checksums it carries were checked
+      # against nextest's own release on 26.09.2026. Raised then, short of the
+      # seven days of the spec's 5.1, and recorded there.
       - name: Install nextest
-        uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
+        uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-nextest@0.9.146
 
@@ -200,7 +203,7 @@ jobs:
       # policies over one graph started disagreeing with each other about a
       # licence the tree had carried all along.
       - name: Install cargo-deny
-        uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
+        uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-deny
 
@@ -282,7 +285,7 @@ jobs:
         run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: Install nextest
-        uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
+        uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-nextest@0.9.146
 
@@ -398,7 +401,7 @@ jobs:
       # ARUNA_REQUIRE_FIXTURE exists to prevent, and it was set on a command
       # that never reached that file.
       - name: Install nextest
-        uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
+        uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
         with:
           tool: cargo-nextest@0.9.146
 
