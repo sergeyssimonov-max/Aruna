@@ -551,14 +551,20 @@ fn a_redirect_loop_gives_up_instead_of_going_round_for_ever() {
     // retrying a loop only walks the identical loop again, so it is not
     // retried. Before that arm existed this was 15 requests and eight seconds,
     // six of them asleep between attempts.
+    //
+    // The count is the whole check, and there is no wall-clock bound beside
+    // it: a retry walks the loop again and shows up here as twelve requests or
+    // more, whatever the clock says. A 2 s bound stood here until 26.09.2026
+    // and measured the host rather than the client – on the owner's machine,
+    // with socket filters (LuLu, Cisco AnyConnect) inspecting each loopback
+    // connection of a freshly linked test binary, the six requests took
+    // 2.04–2.09 s in a parallel run, 0.28 s alone, 0.01 s from another build
+    // directory, with the same instruction count. The 60 s bound above still
+    // catches a hang.
     assert!(
         looping.requests() <= 6,
         "the loop was walked {} times, so it is being retried",
         looping.requests()
-    );
-    assert!(
-        elapsed < Duration::from_secs(2),
-        "took {elapsed:?}, which is long enough to have slept between retries"
     );
     assert!(
         cache.files().is_empty(),
