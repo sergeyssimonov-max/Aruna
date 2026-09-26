@@ -314,7 +314,21 @@ fn zip_from_handle_within(
 ) -> Result<ZipArchive<BufReader<File>>> {
     file.rewind().map_err(ArunaError::io(zip_path))?;
 
-    let archive = ZipArchive::new(BufReader::with_capacity(256 * 1024, file))?;
+    // **The default 8 KiB, not a larger buffer.** zip moves to every entry with
+    // `SeekFrom::Start`, and `BufReader::seek` throws the buffer away, so the
+    // next read refills it whole – for entries of about 3 KiB. At 256 KiB that
+    // was some 72 000 refills and about 18 GiB copied per run of the corpus,
+    // nearly all of it system time. zip wraps each entry in an 8 KiB reader of
+    // its own and asks in 8 KiB pieces, which a buffer of that size passes
+    // straight through to `read`. Measured 26.09.2026, twelve runs each, the
+    // package unchanged: 8 KiB −10.8 % instructions and −11 % wall against
+    // 256 KiB, 16 KiB −10.4 %; a cold disk changes nothing, because the archive
+    // is hashed whole before this parse; 100 000 tiny entries – the hostile
+    // case – 13.8 s against 16.6 s; ten 30 MB entries +0.5 % instructions,
+    // wall within noise. What an entry yields is bounded by
+    // `take(compressed_size)` above this buffer, so its size decides speed and
+    // nothing else.
+    let archive = ZipArchive::new(BufReader::new(file))?;
     if archive.len() > limit {
         return Err(ArunaError::ArchiveTooManyEntries {
             entries: archive.len(),
