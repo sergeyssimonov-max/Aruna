@@ -171,18 +171,19 @@ jobs:
       # than `cargo test` gives: a test that depended on another one's leftover
       # state fails here and passes there.
       #
-      # The exact version the owner's machine runs, raised in the same commit
-      # as the spec's 3.4 (5.1 there). Unpinned, the tool followed this action's
-      # own manifest, which at the action's earlier pin (v2.86.7) stopped at
-      # 0.9.143 – a version whose false LEAK reports 0.9.145 fixed, and
-      # `.config/nextest.toml`'s 100 ms leak-timeout rests on the fix. From
-      # v2.87.16 the manifest knows 0.9.145, and the action installs it from
-      # its own prebuilt list rather than through the cargo-binstall fallback
-      # that put three warnings on every run from 25.09.2026.
+      # The exact version the owner's machine runs, raised together with the
+      # spec's 3.4 (5.1 there). Unpinned, the tool followed this action's own
+      # manifest, which at the action's earlier pin (v2.86.7) stopped at 0.9.143
+      # – a version whose false LEAK reports 0.9.145 fixed, and
+      # `.config/nextest.toml`'s 100 ms leak-timeout rests on the fix. The
+      # manifest of the v2.87.16 pin knows 0.9.145 but not 0.9.146 (26.09.2026),
+      # so 0.9.146 comes through the action's cargo-binstall fallback again, with
+      # its warning on each of the three steps; they go when the pin is raised to
+      # a release whose manifest lists 0.9.146 and has had its seven days.
       - name: Install nextest
         uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
         with:
-          tool: cargo-nextest@0.9.145
+          tool: cargo-nextest@0.9.146
 
       - name: Test (CLI)
         run: cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml
@@ -283,7 +284,7 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
         with:
-          tool: cargo-nextest@0.9.145
+          tool: cargo-nextest@0.9.146
 
       # Without `--all-features`, and that is the condition of the test running
       # at all: the one test in this crate asserts what a build *without* `e2e`
@@ -399,7 +400,7 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
         with:
-          tool: cargo-nextest@0.9.145
+          tool: cargo-nextest@0.9.146
 
       # nextest rather than `cargo test`, for the reason the `check` job gives
       # at length: it can stop a test that hangs, and `cargo test` cannot. This
