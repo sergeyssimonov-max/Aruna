@@ -55,6 +55,12 @@ Coverage. A correction of fact, not an amendment — no requirement changed.
 Amended 2026-09-26: §2, text is compared by code points, never normalised.
 Marked below.
 
+Amended 2026-09-27: §7, what stands in place of a code point no face draws,
+and where the font credit goes. Both are owner's decisions of that day. The
+first rests on a measurement — the trial PDF of 2026-09-26 lost such a code
+point from its text layer — and the second settles a question this file left
+open for the first PDF. Marked below.
+
 **Where this file ends and the specification begins.** `PROJECT-SPEC.ru.md`
 §6.9 lists checks for the PDF contour and says it takes effect with the first
 PDF. This file is the contract; that section is the pre-commit set that will
@@ -440,11 +446,29 @@ not a glyph.
 
 *What replaces the requirement.* Coverage is checked and reported, not asserted.
 For the 639, a missing glyph in a produced PDF is a failure and the run says
-which code point and which document. For the six, absence is the expected and
-recorded state, named in the manifest, and it must never be masked by a
+which code point and which document. ~~For the six, absence is the expected and
+recorded state, named in the manifest,~~ and it must never be masked by a
 substituted face — a substitution draws a wrong sign that no later check can
 see. The number itself is a measurement with a date, like every other number in
 this project, and it moves when the corpus or the font stack moves.
+
+**Amended 2026-09-27: a marker in place of the sign, the code point kept in
+the text.** *The measurement.* The trial of 2026-09-26 (Typst 0.15.1, fallback
+off) drew each code point without a glyph as glyph 0 of the main face, with no
+`ToUnicode` entry: the code point left the text layer, and the extractor missed
+`U+100009` in two documents of ten. "Absence recorded in the manifest" never
+reached the PDF; the reader got an empty box and lost the character.
+
+*What must hold instead, by the owner's decision of 2026-09-27.* Where a code
+point has no glyph in any face of the stack, the PDF draws a marker — a frame
+holding the code point's name, `U+100009` — set in the main face; the code
+point itself stays in the text layer through ActualText (a marked `/Span`,
+ISO 32000), and the marker's letters are not extractable text. The rule is
+general: which code points need it is read from the fonts' `cmap`, never from
+a list. No face is substituted, and **no PDF carries a blank glyph anywhere** —
+the check refuses one without exception. This supersedes the rejection of
+"visible placeholder markers" recorded above for 2026-08-30 to 2026-09-04.
+
 
 **The files are already here, and already checked.** Since 2026-09-17 all seven
 fonts and five licence texts ride in the application bundle at
@@ -467,11 +491,23 @@ says so.** The Mainz terms ask the user of `UllikummiA` to mention:
 > Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal Mainz
 
 The inventory carries it visibly on the page as of 2026-09-17. The PDF does not
-carry it anywhere, because there is no PDF; the first one must, and in the
-document metadata at least — `set document(author: …)` is not the place, since
-the author of the corpus is not the author of the font, so it belongs in the
-keywords or a colophon line that Typst writes into the file. **Whether a visible
+carry it anywhere, because there is no PDF; ~~the first one must, and in the
+document metadata at least~~ — `set document(author: …)` is not the place, since
+the author of the corpus is not the author of the font, ~~so it belongs in the
+keywords or a colophon line that Typst writes into the file~~. ~~**Whether a visible
 line is also wanted is open**: the inventory has one because it is a page, and a
 663-document PDF set would carry it 663 times. Decide it with the first PDF, and
-do not ship one without the metadata. The constant is `aruna::fonts::CREDIT`;
+do not ship one without the metadata.~~ The constant is `aruna::fonts::CREDIT`;
 quoting it a second time by hand would be a paraphrase waiting to happen.
+
+**Settled 2026-09-27 by the owner.** The credit is a visible footnote on the
+first page of each PDF file that uses `UllikummiA` — a subset of it embedded —
+once per file, not on every page where the sign occurs, and its text is
+`aruna::fonts::CREDIT` code point for code point. A PDF without `UllikummiA`
+carries no credit line, and no other font gets one in any PDF. The metadata
+line struck above is not required beside it: the terms ask the user to mention
+the credit, and the footnote mentions it where a reader sees it. Checked per
+file: exactly one footnote, on page one, where the font is embedded; none where
+it is not. For §2 the footnote is a known addition to the document's text — not
+a discrepancy, but a changed wording or a second copy is one. Do not ship a
+file that embeds `UllikummiA` without it.

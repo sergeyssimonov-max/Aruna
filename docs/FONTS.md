@@ -268,7 +268,7 @@ does not.
 
 | | |
 |---|---|
-| covers | 6 signs — `U+24F5`–`U+24F8`, the double-circled digits used as editorial marks, and `U+27E8`/`U+27E9`, the angle brackets |
+| covers | 7 signs — `U+24F5`–`U+24F8`, the double-circled digits used as editorial marks, `U+27E8`/`U+27E9`, the angle brackets, and `U+2592` `▒`, the medium shade, 597 012 times in 23 021 of the documents a PDF is made from |
 | CSS family | `STIX Two Math` |
 | file | `STIXTwoMath-Regular.otf`, version 2.13 b171 |
 | where | **not a system font any more** — `cli/resources/fonts/`, since 2026-09-11 |
@@ -285,6 +285,28 @@ the project's own file without rebuilding it. So moving this face into the tree
 changes nothing about what is drawn, and everything about what the claim rests
 on — a file with a release tag beside it rather than a file that arrives with an
 operating system and leaves with it.
+
+**The seventh sign, `▒`, was missing from this table until 2026-09-27.** The
+table said six. The PDF trial of 2026-09-26 read the `ToUnicode` maps of the
+embedded fonts and found `U+2592` drawn by this face: `Noto Serif` does not have
+it, and in the stack's order STIX Two Math is the first file that does. It is
+far from rare — **597 012 occurrences in 23 021 of the 23 713 documents** the PDF
+stage converts. The coverage figures above do not move: `U+2592` was always
+among the 639, counted as drawn by this file; only the description of the file
+was short.
+
+*What macOS 13 draws it with in HTML, measured 2026-09-27* the same way as the
+seven characters of the main face on 2026-09-11 — every font file of the system
+read by its `cmap`, `LastResort.otf` kept apart; the method gives back the 23
+files carrying `U+02FD`, the number recorded then. **32 of 358** system files
+carry `U+2592`. San Francisco (`SFNS.ttf`) is not one of them, and neither is
+`Noto Sans Cuneiform` or `UllikummiA`; `STIXTwoMath.otf` is — the system copy,
+byte-identical to this one. So the shared stack resolves `▒` to STIX Two Math in
+HTML exactly as in PDF: the sign is in the stack, not left to fallback. One
+qualification, and it is a measurement too: the inventory itself carries **no**
+`▒` at all. Every occurrence is inside the documents, which the package mirrors
+byte for byte with no stylesheet, so a browser opening a document draws it with
+its own fallback, which a `cmap` cannot decide.
 
 ### Noto Serif Hebrew
 
@@ -446,6 +468,14 @@ say different things. **In the PDF it is not there yet**, and that is deferred
 rather than done: there is no PDF. The requirement is written into
 `docs/PDF-ACCEPTANCE.md` so the first PDF is not the one that forgets it.
 
+**Where it goes in a PDF — the owner's decision of 2026-09-27.** A footnote on
+the first page of every PDF file that uses `UllikummiA` — once per file, not on
+every page where the sign occurs — carrying the same words as the inventory,
+`aruna::fonts::CREDIT`, verbatim. A file uses the font when a subset of it is
+embedded. A PDF without `UllikummiA` carries no credit line, and no other font
+gets one in any PDF. Until that day the owner's rule was that no PDF carries a
+font credit at all; the decision gives that rule one exception.
+
 ## Deliberately not named
 
 **`Hiragino Sans GB`** would close one more code point, `U+E83A`, and must not be
@@ -458,7 +488,9 @@ refuses it.
 
 **`UllikummiB`, `UllikummiC`, `Semiramis Unicode 3`** are absent because they add
 nothing: measured against this corpus, they cover no code point the four faces
-above do not.
+above do not. The owner's measurement of 2026-09-27 asked the narrower question
+again for the first two: `UllikummiB` and `UllikummiC` cover **none** of the six
+code points below.
 
 ## Installing — reproducing this environment on another machine
 
@@ -649,6 +681,34 @@ published. **This can only be answered by the TLHdig editors**: what these five
 signs are, and which font renders them. Until it is answered a PDF will have a
 hole in 2 379 lines, and no amount of work in this repository will change that.
 
+#### Decided 2026-09-27: a visible marker, and the code point kept in the text
+
+The hole stays; what fills its place is now decided, by the owner, choosing
+"explicit marking" among the three ways the specification left open (font,
+image, marking). Where a code point has no glyph in any face of the stack, the
+PDF draws a **marker**: a frame holding the code point's name in capitals, like
+`U+100009`, set in the main face — a label, not a substitute sign. The real code
+point stays in the PDF's text layer through **ActualText** (ISO 32000, a marked
+`/Span`), and the label's own letters are not part of the extractable text.
+
+The rule is general. A sign without a glyph is any code point absent from the
+`cmap` of every face in the stack, found from the fonts and never from a list;
+a new one gets a marker by the same rule, and an answer from the editors that
+supplies a face or a standard code point reduces the markers by the same rule.
+No other face is substituted. **No empty box anywhere**: the PDF check refuses
+any blank glyph, with no exception for these six.
+
+Why "an honest blank" was not enough is a measurement, not a preference: in the
+trial of 2026-09-26 the engine drew these as glyph 0 with no `ToUnicode` entry,
+so the code point vanished from the text layer — the extractor lost `U+100009`
+in two documents of ten. What the manifest recorded never reached the reader of
+the PDF.
+
+Rejected by the same decision: accepting the gaps in acceptance, leaving these
+documents out of conversion, drawing a font of our own, and taking
+`UllikummiB` or `UllikummiC`, which draw none of the six. The enquiry of
+2026-08-22 stays open.
+
 `docs/TLHDIG-ANFRAGE.de.md` is the enquiry to them, in German, carrying the
 counts and the cited passages. **Sent 2026-08-22 to `tlhdig@uni-wuerzburg.de`
 with a copy to the Mainz Impressum; unanswered as of 2026-09-20.** The text is
@@ -667,7 +727,8 @@ anybody intended.
 
 It is left alone for the same reason: it is in the source, and the source is not
 ours to correct. It renders as nothing, which is the honest outcome, and the one
-font that would draw something there would draw the wrong thing.
+font that would draw something there would draw the wrong thing. In a PDF, since
+the decision of 2026-09-27, it gets the same marker as the five above.
 
 ## Sources
 
