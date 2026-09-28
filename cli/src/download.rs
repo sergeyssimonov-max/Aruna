@@ -908,12 +908,11 @@ mod tests {
     struct FakeServer {
         port: u16,
         hits: Arc<AtomicU32>,
-        /// The request heads it was sent, so a test can ask what the client
-        /// said about itself as well as what it asked for.
-        heads: Arc<std::sync::Mutex<Vec<String>>>,
-        /// When each request head had arrived: what a deadline is timed from,
-        /// see [`PAST_DEADLINE`].
-        requested: Arc<std::sync::Mutex<Vec<Instant>>>,
+        /// The request heads it was sent, each with when it had arrived, so a
+        /// test can ask what the client said about itself as well as what it
+        /// asked for – and time a deadline from the request, see
+        /// [`PAST_DEADLINE`].
+        heads: Arc<std::sync::Mutex<Vec<(Instant, String)>>>,
     }
 
     impl FakeServer {
@@ -936,10 +935,8 @@ mod tests {
             let port = listener.local_addr().expect("addr").port();
             let hits = Arc::new(AtomicU32::new(0));
             let counter = Arc::clone(&hits);
-            let heads: Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+            let heads: Arc<std::sync::Mutex<Vec<(Instant, String)>>> = Default::default();
             let recorder = Arc::clone(&heads);
-            let requested: Arc<std::sync::Mutex<Vec<Instant>>> = Default::default();
-            let arrivals = Arc::clone(&requested);
 
             std::thread::spawn(move || {
                 for stream in listener.incoming().flatten() {
@@ -956,11 +953,8 @@ mod tests {
                         head.push_str(&line);
                         line.clear();
                     }
-                    if let Ok(mut times) = arrivals.lock() {
-                        times.push(Instant::now());
-                    }
                     if let Ok(mut seen) = recorder.lock() {
-                        seen.push(head);
+                        seen.push((Instant::now(), head));
                     }
 
                     match reply {
@@ -1011,21 +1005,16 @@ mod tests {
                 }
             });
 
-            FakeServer {
-                port,
-                hits,
-                heads,
-                requested,
-            }
+            FakeServer { port, hits, heads }
         }
 
         /// When the first request head had arrived.
         fn first_request(&self) -> Instant {
-            *self
-                .requested
+            self.heads
                 .lock()
-                .expect("the clock is not poisoned")
+                .expect("the recorder is not poisoned")
                 .first()
+                .map(|(arrived, _)| *arrived)
                 .expect("a request arrived")
         }
 
@@ -1043,7 +1032,7 @@ mod tests {
                 .lock()
                 .expect("the recorder is not poisoned")
                 .first()
-                .cloned()
+                .map(|(_, head)| head.clone())
                 .unwrap_or_default()
         }
     }

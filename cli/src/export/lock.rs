@@ -221,12 +221,7 @@ fn acquire_with(
                 // (owner's decision, 25.09.2026 – not a refusal, not a wait).
                 if !same_file(&file, &path) {
                     if nameless(&file) {
-                        if started.elapsed() >= wait {
-                            return Err(ArunaError::PublishBusy {
-                                path: path.clone(),
-                                holder: holder(&path),
-                            });
-                        }
+                        busy_after(started, wait, &path)?;
                         drop(file);
                         std::thread::sleep(poll);
                         continue;
@@ -248,12 +243,7 @@ fn acquire_with(
                     job.report(crate::progress::Event::WaitingForPublication);
                     told = true;
                 }
-                if started.elapsed() >= wait {
-                    return Err(ArunaError::PublishBusy {
-                        path: path.clone(),
-                        holder: holder(&path),
-                    });
-                }
+                busy_after(started, wait, &path)?;
                 drop(file);
                 std::thread::sleep(poll);
             }
@@ -273,6 +263,18 @@ fn acquire_with(
             }
         }
     }
+}
+
+/// The refusal of a run that has waited out `wait` since `started`, naming
+/// who holds the lock; nothing while there is time left.
+fn busy_after(started: Instant, wait: Duration, path: &Path) -> Result<()> {
+    if started.elapsed() >= wait {
+        return Err(ArunaError::PublishBusy {
+            path: path.to_path_buf(),
+            holder: holder(path),
+        });
+    }
+    Ok(())
 }
 
 /// Whether `path` names the file `file` has open.
@@ -674,14 +676,14 @@ mod tests {
         let heard = Told(std::sync::Mutex::new(Vec::new()));
         let cancel = crate::job::Cancel::new();
         let job = Job::new(&heard, &cancel);
-        let removed = std::sync::atomic::AtomicU32::new(0);
+        let removed = std::cell::Cell::new(0u32);
         let taken = acquire_with(
             dir.path(),
             &job,
             (Duration::from_secs(60), Duration::from_millis(1)),
             |file| {
-                if removed.load(std::sync::atomic::Ordering::SeqCst) < 2 * ATTEMPTS {
-                    removed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if removed.get() < 2 * ATTEMPTS {
+                    removed.set(removed.get() + 1);
                     fs::remove_file(&path).expect("removed by its holder");
                 }
                 file.try_lock()
