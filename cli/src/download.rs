@@ -911,6 +911,9 @@ mod tests {
         /// The request heads it was sent, so a test can ask what the client
         /// said about itself as well as what it asked for.
         heads: Arc<std::sync::Mutex<Vec<String>>>,
+        /// When each request head had arrived: what a deadline is timed from,
+        /// see [`PAST_DEADLINE`].
+        requested: Arc<std::sync::Mutex<Vec<Instant>>>,
     }
 
     impl FakeServer {
@@ -935,6 +938,8 @@ mod tests {
             let counter = Arc::clone(&hits);
             let heads: Arc<std::sync::Mutex<Vec<String>>> = Default::default();
             let recorder = Arc::clone(&heads);
+            let requested: Arc<std::sync::Mutex<Vec<Instant>>> = Default::default();
+            let arrivals = Arc::clone(&requested);
 
             std::thread::spawn(move || {
                 for stream in listener.incoming().flatten() {
@@ -950,6 +955,9 @@ mod tests {
                     while reader.read_line(&mut line).unwrap_or(0) > 2 {
                         head.push_str(&line);
                         line.clear();
+                    }
+                    if let Ok(mut times) = arrivals.lock() {
+                        times.push(Instant::now());
                     }
                     if let Ok(mut seen) = recorder.lock() {
                         seen.push(head);
@@ -1003,7 +1011,22 @@ mod tests {
                 }
             });
 
-            FakeServer { port, hits, heads }
+            FakeServer {
+                port,
+                hits,
+                heads,
+                requested,
+            }
+        }
+
+        /// When the first request head had arrived.
+        fn first_request(&self) -> Instant {
+            *self
+                .requested
+                .lock()
+                .expect("the clock is not poisoned")
+                .first()
+                .expect("a request arrived")
         }
 
         fn url(&self) -> String {
@@ -1456,8 +1479,8 @@ mod tests {
         // A refusal is a refusal, whatever the status.
         for status in [404u16, 410, 500, 503] {
             let server = FakeServer::start(vec![Reply::Status(status, None)]);
-            let err = fetch_text(&server.url(), Duration::from_secs(5))
-                .expect_err("a status is not an answer");
+            let err =
+                fetch_text(&server.url(), QUESTION_GUARD).expect_err("a status is not an answer");
             assert!(
                 matches!(err, ArunaError::Http { status: got, .. } if got == status),
                 "status {status} came back as {err}"
@@ -1468,7 +1491,7 @@ mod tests {
         // caller's job, and it is the caller that knows what it asked for.
         let server = FakeServer::start(vec![Reply::Body(b"<html>502</html>".to_vec())]);
         assert_eq!(
-            fetch_text(&server.url(), Duration::from_secs(5)).unwrap(),
+            fetch_text(&server.url(), QUESTION_GUARD).unwrap(),
             "<html>502</html>"
         );
     }
@@ -1771,7 +1794,7 @@ mod tests {
     #[test]
     fn a_cut_inside_a_character_is_still_a_refusal() {
         let server = FakeServer::start(vec![Reply::Body("ααα".as_bytes().to_vec())]);
-        let err = fetch_text_within(&server.url(), Duration::from_secs(5), 3)
+        let err = fetch_text_within(&server.url(), QUESTION_GUARD, 3)
             .expect_err("six bytes against a three byte cap");
         assert!(
             matches!(
@@ -1795,13 +1818,13 @@ mod tests {
     fn the_metadata_cap_is_a_refusal_and_not_a_prefix() {
         let server = FakeServer::start(vec![Reply::Body(b"<html>".to_vec())]);
         assert_eq!(
-            fetch_text_within(&server.url(), Duration::from_secs(5), 6).expect("exactly the cap"),
+            fetch_text_within(&server.url(), QUESTION_GUARD, 6).expect("exactly the cap"),
             "<html>"
         );
 
         let server = FakeServer::start(vec![Reply::Body(b"<html>".to_vec())]);
-        let err = fetch_text_within(&server.url(), Duration::from_secs(5), 5)
-            .expect_err("one byte over the cap");
+        let err =
+            fetch_text_within(&server.url(), QUESTION_GUARD, 5).expect_err("one byte over the cap");
         assert!(
             matches!(
                 err,
@@ -1832,6 +1855,62 @@ mod tests {
         );
     }
 
+    /// How far past its own deadline a test here lets the program come back,
+    /// timed from the moment the server had the request.
+    ///
+    /// **From the request, not from the call and not from the accept.** On the
+    /// owner's machine the first connection a process opens to 127.0.0.1 is
+    /// held by the network filters before `connect` returns; every test here is
+    /// a process of its own and opens one. Measured 28.09.2026: 0,39 s idle,
+    /// 0,44–1,55 s beside the full set, and in the full set these tests came
+    /// back 2,6–3 s late as a rule, 6,6 s at worst, 19 s once – against
+    /// 0,2–11,5 ms for every later connection, and nothing at all on the CI
+    /// runner. The server accepts before the client's `connect` is let go, so
+    /// timed from the accept they were still 1,1–3,5 s late (median, full set);
+    /// timed from the request – which the client sends only once it is through,
+    /// and right before the read its timeout bounds – no more than 7,7 ms, over
+    /// 130 runs alone and 10 in the full set.
+    ///
+    /// The margin is twice that worst lateness plus one step of the dribble,
+    /// which is checked against its deadline between bytes 20 ms apart:
+    /// 2 × (7,7 + 20) ms = 55 ms, rounded up to 100 ms. The deadlines tested are
+    /// 0,4 and 1 s; a deadline that did not fire would miss by seconds.
+    const PAST_DEADLINE: Duration = Duration::from_millis(100);
+
+    /// The deadline the question tests give [`fetch_text`] where time is not
+    /// what they are about: a guard against a hang, not a bound.
+    ///
+    /// [`fetch_text`] holds the connect to its deadline, and 5 s was less than
+    /// the first connection of a process took beside the full set on the
+    /// owner's machine – 19 s at the worst measured, 28.09.2026 (see
+    /// [`PAST_DEADLINE`]): a status test came back as "connection timed out".
+    /// Twice the worst, rounded up.
+    const QUESTION_GUARD: Duration = Duration::from_secs(40);
+
+    /// Whether `err` is a read that timed out, rather than a refusal of the
+    /// connection, a hang-up or anything else the transport can report.
+    ///
+    /// A read timeout reaches `ureq` as `WouldBlock` – `EAGAIN` from
+    /// `SO_RCVTIMEO`, on macOS and on Linux alike – and `TimedOut` is taken too,
+    /// the kind the standard library gives it elsewhere.
+    fn is_a_read_timeout(err: &ArunaError) -> bool {
+        let ArunaError::Network { source, .. } = err else {
+            return false;
+        };
+        let Some(ureq::Error::Transport(transport)) = source.downcast_ref::<ureq::Error>() else {
+            return false;
+        };
+        transport.kind() == ureq::ErrorKind::Io
+            && std::error::Error::source(transport)
+                .and_then(|io| io.downcast_ref::<std::io::Error>())
+                .is_some_and(|io| {
+                    matches!(
+                        io.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    )
+                })
+    }
+
     /// A server that never stops sending must not stop the program either.
     ///
     /// `timeout_read` cannot catch this: every read returns a byte, so no
@@ -1844,9 +1923,12 @@ mod tests {
     /// the attempt deadline is kept between reads of the body rather than by
     /// ureq's overall timeout, which overrode the read timeout.
     ///
-    /// Which step the deadline bites at is a fact about the machine. That it
-    /// bites, and that the program is back in well under five seconds, is the
-    /// fact about the program — so that is what is asserted.
+    /// Two facts are asserted, and both are needed. That it was the attempt
+    /// deadline that ended it – not a hang-up, not a read timeout – after the
+    /// server had taken the request. And that it ended no later than the
+    /// deadline allows, timed from the request ([`PAST_DEADLINE`]): the
+    /// deadline is set before the connect, so from the request it is never
+    /// later.
     #[test]
     fn a_server_that_dribbles_for_ever_is_given_up_on() {
         let server = FakeServer::start(vec![Reply::Dribble]);
@@ -1857,18 +1939,25 @@ mod tests {
             attempt: Duration::from_millis(400),
         };
 
-        let started = std::time::Instant::now();
         let outcome = attempt_download(&server.url(), &dest, None, &Job::unattended(), timeouts);
-        let waited = started.elapsed();
+        let waited = server.first_request().elapsed();
 
+        let err = outcome.expect_err("a transfer that never ends must not be waited out");
+        let ArunaError::Network { source, .. } = &err else {
+            panic!("not the deadline: {err}");
+        };
+        let io = source
+            .downcast_ref::<std::io::Error>()
+            .unwrap_or_else(|| panic!("not the deadline: {err}"));
+        assert_eq!(io.kind(), std::io::ErrorKind::TimedOut, "{err}");
+        assert_eq!(io.to_string(), "the attempt ran past its deadline");
+        assert_eq!(server.hits(), 1);
+        assert!(server.first_head().starts_with("GET /archive.zip"));
         assert!(
-            outcome.is_err(),
-            "a transfer that never ends must not be waited out"
+            waited < timeouts.attempt + PAST_DEADLINE,
+            "gave up {waited:?} after the request, which is not giving up"
         );
-        assert!(
-            waited < Duration::from_secs(5),
-            "gave up after {waited:?}, which is not giving up"
-        );
+        assert!(!dest.exists());
     }
 
     /// Отмена доходит до загрузки, чей сервер замолчал, не позже таймаута чтения.
@@ -1897,18 +1986,19 @@ mod tests {
             attempt: Duration::from_secs(30),
         };
 
-        let started = Instant::now();
         let err = download_verified_within(&server.url(), &dest, None, &job, timeouts)
             .expect_err("a silent server gives nothing to download");
-        let waited = started.elapsed();
+        // From the request, as [`PAST_DEADLINE`] says why: the cancel is asked
+        // for at 200 ms and heard after the read that is waiting times out.
+        let waited = server.first_request().elapsed();
 
         assert!(
             matches!(err, ArunaError::Cancelled { .. }),
             "unexpected: {err}"
         );
         assert!(
-            waited < Duration::from_secs(5),
-            "the cancel was heard after {waited:?}, not within the read timeout"
+            waited < timeouts.read + PAST_DEADLINE,
+            "the cancel was heard {waited:?} after the request, not within the read timeout"
         );
         assert!(!dest.exists());
     }
@@ -1931,22 +2021,21 @@ mod tests {
             attempt: Duration::from_secs(30),
         };
 
-        let started = Instant::now();
         let err = attempt_download(&server.url(), &dest, None, &Job::unattended(), timeouts)
             .expect_err("a server that says nothing gives nothing to download");
-        let waited = started.elapsed();
+        // From the request, as [`PAST_DEADLINE`] says why.
+        let waited = server.first_request().elapsed();
 
-        assert!(
-            matches!(err, ArunaError::Network { .. }),
-            "unexpected: {err}"
-        );
+        assert!(is_a_read_timeout(&err), "not the read timeout: {err:?}");
         assert!(
             is_retryable(&err),
             "a silent server deserves another attempt"
         );
+        assert_eq!(server.hits(), 1);
+        assert!(server.first_head().starts_with("GET /archive.zip"));
         assert!(
-            waited < Duration::from_secs(5),
-            "the head was waited for {waited:?}, past the read timeout"
+            waited < timeouts.read + PAST_DEADLINE,
+            "the head was waited for {waited:?} after the request, past the read timeout"
         );
         assert!(!dest.exists());
     }
