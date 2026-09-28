@@ -113,9 +113,15 @@ impl Publication {
 }
 
 /// How many times the name may turn out to be a different file from the one
-/// just locked before the disk is taken not to keep inode numbers still – the
-/// same count `Owner::claim` gives the staging marker. A holder that finishes
-/// in the gap costs one; eight in a row is not a race any more.
+/// just locked, **while that file still has a name**, before the disk is taken
+/// not to keep inode numbers still – the same count `Owner::claim` gives the
+/// staging marker.
+///
+/// A holder that finishes in the gap removes the file this run then locks, and
+/// that costs nothing here: it is a race, told apart by the file having no
+/// name left, and a run that waits through many publications meets it many
+/// times. Until 2026-09-28 it counted, and eight of them sent a run on a disk
+/// that has `flock` into publishing without it, beside the next holder.
 const ATTEMPTS: u32 = 8;
 
 /// The two durations as arguments, so the waiting can be tested in
@@ -207,11 +213,24 @@ fn acquire_with(
                 // waiter that had opened it before then locks a file with no
                 // name: it holds nothing anyone else can see. The same inode
                 // under the name is the proof; anything else is another try,
-                // after a pause. [`ATTEMPTS`] in a row is a disk whose inode
-                // numbers do not hold still, where the proof cannot be had:
-                // the run publishes without it and says so (owner's decision,
-                // 25.09.2026 – not a refusal, not a wait).
+                // after a pause. A locked file with no name is that race and
+                // only that: it is tried again for as long as the wait allows.
+                // [`ATTEMPTS`] mismatches on a file that still has a name is a
+                // disk whose inode numbers do not hold still, where the proof
+                // cannot be had: the run publishes without it and says so
+                // (owner's decision, 25.09.2026 – not a refusal, not a wait).
                 if !same_file(&file, &path) {
+                    if nameless(&file) {
+                        if started.elapsed() >= wait {
+                            return Err(ArunaError::PublishBusy {
+                                path: path.clone(),
+                                holder: holder(&path),
+                            });
+                        }
+                        drop(file);
+                        std::thread::sleep(poll);
+                        continue;
+                    }
                     drifted += 1;
                     if drifted >= ATTEMPTS {
                         job.report(crate::progress::Event::PublishingWithoutLock);
@@ -264,6 +283,17 @@ fn same_file(file: &fs::File, path: &Path) -> bool {
         (Ok(held), Ok(named)) => held.dev() == named.dev() && held.ino() == named.ino(),
         _ => false,
     }
+}
+
+/// Whether `file` has been removed from every directory – what a lock file its
+/// holder has finished with looks like to a waiter that opened it before.
+///
+/// A file whose count cannot be read is not taken to be removed: it goes on
+/// being counted as before.
+#[cfg(unix)]
+fn nameless(file: &fs::File) -> bool {
+    use std::os::unix::fs::MetadataExt as _;
+    file.metadata().is_ok_and(|meta| meta.nlink() == 0)
 }
 
 /// This run's token into the file it has just locked, replacing whatever was
@@ -624,6 +654,52 @@ mod tests {
             heard.0.into_inner().expect("heard"),
             [crate::progress::Event::PublishingWithoutLock.to_string()]
         );
+    }
+
+    /// **A file its holder removed is a race, not a drifting disk, however
+    /// often it happens.**
+    ///
+    /// Until 2026-09-28 every mismatch counted towards [`ATTEMPTS`], and the
+    /// count was never reset: a run that waited through eight finished
+    /// publications of others published "without the lock" on a disk that
+    /// has it, beside the next holder. Seen by
+    /// `runs_racing_for_the_lock_never_hold_it_two_at_once` in one run of 200,
+    /// and by diagnosis: eight mismatches, 57 refusals between them, the file
+    /// held each time already removed. Here the holder's removal is put
+    /// between opening and locking, more times than [`ATTEMPTS`].
+    #[test]
+    fn a_waiter_outlasting_many_holders_still_takes_the_lock_itself() {
+        let dir = tempdir().expect("tempdir");
+        let path = lock_path(dir.path());
+        let heard = Told(std::sync::Mutex::new(Vec::new()));
+        let cancel = crate::job::Cancel::new();
+        let job = Job::new(&heard, &cancel);
+        let removed = std::sync::atomic::AtomicU32::new(0);
+        let taken = acquire_with(
+            dir.path(),
+            &job,
+            (Duration::from_secs(60), Duration::from_millis(1)),
+            |file| {
+                if removed.load(std::sync::atomic::Ordering::SeqCst) < 2 * ATTEMPTS {
+                    removed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    fs::remove_file(&path).expect("removed by its holder");
+                }
+                file.try_lock()
+            },
+            same_file,
+        )
+        .expect("the lock is taken in the end");
+        assert!(
+            same_file(&taken.file, &path),
+            "the run holds a file with no name"
+        );
+        drop(taken);
+        assert_eq!(
+            heard.0.into_inner().expect("heard"),
+            Vec::<String>::new(),
+            "a race was reported as a disk without the lock"
+        );
+        assert!(!path.exists(), "the lock file was left behind");
     }
 
     /// **Runs racing for the lock never hold it two at once.**
