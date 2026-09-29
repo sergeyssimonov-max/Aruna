@@ -1152,35 +1152,89 @@ mod tests {
     /// handshake: the read timeout is what applies there, and it was 300 s
     /// against the 10 s the Zenodo question asks for – measured 300 s by the
     /// release gate of 25.09.2026 (Н1), with a cancel unable to reach it. The
-    /// proxy here holds the line for 20 s, so the old code fails in 20 s
-    /// rather than 300.
+    /// proxy here holds the line for 60 s, past the deadline below, so the old
+    /// code fails in 60 s rather than 300.
+    ///
+    /// Asserted: the proxy was asked to `CONNECT`, the refusal is the TLS
+    /// handshake's read running out – `ConnectionFailed` "tls connection init
+    /// failed" over `WouldBlock` or `TimedOut`, not a connect to the proxy
+    /// that did not go through, nor a proxy that hung up (`UnexpectedEof`) –
+    /// and it came no later than the deadline from the `CONNECT`, see
+    /// [`PAST_DEADLINE`]. The deadline is [`QUESTION_GUARD`], not the 1 s it
+    /// was, and the test takes that long: [`fetch_text`] has one deadline for
+    /// the connect to the proxy and the handshake alike.
     #[test]
     fn a_question_behind_a_silent_proxy_ends_by_its_deadline() {
         use std::io::{Read as _, Write as _};
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().expect("addr").port();
+        let asked: Arc<std::sync::Mutex<Option<(Instant, String)>>> = Default::default();
+        let recorder = Arc::clone(&asked);
         std::thread::spawn(move || {
             let (mut conn, _) = listener.accept().expect("accept");
             let mut buf = [0u8; 4096];
-            let _ = conn.read(&mut buf).expect("read");
+            let n = conn.read(&mut buf).expect("read");
+            if let Ok(mut seen) = recorder.lock() {
+                *seen = Some((
+                    Instant::now(),
+                    String::from_utf8_lossy(&buf[..n]).into_owned(),
+                ));
+            }
             conn.write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
                 .expect("reply");
-            std::thread::sleep(Duration::from_secs(20));
+            // The proxy's own hang-up, the test's outer guard: 60 s after the
+            // CONNECT, 20 s past the program's deadline of [`QUESTION_GUARD`],
+            // so that the handshake's deadline ends the attempt and a program
+            // that ignored it would be ended here, 60 s in, past the bound.
+            // Within nextest's terminate-after of 4 × 30 s = 120 s even so: a
+            // connect held to its 30 s cap and then this 60 s make 90 s.
+            std::thread::sleep(Duration::from_secs(60));
         });
 
         std::env::set_var("HTTPS_PROXY", format!("http://127.0.0.1:{port}"));
-        let started = std::time::Instant::now();
-        let answer = fetch_text(
-            "https://aruna-proxy-test.invalid/record",
-            Duration::from_secs(1),
-        );
-        let waited = started.elapsed();
+        let answer = fetch_text("https://aruna-proxy-test.invalid/record", QUESTION_GUARD);
+        let returned = Instant::now();
         std::env::remove_var("HTTPS_PROXY");
 
-        assert!(answer.is_err(), "a silent proxy gave an answer");
+        let err = answer.expect_err("a silent proxy gave an answer");
+        let (at, request) = asked
+            .lock()
+            .expect("the recorder is not poisoned")
+            .clone()
+            .expect("the proxy was asked");
         assert!(
-            waited < Duration::from_secs(5),
-            "a 1 s question waited {waited:?}"
+            request.starts_with("CONNECT aruna-proxy-test.invalid:443 "),
+            "{request:?}"
+        );
+        let ArunaError::Network { source, .. } = &err else {
+            panic!("not the handshake's deadline: {err:?}");
+        };
+        let Some(ureq::Error::Transport(transport)) = source.downcast_ref::<ureq::Error>() else {
+            panic!("not the handshake's deadline: {err:?}");
+        };
+        assert_eq!(
+            transport.kind(),
+            ureq::ErrorKind::ConnectionFailed,
+            "{err:?}"
+        );
+        assert_eq!(
+            transport.message(),
+            Some("tls connection init failed"),
+            "{err:?}"
+        );
+        assert!(
+            std::error::Error::source(transport)
+                .and_then(|io| io.downcast_ref::<std::io::Error>())
+                .is_some_and(|io| matches!(
+                    io.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                )),
+            "not the handshake's deadline: {err:?}"
+        );
+        let waited = returned.duration_since(at);
+        assert!(
+            waited < QUESTION_GUARD + PAST_DEADLINE,
+            "a {QUESTION_GUARD:?} question waited {waited:?} after the CONNECT"
         );
     }
 
@@ -1489,13 +1543,25 @@ mod tests {
     ///
     /// A captive portal or a proxy answering with binary is the ordinary way
     /// this happens on a hotel network.
+    ///
+    /// Refused for being binary – the answer arrived and is not UTF-8 – and
+    /// not for a hang-up or a connect that did not go through, which an
+    /// `is_err` alone would have let pass.
     #[test]
     fn an_answer_that_is_not_text_is_refused() {
         let server = FakeServer::start(vec![Reply::Body(vec![0xff, 0xfe, 0x00, 0x01])]);
+        let err = fetch_text(&server.url(), QUESTION_GUARD)
+            .expect_err("bytes that are not UTF-8 are not an answer");
+        let ArunaError::Network { source, .. } = &err else {
+            panic!("not refused as binary: {err:?}");
+        };
         assert!(
-            fetch_text(&server.url(), Duration::from_secs(5)).is_err(),
-            "bytes that are not UTF-8 are not an answer"
+            source
+                .downcast_ref::<std::string::FromUtf8Error>()
+                .is_some(),
+            "not refused as binary: {err:?}"
         );
+        assert_eq!(server.hits(), 1);
     }
 
     /// A fast flood is capped by size, where the endless dribble below is
@@ -1766,12 +1832,18 @@ mod tests {
     fn a_flood_is_refused_by_size() {
         let flood = vec![b'x'; 8 * 1024 * 1024];
         let server = FakeServer::start(vec![Reply::Body(flood)]);
-        let err = fetch_text(&server.url(), Duration::from_secs(30))
-            .expect_err("a flood is not an answer");
+        let err = fetch_text(&server.url(), QUESTION_GUARD).expect_err("a flood is not an answer");
+        // Refused by the cap, one byte past it – not cut short by a deadline
+        // or a hang-up, which the refusal would not be `Oversized` for.
         assert!(
-            matches!(err, ArunaError::Oversized { limit, .. } if limit == MAX_METADATA),
+            matches!(
+                err,
+                ArunaError::Oversized { limit, got, .. }
+                    if limit == MAX_METADATA && got == MAX_METADATA + 1
+            ),
             "an oversized answer came back as {err}"
         );
+        assert_eq!(server.hits(), 1);
     }
 
     /// A body cut mid-character is refused as too long, not as not-text.
@@ -1827,20 +1899,42 @@ mod tests {
         );
     }
 
-    /// A repository answering a small question with an endless body must not
-    /// be able to exhaust memory: the read is capped.
+    /// A repository answering a small question with a body that never ends
+    /// is given up on by the question's deadline.
+    ///
+    /// The dribble never ends, and slowly; the deadline is what stops it – a
+    /// fast flood is stopped by the cap instead, see
+    /// [`a_flood_is_refused_by_size`]. What is asserted is the deadline: the request
+    /// arrived, the refusal came from reading the body – a plain `io::Error`,
+    /// where a connect or a head fails inside `ureq::Error` – and it is the
+    /// deadline's, no later than the deadline from the request.
+    ///
+    /// The deadline is [`QUESTION_GUARD`], not the 400 ms it was, and the test
+    /// takes that long: [`fetch_text`] has one deadline for the connect and
+    /// the read alike, and 400 ms is less than a connect takes here. Until
+    /// 29.09.2026 the test was named for the cap
+    /// (`an_oversized_answer_is_cut_rather_than_swallowed`); the cap takes no
+    /// part here – the dribble announces 1 MiB, under [`MAX_METADATA`], and a
+    /// byte every 20 ms would take a day to reach it.
     #[test]
-    fn an_oversized_answer_is_cut_rather_than_swallowed() {
+    fn an_endless_answer_is_given_up_on_by_its_deadline() {
         let server = FakeServer::start(vec![Reply::Dribble]);
-        let started = std::time::Instant::now();
-        // The dribble never ends; the deadline is what stops it, and the cap is
-        // what would stop a fast flood.
-        let outcome = fetch_text(&server.url(), Duration::from_millis(400));
-        assert!(outcome.is_err(), "an endless answer must not be waited out");
+        let outcome = fetch_text(&server.url(), QUESTION_GUARD);
+        let waited = server.first_request().elapsed();
+
+        let err = outcome.expect_err("an endless answer must not be waited out");
+        let ArunaError::Network { source, .. } = &err else {
+            panic!("not the deadline: {err:?}");
+        };
+        let io = source
+            .downcast_ref::<std::io::Error>()
+            .unwrap_or_else(|| panic!("not refused while reading the body: {err:?}"));
+        assert_eq!(io.kind(), std::io::ErrorKind::TimedOut, "{err:?}");
+        assert_eq!(server.hits(), 1);
+        assert!(server.first_head().starts_with("GET /archive.zip"));
         assert!(
-            started.elapsed() < Duration::from_secs(5),
-            "gave up after {:?}",
-            started.elapsed()
+            waited < QUESTION_GUARD + PAST_DEADLINE,
+            "gave up {waited:?} after the request"
         );
     }
 
@@ -1866,14 +1960,28 @@ mod tests {
     /// 0,4 and 1 s; a deadline that did not fire would miss by seconds.
     const PAST_DEADLINE: Duration = Duration::from_millis(100);
 
-    /// The deadline the question tests give [`fetch_text`] where time is not
-    /// what they are about: a guard against a hang, not a bound.
+    /// The deadline the question tests give [`fetch_text`]: a guard against
+    /// a hang, long enough that the connection is made inside it.
     ///
-    /// [`fetch_text`] holds the connect to its deadline, and 5 s was less than
-    /// the first connection of a process took beside the full set on the
-    /// owner's machine – 19 s at the worst measured, 28.09.2026 (see
-    /// [`PAST_DEADLINE`]): a status test came back as "connection timed out".
-    /// Twice the worst, rounded up.
+    /// [`fetch_text`] holds the connect to its deadline, and on the owner's
+    /// machine a connection to 127.0.0.1 waits on the network filters (see
+    /// [`PAST_DEADLINE`]): a status test with 5 s came back as "connection
+    /// timed out", and one full set in 30 did so again with 8 s (29.09.2026).
+    ///
+    /// Two measurements, and they disagree. Inside the tests – each server
+    /// here noting how long after it was started its first request arrived –
+    /// 30 full sets gave 780 requests with 4,93 s at the worst (29.09.2026).
+    /// The whole time of `a_server_that_never_answers…` in the 30 full sets
+    /// before them reached 18,12 s, and in one of those sets a connect did not
+    /// go through in 8 s. So there is a rare tail near 17 s, and 30 sets do not
+    /// reliably catch it; the basis is the tail: 2 × 18,12 s = 36,24 s,
+    /// rounded up to 37 s, and 40 s ≥ 37 s.
+    ///
+    /// The connect itself is held to `deadline.min(30 s)` in
+    /// [`request_answer`]: against the worst connect seen, about 17 s, that is
+    /// a margin of 30 / 17 ≈ 1,76, not the 2 this guard is held to. Twice the
+    /// worst cannot be had for the connect without a separate connect deadline
+    /// in [`fetch_text`] – a change to the program, not to these tests.
     const QUESTION_GUARD: Duration = Duration::from_secs(40);
 
     /// Whether `err` is a read that timed out, rather than a refusal of the
