@@ -61,6 +61,11 @@ first rests on a measurement — the trial PDF of 2026-09-26 lost such a code
 point from its text layer — and the second settles a question this file left
 open for the first PDF. Marked below.
 
+Amended 2026-09-29: §7, how the marker keeps its code point, and the one
+exception to "do not convert text to outlines". Owner's decision of
+2026-09-28, on the measurements of the trials of 2026-09-27 and the reader
+check of 2026-09-28. Marked below.
+
 **Where this file ends and the specification begins.** `PROJECT-SPEC.ru.md`
 §6.9 lists checks for the PDF contour and says it takes effect with the first
 PDF. This file is the contract; that section is the pre-commit set that will
@@ -422,6 +427,11 @@ the BMP is untouched — control characters are not up there.
 Before bundling anything: verify the licence permits both redistribution **and**
 embedding, and record both. Do not convert text to outlines.
 
+*Amended 2026-09-29, owner's decision of 2026-09-28.* The text of a document is
+never converted to outlines. The one thing drawn as outlines is not text of the
+document: the letters of a marker's name, `U+100009`, set where a code point
+has no glyph in any face — see the amendment of 2026-09-29 below.
+
 ~~Check that every code point in the corpus has a glyph — the list is produced
 by `corpus_inventory`.~~
 
@@ -461,13 +471,37 @@ reached the PDF; the reader got an empty box and lost the character.
 
 *What must hold instead, by the owner's decision of 2026-09-27.* Where a code
 point has no glyph in any face of the stack, the PDF draws a marker — a frame
-holding the code point's name, `U+100009` — set in the main face; the code
+holding the code point's name, `U+100009` — ~~set in the main face; the code
 point itself stays in the text layer through ActualText (a marked `/Span`,
-ISO 32000), and the marker's letters are not extractable text. The rule is
+ISO 32000), and the marker's letters are not extractable text~~. The rule is
 general: which code points need it is read from the fonts' `cmap`, never from
 a list. No face is substituted, and **no PDF carries a blank glyph anywhere** —
 the check refuses one without exception. This supersedes the rejection of
 "visible placeholder markers" recorded above for 2026-08-30 to 2026-09-04.
+
+**Amended 2026-09-29: the marker's letters as outlines, its code point as
+invisible text.** *The measurement.* The trial of 2026-09-27 put the code point
+into ActualText on the marker's span, as struck above, and only a reader that
+honours ActualText gave it back: `pdf-extract` 0.12.1 and PDFKit — and Preview,
+which copies through PDFKit — ignored it and gave the letters `U+100009`
+instead. The third trial of the same day drew the letters as outlines of the
+main face and put the code point under them as invisible text (text rendering
+mode 3, a Type3 face that paints nothing, with a `ToUnicode` entry): the
+project's own reader, `pdf-extract` and PDFKit gave the code point and none of
+the letters in all 968 documents with a marker. On 2026-09-28 poppler
+(`pdftotext`) and PDFKit gave exactly `U+100009` in place of the marker of
+`CTH 670/KBo 52.182`.
+
+*What must hold instead, by the owner's decision of 2026-09-28.* The marker's
+letters are drawn as outlines — vector paths, not text — and this is the only
+exception to "do not convert text to outlines" above: the letters are a name
+for a missing sign, not text of the document. The code point is carried by an
+invisible text layer at the marker's place, not by ActualText. Every reader —
+the project's own, `pdf-extract`, PDFKit — gives the code point there and none
+of the letters. ActualText stays in one role only: a cluster that Typst 0.15.1
+writes twice (a combining mark set with a shift, typst/typst #4225) is wrapped
+in a `/Span` with `/ActualText` of the source text; a reader that ignores
+ActualText shows the repetition, and that is recorded as a limit of the reader.
 
 
 **The files are already here, and already checked.** Since 2026-09-17 all seven
