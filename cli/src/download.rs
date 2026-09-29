@@ -1159,8 +1159,9 @@ mod tests {
     /// handshake's read running out – `ConnectionFailed` "tls connection init
     /// failed" over `WouldBlock` or `TimedOut`, not a connect to the proxy
     /// that did not go through, nor a proxy that hung up (`UnexpectedEof`) –
-    /// and it came no later than the deadline from the `CONNECT`, see
-    /// [`PAST_DEADLINE`]. The deadline is [`QUESTION_GUARD`], not the 1 s it
+    /// and it came no earlier than the deadline from the call and no later
+    /// than the deadline from the ClientHello, where the handshake's timer
+    /// starts, see [`FETCH_PAST_DEADLINE`]. The deadline is [`QUESTION_GUARD`], not the 1 s it
     /// was, and the test takes that long: [`fetch_text`] has one deadline for
     /// the connect to the proxy and the handshake alike.
     #[test]
@@ -1168,20 +1169,26 @@ mod tests {
         use std::io::{Read as _, Write as _};
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().expect("addr").port();
-        let asked: Arc<std::sync::Mutex<Option<(Instant, String)>>> = Default::default();
+        let asked: Arc<std::sync::Mutex<Option<String>>> = Default::default();
         let recorder = Arc::clone(&asked);
+        let greeted: Arc<std::sync::Mutex<Option<Instant>>> = Default::default();
+        let greeting = Arc::clone(&greeted);
         std::thread::spawn(move || {
             let (mut conn, _) = listener.accept().expect("accept");
             let mut buf = [0u8; 4096];
             let n = conn.read(&mut buf).expect("read");
             if let Ok(mut seen) = recorder.lock() {
-                *seen = Some((
-                    Instant::now(),
-                    String::from_utf8_lossy(&buf[..n]).into_owned(),
-                ));
+                *seen = Some(String::from_utf8_lossy(&buf[..n]).into_owned());
             }
             conn.write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
                 .expect("reply");
+            // The client's first TLS message: sent right before the read the
+            // handshake's timer runs on, see [`FETCH_PAST_DEADLINE`].
+            if conn.read(&mut buf).is_ok_and(|n| n > 0) {
+                if let Ok(mut seen) = greeting.lock() {
+                    *seen = Some(Instant::now());
+                }
+            }
             // The proxy's own hang-up, the test's outer guard: 60 s after the
             // CONNECT, 20 s past the program's deadline of [`QUESTION_GUARD`],
             // so that the handshake's deadline ends the attempt and a program
@@ -1192,12 +1199,13 @@ mod tests {
         });
 
         std::env::set_var("HTTPS_PROXY", format!("http://127.0.0.1:{port}"));
+        let started = Instant::now();
         let answer = fetch_text("https://aruna-proxy-test.invalid/record", QUESTION_GUARD);
         let returned = Instant::now();
         std::env::remove_var("HTTPS_PROXY");
 
         let err = answer.expect_err("a silent proxy gave an answer");
-        let (at, request) = asked
+        let request = asked
             .lock()
             .expect("the recorder is not poisoned")
             .clone()
@@ -1231,10 +1239,22 @@ mod tests {
                 )),
             "not the handshake's deadline: {err:?}"
         );
-        let waited = returned.duration_since(at);
+        // The handshake's timer, as [`FETCH_PAST_DEADLINE`] says: it starts
+        // with the read after the ClientHello and runs no longer than the
+        // deadline.
+        let hello = greeted
+            .lock()
+            .expect("the recorder is not poisoned")
+            .expect("the handshake began");
+        let waited = returned.duration_since(hello);
         assert!(
-            waited < QUESTION_GUARD + PAST_DEADLINE,
-            "a {QUESTION_GUARD:?} question waited {waited:?} after the CONNECT"
+            returned.duration_since(started) >= QUESTION_GUARD,
+            "gave up {:?} after the call, before its deadline",
+            returned.duration_since(started)
+        );
+        assert!(
+            waited < QUESTION_GUARD + FETCH_PAST_DEADLINE,
+            "the handshake ran {waited:?} from the ClientHello"
         );
     }
 
@@ -1907,7 +1927,8 @@ mod tests {
     /// [`a_flood_is_refused_by_size`]. What is asserted is the deadline: the request
     /// arrived, the refusal came from reading the body – a plain `io::Error`,
     /// where a connect or a head fails inside `ureq::Error` – and it is the
-    /// deadline's, no later than the deadline from the request.
+    /// deadline's: no earlier than the deadline from the call, and no later
+    /// than the deadline and [`FETCH_PAST_DEADLINE`] from it.
     ///
     /// The deadline is [`QUESTION_GUARD`], not the 400 ms it was, and the test
     /// takes that long: [`fetch_text`] has one deadline for the connect and
@@ -1919,8 +1940,9 @@ mod tests {
     #[test]
     fn an_endless_answer_is_given_up_on_by_its_deadline() {
         let server = FakeServer::start(vec![Reply::Dribble]);
+        let started = Instant::now();
         let outcome = fetch_text(&server.url(), QUESTION_GUARD);
-        let waited = server.first_request().elapsed();
+        let waited = started.elapsed();
 
         let err = outcome.expect_err("an endless answer must not be waited out");
         let ArunaError::Network { source, .. } = &err else {
@@ -1933,10 +1955,40 @@ mod tests {
         assert_eq!(server.hits(), 1);
         assert!(server.first_head().starts_with("GET /archive.zip"));
         assert!(
-            waited < QUESTION_GUARD + PAST_DEADLINE,
-            "gave up {waited:?} after the request"
+            waited >= QUESTION_GUARD,
+            "gave up {waited:?} after the call, before its deadline"
+        );
+        assert!(
+            waited < QUESTION_GUARD + FETCH_PAST_DEADLINE,
+            "gave up {waited:?} after the call"
         );
     }
+
+    /// How far past [`QUESTION_GUARD`] a question test lets [`fetch_text`]
+    /// come back, each path timed from where its timer starts.
+    ///
+    /// The endless answer: `ureq` reads the body through a stream that sets the
+    /// socket's timeout to what is left of the deadline before every read
+    /// (`DeadlineStream`, `stream.rs:83–98` of `ureq` 2.12.1), so the refusal
+    /// comes at the deadline, timed from the call. The silent proxy: the
+    /// socket's read timeout is set once, when the connect to the proxy is
+    /// made, to what is left of the deadline (`stream.rs:433–435`), and the TLS
+    /// handshake reads the bare socket with it (`stream.rs:341`) – a timer that
+    /// starts again with each read, so it runs from the read after the
+    /// ClientHello for no longer than the deadline. That is where it is timed
+    /// from here; timed from the CONNECT, it failed CI 36524791412 on Linux at
+    /// 40,675 s.
+    ///
+    /// Measured 29.09.2026, 20 child runs of each test at once plus the test
+    /// itself: the endless answer at most 9,7 ms late on the owner's Mac and
+    /// 2,2 ms on the CI runner; the proxy 2,8 ms on the Mac and 3,244 s on the
+    /// runner (CI 36601207988, branch `measure/proxy-lateness`) – on Linux the
+    /// seconds come after the ClientHello has arrived, grow with load (0,675 s
+    /// alone, 2,4 s beside 40 processes), and where they go was not found.
+    /// Twice the worst, rounded up to 100 ms: 6,5 s. The proxy's own hang-up at
+    /// 60 s stays past 40 + 6,5 s, so a handshake that ignored its deadline
+    /// still fails the bound.
+    const FETCH_PAST_DEADLINE: Duration = Duration::from_millis(6500);
 
     /// How far past its own deadline a test here lets the program come back,
     /// timed from the moment the server had the request.
