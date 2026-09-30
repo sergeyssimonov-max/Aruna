@@ -72,6 +72,9 @@ of 2026-09-30 — no element of the `table` namespace occurs in the corpus; and
 same day, a correction of fact and not an amendment: the count of §5. Each is
 marked below.
 
+Corrected 2026-09-30, second entry: §0, the dependency list and the claim
+that nothing consumes the document model. A correction of fact.
+
 **Where this file ends and the specification begins.** `PROJECT-SPEC.ru.md`
 §6.9 lists checks for the PDF contour and says it takes effect with the first
 PDF. This file is the contract; that section is the pre-commit set that will
@@ -139,9 +142,15 @@ The current pipeline reads seven metadata fields out of the first 16 KiB of a
 document and copies the rest byte for byte. **Since 2026-09-13 it also has an
 element tree**: `cli/src/document.rs` builds the document model over the parser
 adopted below — the XML Information Set of a document, refused for 223 documents
-and compared with `xsltproc` node for node over the other 23 713. Nothing
+and compared with `xsltproc` node for node over the other 23 713. ~~Nothing
 consumes it yet; the semantic manifest of §2 is the next step. The dependency
-list is unchanged: `dirs`, `memchr`, `quick-xml`, `thiserror`, `ureq`, `zip`.
+list is unchanged: `dirs`, `memchr`, `quick-xml`, `thiserror`, `ureq`, `zip`.~~
+
+*Corrected 2026-09-30.* The PDF of every document is built from it since
+that day (`cli/src/pdf/`), and the dependency list carries the typesetting
+engine: `typst`, `typst-layout`, `typst-pdf` 0.15.1, `lopdf` 0.45.0 and
+`skrifa` 0.42.1 beside the six above. A correction of fact, not an
+amendment – no requirement changed.
 
 Converting these manuscripts without losing their content therefore begins with
 choosing a parser, not a PDF library. The parser was adopted on 2026-09-05:
