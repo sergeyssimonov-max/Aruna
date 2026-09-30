@@ -293,6 +293,7 @@ fn the_corpus_is_built_where_the_caller_says() {
     let report = app::build_corpus_into(
         &CorpusRequest {
             local_archive: Some(zip),
+            pdf: aruna::app::PdfRequest::Off,
         },
         &destination,
         &Job::unattended(),
@@ -337,6 +338,7 @@ fn two_runs_in_one_process_produce_the_same_bytes() {
         let report = app::build_corpus_into(
             &CorpusRequest {
                 local_archive: Some(zip.clone()),
+                pdf: aruna::app::PdfRequest::Off,
             },
             &destination,
             &Job::unattended(),

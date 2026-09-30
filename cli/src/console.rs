@@ -40,6 +40,11 @@ pub fn headline(err: &ArunaError) -> String {
         Oversized { url, limit, got } => {
             format!("ответ {url} длиннее предела: остановлено на {got} байтах, предел {limit}")
         }
+        // Не установка неполна, а каталог не назван: консольный случай.
+        FontMissing { path, covers } if *covers == aruna::app::NO_FONT_DIRECTORY => format!(
+            "для PDF нужны шрифты docs/FONTS.md, а каталог с ними не назван: первым нужен {}",
+            path.display()
+        ),
         FontMissing { path, covers } => format!(
             "шрифта {} нет на месте, а он рисует {}; приложение установлено не полностью",
             path.display(),
@@ -141,6 +146,7 @@ pub fn headline(err: &ArunaError) -> String {
             format!("не заменяю {}: {}", path.display(), translated(reason))
         }
         DownloadsDir => "не удалось определить каталог Downloads".to_string(),
+
     }
 }
 
@@ -368,6 +374,56 @@ pub const PHRASES: &[(&str, &str)] = &[
         "the terms the font beside it is distributed under",
         "условия, на которых распространяется шрифт рядом",
     ),
+    (
+        "the PDF, and no directory of fonts was named (ARUNA_FONTS in the console)",
+        "PDF, а каталог шрифтов не назван (в консоли – ARUNA_FONTS)",
+    ),
+    // export::validate и export::pdf – фаза PDF
+    ("PDF link points at no PDF of this build: {}", "ссылка на PDF ведет не к PDF этой сборки: {}"),
+    ("PDF built but not linked: {}", "PDF построен, но опись на него не ссылается: {}"),
+    ("PDF built but not on disk: {}", "PDF построен, но на диске его нет: {}"),
+    ("PDF on disk that no document built: {}", "PDF на диске, которого не строил ни один документ: {}"),
+    (
+        "the PDF of {} broke an invariant of this program",
+        "PDF документа {} нарушил правило программы",
+    ),
+    (
+        "the PDF of {} broke an invariant of this program; {}",
+        "PDF документа {} нарушил правило программы; {}",
+    ),
+    // pdf – нарушенные правила сборки PDF
+    (
+        "Typst asked for {}, and only the template and the data exist",
+        "Typst запросил {}, а есть только шаблон и данные",
+    ),
+    (
+        "{} labels in the text, {} label images in the file",
+        "меток в тексте {}, их изображений в файле {}",
+    ),
+    (
+        "{} label spans not found exactly once in their stream",
+        "{} меток не нашли своего места в потоке страницы",
+    ),
+    (
+        "page {}: two repeated clusters overlap at MCID {}",
+        "страница {}: два повтора кластера перекрываются у MCID {}",
+    ),
+    (
+        "the credit was predicted and UllikummiA is not embedded",
+        "сноска об авторстве предсказана, а UllikummiA не встроен",
+    ),
+    (
+        "UllikummiA is embedded and the credit was not predicted",
+        "UllikummiA встроен, а сноска об авторстве не предсказана",
+    ),
+    ("the main face cannot draw a label: {}", "основное начертание не рисует надпись метки: {}"),
+    ("the font stack has no regular face of {}", "в стеке шрифтов нет прямого начертания {}"),
+    ("the world of the template could not be built", "мир шаблона не построен"),
+    (
+        "the PDF this program wrote could not be read back: {}",
+        "PDF, только что записанный программой, не прочитан обратно: {}",
+    ),
+    ("Typst refused the document: {}", "Typst отказал документу: {}"),
 ];
 
 /// Перевод формулировки ядра; незнакомая остается как есть.
@@ -581,6 +637,10 @@ mod tests {
                 reason: "it contains \"Ш\", which this exporter did not put there".into(),
             },
             ArunaError::DownloadsDir,
+            ArunaError::FontMissing {
+                path: PathBuf::from("UllikummiA.ttf"),
+                covers: aruna::app::NO_FONT_DIRECTORY,
+            },
         ]
     }
 
@@ -799,9 +859,13 @@ mod tests {
             ),
             (include_str!("fonts.rs"), &["covers: "][..]),
             (include_str!("export/mod.rs"), &["first: "][..]),
+            (include_str!("export/pdf.rs"), &["first: "][..]),
+            (include_str!("pdf/mod.rs"), &["#[error("][..]),
         ];
         // Не отказы: команды для нормализатора, а не текст для человека.
-        let not_refusals = ["DROP_PI {}"];
+        // И сообщение, которое целиком – чужое сообщение внутри: `PdfError`
+        // передает инвариант и отказ шрифтов как есть, их фразы – выше.
+        let not_refusals = ["DROP_PI {}", "{}"];
         let known: Vec<&str> = PHRASES
             .iter()
             .map(|(english, _)| *english)

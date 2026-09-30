@@ -519,6 +519,10 @@ fn the_binary_still_runs_to_completion() {
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_aruna"))
         .env("HOME", home.path())
         .env("ARUNA_ZIP", &zip)
+        .env(
+            "ARUNA_FONTS",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
+        )
         .env("ARUNA_CACHE_DIR", home.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
         .env_remove("XDG_DOWNLOAD_DIR")

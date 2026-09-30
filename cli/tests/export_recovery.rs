@@ -306,6 +306,10 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
     let out = Command::new(env!("CARGO_BIN_EXE_aruna"))
         .env("HOME", home.path())
         .env("ARUNA_ZIP", &zip)
+        .env(
+            "ARUNA_FONTS",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
+        )
         .env("ARUNA_CACHE_DIR", home.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
         .env_remove("XDG_DOWNLOAD_DIR")

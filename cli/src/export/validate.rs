@@ -11,7 +11,7 @@
 //! the second call in [`super::build`] does, after the rename.
 
 use super::manifest;
-use super::naming::{dir_component, pdf_path, resolve};
+use super::naming::{dir_component, resolve};
 use super::{inventory, Placed, MANIFEST};
 use crate::error::{ArunaError, Result};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
@@ -91,6 +91,25 @@ pub fn validate(
     records: &[ManuscriptRecord],
     placed: &[Placed],
 ) -> Result<Validation> {
+    validate_with(root, records, placed, None)
+}
+
+/// [`validate`], for a package that may carry PDFs: `pdfs` is what became of
+/// each placed document's PDF, `None` when the build made none. Every PDF
+/// built is on disk, linked once from the inventory and named in the
+/// manifest; no other PDF is anywhere.
+pub fn validate_with(
+    root: &Path,
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    pdfs: Option<&[super::PdfState]>,
+) -> Result<Validation> {
+    let expected_pdfs: HashSet<PathBuf> = pdfs
+        .into_iter()
+        .flatten()
+        .filter_map(|s| s.built().map(Path::to_path_buf))
+        .collect();
+    let mut linked_pdfs: HashSet<PathBuf> = HashSet::new();
     let inventory_path = root.join(crate::paths::OUTPUT_FILE_NAME);
     let html = read_inventory(&inventory_path)?;
 
@@ -111,7 +130,13 @@ pub fn validate(
         // links to a page inside each CTH folder until 2026-08-23; that page is
         // no longer written and nothing may link to one, so anything that is not
         // a fragment is a fault rather than a second kind of link.
-        if href.ends_with(".xml") {
+        if pdfs.is_some() && href.ends_with(".pdf") {
+            if expected_pdfs.contains(&relative) && target.is_file() {
+                linked_pdfs.insert(relative);
+            } else {
+                errors.push(format!("PDF link points at no PDF of this build: {href}"));
+            }
+        } else if href.ends_with(".xml") {
             counts.fragment_links += 1;
             if target.is_file() {
                 linked_files.insert(relative);
@@ -137,14 +162,30 @@ pub fn validate(
     // …and the filesystem must hold exactly what the inventory links.
     let mut on_disk: HashSet<PathBuf> = HashSet::new();
     let mut at_the_root: HashSet<String> = HashSet::new();
+    let mut pdfs_on_disk: HashSet<PathBuf> = HashSet::new();
     walk(
         root,
         root,
         MAX_DEPTH,
-        &mut on_disk,
-        &mut at_the_root,
+        &mut Found {
+            files: &mut on_disk,
+            pdfs: pdfs.is_some().then_some(&mut pdfs_on_disk),
+            at_the_root: &mut at_the_root,
+        },
         &mut errors,
     );
+    for missing in expected_pdfs.difference(&linked_pdfs) {
+        errors.push(format!("PDF built but not linked: {}", missing.display()));
+    }
+    for missing in expected_pdfs.difference(&pdfs_on_disk) {
+        errors.push(format!("PDF built but not on disk: {}", missing.display()));
+    }
+    for stray in pdfs_on_disk.difference(&expected_pdfs) {
+        errors.push(format!(
+            "PDF on disk that no document built: {}",
+            stray.display()
+        ));
+    }
 
     // Четыре корневых файла обязаны быть на месте. Обход их только терпел –
     // «это не сирота», – а требования не предъявлял никто: опись спрашивалась
@@ -167,7 +208,7 @@ pub fn validate(
     // The manifest describes the same package, and is checked against the same
     // model rather than against the inventory: two documents agreeing with each
     // other prove nothing if both were written from a model that was wrong.
-    check_manifest(root, placed, &expected, &mut errors);
+    check_manifest(root, placed, &expected, &expected_pdfs, &mut errors);
 
     // Groups: one directory each, and each one there. Nothing links a folder any
     // more, so this is checked against the filesystem rather than against the
@@ -201,6 +242,7 @@ fn check_manifest(
     root: &Path,
     placed: &[Placed],
     expected: &HashSet<PathBuf>,
+    expected_pdfs: &HashSet<PathBuf>,
     errors: &mut Vec<String>,
 ) {
     let path = root.join(MANIFEST);
@@ -216,13 +258,9 @@ fn check_manifest(
     // distinct is not the same question: a manifest whose PDF names are all
     // wrong but all different passed that, which is the manifest agreeing with
     // itself rather than with the package.
-    for (key, expected) in [
-        ("file", expected.clone()),
-        (
-            "pdf",
-            placed.iter().map(|p| pdf_path(&p.relative)).collect(),
-        ),
-    ] {
+    // `pdf` names the PDFs this build made – every one, and nothing else: a
+    // document without one has no such string, whatever the reason.
+    for (key, expected) in [("file", expected.clone()), ("pdf", expected_pdfs.clone())] {
         let named: HashSet<PathBuf> = manifest::values_of(&json, key)
             .into_iter()
             .map(PathBuf::from)
@@ -239,11 +277,16 @@ fn check_manifest(
                 extra.display()
             ));
         }
-        if named.len() != placed.len() {
+        let documents = if key == "pdf" {
+            expected.len()
+        } else {
+            placed.len()
+        };
+        if named.len() != documents {
             errors.push(format!(
                 "the manifest lists {} distinct {key} names for {} documents",
                 named.len(),
-                placed.len()
+                documents
             ));
         }
     }
@@ -255,14 +298,15 @@ fn check_manifest(
 /// nothing else, so a stray file is reported rather than ignored — that is how
 /// a leftover from an earlier build, or a `.DS_Store` the Finder dropped in,
 /// gets noticed.
-fn walk(
-    root: &Path,
-    dir: &Path,
-    depth: u32,
-    files: &mut HashSet<PathBuf>,
-    at_the_root: &mut HashSet<String>,
-    errors: &mut Vec<String>,
-) {
+/// What a walk collects.
+struct Found<'a> {
+    files: &'a mut HashSet<PathBuf>,
+    /// PDFs, when the package may carry them; `None` makes a PDF a stray.
+    pdfs: Option<&'a mut HashSet<PathBuf>>,
+    at_the_root: &'a mut HashSet<String>,
+}
+
+fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut Vec<String>) {
     // A package is two levels deep and nothing else is allowed in it, so a tree
     // that keeps going is not one of ours. `is_dir` follows symbolic links, so
     // without a bound a link pointing at its own parent would recurse until the
@@ -310,21 +354,27 @@ fn walk(
                 path.display()
             ));
         } else if kind.is_some_and(|t| t.is_dir()) {
-            walk(root, &path, depth - 1, files, at_the_root, errors);
+            walk(root, &path, depth - 1, found, errors);
         } else if belongs {
             // Запомнить, а не просто стерпеть: «этот файл здесь уместен» и «этот
             // файл здесь есть» – разные утверждения, и второе спрашивается ниже
             // по собранному множеству. Отдельный обход ради него был бы вторым
             // ответом на вопрос, который этот обход уже задал.
-            at_the_root.insert(name);
+            found.at_the_root.insert(name);
             continue;
+        } else if let (Some(pdfs), true, false) =
+            (found.pdfs.as_deref_mut(), name.ends_with(".pdf"), at_root)
+        {
+            if let Ok(relative) = path.strip_prefix(root) {
+                pdfs.insert(relative.to_path_buf());
+            }
         } else if !name.ends_with(".xml") {
             errors.push(format!(
                 "unexpected file in the package: {}",
                 path.display()
             ));
         } else if let Ok(relative) = path.strip_prefix(root) {
-            files.insert(relative.to_path_buf());
+            found.files.insert(relative.to_path_buf());
         }
     }
 }
@@ -438,6 +488,7 @@ mod tests {
                 &Default::default(),
                 &Default::default(),
                 &Default::default(),
+                None,
             ),
         )
         .expect("manifest");
@@ -498,8 +549,11 @@ mod tests {
             &root,
             &root,
             MAX_DEPTH,
-            &mut files,
-            &mut at_the_root,
+            &mut Found {
+                files: &mut files,
+                pdfs: None,
+                at_the_root: &mut at_the_root,
+            },
             &mut errors,
         );
 
@@ -537,8 +591,11 @@ mod tests {
             &root,
             &root,
             MAX_DEPTH,
-            &mut files,
-            &mut at_the_root,
+            &mut Found {
+                files: &mut files,
+                pdfs: None,
+                at_the_root: &mut at_the_root,
+            },
             &mut errors,
         );
 
@@ -657,33 +714,37 @@ mod tests {
         assert!(text.contains(&first), "{text}");
     }
 
+    /// A package built without PDFs has no `pdf` entry in its manifest: one
+    /// that names a PDF the build did not make describes another package.
     #[test]
-    fn a_manifest_giving_two_documents_one_pdf_fails() {
+    fn a_manifest_naming_a_pdf_the_build_did_not_make_fails() {
         let dir = tempdir().expect("tempdir");
         let fragments = sample();
         let placed = package(dir.path(), &fragments);
 
         let path = dir.path().join(MANIFEST);
         let json = fs::read_to_string(&path).expect("read");
-        let second = pdf_path(&placed[1].relative).to_string_lossy().to_string();
-        let first = pdf_path(&placed[0].relative).to_string_lossy().to_string();
-        fs::write(&path, json.replace(&second, &first)).expect("write");
+        let pdf = crate::export::naming::pdf_path(&placed[0].relative)
+            .to_string_lossy()
+            .to_string();
+        let file = placed[0].relative.to_string_lossy().to_string();
+        let named = json.replacen(
+            &format!("\"file\": \"{file}\","),
+            &format!("\"file\": \"{file}\",\n          \"pdf\": \"{pdf}\","),
+            1,
+        );
+        assert_ne!(named, json, "the entry was not planted");
+        fs::write(&path, named).expect("write");
 
         let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
         let text = format!("{err}");
         assert!(text.contains("pdf"), "{text}");
         assert!(
-            text.contains(&second),
-            "the name that went missing is the one to say: {text}"
+            text.contains(&pdf),
+            "the PDF named is the one to say: {text}"
         );
     }
 
-    /// `index.html` is refused wherever it appears — this is the guard on the
-    /// decision, not a tidiness check.
-    ///
-    /// The exporter wrote one into every CTH folder until 2026-08-23. Re-adding
-    /// that would be a silent return of a feature that was deliberately given
-    /// up, so a package carrying one is not a package this program built.
     #[test]
     fn an_index_page_is_no_longer_part_of_a_package_anywhere() {
         let fragments = sample();

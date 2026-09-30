@@ -160,6 +160,10 @@ pub struct FragmentPresentation<'a> {
     /// group pages any more, so the inventory is the only document that links
     /// and the package root is the only place a link is written from.
     pub href: Option<String>,
+    /// This manuscript's PDF, beside its XML: `./CTH%205/KBo%201.1.pdf`.
+    /// `None` when the build made no PDF of it – none at all, or this one
+    /// refused (owner's decision of 2026-09-30, question 5).
+    pub pdf_href: Option<String>,
     /// The record itself, for the fields a renderer lays out in columns.
     pub record: &'a ManuscriptRecord,
 }
@@ -219,6 +223,7 @@ impl<'a> CorpusPresentation<'a> {
                     FragmentPresentation {
                         display_name: display_name(record, place),
                         href: place.map(|p| href(&p.relative)),
+                        pdf_href: None,
                         record,
                     }
                 })
@@ -228,6 +233,19 @@ impl<'a> CorpusPresentation<'a> {
         }
 
         CorpusPresentation { source, groups }
+    }
+
+    /// The PDFs a build made, linked beside their documents. `built` is
+    /// parallel to `placed`, as `placed` is to the records; `None` links none.
+    pub fn with_pdfs(mut self, placed: &[Placed], built: Option<&[bool]>) -> Self {
+        let Some(built) = built else { return self };
+        let fragments = self.groups.iter_mut().flat_map(|g| g.fragments.iter_mut());
+        for ((fragment, place), made) in fragments.zip(placed).zip(built) {
+            if *made {
+                fragment.pdf_href = Some(href(&crate::export::naming::pdf_path(&place.relative)));
+            }
+        }
+        self
     }
 
     /// How many manuscripts the corpus holds.

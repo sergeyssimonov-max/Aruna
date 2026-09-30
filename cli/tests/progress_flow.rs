@@ -131,6 +131,8 @@ impl Progress for Recording {
             // many refinements the corpus happened to produce.
             Event::Downloading { .. } => Seen::Tick("Downloading"),
             Event::DocumentsWritten { done, total } => Seen::Written { done, total },
+            Event::WritingPdfs { .. } => Seen::Other("WritingPdfs"),
+            Event::PdfsWritten { .. } => Seen::Tick("PdfsWritten"),
         };
         self.0.lock().expect("not poisoned").push(seen);
     }
@@ -420,6 +422,10 @@ fn the_binary_reports_the_same_run_on_stderr() {
     let out = Command::new(env!("CARGO_BIN_EXE_aruna"))
         .env("HOME", home.path())
         .env("ARUNA_ZIP", &zip)
+        .env(
+            "ARUNA_FONTS",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
+        )
         .env("ARUNA_CACHE_DIR", home.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
         .env_remove("XDG_DOWNLOAD_DIR")

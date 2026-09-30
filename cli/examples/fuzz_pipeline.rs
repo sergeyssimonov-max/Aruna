@@ -178,6 +178,18 @@ fn main() {
         fonts.observe(&text(&mut rng));
         let label = text(&mut rng);
         let refused = [text(&mut rng), text(&mut rng)];
+        // The PDF entries as well: half built, half refused with fuzzed prose.
+        let pdfs: Vec<aruna::export::PdfState> = placed
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                if i % 2 == 0 {
+                    aruna::export::PdfState::Built(aruna::export::pdf_path(&p.relative))
+                } else {
+                    aruna::export::PdfState::Refused(text(&mut rng))
+                }
+            })
+            .collect();
         let json = render_manifest(
             &recs,
             &placed,
@@ -189,6 +201,7 @@ fn main() {
             &applied,
             &fonts,
             &Default::default(),
+            Some(&pdfs),
         );
         if let Err(why) = check_json(&json) {
             json_bad += 1;

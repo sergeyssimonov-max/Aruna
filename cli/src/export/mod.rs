@@ -23,6 +23,7 @@ mod lock;
 pub mod manifest;
 pub mod naming;
 pub mod normalize;
+pub mod pdf;
 pub mod validate;
 pub mod verify;
 
@@ -33,7 +34,8 @@ pub use naming::{
     dir_component, href, output_path, path_component, pdf_path, percent_decode, resolve,
 };
 pub use normalize::{normalize_document, normalize_into};
-pub use validate::{validate, Validation};
+pub use pdf::{Pdf, PdfState};
+pub use validate::{validate, validate_with, Validation};
 
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, Phase};
@@ -331,6 +333,22 @@ pub struct Built {
     /// 8 423. Until 2026-09-10 this field held the second and every label on it
     /// said the first.
     pub stylesheet_dropped: usize,
+    /// The PDFs, when the build made them: how many were built beside their
+    /// XML and how many documents got none.
+    pub pdfs: Option<PdfCount>,
+}
+
+/// What the PDF phase came to.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct PdfCount {
+    pub built: usize,
+    pub refused: usize,
+}
+
+/// [`build_with`] without PDFs: the package of XML documents, the inventory
+/// and the manifest, byte for byte as before the PDF phase existed.
+pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) -> Result<Built> {
+    build_with(zip, destination, source_label, Pdf::Off, job)
 }
 
 /// Build the package under `destination`, and return what it contains.
@@ -351,7 +369,18 @@ pub struct Built {
 /// directory that removes itself unless it is published, so stopping leaves
 /// the destination exactly as it was found — the same guarantee a failed build
 /// already had, reached by the same mechanism.
-pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) -> Result<Built> {
+///
+/// With [`Pdf::On`] each document also gets its PDF, built between the XML
+/// documents and the inventory ([`pdf`]); the inventory links it beside the
+/// XML and the manifest names it. [`Pdf::Off`] leaves every file but those
+/// links and entries as it was.
+pub fn build_with(
+    zip: &Path,
+    destination: &Path,
+    source_label: &str,
+    pdf: Pdf<'_>,
+    job: &Job<'_>,
+) -> Result<Built> {
     let final_root = destination.join(PACKAGE);
     let staging = destination.join(staging_name());
 
@@ -403,7 +432,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         documents: placed.len(),
     });
     let mut tallies = Tallies::default();
-    write_documents(
+    let mut package_bytes = write_documents(
         &mut archive,
         &fragments,
         &placed,
@@ -431,6 +460,23 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // stayed alive to the end of the build with nothing left to read them.
     let records: Vec<ManuscriptRecord> = fragments.into_iter().map(|f| f.record).collect();
 
+    // The PDFs, before the inventory and the manifest: both say what became
+    // of each one.
+    let pdfs = match pdf {
+        Pdf::Off => None,
+        Pdf::On(fonts) => Some(pdf::write_pdfs(
+            staging.path(),
+            &records,
+            &placed,
+            fonts,
+            &mut package_bytes,
+            job,
+        )?),
+    };
+    let built_pdfs: Option<Vec<bool>> = pdfs
+        .as_ref()
+        .map(|states| states.iter().map(|s| s.built().is_some()).collect());
+
     // What every document shows, decided once. Both pages are written from
     // this and neither re-derives a name, a link or a fact of its own — see
     // [`crate::presentation`].
@@ -442,7 +488,8 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // on the real corpus that nobody would look at again.
     {
         let corpus =
-            crate::presentation::CorpusPresentation::linked(&records, &placed, source_label);
+            crate::presentation::CorpusPresentation::linked(&records, &placed, source_label)
+                .with_pdfs(&placed, built_pdfs.as_deref());
         let html = crate::html::render_linked_html(&corpus, "");
         let inventory = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
         fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
@@ -486,6 +533,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
             &tallies.applied,
             &tallies.fonts,
             &tallies.xml,
+            pdfs.as_deref(),
         );
         let manifest_path = staging.path().join(MANIFEST);
         fs::write(&manifest_path, &manifest_json).map_err(ArunaError::io(manifest_path))?;
@@ -495,7 +543,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     // the write should not spend six more seconds proving it was written.
     job.check(Phase::Validating)?;
     job.report(Event::CheckingPackage);
-    let staged = validate(staging.path(), &records, &placed)?;
+    let staged = validate_with(staging.path(), &records, &placed, pdfs.as_deref())?;
 
     // Only now does it get the name. The package already there is moved aside
     // first, and put back if the publish fails.
@@ -528,7 +576,7 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
     previous.published();
 
     job.report(Event::CheckingPublished);
-    let published = validate(&final_root, &records, &placed)?;
+    let published = validate_with(&final_root, &records, &placed, pdfs.as_deref())?;
 
     // Опубликованное обязано совпасть с собранным – и проверяется это здесь,
     // пока копия читателя еще в `Replaced`, и отказом, а не паникой. Стоял тут
@@ -559,6 +607,13 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
         fragment_links: published.fragment_links,
         disambiguated,
         stylesheet_dropped,
+        pdfs: pdfs.map(|states| {
+            let built = states.iter().filter(|s| s.built().is_some()).count();
+            PdfCount {
+                built,
+                refused: states.len() - built,
+            }
+        }),
     })
 }
 
@@ -1114,7 +1169,7 @@ fn write_documents(
     staging: &Path,
     tallies: &mut Tallies,
     job: &Job<'_>,
-) -> Result<()> {
+) -> Result<u64> {
     // **One slot per entry name, and the archive is held to it here.**
     //
     // `collect` on a map keeps the last value for a repeated key, so an archive
@@ -1308,7 +1363,7 @@ fn write_documents(
             written,
         });
     }
-    Ok(())
+    Ok(package_bytes)
 }
 
 /// The collision behind a group folder the disk already had: which folder this
@@ -1475,7 +1530,7 @@ mod tests {
             .find("staging.publish(&final_root)")
             .expect("staging больше не публикуется под окончательным именем");
         let read_again = code
-            .find("let published = validate(&final_root")
+            .find("let published = validate_with(&final_root")
             .expect("опубликованное дерево больше не читается заново");
         let let_go = code
             .find("previous.committed()")

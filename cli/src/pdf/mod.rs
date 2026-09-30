@@ -61,7 +61,11 @@ pub enum Invariant {
     LabelSpans(usize),
     #[error("page {page}: two repeated clusters overlap at MCID {mcid}")]
     ClustersOverlap { page: u32, mcid: i64 },
-    #[error("the credit was predicted {predicted} and UllikummiA embedded {embedded}")]
+    #[error("{}", if *predicted {
+        "the credit was predicted and UllikummiA is not embedded"
+    } else {
+        "UllikummiA is embedded and the credit was not predicted"
+    })]
     Credit { predicted: bool, embedded: bool },
     #[error("the main face cannot draw a label: {0}")]
     MainFace(String),

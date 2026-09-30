@@ -24,7 +24,7 @@
 
 use crate::xml_wellformed::{beyond_the_parser, Beyond, Finding, Limit, Reason};
 
-use super::naming::{href, pdf_path};
+use super::naming::href;
 use super::verify::{self, ADD_DECLARATION, DROP_BOM, REFLOW_PROLOGUE};
 use super::{Placed, PACKAGE};
 use crate::parse::{group_runs, ManuscriptRecord};
@@ -472,6 +472,7 @@ pub fn render_manifest(
     normalisation: &BTreeMap<String, usize>,
     fonts: &FontContract,
     xml: &XmlReport,
+    pdfs: Option<&[super::PdfState]>,
 ) -> String {
     // The real manifest averages about 350 bytes per document; 1 MiB for an
     // 8.3 MB result meant four reallocations and settling at 16 MiB.
@@ -486,6 +487,22 @@ pub fn render_manifest(
         "  \"inventory\": {},",
         string(crate::paths::OUTPUT_FILE_NAME)
     );
+
+    // What the PDF phase did, when there was one (owner's decisions of
+    // 2026-09-30, questions 1, 3 and 13): the template every PDF names, and
+    // the tally. Each document says its own below.
+    if let Some(states) = pdfs {
+        let built = states.iter().filter(|s| s.built().is_some()).count();
+        let _ = writeln!(out, "  \"pdfs\": {{");
+        let _ = writeln!(
+            out,
+            "    \"template\": {},",
+            string(crate::pdf::TEMPLATE_VERSION)
+        );
+        let _ = writeln!(out, "    \"built\": {built},");
+        let _ = writeln!(out, "    \"refused\": {}", states.len() - built);
+        out.push_str("  },\n");
+    }
 
     let _ = writeln!(out, "  \"source\": {{");
     let _ = writeln!(out, "    \"label\": {},", string(source.label));
@@ -754,6 +771,7 @@ pub fn render_manifest(
     // The groups, in the order the inventory lists them — which is the order a
     // table of contents wants.
     out.push_str("  \"groups\": [\n");
+    let mut index = 0usize;
     for (g, (label, run, slice)) in super::group_slices(records, placed).enumerate() {
         let dir = PathBuf::from(super::dir_component(label));
 
@@ -776,13 +794,27 @@ pub fn render_manifest(
                 "          \"href\": {},",
                 string(&href(&place.relative))
             );
-            // Where this document's PDF will go. Named here so the converter
-            // does not invent a second naming rule for the same document.
-            let _ = writeln!(
-                out,
-                "          \"pdf\": {},",
-                string(&pdf_path(&place.relative).to_string_lossy())
-            );
+            // This document's PDF: its path when it was built, why not when it
+            // was refused, nothing when the build made no PDFs. The path is
+            // `naming::pdf_path`, the one naming rule for it.
+            match pdfs.and_then(|states| states.get(index)) {
+                Some(super::PdfState::Built(pdf)) => {
+                    let _ = writeln!(
+                        out,
+                        "          \"pdf\": {},",
+                        string(&pdf.to_string_lossy())
+                    );
+                }
+                Some(super::PdfState::Refused(reason)) => {
+                    let _ = writeln!(
+                        out,
+                        "          \"pdf\": {{ \"refused\": {} }},",
+                        string(reason)
+                    );
+                }
+                None => {}
+            }
+            index += 1;
             let _ = writeln!(out, "          \"lang\": {},", string(&record.lang));
             let _ = writeln!(out, "          \"corpus\": {},", string(&record.corpus));
             let _ = writeln!(out, "          \"editor\": {},", string(&record.authorship));
@@ -1032,7 +1064,21 @@ mod tests {
             archive_md5: "abc123",
             not_manuscripts: &refused,
         };
-        render_manifest(&records, &placed, &source, &applied, &fonts, &xml)
+        // Every document with its PDF built: the manifest of a build with the
+        // PDF phase, which is the one by default.
+        let pdfs: Vec<super::super::PdfState> = placed
+            .iter()
+            .map(|p| super::super::PdfState::Built(super::super::pdf_path(&p.relative)))
+            .collect();
+        render_manifest(
+            &records,
+            &placed,
+            &source,
+            &applied,
+            &fonts,
+            &xml,
+            Some(&pdfs),
+        )
     }
 
     /// The manifest has to be JSON before it has to be anything else.
@@ -1071,6 +1117,7 @@ mod tests {
             &BTreeMap::new(),
             &FontContract::default(),
             &XmlReport::default(),
+            None,
         );
         assert!(text.contains("\"entries\": []\n    }\n  },"), "{text}");
     }
@@ -1106,6 +1153,7 @@ mod tests {
             &BTreeMap::new(),
             &fonts,
             &XmlReport::default(),
+            None,
         );
         assert!(text.contains("𒀀 source"));
         assert!(!text.contains("\\u12000"));

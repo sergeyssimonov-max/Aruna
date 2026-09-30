@@ -386,6 +386,20 @@ fn write_item_row(
         ),
         None => title,
     };
+    // The PDF beside the XML, when the build made one: the same link the
+    // frontend renders for the document, a second time, named `PDF` (owner's
+    // decision of 2026-09-30, question 5). Its own markup belongs to the
+    // window's part of the transfer; until then it is this fragment reused.
+    let title = match &fragment.pdf_href {
+        Some(pdf) => format!(
+            "{title} {}",
+            filled(
+                trimmed(MANUSCRIPT_LINK),
+                &[("HREF", &escape_html(pdf)), ("TITLE", "PDF")],
+            )
+        ),
+        None => title,
+    };
     fill(
         out,
         trimmed(MANUSCRIPT_ROW),
@@ -742,6 +756,7 @@ mod tests {
                 fragments: vec![FragmentPresentation {
                     display_name: "KBo 1",
                     href: Some("./a.xml\" onload=\"boom".into()),
+                    pdf_href: None,
                     record: &record,
                 }],
             }],

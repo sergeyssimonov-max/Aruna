@@ -86,6 +86,17 @@ pub enum Event<'a> {
     /// Both halves, so that a sink showing a fraction cannot show one whose
     /// denominator drifted from the stage line above it.
     DocumentsWritten { done: usize, total: usize },
+    /// The PDF of every document is being built beside it (owner's decision
+    /// of 2026-09-30, question 3; the window hears it from the third part of
+    /// the transfer, question 8).
+    WritingPdfs { documents: usize },
+    /// How far the PDFs are, and how many were built rather than refused. A
+    /// tick, not a stage – see [`Event::is_tick`].
+    PdfsWritten {
+        done: usize,
+        built: usize,
+        total: usize,
+    },
     /// The staged package is being checked against the model it came from.
     CheckingPackage,
     /// Another run is publishing into the same folder, and this one waits for
@@ -120,7 +131,7 @@ impl Event<'_> {
     pub fn is_tick(&self) -> bool {
         matches!(
             self,
-            Event::Downloading { .. } | Event::DocumentsWritten { .. }
+            Event::Downloading { .. } | Event::DocumentsWritten { .. } | Event::PdfsWritten { .. }
         )
     }
 }
@@ -198,6 +209,10 @@ impl fmt::Display for Event<'_> {
             } => write!(f, "  {manuscripts} manuscripts in {groups} groups"),
             Event::WritingDocuments { documents } => write!(f, "Writing {documents} documents…"),
             Event::DocumentsWritten { done, total } => write!(f, "  {done} of {total} documents"),
+            Event::WritingPdfs { documents } => write!(f, "Building the PDF of {documents} documents…"),
+            Event::PdfsWritten { done, built, total } => {
+                write!(f, "  {done} of {total} documents, {built} PDFs")
+            }
             Event::CheckingPackage => write!(f, "Checking the package…"),
             Event::WaitingForPublication => write!(
                 f,
@@ -297,7 +312,7 @@ mod tests {
             expected: 10,
             got: 4,
         };
-        let cases: [(Event<'_>, &str); 20] = [
+        let cases: [(Event<'_>, &str); 21] = [
             (
                 Event::CacheUnusable { dir: &dir },
                 "Cannot write to the cache directory (/cache/aruna); downloading for this run only.",
@@ -367,6 +382,10 @@ mod tests {
                 Event::WritingDocuments { documents: 24_501 },
                 "Writing 24501 documents…",
             ),
+            (
+                Event::WritingPdfs { documents: 23_936 },
+                "Building the PDF of 23936 documents…",
+            ),
             (Event::CheckingPackage, "Checking the package…"),
             (
                 Event::WaitingForPublication,
@@ -401,7 +420,7 @@ mod tests {
     /// denominator, and saying so is better than inventing one.
     #[test]
     fn a_tick_says_how_far_along_a_stage_is_and_is_not_one() {
-        let cases: [(Event<'_>, &str); 3] = [
+        let cases: [(Event<'_>, &str); 4] = [
             (
                 Event::Downloading {
                     bytes: 1_048_576,
@@ -422,6 +441,14 @@ mod tests {
                     total: 23_936,
                 },
                 "  500 of 23936 documents",
+            ),
+            (
+                Event::PdfsWritten {
+                    done: 250,
+                    built: 248,
+                    total: 23_936,
+                },
+                "  250 of 23936 documents, 248 PDFs",
             ),
         ];
 
