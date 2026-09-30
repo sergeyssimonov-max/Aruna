@@ -976,6 +976,11 @@ impl BuildProgress {
                 progress.total = Some(counted(*total));
                 Stage::Writing
             }
+            // Фаза PDF: окно ее не показывает до третьей части переноса
+            // (решение владельца 30.09.2026, вопрос 8) – `WindowProgress`
+            // отбрасывает эти события до провода. Здесь они названы, чтобы
+            // разбор остался исчерпывающим, и провода не достигают.
+            Core::WritingPdfs { .. } | Core::PdfsWritten { .. } => Stage::Writing,
             Core::CheckingPackage => Stage::CheckingPackage,
             Core::WaitingForPublication => Stage::WaitingForPublication,
             Core::PublishingWithoutLock => Stage::PublishingWithoutLock,
@@ -984,6 +989,16 @@ impl BuildProgress {
         };
         progress
     }
+}
+
+/// События фазы PDF: окно их пока не получает (решение владельца
+/// 30.09.2026, вопрос 8) – ни стадии, ни фраз, ни `bindings.ts` для них еще
+/// нет; это третья часть переноса.
+fn is_pdf_phase(event: &aruna::progress::Event<'_>) -> bool {
+    matches!(
+        event,
+        aruna::progress::Event::WritingPdfs { .. } | aruna::progress::Event::PdfsWritten { .. }
+    )
 }
 
 /// Синк прогресса, который шлет события в окно.
@@ -1000,6 +1015,9 @@ struct WindowProgress {
 impl aruna::progress::Progress for WindowProgress {
     fn report(&self, event: aruna::progress::Event<'_>) {
         use tauri_specta::Event as _;
+        if is_pdf_phase(&event) {
+            return;
+        }
         let _ = BuildProgress::of(self.job, &event).emit(&self.app);
     }
 }
@@ -1110,6 +1128,15 @@ async fn build_corpus(
     let cancel = aruna::job::Cancel::new();
     state.claim(cancel.clone())?;
 
+    // Шрифты PDF – из каталога ресурсов приложения, того же, что проверен при
+    // запуске, и больше ниоткуда (решение владельца 30.09.2026, вопрос 10).
+    // Каталог не найден – ядро откажет до начала работы и назовет файл.
+    let fonts = app
+        .path()
+        .resource_dir()
+        .ok()
+        .map(|dir| dir.join(FONT_RESOURCES));
+
     let handle = app.clone();
     // Задание строится внутри замыкания, и иначе нельзя: `Job<'a>` заимствует
     // и синк, и флаг, поэтому оно не может жить дольше вызова, который его
@@ -1124,6 +1151,7 @@ async fn build_corpus(
         // пользуется: `None` — закрепленная запись Zenodo через кеш.
         let request = aruna::app::CorpusRequest {
             local_archive: None,
+            pdf: aruna::app::PdfRequest::On { fonts },
         };
         build_once(id, &request, chosen.as_deref(), &cancel, &sink)
     })
@@ -1470,6 +1498,29 @@ mod wire {
     /// Обе половины дроби приходят из ядра как есть; окно ничего не считает
     /// само, и полоса не может показать долю, знаменатель которой разошелся с
     /// объявленным.
+    /// **Фаза PDF окна пока не достигает** (решение владельца 30.09.2026,
+    /// вопрос 8): ее события отбрасываются до провода, прочие идут как шли.
+    #[test]
+    fn the_pdf_phase_does_not_reach_the_window_yet() {
+        use aruna::progress::Event as Core;
+
+        let phase = [
+            Core::WritingPdfs { documents: 3 },
+            Core::PdfsWritten {
+                done: 1,
+                built: 1,
+                total: 3,
+            },
+        ];
+        for event in &phase {
+            assert!(is_pdf_phase(event), "{event:?}");
+            // Разбор назвал бы их записью, но до него они не доходят.
+            assert_eq!(BuildProgress::of(1, event).stage, Stage::Writing);
+        }
+        assert!(!is_pdf_phase(&Core::WritingDocuments { documents: 3 }));
+        assert!(!is_pdf_phase(&Core::CheckingPackage));
+    }
+
     #[test]
     fn the_stage_names_the_whole_and_the_tick_fills_it_in() {
         use aruna::progress::Event as Core;
@@ -2571,6 +2622,7 @@ mod cancelling {
         };
         let request = aruna::app::CorpusRequest {
             local_archive: Some(zip),
+            pdf: aruna::app::PdfRequest::Off,
         };
         let outcome = build_once(
             aruna::job::JobId::next(),
@@ -2637,6 +2689,7 @@ mod cancelling {
         };
         let request = aruna::app::CorpusRequest {
             local_archive: Some(zip),
+            pdf: aruna::app::PdfRequest::Off,
         };
         let outcome = build_once(
             aruna::job::JobId::next(),
@@ -2695,6 +2748,7 @@ mod cancelling {
         };
         let request = aruna::app::CorpusRequest {
             local_archive: Some(zip),
+            pdf: aruna::app::PdfRequest::Off,
         };
         let report = build_once(
             aruna::job::JobId::next(),
