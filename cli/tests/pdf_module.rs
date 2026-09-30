@@ -383,3 +383,21 @@ fn the_structure_of_each_sample_is_its_snapshot() {
         insta::assert_snapshot!(format!("structure-{name}"), structure(&r.pdf));
     }
 }
+
+/// **The reader's teeth**: a label whose invisible text is spoiled, and a
+/// label layer that lost its `ToUnicode`, both fail the check a good file
+/// passes – the same probes the gate puts to PDFKit.
+#[test]
+fn a_spoiled_label_or_a_lost_to_unicode_fails_the_reader() {
+    let (_, r) = build(&doc(LABEL), "KBo 52.182");
+    let count = |pdf: &[u8]| {
+        check(pdf)
+            .expect("readable")
+            .raw
+            .matches('\u{100009}')
+            .count()
+    };
+    assert_eq!(count(&r.pdf), 2);
+    assert_ne!(count(&spoil_label(&r.pdf).expect("a label")), 2);
+    assert_eq!(count(&drop_label_to_unicode(&r.pdf).expect("a layer")), 0);
+}

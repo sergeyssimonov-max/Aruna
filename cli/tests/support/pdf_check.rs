@@ -629,3 +629,26 @@ pub fn spoil_label(pdf: &[u8]) -> Result<Vec<u8>, String> {
     }
     Err("no label".into())
 }
+
+/// (e) the labels' invisible layer loses its `ToUnicode`: a reader then has
+/// no code point to give, and a check that still passes has no teeth.
+pub fn drop_label_to_unicode(pdf: &[u8]) -> Result<Vec<u8>, String> {
+    let mut doc = Document::load_mem(pdf).map_err(|e| e.to_string())?;
+    let mut dropped = 0;
+    for object in doc.objects.values_mut() {
+        if let Ok(dict) = object.as_dict_mut() {
+            let type3 =
+                dict.get(b"Subtype").and_then(|o| o.as_name()).ok() == Some(b"Type3".as_slice());
+            if type3 && dict.has(b"ToUnicode") {
+                dict.remove(b"ToUnicode");
+                dropped += 1;
+            }
+        }
+    }
+    if dropped == 0 {
+        return Err("no label layer".into());
+    }
+    let mut out = Vec::new();
+    doc.save_to(&mut out).map_err(|e| e.to_string())?;
+    Ok(out)
+}
