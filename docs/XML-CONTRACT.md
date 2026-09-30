@@ -6,6 +6,14 @@ kind of XML data has to end up when these manuscripts become PDF.
 Every number here was measured, and the command that produced it is given. None
 of it is estimated.
 
+Amended 2026-09-30: §2, §4 and §5, by the owner's decisions of 2026-09-30 on
+questions 3 and 5 of §5. The ground is the measurement of the fourth PDF trial
+over all 23 936 documents of the 2.6.2 package: no element of the OpenDocument
+`table` namespace occurs anywhere, `text:tab` occurs in 63 documents, and the
+three comments are editors' notes in the header. This is the first line of a
+log this file had not kept until now; earlier changes stand dated where they
+were made. Each place changed today is marked below.
+
 ---
 
 ## 1. The source is not ours to change
@@ -116,8 +124,20 @@ Structure, by number of documents carrying it:
 The eight namespaces are `http://hethiter.net/ns/AO/1.0`,
 `http://hethiter.net/ns/hpm/1.0`, `http://purl.org/dc/elements/1.1/`,
 `http://www.w3.org/1999/xlink`, and four OpenDocument ones
-(`drawing`, `meta`, `table`, `text`). The OpenDocument four are not decoration:
-documents carry real table structure.
+(`drawing`, `meta`, `table`, `text`). ~~The OpenDocument four are not decoration:
+documents carry real table structure.~~
+
+*Amended 2026-09-30.* The struck sentence described markup the corpus does not
+contain. Measured over all 23 936 documents of the 2.6.2 package on 2026-09-30
+(fourth PDF trial): the four namespaces are declared on every root, and no
+element of `table` or `drawing` occurs anywhere — 0 documents. What occurs of
+OpenDocument is `text:tab` (63 documents, 212 occurrences, all among the 23 713
+the document model reads), `text:line-break` (6 documents, all six refused by
+the model), `text:h` (4) and `text:bookmark` (1). `text:tab` is a trace of
+tabulation carried over from an editor: it shifts the rest of a line towards a
+column of the tablet, and it defines no cells and no rows. **By the owner's
+decision of 2026-09-30 a `text:tab` is rendered as a shift of the line**, the
+view "rows" of the trial, never as a table (§4, §5 question 5).
 
 Collisions: 132 file names repeat across folders, 0 differ only by case, 600 ids
 are used by more than one element, 0 symbolic links.
@@ -301,7 +321,8 @@ same comparison runs with every test run).
 | root `AOxml` | 23 936 | `Document::root` | document frame |
 | element tree | 4.88 M elements | `Kind::Element`, in document order | layout structure |
 | attributes | 6.37 M | `Element::attributes`, in the order written; the scan still reads 7 named fields | metadata block; editorial attributes visible |
-| namespaces | 8, everywhere | `Element::namespaces` as declared; `Name::namespace` resolved | qualified names resolved before layout; ODF `table:` renders as a table |
+| namespaces | 8, everywhere | `Element::namespaces` as declared; `Name::namespace` resolved | qualified names resolved before layout ~~; ODF `table:` renders as a table~~ — amended 2026-09-30: no ODF table markup occurs (§2) |
+| `text:tab` | 63 docs, 212 | an element without children, in place | a shift of the line, never a table cell — owner's decision 2026-09-30 (§5 question 5) |
 | mixed content | 23 616 docs | `Kind::Text` between elements, whitespace kept | **inline runs must stay inline** — the single largest layout risk |
 | text nodes | — | `Kind::Text` | body text |
 | `docID` / siglum | 23 936 | element `docID`; `sigla` from the scan | running head and heading |
@@ -310,7 +331,7 @@ same comparison runs with every test run).
 | editor, date | 23 646 docs carry an `editor` attribute | the attributes as written; `authorship`, `year` from the scan | metadata block and PDF metadata |
 | `lg` language codes | 23 711 docs | the attributes as written; `lang` from the scan | metadata block; script selection |
 | empty markers (`lb`, `gap`, `parsep`) | most | elements without children | line and section breaks — layout, not nothing |
-| comments | 3 docs | `Kind::Comment` | technical appendix; **not dropped** |
+| comments | 3 docs | `Kind::Comment` | ~~technical appendix; **not dropped**~~ omitted: not shown in the PDF — owner's decision 2026-09-30 (§5 question 3) |
 | processing instructions | 8 423 docs | `Kind::Instruction`, in place | the stylesheet PI is dropped by rule; any other PI goes to the appendix |
 | XML declaration | 442 docs | `Document::declaration`, `None` when absent | not shown; recorded in the manifest |
 | ids | 600 duplicated | attributes as written; no uniqueness assumed | anchors; duplicates cannot be resolved by id alone and need the document path as well |
@@ -323,6 +344,12 @@ same comparison runs with every test run).
 
 **No category is "ignored".** Where a construct is not displayed, the row says
 where it goes instead.
+
+*Amended 2026-09-30: one exception, decided rather than defaulted.* Comments
+are omitted from the PDF by the owner's decision on §5 question 3. The three
+there are are editors' notes about the file in the header, not text of the
+manuscript; the row says so, and the document keeps them in the package byte
+for byte.
 
 **Three rows of this table were wrong until 2026-09-13**, and building the model
 is what showed it; measured over the archive that day.
@@ -404,11 +431,29 @@ Open questions, each of which changes what the converter does:
    new class is a new manifest key, and the manifest is part of the checksum.
 2. **Entity expansion.** None appear today. When one does: expand and record,
    or refuse?
-3. **Comments.** Three documents carry them. Editorial or incidental?
+3. ~~**Comments.** Three documents carry them. Editorial or incidental?~~
+
+   **Decided by the owner, 2026-09-30: omitted, not shown in the PDF.** The
+   samples of the fourth PDF trial answered the question: all three —
+   `CTH 627/IBoT 4.193`, `CTH 664/KBo 67.110`, `CTH 670/Privat 148` — sit in
+   the header, in `AOHeader/meta/neu`, as the first node of the revision log,
+   and all three are editors' notes about the file (`NN::/…`); no comment
+   stands in the body. They stay in the package byte for byte; the PDF does not
+   carry them (§4, comments row).
 4. **The 600 duplicated ids.** Anchors need to be unique per PDF; the document
    path disambiguates them, and the manifest must say so.
-5. **OpenDocument table markup.** Rendered as tables, or as the transliteration
-   rows they encode?
+5. ~~**OpenDocument table markup.** Rendered as tables, or as the transliteration
+   rows they encode?~~
+
+   **Decided by the owner, 2026-09-30: there are no tables; `text:tab` is a
+   shift of the line.** The question assumed table markup the corpus does not
+   contain — no element of the `table` namespace occurs (§2). The only
+   OpenDocument markup that could be read as tabular is `text:tab`, and the
+   trial's sample, `CTH 746/KUB 28.15`, set as a table showed what it is: five
+   empty cells and the text in the sixth, a shift towards the right-hand column
+   of the tablet rather than columns of data. It is rendered in the view
+   "rows" as a shift of the line, never as table cells, and no character is
+   added to the text for it (§2, §4).
 
 ---
 
