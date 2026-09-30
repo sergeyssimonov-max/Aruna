@@ -66,6 +66,12 @@ exception to "do not convert text to outlines". Owner's decision of
 2026-09-28, on the measurements of the trials of 2026-09-27 and the reader
 check of 2026-09-28. Marked below.
 
+Amended 2026-09-30: §3, the table row of the reference set, on the measurement
+of 2026-09-30 — no element of the `table` namespace occurs in the corpus; and
+§7, one PDF per document, by the owner's decision of 2026-09-30. Corrected the
+same day, a correction of fact and not an amendment: the count of §5. Each is
+marked below.
+
 **Where this file ends and the specification begins.** `PROJECT-SPEC.ru.md`
 §6.9 lists checks for the PDF contour and says it takes effect with the first
 PDF. This file is the contract; that section is the pre-commit set that will
@@ -333,8 +339,15 @@ The reference set, chosen for what breaks layout rather than for typicality:
 | most notes | note block against page break |
 | rare characters, cuneiform, private use | glyph coverage |
 | longest identifiers | running head overflow |
-| document with an OpenDocument table | table rendering |
+| ~~document with an OpenDocument table~~ | ~~table rendering~~ |
 | a document that ends one line onto a new page | widow and orphan handling |
+
+*Amended 2026-09-30.* The struck row asked for a document the corpus does not
+have: no element of the `table` namespace occurs in any of the 23 936 documents
+(measured 2026-09-30, `XML-CONTRACT.md` §2). The only OpenDocument markup that
+reads as tabular, `text:tab`, is drawn as a fixed-width indent and never as a
+table (`XML-CONTRACT.md` §5, question 5), so there is no table rendering to
+test.
 
 Each must show: no clipped text, no overlap, nothing outside the margins,
 correct hyphenation, sensible page breaks, no unexplained blank page, correct
@@ -354,7 +367,14 @@ fail on the second run for no reason.
 
 ## 5. Batch behaviour
 
-The batch is the whole corpus: 23 936 documents into 663 folders.
+~~The batch is the whole corpus: 23 936 documents into 663 folders.~~
+
+*Corrected 2026-09-30.* The batch is every document the model reads: 23 713
+documents in 662 groups, one PDF per document beside its XML. The document
+model refuses 223 of the 23 936 — 206 the parser refuses and 17 beyond it — and
+group `CTH 756` is refused whole, so 662 folders receive PDFs, not 663
+(measured 2026-09-26, `PROJECT-SPEC.ru.md` 8.3). A correction of fact: no
+requirement of this section changed.
 
 Must: write atomically, never leave a damaged file under a final name, never
 touch the source, continue past a single document's failure where that is safe,
@@ -545,3 +565,11 @@ file: exactly one footnote, on page one, where the font is embedded; none where
 it is not. For §2 the footnote is a known addition to the document's text — not
 a discrepancy, but a changed wording or a second copy is one. Do not ship a
 file that embeds `UllikummiA` without it.
+
+**Amended 2026-09-30, owner's decision of 2026-09-30: one PDF per document.**
+The PDF of a document is written beside its XML, `CTH N/<siglum>.pdf`, the
+path the package manifest already names for every document; there is no PDF
+per CTH group. "The file" of the paragraph above is therefore always the PDF of
+one document, and the credit stands once in each document's PDF that embeds a
+subset of `UllikummiA`. The struck sentence above about a "663-document PDF
+set" belonged to a plan that no longer holds.

@@ -691,6 +691,18 @@ PDF draws a **marker**: a frame holding the code point's name in capitals, like
 point stays in the PDF's text layer through **ActualText** (ISO 32000, a marked
 `/Span`), and the label's own letters are not part of the extractable text.
 
+*Amended 2026-09-30, to the owner's decision of 2026-09-28.* The paragraph
+above describes the first way of carrying the code point, and it no longer
+holds. The label's letters are drawn as **outlines** of the main face — vector
+paths, not text — and the code point is carried by an **invisible text layer**
+under them (text rendering mode 3, a Type3 face that paints nothing, with a
+`ToUnicode` entry), **not by ActualText**. The reason is a measurement: with
+ActualText only a reader that honours it gave the code point back, while
+`pdf-extract` and PDFKit gave the letters `U+100009`; with the invisible layer
+every reader gave the code point and none of the letters, in all 968
+documents with a marker. ActualText keeps one role only, a cluster Typst
+writes twice. The contract is `PDF-ACCEPTANCE.md` §7, amendment of 2026-09-29.
+
 The rule is general. A sign without a glyph is any code point absent from the
 `cmap` of every face in the stack, found from the fonts and never from a list;
 a new one gets a marker by the same rule, and an answer from the editors that

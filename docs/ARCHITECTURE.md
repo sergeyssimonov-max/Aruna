@@ -146,6 +146,16 @@ speaks about paper. `docs/PDF-ACCEPTANCE.md` holds the criteria. **No PDF
 library has been chosen**, and none is to be chosen without a comparison run
 against the real corpus.
 
+**Decided 2026-09-30 by the owner, after four trials against the real
+corpus.** The engine is Typst (`PROJECT-SPEC.ru.md` 4.10), and the renderer is
+split the way HTML is. `cli/src/pdf/` is pure, like `html`: a document in, the
+bytes of a PDF out, no file opened. Writing those bytes is `export`'s, as
+writing the inventory is: a PDF phase after the XML documents are written, before
+the inventory and the manifest, inside `Staging`, so cancellation and failure
+leave the reader's folder untouched by the same mechanism as today. The
+document model still knows nothing about PDF. "Not at `export`" above is kept
+for the rendering; the phase that writes files is where files are written.
+
 ## 7. Where a Tauri adapter attaches
 
 At `app`, and it is attached. `src-tauri/Cargo.toml` carries

@@ -11,6 +11,10 @@ questions 3 and 5 of §5; the measurement is in §2. First entry of a log this
 file had not kept; earlier changes stand dated where they were made, and each
 place changed today is marked below.
 
+Amended 2026-09-30, second entry: §5 question 5, how the shift of `text:tab`
+is drawn, by the owner's decision of the same day on question 4 of the design
+note. Marked below.
+
 ---
 
 ## 1. The source is not ours to change
@@ -446,9 +450,15 @@ Open questions, each of which changes what the converter does:
    empty cells and the text in the sixth, a shift towards the right-hand column
    of the tablet rather than columns of data. It is rendered in the view
    "rows" as a shift of the line, never as table cells, and no character is
-   added to the text for it (§2, §4). How wide the shift is drawn is still
+   added to the text for it (§2, §4). ~~How wide the shift is drawn is still
    open: the trial's "rows" view did not draw it at all (`PROJECT-SPEC.ru.md`
-   7.3, question 4 of the design note).
+   7.3, question 4 of the design note).~~
+
+   *Amended 2026-09-30, the owner's decision of that day:* each `text:tab` is
+   drawn as a horizontal indent of fixed width, Typst's `h()`, which is space
+   and not a character — nothing enters the text layer. The width is chosen
+   against the trial's picture of `KUB 28.15` and recorded as a number in
+   `PROJECT-SPEC.ru.md` 4.10.
 
 ---
 
