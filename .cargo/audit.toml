@@ -46,5 +46,33 @@
 # Removed when citationberg publishes a release on quick-xml >= 0.41 and it
 # reaches this tree through hayagriva and typst-library. Reviewed – the proof
 # repeated on the new sources, not carried over – at every Typst release.
+#
+# **Four unmaintained crates, recorded rather than left as warnings** – owner's
+# decision of 2026-09-30 (task «pdf-converter-2»). Each is a transitive of
+# Typst 0.15.1, none is a dependency of this workspace, and `cargo deny`
+# (`unmaintained = "workspace"`) holds the direct ones at zero. They are
+# warnings, not vulnerabilities: no advisory names a flaw in them, only that
+# nobody maintains them. The `cargo audit` count was 8 accepted warnings
+# before Typst, 12 with it; these four are the difference.
+#
+# - RUSTSEC-2025-0141 bincode 1.3.3 – typst-library 0.15.1 → two-face 0.4.5 →
+#   syntect 5.3.0 (syntax highlighting of raw blocks; the template sets none).
+# - RUSTSEC-2024-0320 yaml-rust 0.4.5 – the same path through syntect.
+# - RUSTSEC-2026-0206 rustybuzz 0.20.1 – typst-pdf 0.15.1 → krilla 0.8.2
+#   (text shaping of the PDF writer).
+# - RUSTSEC-2026-0192 ttf-parser 0.25.1 – krilla-svg 0.8.1 → fontdb 0.23.0
+#   (fonts of an SVG; the labels' SVG draws paths, no text). Named directly it
+#   would be refused by `cargo deny`, which is why the labels read outlines
+#   through skrifa.
+#
+# Removed with the Typst release that drops each one; reviewed at every Typst
+# release, as the two advisories above are.
 [advisories]
-ignore = ["RUSTSEC-2026-0194", "RUSTSEC-2026-0195"]
+ignore = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    "RUSTSEC-2025-0141",
+    "RUSTSEC-2024-0320",
+    "RUSTSEC-2026-0206",
+    "RUSTSEC-2026-0192",
+]

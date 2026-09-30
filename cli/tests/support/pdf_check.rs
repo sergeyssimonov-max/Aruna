@@ -630,9 +630,21 @@ pub fn spoil_label(pdf: &[u8]) -> Result<Vec<u8>, String> {
     Err("no label".into())
 }
 
-/// (e) the labels' invisible layer loses its `ToUnicode`: a reader then has
-/// no code point to give, and a check that still passes has no teeth.
+/// (e) the labels' invisible layer loses its `ToUnicode`. This project's
+/// reader then has no code point to give; PDFKit still has one, from the
+/// glyph names of the layer's encoding (`u100009`), which the layer writes
+/// for a reader that reads names – see [`drop_label_names`].
 pub fn drop_label_to_unicode(pdf: &[u8]) -> Result<Vec<u8>, String> {
+    strip_label_layer(pdf, false)
+}
+
+/// (f) the layer loses its `ToUnicode` and its glyph names both: no reader
+/// has a code point to give.
+pub fn drop_label_names(pdf: &[u8]) -> Result<Vec<u8>, String> {
+    strip_label_layer(pdf, true)
+}
+
+fn strip_label_layer(pdf: &[u8], names: bool) -> Result<Vec<u8>, String> {
     let mut doc = Document::load_mem(pdf).map_err(|e| e.to_string())?;
     let mut dropped = 0;
     for object in doc.objects.values_mut() {
@@ -641,6 +653,20 @@ pub fn drop_label_to_unicode(pdf: &[u8]) -> Result<Vec<u8>, String> {
                 dict.get(b"Subtype").and_then(|o| o.as_name()).ok() == Some(b"Type3".as_slice());
             if type3 && dict.has(b"ToUnicode") {
                 dict.remove(b"ToUnicode");
+                if names {
+                    if let Ok(encoding) = dict.get_mut(b"Encoding").and_then(|o| o.as_dict_mut()) {
+                        if let Ok(diffs) = encoding
+                            .get_mut(b"Differences")
+                            .and_then(|o| o.as_array_mut())
+                        {
+                            for (i, item) in diffs.iter_mut().enumerate() {
+                                if matches!(item, lopdf::Object::Name(_)) {
+                                    *item = lopdf::Object::Name(format!("g{i}").into_bytes());
+                                }
+                            }
+                        }
+                    }
+                }
                 dropped += 1;
             }
         }

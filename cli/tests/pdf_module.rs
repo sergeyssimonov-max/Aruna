@@ -400,4 +400,5 @@ fn a_spoiled_label_or_a_lost_to_unicode_fails_the_reader() {
     assert_eq!(count(&r.pdf), 2);
     assert_ne!(count(&spoil_label(&r.pdf).expect("a label")), 2);
     assert_eq!(count(&drop_label_to_unicode(&r.pdf).expect("a layer")), 0);
+    assert_eq!(count(&drop_label_names(&r.pdf).expect("a layer")), 0);
 }

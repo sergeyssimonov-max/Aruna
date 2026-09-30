@@ -119,7 +119,7 @@ fn build(zip: &Path, fonts: &Path, destination: &Path, off: bool) -> bool {
     let built = export::build_with(
         zip,
         destination,
-        "Zenodo record 20328284 — TLHdig Beta 0.3",
+        aruna::SOURCE_LABEL,
         pdf,
         &Job::new(&clock, &cancel),
     );
@@ -252,14 +252,20 @@ struct Tally {
     pdfkit: Vec<String>,
     pdfkit_label_docs: usize,
     pdfkit_teeth: Vec<String>,
+    /// Whether PDFKit still gives the code point with the ToUnicode gone.
+    pdfkit_names: Option<bool>,
     controls: Vec<String>,
 }
 
 fn check_package(package: &Path, fonts: &Path, c14n: bool, pdfkit: bool) -> bool {
     let fonts = Fonts::load(fonts).expect("the fonts of docs/FONTS.md");
     let manifest = std::fs::read_to_string(package.join(export::MANIFEST)).expect("a manifest");
-    let files = export::manifest::values_of(&manifest, "file");
-    let sigla = export::manifest::values_of(&manifest, "siglum");
+    // The documents, from the groups: `file` is a key elsewhere too.
+    let groups = &manifest[manifest
+        .find("\"groups\": [")
+        .expect("the manifest lists groups")..];
+    let files = export::manifest::values_of(groups, "file");
+    let sigla = export::manifest::values_of(groups, "siglum");
     assert_eq!(files.len(), sigla.len(), "the manifest's documents");
     let trees = std::env::temp_dir().join(format!("pdf_gate-trees-{}", std::process::id()));
     if c14n {
@@ -321,7 +327,14 @@ fn check_package(package: &Path, fonts: &Path, c14n: bool, pdfkit: bool) -> bool
         if got.orphans + got.twice > 0 {
             t.orphans_or_twice.push(file.clone());
         }
-        if first_difference(&cps(&expected_text(&page)), &cps(&tree_text(&got.xml))).is_some() {
+        // The credit is the tree's first paragraph where it stands: a known
+        // addition to the text (PDF-ACCEPTANCE §7), expected once.
+        let logical = if credit {
+            format!("{}\n{}", aruna::fonts::CREDIT, expected_text(&page))
+        } else {
+            expected_text(&page)
+        };
+        if first_difference(&cps(&logical), &cps(&tree_text(&got.xml))).is_some() {
             t.logical.push(file.clone());
         }
         if c14n {
@@ -438,14 +451,14 @@ fn run_pdfkit(label_pdfs: &[(PathBuf, BTreeMap<u32, usize>)], t: &mut Tally) {
             .push("swiftc did not build the reader: the property is UNMET, not passed".into());
         return;
     }
-    // The reader's teeth first: a spoiled label and a lost ToUnicode on the
-    // first document with labels must both be caught, or the reading below
-    // proves nothing.
+    // The reader's teeth first: a spoiled label, and a layer without its
+    // ToUnicode and its glyph names, on the first document with labels must
+    // both be caught, or the reading below proves nothing.
     if let Some((path, want)) = label_pdfs.first() {
         let pdf = std::fs::read(path).expect("the PDF");
         for (what, spoiled) in [
             ("spoiled label", spoil_label(&pdf)),
-            ("lost ToUnicode", drop_label_to_unicode(&pdf)),
+            ("lost ToUnicode and glyph names", drop_label_names(&pdf)),
         ] {
             let probe = bin.with_extension(format!("{}.pdf", what.replace(' ', "-")));
             let caught = spoiled.is_ok_and(|bytes| {
@@ -461,6 +474,18 @@ fn run_pdfkit(label_pdfs: &[(PathBuf, BTreeMap<u32, usize>)], t: &mut Tally) {
                 "{what}: {}",
                 if caught { "caught" } else { "MISSED" }
             ));
+        }
+        // ToUnicode alone: PDFKit falls back on the glyph names, as the layer
+        // means it to. Said, not counted as a tooth.
+        let probe = bin.with_extension("lost-ToUnicode.pdf");
+        if let Ok(bytes) = drop_label_to_unicode(&pdf) {
+            std::fs::write(&probe, bytes).expect("scratch");
+            let out = Command::new(&bin)
+                .arg(&probe)
+                .output()
+                .expect("the reader runs");
+            t.pdfkit_names = Some(pdfkit_agrees(&String::from_utf8_lossy(&out.stdout), want));
+            let _ = std::fs::remove_file(&probe);
         }
     }
     for chunk in label_pdfs.chunks(200) {
@@ -589,6 +614,16 @@ fn report(t: &Tally, c14n: bool, pdfkit: bool) -> bool {
             ok &= line.ends_with("caught");
         }
         ok &= t.pdfkit_teeth.len() == 2;
+        if let Some(kept) = t.pdfkit_names {
+            println!(
+                "| PDFKit, ToUnicode alone removed | {} |",
+                if kept {
+                    "code point kept, from the glyph names"
+                } else {
+                    "code point lost"
+                }
+            );
+        }
     }
     println!(
         "| documents with our wrappers (variant A) | {} |",
