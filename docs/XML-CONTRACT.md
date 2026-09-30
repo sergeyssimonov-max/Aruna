@@ -7,12 +7,9 @@ Every number here was measured, and the command that produced it is given. None
 of it is estimated.
 
 Amended 2026-09-30: §2, §4 and §5, by the owner's decisions of 2026-09-30 on
-questions 3 and 5 of §5. The ground is the measurement of the fourth PDF trial
-over all 23 936 documents of the 2.6.2 package: no element of the OpenDocument
-`table` namespace occurs anywhere, `text:tab` occurs in 63 documents, and the
-three comments are editors' notes in the header. This is the first line of a
-log this file had not kept until now; earlier changes stand dated where they
-were made. Each place changed today is marked below.
+questions 3 and 5 of §5; the measurement is in §2. First entry of a log this
+file had not kept; earlier changes stand dated where they were made, and each
+place changed today is marked below.
 
 ---
 
@@ -342,14 +339,10 @@ same comparison runs with every test run).
 | XInclude | 0 today | an element like any other; not followed | not followed, ever |
 | the original file | 23 936 | copied verbatim | see below |
 
-**No category is "ignored".** Where a construct is not displayed, the row says
-where it goes instead.
-
-*Amended 2026-09-30: one exception, decided rather than defaulted.* Comments
-are omitted from the PDF by the owner's decision on §5 question 3. The three
-there are are editors' notes about the file in the header, not text of the
-manuscript; the row says so, and the document keeps them in the package byte
-for byte.
+**Nothing is dropped silently.** Where a construct is not displayed, the row
+says where it goes instead, or names the decision that leaves it out of the
+PDF — as for comments since 2026-09-30 (§5 question 3). *Amended 2026-09-30:*
+this read "No category is 'ignored'" until the first such decision.
 
 **Three rows of this table were wrong until 2026-09-13**, and building the model
 is what showed it; measured over the archive that day.
@@ -453,7 +446,9 @@ Open questions, each of which changes what the converter does:
    empty cells and the text in the sixth, a shift towards the right-hand column
    of the tablet rather than columns of data. It is rendered in the view
    "rows" as a shift of the line, never as table cells, and no character is
-   added to the text for it (§2, §4).
+   added to the text for it (§2, §4). How wide the shift is drawn is still
+   open: the trial's "rows" view did not draw it at all (`PROJECT-SPEC.ru.md`
+   7.3, question 4 of the design note).
 
 ---
 
