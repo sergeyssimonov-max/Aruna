@@ -1,0 +1,50 @@
+# The two advisories below are excepted because the core carries Typst 0.15.1
+# (specification 4.10) and with it quick-xml 0.38.4. Specification 5.1,
+# owner's decision of 2026-09-27: an advisory is ignored only where the
+# vulnerable code is proved unreachable, with its reason, the condition that
+# removes it, a review at every Typst release, and a guard that fails if the
+# path opens. Brought to `main` with the first commit of Typst by the owner's
+# decision of 2026-09-30 (question 9 of the design note of the PDF transfer);
+# the proof below was redone on the sources of this tree that day, not copied.
+#
+# Who depends on it: `cargo tree --locked -i quick-xml@0.38.4` names one
+# crate, citationberg 0.7.0, on the path typst-library 0.15.1 → hayagriva
+# 0.10.1 → citationberg 0.7.0 → quick-xml 0.38.4. The core's own parser is
+# quick-xml 0.42.0, which both advisories do not touch (patched >= 0.41.0).
+#
+# What is vulnerable: RUSTSEC-2026-0194 – quadratic time in the duplicate-
+# attribute check of `BytesStart::attributes`; RUSTSEC-2026-0195 – unbounded
+# namespace allocation in `NsReader`. Both need XML handed to quick-xml.
+#
+# Where citationberg hands it XML: `quick_xml::de::Deserializer::from_str` in
+# four functions – `IndependentStyle::from_xml`, `DependentStyle::from_xml`,
+# `Style::from_xml` and `LocaleFile::from_xml` (citationberg src/lib.rs:274,
+# 330, 373, 3019–3020). Its other quick-xml use is the serializer (lib.rs:384,
+# 3031), which reads nothing.
+#
+# Who calls those: in typst-library, one place – `CslStyle::from_data`
+# (src/model/bibliography.rs:544–546), reached from `CslStyle::load` only for
+# `CslSource::Normal` (bibliography.rs:521–523), that is when the `style`
+# argument of `bibliography` (bibliography.rs:156–157) or `cite`
+# (src/model/cite.rs:100–102) is a path or bytes. Named, built-in styles take
+# `CslStyle::from_archived`, and hayagriva's archive is CBOR, not XML
+# (hayagriva src/csl/archive.rs:697, 1131, 1208). hayagriva's own `from_xml`
+# calls are in its tests (src/csl/mod.rs, after `#[cfg(test)]` at 3421), in a
+# doc comment (src/lib.rs:47–50) and in its binary (src/main.rs), which is
+# built only with its `cli` feature and not at all as a dependency.
+#
+# Why this crate never takes that path: no template names a bibliography or a
+# citation, the world serves the template and `/doc.json` and nothing else,
+# and the text of a document reaches Typst as JSON data, never as markup.
+#
+# Guard: cli/tests/quick_xml_guard.rs – it fails if any `.typ` file of the
+# crate names a bibliography, a citation, a reference or a way to read code or
+# files, if any Rust source names the citation crates or types, and if a
+# document whose text is such markup is not set as text word for word or makes
+# Typst ask the world for anything but /main.typ and /doc.json.
+#
+# Removed when citationberg publishes a release on quick-xml >= 0.41 and it
+# reaches this tree through hayagriva and typst-library. Reviewed – the proof
+# repeated on the new sources, not carried over – at every Typst release.
+[advisories]
+ignore = ["RUSTSEC-2026-0194", "RUSTSEC-2026-0195"]

@@ -72,6 +72,14 @@ allow = [
     # unmodified, so it asks nothing of Aruna's own source. Named here so that
     # stays a conscious fact rather than a discovery.
     "MPL-2.0",
+    # The typesetting engine of the PDF (specification 4.10), measured
+    # 2026-09-12 and brought into the core 2026-09-30. `ar_archive_writer`,
+    # a build dependency of `psm` under `stacker`, is Apache-2.0 with the LLVM
+    # exception – Apache-2.0 plus a permission, never a restriction.
+    "Apache-2.0 WITH LLVM-exception",
+    # `roman-numerals-rs`, under `typst-library`, offers `0BSD OR CC0-1.0`;
+    # zero-clause BSD is the one taken – MIT without even the notice clause.
+    "0BSD",
 ]
 
 # A licence expression this cannot read with 80 % confidence is worth a human
@@ -102,16 +110,32 @@ deny = []
 # its default, so an actual security advisory anywhere in the tree still fails.
 unmaintained = "workspace"
 
-# **No ignores, and that is deliberate.** The specification keeps the
-# `unmaintained` and `unsound` warnings visible on purpose: they are the
-# indicator that would otherwise be the first thing silenced when a real
-# vulnerability appears behind one of them. An advisory silenced in a config
-# file is an advisory nobody reads again.
+# **No ignores, and that is deliberate** – with one exception. The
+# specification keeps the `unmaintained` and `unsound` warnings visible on
+# purpose: they are the indicator that would otherwise be the first thing
+# silenced when a real vulnerability appears behind one of them. An advisory
+# silenced in a config file is an advisory nobody reads again.
 #
 # What reduces them here is the platform filter above, not an exception list —
 # most of them were reported against crates that only exist in the Linux and
 # Windows branches of this tree.
-ignore = []
+#
+# **The exception.** The owner's decision of 2026-09-27 (specification 5.1)
+# allows an advisory to be ignored only where the vulnerable code is proved
+# unreachable, with its reason, the condition that removes it, a review at
+# every Typst release and a guard; the decision of 2026-09-30 brought it to
+# `main` with the first commit of Typst. Two advisories meet it, both in
+# quick-xml 0.38.4 on the path typst-library 0.15.1 → hayagriva 0.10.1 →
+# citationberg 0.7.0, which only a CSL style given to a bibliography or a
+# citation as a path or bytes reaches; this crate opens no such path. The proof
+# with every file and line is in `.cargo/audit.toml`, which carries the same
+# exception for `cargo audit`; the guard is cli/tests/quick_xml_guard.rs.
+# Removed when citationberg releases on quick-xml >= 0.41 and that reaches this
+# tree; reviewed at every Typst release.
+ignore = [
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.38.4 via typst-library -> hayagriva -> citationberg: CSL parsing unreachable from this crate (owner's decisions 2026-09-27 and 2026-09-30, spec 5.1; proof in .cargo/audit.toml; guard cli/tests/quick_xml_guard.rs); remove when citationberg is on quick-xml >= 0.41" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.38.4 via typst-library -> hayagriva -> citationberg: CSL parsing unreachable from this crate (owner's decisions 2026-09-27 and 2026-09-30, spec 5.1; proof in .cargo/audit.toml; guard cli/tests/quick_xml_guard.rs); remove when citationberg is on quick-xml >= 0.41" },
+]
 
 [sources]
 # Everything comes from crates.io. A dependency pulled from a git remote or a

@@ -24,6 +24,23 @@ ureq = { version = "2.12", default-features = true, features = ["tls"] }
 # and a lock file resolved from a lower floor is one `cargo update` away from
 # picking a vulnerable version back up.
 zip = { version = "2.3", default-features = false, features = ["deflate"] }
+# The PDF of every document (specification 4.10; owner's decisions of
+# 2026-09-30, questions 2, 9 and 16 of the design note): the typesetting
+# engine, pinned exactly, in the core without a Cargo feature – one
+# configuration, paid once. krilla 0.8.2 comes through typst-pdf and is not
+# named here. The one line of the engine has to stand at one version (3.8).
+typst = "=0.15.1"
+typst-layout = "=0.15.1"
+typst-pdf = "=0.15.1"
+# In the working path, not only in checks: the marker's invisible text layer
+# and the ActualText wrappers of a repeated cluster are written by editing the
+# finished PDF (decisions of 2026-09-27 and 2026-09-28).
+lopdf = "=0.45.0"
+# The outlines of the main face for the letters of a marker (variant B).
+# Already in the tree through Typst; this names it. Not ttf-parser, also in the
+# tree: it carries an unmaintained advisory (RUSTSEC-2026-0192), which
+# cargo-deny rightly refuses for a direct dependency.
+skrifa = "=0.42.1"
 
 [features]
 # Opens `parse::fields` for measurement. Off by default and never enabled by the
