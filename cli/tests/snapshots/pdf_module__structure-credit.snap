@@ -1,0 +1,8 @@
+---
+source: cli/tests/pdf_module.rs
+expression: structure(&r.pdf)
+---
+info Title: credit
+info Keywords: aruna-pdf-template 1
+info Creator: Aruna {version}
+page 1: 595.28 × 841.89 pt, 136 glyphs, fonts LEFAKY+UllikummiA, QIGYIM+NotoSerif-Bold, SXVFKK+NotoSerif-Regular

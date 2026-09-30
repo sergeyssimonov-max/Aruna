@@ -29,6 +29,7 @@ pub mod md5;
 pub mod order;
 pub mod parse;
 pub mod paths;
+pub mod pdf;
 pub mod presentation;
 pub mod progress;
 pub mod sha256;

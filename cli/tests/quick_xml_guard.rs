@@ -19,23 +19,16 @@
 //!    CSL style and other files is set as text word for word, and Typst asks
 //!    the world for the template and the data and for nothing else.
 //!
-//! Test 3 builds its own minimal world, the shape of the one the trial proved
-//! (`/main.typ` and `/doc.json`, the document as JSON data): until the PDF
-//! module exists it guards the mechanism, not the product. When
-//! `aruna::pdf` lands it is re-pointed at the module's own renderer.
+//! Test 3 runs the product's renderer, `aruna::pdf::render`, and its world –
+//! `/main.typ` and `/doc.json`, the document as JSON data.
 
-use std::collections::BTreeSet;
+#[path = "support/pdf_check.rs"]
+mod pdf_check;
+
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
-use typst::diag::{FileError, FileResult};
-use typst::foundations::{Bytes, Datetime, Duration};
-use typst::layout::{Frame, FrameItem};
-use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
-use typst::text::{Font, FontBook};
-use typst::utils::LazyHash;
-use typst::{Library, LibraryExt, World};
-use typst_layout::PagedDocument;
+use aruna::document::Document;
+use aruna::pdf::{self, Fonts, Page};
 
 /// The words that open a path to CSL, or to markup read from data, in a
 /// template: a bibliography, a citation, a reference, a style file, and every
@@ -104,11 +97,11 @@ fn no_template_opens_a_path_to_a_csl_style() {
             path.display()
         );
     }
-    // The inline template of test 3 is held to the same words.
-    let inline = TEMPLATE.to_lowercase();
-    for word in FORBIDDEN_IN_TEMPLATE {
-        assert!(!inline.contains(word), "the test's template says {word:?}");
-    }
+    let product = crate_dir().join("src").join("pdf").join("template.typ");
+    assert!(
+        templates.contains(&product),
+        "the scan reaches the product's template"
+    );
 }
 
 #[test]
@@ -130,160 +123,43 @@ fn no_source_calls_the_citation_machinery() {
     }
 }
 
-/// The template of test 3: the document arrives as data and is set as text.
-const TEMPLATE: &str = r#"#let d = json("/doc.json")
-#set document(date: none)
-#set text(font: "Noto Serif", fallback: false)
-#for line in d.lines [#line \ ]
-"#;
-
-struct Guard {
-    library: LazyHash<Library>,
-    book: LazyHash<FontBook>,
-    fonts: Vec<Font>,
-    main_id: FileId,
-    data_id: FileId,
-    main: Source,
-    data: Bytes,
-    /// Every path Typst asked the world for, served or not.
-    asked: Mutex<BTreeSet<String>>,
-}
-
-fn file_id(p: &str) -> FileId {
-    RootedPath::new(VirtualRoot::Project, VirtualPath::new(p).expect("a path")).intern()
-}
-
-impl Guard {
-    fn ask(&self, id: FileId) {
-        self.asked
-            .lock()
-            .expect("an unpoisoned log")
-            .insert(format!("{:?}", id.vpath()));
-    }
-}
-
-impl World for Guard {
-    fn library(&self) -> &LazyHash<Library> {
-        &self.library
-    }
-    fn book(&self) -> &LazyHash<FontBook> {
-        &self.book
-    }
-    fn main(&self) -> FileId {
-        self.main_id
-    }
-    fn source(&self, id: FileId) -> FileResult<Source> {
-        self.ask(id);
-        if id == self.main_id {
-            Ok(self.main.clone())
-        } else {
-            Err(FileError::NotFound(PathBuf::from(
-                "only the template exists",
-            )))
-        }
-    }
-    fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.ask(id);
-        if id == self.data_id {
-            Ok(self.data.clone())
-        } else {
-            Err(FileError::NotFound(PathBuf::from("only doc.json exists")))
-        }
-    }
-    fn font(&self, index: usize) -> Option<Font> {
-        self.fonts.get(index).cloned()
-    }
-    fn today(&self, _offset: Option<Duration>) -> Option<Datetime> {
-        None
-    }
-}
-
-fn json_str(s: &str) -> String {
-    let mut out = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            c if u32::from(c) < 0x20 => out.push_str(&format!("\\u{:04x}", u32::from(c))),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
-fn text_of(frame: &Frame, out: &mut String) {
-    for (_, item) in frame.items() {
-        match item {
-            FrameItem::Group(group) => text_of(&group.frame, out),
-            FrameItem::Text(text) => out.push_str(&text.text),
-            _ => {}
-        }
-    }
-}
-
+/// Test 3 on the product's own renderer: a document whose text is markup
+/// that would load a bibliography, a CSL style and other files.
 #[test]
 fn markup_in_a_document_is_set_as_text() {
     let lines = [
         "#bibliography(\"x.bib\")",
         "#bibliography(\"x.bib\", style: \"/doc.json\")",
-        "@ref and #cite(<k>) and #ref(<k>)",
+        "@ref and #cite(&lt;k&gt;) and #ref(&lt;k&gt;)",
         "#import \"/doc.json\" #include \"/x.typ\" #read(\"/doc.json\")",
-        "$x^2$ *bold* _it_ `raw` <lab> = heading - item + item / term: x",
+        "$x^2$ *bold* _it_ `raw` &lt;lab&gt; = heading - item + item / term: x",
     ];
-    let dir = crate_dir().join("resources").join("fonts");
-    aruna::fonts::verify_dir(&dir).expect("the fonts are the files docs/FONTS.md records");
-    let data = std::fs::read(dir.join("NotoSerif-Regular.ttf")).expect("the main face");
-    let fonts: Vec<Font> = Font::iter(Bytes::new(data)).collect();
-    let main_id = file_id("/main.typ");
-    let json = format!(
-        "{{\"lines\":[{}]}}",
-        lines
-            .iter()
-            .map(|l| json_str(l))
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-    let world = Guard {
-        library: LazyHash::new(Library::default()),
-        book: LazyHash::new(FontBook::from_fonts(&fonts)),
-        fonts,
-        main_id,
-        data_id: file_id("/doc.json"),
-        main: Source::new(main_id, TEMPLATE.to_string()),
-        data: Bytes::new(json.into_bytes()),
-        asked: Mutex::new(BTreeSet::new()),
-    };
-    let warned = typst::compile::<PagedDocument>(&world);
-    let warnings: Vec<String> = warned
-        .warnings
-        .iter()
-        .map(|w| w.message.to_string())
-        .collect();
-    assert!(warnings.is_empty(), "{warnings:?}");
-    let document = warned.output.unwrap_or_else(|errors| {
-        panic!(
-            "{:?}",
-            errors
-                .iter()
-                .map(|e| e.message.to_string())
-                .collect::<Vec<_>>()
-        )
-    });
-    let asked = world.asked.lock().expect("an unpoisoned log").clone();
+    let body: String = lines.iter().map(|l| format!("<lb/> <w>{l}</w>")).collect();
+    let xml = format!("<?xml version=\"1.0\"?><AOxml><body><text>{body}</text></body></AOxml>");
+    let doc = Document::read(xml.as_bytes()).expect("a well-formed sample");
+    let fonts = Fonts::load(&crate_dir().join("resources").join("fonts"))
+        .expect("the fonts are the files docs/FONTS.md records");
+    let page = Page::of(&doc, "CTH 0", "KBo 0.1");
+    let r = pdf::render(&doc, "CTH 0", "KBo 0.1", "CTH 0/KBo 0.1.pdf", &fonts)
+        .unwrap_or_else(|e| panic!("the document is refused: {e}"));
     assert_eq!(
-        asked,
-        ["\"/doc.json\"", "\"/main.typ\""]
-            .into_iter()
-            .map(String::from)
-            .collect::<BTreeSet<_>>(),
-        "the world was asked for {asked:?}"
+        r.asked.iter().map(String::as_str).collect::<Vec<_>>(),
+        ["doc.json", "main.typ"],
+        "the world was asked for more than the template and the data"
     );
-    let mut set = String::new();
-    for page in document.pages() {
-        text_of(&page.frame, &mut set);
+    let want = pdf_check::cps(&pdf_check::expected_text(&page));
+    let tree = pdf_check::export_tree(&r.pdf).expect("tagged");
+    let got = pdf_check::cps(&pdf_check::tree_text(&tree.xml));
+    assert_eq!(
+        pdf_check::first_difference(&want, &got),
+        None,
+        "the text of the document came out changed"
+    );
+    for line in lines {
+        let line = line.replace("&lt;", "<").replace("&gt;", ">");
+        assert!(
+            page.texts().any(|t| t == line),
+            "{line:?} is not a line of the page"
+        );
     }
-    let want: String = lines.concat().chars().filter(|c| *c != ' ').collect();
-    let got: String = set.chars().filter(|c| *c != ' ').collect();
-    assert_eq!(got, want, "the text of the document came out changed");
 }

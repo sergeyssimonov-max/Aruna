@@ -54,3 +54,10 @@ required-features = ["bench"]
 
 [dev-dependencies]
 tempfile = "3"
+# Snapshots of the structure of a PDF – pages, sizes, metadata, fonts
+# (specification 6.9, golden files). Owner's decision of 2026-09-30 after the
+# selection of step 3 of «pdf-converter-2»: exact, without default features
+# (no colours, two packages). Run with INSTA_UPDATE=no in every check; a
+# snapshot is rewritten only by a deliberate local INSTA_UPDATE=always and
+# committed apart, with its reason.
+insta = { version = "=1.48.0", default-features = false }
