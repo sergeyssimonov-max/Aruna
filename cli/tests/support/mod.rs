@@ -379,6 +379,52 @@ impl<'a> Parser<'a> {
 // Archives
 // ---------------------------------------------------------------------------
 
+/// The archive, wherever this run keeps it.
+///
+/// Three names, in this order, and the second one is why this file exists as it
+/// does: `ARUNA_ZIP` is what a person passes and what the binary itself honours;
+/// `ARUNA_FIXTURE_ZIP` is what CI sets, because there the 71 MiB download lives
+/// in a cache directory outside the checkout. This suite used to read only the
+/// first, so the corpus job — which sets only the second, and sets
+/// `ARUNA_REQUIRE_FIXTURE=1` precisely so that a skip cannot pass — never ran a
+/// line of it, and the failure mode was silence rather than an error. Both are
+/// read here now, and `tests/integration.rs` reads the same pair. `tests/corpus.rs`
+/// and `tests/document_model.rs` each had their own copy of these two
+/// functions until 2026-10-01.
+pub fn corpus_archive() -> Option<PathBuf> {
+    for name in ["ARUNA_ZIP", "ARUNA_FIXTURE_ZIP"] {
+        if let Some(named) = std::env::var_os(name) {
+            return Some(PathBuf::from(named));
+        }
+    }
+    let default = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip");
+    default.is_file().then_some(default)
+}
+
+/// The archive, or a note saying why this test did nothing.
+pub fn required_corpus() -> Option<PathBuf> {
+    match corpus_archive() {
+        Some(path) if path.is_file() => Some(path),
+        other => {
+            assert!(
+                std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
+                "ARUNA_REQUIRE_FIXTURE is set but {other:?} is missing"
+            );
+            eprintln!("skipping: the corpus archive is not present");
+            None
+        }
+    }
+}
+
+/// A manuscript in the corpus's own shape, with the stylesheet instruction
+/// most of its documents open with.
+pub fn styled_manuscript(siglum: &str) -> String {
+    format!(
+        r#"<?xml-stylesheet href="HPMxml.css" type="text/css"?><AOxml xml:space="preserve"><AOHeader><docID>{siglum}</docID><meta><uebern editor="FB" date="2017-03-28"/></meta></AOHeader><body><text><l lg="Hit"/>text</text></body></AOxml>"#
+    )
+}
+
 /// A manuscript in the shape the corpus really has one.
 pub fn manuscript(siglum: &str, editor: &str, date: &str) -> String {
     format!(

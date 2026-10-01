@@ -15,12 +15,8 @@ use tempfile::tempdir;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
-/// A manuscript in the corpus's own shape.
-fn manuscript(siglum: &str) -> String {
-    format!(
-        r#"<?xml-stylesheet href="HPMxml.css" type="text/css"?><AOxml xml:space="preserve"><AOHeader><docID>{siglum}</docID><meta><uebern editor="FB" date="2017-03-28"/></meta></AOHeader><body><text><l lg="Hit"/>text</text></body></AOxml>"#
-    )
-}
+mod support;
+use support::styled_manuscript as manuscript;
 
 /// An archive with the awkward shapes the corpus really has: one group filed
 /// under two folders and not adjacent to itself, a siglum that repeats, and a

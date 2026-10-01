@@ -38,32 +38,8 @@ use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// The archive, wherever this run keeps it — the same three places
-/// `tests/corpus.rs` looks, in the same order.
-fn archive() -> Option<PathBuf> {
-    for name in ["ARUNA_ZIP", "ARUNA_FIXTURE_ZIP"] {
-        if let Some(named) = std::env::var_os(name) {
-            return Some(PathBuf::from(named));
-        }
-    }
-    let default = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip");
-    default.is_file().then_some(default)
-}
-
-fn required() -> Option<PathBuf> {
-    match archive() {
-        Some(path) if path.is_file() => Some(path),
-        other => {
-            assert!(
-                std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
-                "ARUNA_REQUIRE_FIXTURE is set but {other:?} is missing"
-            );
-            eprintln!("skipping: the corpus archive is not present");
-            None
-        }
-    }
-}
+mod support;
+use support::required_corpus as required;
 
 fn xsltproc_present() -> bool {
     let present = Command::new("xsltproc")

@@ -19,12 +19,8 @@ use tempfile::tempdir;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
-/// A manuscript with a chosen siglum, in the corpus's own shape.
-fn manuscript(siglum: &str) -> String {
-    format!(
-        r#"<?xml-stylesheet href="HPMxml.css" type="text/css"?><AOxml xml:space="preserve"><AOHeader><docID>{siglum}</docID><meta><uebern editor="FB" date="2017-03-28"/></meta></AOHeader><body><text><l lg="Hit"/>text</text></body></AOxml>"#
-    )
-}
+mod support;
+use support::styled_manuscript as manuscript;
 
 /// An archive of `(entry name, body)`, stored uncompressed.
 fn archive(dir: &Path, entries: &[(&str, Vec<u8>)]) -> PathBuf {

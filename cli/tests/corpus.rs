@@ -24,7 +24,9 @@
 use aruna::export::{normalize_into, verify};
 use aruna::parse::{entry_name, is_manuscript_xml, looks_like_manuscript, HEADER_READ_LIMIT};
 use std::io::Read as _;
-use std::path::PathBuf;
+
+mod support;
+use support::required_corpus as required;
 
 /// What TLHdig Beta 0.3 holds.
 const DOCUMENTS: usize = 23_936;
@@ -43,43 +45,6 @@ const TAGS_DO_NOT_BALANCE: usize = 121;
 /// above: it says a renderer will meet decomposed diacritics in this many
 /// documents and had better place marks itself.
 const NOT_NFC: usize = 78;
-
-/// The archive, wherever this run keeps it.
-///
-/// Three names, in this order, and the second one is why this file exists as it
-/// does: `ARUNA_ZIP` is what a person passes and what the binary itself honours;
-/// `ARUNA_FIXTURE_ZIP` is what CI sets, because there the 71 MiB download lives
-/// in a cache directory outside the checkout. This suite used to read only the
-/// first, so the corpus job — which sets only the second, and sets
-/// `ARUNA_REQUIRE_FIXTURE=1` precisely so that a skip cannot pass — never ran a
-/// line of it, and the failure mode was silence rather than an error. Both are
-/// read here now, and `tests/integration.rs` reads the same pair.
-fn archive() -> Option<PathBuf> {
-    for name in ["ARUNA_ZIP", "ARUNA_FIXTURE_ZIP"] {
-        if let Some(named) = std::env::var_os(name) {
-            return Some(PathBuf::from(named));
-        }
-    }
-    let default = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip");
-    default.is_file().then_some(default)
-}
-
-/// The archive, or a note saying why this test did nothing.
-fn required() -> Option<PathBuf> {
-    match archive() {
-        Some(path) if path.is_file() => Some(path),
-        other => {
-            assert!(
-                std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
-                "ARUNA_REQUIRE_FIXTURE is set but {:?} is missing",
-                other
-            );
-            eprintln!("skipping: the corpus archive is not present");
-            None
-        }
-    }
-}
 
 #[test]
 fn the_whole_corpus_normalises_without_distortion_and_the_archive_is_not_written_to() {
