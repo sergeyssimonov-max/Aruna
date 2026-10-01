@@ -488,22 +488,48 @@ pub fn render_manifest(
         string(crate::paths::OUTPUT_FILE_NAME)
     );
 
-    // What the PDF phase did, when there was one (owner's decisions of
-    // 2026-09-30, questions 1, 3 and 13): the template every PDF names, and
-    // the tally. Each document says its own below.
     if let Some(states) = pdfs {
-        let built = states.iter().filter(|s| s.built().is_some()).count();
-        let _ = writeln!(out, "  \"pdfs\": {{");
-        let _ = writeln!(
-            out,
-            "    \"template\": {},",
-            string(crate::pdf::TEMPLATE_VERSION)
-        );
-        let _ = writeln!(out, "    \"built\": {built},");
-        let _ = writeln!(out, "    \"refused\": {}", states.len() - built);
-        out.push_str("  },\n");
+        render_pdfs(&mut out, states);
     }
+    render_source(&mut out, source);
+    let _ = writeln!(out, "  \"counts\": {{");
+    let _ = writeln!(out, "    \"groups\": {groups},");
+    let _ = writeln!(out, "    \"documents\": {}", placed.len());
+    out.push_str("  },\n");
 
+    render_normalisation(&mut out, normalisation);
+    render_fonts(&mut out, fonts);
+    // Which CTH titles the inventory shows, where they come from and on what
+    // terms. The counts are per group, over the six statuses of
+    // `cth_titles::Match`, in a fixed order so that two packages compare by
+    // `diff`; the groups that did not get their own title are named.
+    render_cth_titles(&mut out, records);
+
+    render_xml(&mut out, xml);
+    render_groups(&mut out, records, placed, groups, pdfs);
+    out.push_str("  ]\n}\n");
+    out
+}
+
+/// What the PDF phase did, when there was one (owner's decisions of
+/// 2026-09-30, questions 1, 3 and 13): the template every PDF names, and
+/// the tally. Each document says its own below.
+fn render_pdfs(out: &mut String, states: &[super::PdfState]) {
+    let built = states.iter().filter(|s| s.built().is_some()).count();
+    let _ = writeln!(out, "  \"pdfs\": {{");
+    let _ = writeln!(
+        out,
+        "    \"template\": {},",
+        string(crate::pdf::TEMPLATE_VERSION)
+    );
+    let _ = writeln!(out, "    \"built\": {built},");
+    let _ = writeln!(out, "    \"refused\": {}", states.len() - built);
+    out.push_str("  },\n");
+}
+
+/// Where the documents came from: the edition, the digest of the archive,
+/// and the entries named like a manuscript that are not one.
+fn render_source(out: &mut String, source: &Source<'_>) {
     let _ = writeln!(out, "  \"source\": {{");
     let _ = writeln!(out, "    \"label\": {},", string(source.label));
     let _ = writeln!(out, "    \"archive_md5\": {},", string(source.archive_md5));
@@ -531,15 +557,12 @@ pub fn render_manifest(
         out.push_str("\n      ");
     }
     out.push_str("]\n    }\n  },\n");
+}
 
-    let _ = writeln!(out, "  \"counts\": {{");
-    let _ = writeln!(out, "    \"groups\": {groups},");
-    let _ = writeln!(out, "    \"documents\": {}", placed.len());
-    out.push_str("  },\n");
-
-    // What the normaliser was permitted to do, and what it actually did. A
-    // converter reading a document can tell an added declaration from one the
-    // corpus wrote.
+/// What the normaliser was permitted to do, and what it actually did. A
+/// converter reading a document can tell an added declaration from one the
+/// corpus wrote.
+fn render_normalisation(out: &mut String, normalisation: &BTreeMap<String, usize>) {
     out.push_str("  \"normalisation\": {\n");
     out.push_str("    \"permitted\": [\n");
     let permitted = permitted();
@@ -557,12 +580,14 @@ pub fn render_manifest(
         );
     }
     out.push_str("    }\n  },\n");
+}
 
-    // The font contract: the coverage the corpus demands, and the one font the
-    // package carries because its pages cannot be read without it. Both claims
-    // are about this package, so both are checked against it —
-    // `tests/package_pages.rs` reads this block back and compares it with the
-    // files actually placed.
+/// The font contract: the coverage the corpus demands, and the one font the
+/// package carries because its pages cannot be read without it. Both claims
+/// are about this package, so both are checked against it —
+/// `tests/package_pages.rs` reads this block back and compares it with the
+/// files actually placed.
+fn render_fonts(out: &mut String, fonts: &FontContract) {
     out.push_str("  \"fonts\": {\n");
     out.push_str("    \"files_included\": true,\n");
     let _ = writeln!(
@@ -613,20 +638,16 @@ pub fn render_manifest(
         );
     }
     out.push_str("    }\n  },\n");
+}
 
-    // Which CTH titles the inventory shows, where they come from and on what
-    // terms. The counts are per group, over the six statuses of
-    // `cth_titles::Match`, in a fixed order so that two packages compare by
-    // `diff`; the groups that did not get their own title are named.
-    render_cth_titles(&mut out, records);
-
-    // Which documents this program could not read, which ones break a standard,
-    // and why. Placed above the
-    // groups because it is a summary and the groups are eight megabytes of
-    // list; a reader opening this file sees the counts without scrolling.
-    //
-    // Only the documents with a finding are listed. Naming the 23 730 that are
-    // fine would triple the file to say nothing.
+/// Which documents this program could not read, which ones break a standard,
+/// and why. Placed above the
+/// groups because it is a summary and the groups are eight megabytes of
+/// list; a reader opening this file sees the counts without scrolling.
+///
+/// Only the documents with a finding are listed. Naming the 23 730 that are
+/// fine would triple the file to say nothing.
+fn render_xml(out: &mut String, xml: &XmlReport) {
     out.push_str("  \"xml\": {\n");
     let _ = writeln!(
         out,
@@ -683,16 +704,21 @@ pub fn render_manifest(
         let _ = writeln!(out, "      }}{}", comma(i, xml.findings.len()));
     }
     out.push_str("    ],\n");
+    render_beyond(out, xml);
+    render_totals(out, xml);
+    out.push_str("    }\n  },\n");
+}
 
-    // The other half of the same question, and the half that went uncounted
-    // from August until 2026-09-10.
-    //
-    // These documents are *not* in the list above: this parser accepts them.
-    // They are here because a reader who checks the package with `xmllint` will
-    // otherwise find seventeen documents blamed that the manifest calls fine,
-    // and will have no way to tell a known limit from a defect in this program.
-    // Same shape as the list above — file, class, line, column — so the two can
-    // be read together.
+/// The other half of the same question, and the half that went uncounted
+/// from August until 2026-09-10.
+///
+/// These documents are *not* in the list above: this parser accepts them.
+/// They are here because a reader who checks the package with `xmllint` will
+/// otherwise find seventeen documents blamed that the manifest calls fine,
+/// and will have no way to tell a known limit from a defect in this program.
+/// Same shape as the list above — file, class, line, column — so the two can
+/// be read together.
+fn render_beyond(out: &mut String, xml: &XmlReport) {
     out.push_str("    \"beyond_this_parser\": {\n");
     let _ = writeln!(
         out,
@@ -726,15 +752,17 @@ pub fn render_manifest(
     }
     out.push_str("      ]\n");
     out.push_str("    },\n");
+}
 
-    // Three numbers a reader will otherwise have to derive, each with the
-    // sentence that says what it counts.
-    //
-    // They are written out because they were being derived wrongly. Until
-    // 2026-09-10 this file published one of them, 206, beside a sentence about
-    // four documents, and the other two existed only in `docs/XML-CONTRACT.md`
-    // as the output of a command nobody re-ran. Every number here is computed
-    // by the run that wrote the file, from the two lists above.
+/// Three numbers a reader will otherwise have to derive, each with the
+/// sentence that says what it counts.
+///
+/// They are written out because they were being derived wrongly. Until
+/// 2026-09-10 this file published one of them, 206, beside a sentence about
+/// four documents, and the other two existed only in `docs/XML-CONTRACT.md`
+/// as the output of a command nobody re-ran. Every number here is computed
+/// by the run that wrote the file, from the two lists above.
+fn render_totals(out: &mut String, xml: &XmlReport) {
     out.push_str("    \"totals\": {\n");
     let totals: [(&str, usize, &str); 3] = [
         (
@@ -766,10 +794,17 @@ pub fn render_manifest(
         let _ = writeln!(out, "        \"means\": {}", string(means));
         let _ = writeln!(out, "      }}{}", comma(i, totals.len()));
     }
-    out.push_str("    }\n  },\n");
+}
 
-    // The groups, in the order the inventory lists them — which is the order a
-    // table of contents wants.
+/// The groups, in the order the inventory lists them — which is the order a
+/// table of contents wants.
+fn render_groups(
+    out: &mut String,
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    groups: usize,
+    pdfs: Option<&[super::PdfState]>,
+) {
     out.push_str("  \"groups\": [\n");
     let mut index = 0usize;
     for (g, (label, run, slice)) in super::group_slices(records, placed).enumerate() {
@@ -794,26 +829,7 @@ pub fn render_manifest(
                 "          \"href\": {},",
                 string(&href(&place.relative))
             );
-            // This document's PDF: its path when it was built, why not when it
-            // was refused, nothing when the build made no PDFs. The path is
-            // `naming::pdf_path`, the one naming rule for it.
-            match pdfs.and_then(|states| states.get(index)) {
-                Some(super::PdfState::Built(pdf)) => {
-                    let _ = writeln!(
-                        out,
-                        "          \"pdf\": {},",
-                        string(&pdf.to_string_lossy())
-                    );
-                }
-                Some(super::PdfState::Refused(reason)) => {
-                    let _ = writeln!(
-                        out,
-                        "          \"pdf\": {{ \"refused\": {} }},",
-                        string(reason)
-                    );
-                }
-                None => {}
-            }
+            render_pdf_field(out, pdfs.and_then(|states| states.get(index)));
             index += 1;
             let _ = writeln!(out, "          \"lang\": {},", string(&record.lang));
             let _ = writeln!(out, "          \"corpus\": {},", string(&record.corpus));
@@ -825,8 +841,29 @@ pub fn render_manifest(
         out.push_str("      ]\n");
         let _ = writeln!(out, "    }}{}", comma(g, groups));
     }
-    out.push_str("  ]\n}\n");
-    out
+}
+
+/// This document's PDF: its path when it was built, why not when it was
+/// refused, nothing when the build made no PDFs. The path is
+/// `naming::pdf_path`, the one naming rule for it.
+fn render_pdf_field(out: &mut String, state: Option<&super::PdfState>) {
+    match state {
+        Some(super::PdfState::Built(pdf)) => {
+            let _ = writeln!(
+                out,
+                "          \"pdf\": {},",
+                string(&pdf.to_string_lossy())
+            );
+        }
+        Some(super::PdfState::Refused(reason)) => {
+            let _ = writeln!(
+                out,
+                "          \"pdf\": {{ \"refused\": {} }},",
+                string(reason)
+            );
+        }
+        None => {}
+    }
 }
 
 /// The permit list, as the manifest states it.
