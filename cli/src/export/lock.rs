@@ -277,9 +277,10 @@ fn busy_after(started: Instant, wait: Duration, path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Whether `path` names the file `file` has open.
+/// Whether `path` names the file `file` has open: the same device and inode.
+/// The staging marker asks the same question of its own lock.
 #[cfg(unix)]
-fn same_file(file: &fs::File, path: &Path) -> bool {
+pub(super) fn same_file(file: &fs::File, path: &Path) -> bool {
     use std::os::unix::fs::MetadataExt as _;
     match (file.metadata(), fs::symlink_metadata(path)) {
         (Ok(held), Ok(named)) => held.dev() == named.dev() && held.ino() == named.ino(),

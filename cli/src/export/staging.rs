@@ -282,8 +282,6 @@ impl Owner {
     const ATTEMPTS: u32 = 8;
 
     fn claim(path: PathBuf) -> Option<Self> {
-        use std::os::unix::fs::MetadataExt as _;
-
         for _ in 0..Self::ATTEMPTS {
             let Ok(file) = File::options()
                 .write(true)
@@ -309,11 +307,8 @@ impl Owner {
             // run creating the file and locking it, and a lock on a file no
             // longer at the path protects nothing. The same inode at the path
             // is the claim; anything else is another attempt.
-            let held = file.metadata().map(|m| (m.dev(), m.ino()));
-            let named = fs::symlink_metadata(&path).map(|m| (m.dev(), m.ino()));
-            match (held, named) {
-                (Ok(a), Ok(b)) if a == b => return Some(Self { path, _file: file }),
-                _ => continue,
+            if super::lock::same_file(&file, &path) {
+                return Some(Self { path, _file: file });
             }
         }
         None

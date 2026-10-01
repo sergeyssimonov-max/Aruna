@@ -350,6 +350,16 @@ pub struct PdfCount {
     pub refused: usize,
 }
 
+impl PdfCount {
+    fn of(states: &[PdfState]) -> Self {
+        let built = states.iter().filter(|s| s.built().is_some()).count();
+        PdfCount {
+            built,
+            refused: states.len() - built,
+        }
+    }
+}
+
 /// [`build_with`] without PDFs: the package of XML documents, the inventory
 /// and the manifest, byte for byte as before the PDF phase existed.
 pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) -> Result<Built> {
@@ -391,37 +401,12 @@ pub fn build_with(
 
     validate::check_destination(&final_root)?;
 
-    job.report(Event::ReadingHeaders);
-    // **One open file for the whole build, and every answer taken from it.**
-    // The two passes used to open the path themselves and the digest opened it
-    // a third time, so three reads of "the archive" were three reads of
-    // whatever that path named at the moment each of them looked. Replace the
-    // file between them — a corpus re-downloaded beside a running build, a
-    // sync service finishing its work — and the manifest names an archive the
-    // package was not built from, which is the one thing the digest is in the
-    // manifest to rule out. Nothing here notices, and nothing fails: the
-    // reader gets a package that states its own provenance wrongly.
-    //
-    // A handle is the only thing that survives that. The path is named once,
-    // and the bytes hashed below are the bytes the entries are read from
-    // afterwards because there is no second file to be read from.
-    let mut file = crate::archive::open_zip_file(zip)?;
-    // The archive this package was built from, named in the manifest so a
-    // reader can tell which edition of the corpus they are looking at.
-    //
-    // Hashed before the central directory is parsed, which moves one refusal
-    // later than it used to stand: an archive whose trailer lies about its
-    // entry count is now read through once before the directory it declares is
-    // counted and refused. That is a read of a local file and no allocation —
-    // the ceiling exists to stop a million records being built in memory, and
-    // that half still happens before the parse.
-    let archive_digest = crate::md5::md5_stream(&mut file).map_err(ArunaError::io(zip))?;
-    let mut archive = crate::archive::zip_from_handle(file, zip)?;
-    let (mut fragments, not_manuscripts) = collect_fragments_from(&mut archive, job)?;
-    job.report(Event::HeadersRead {
-        manuscripts: fragments.len(),
-        groups: distinct_groups(&fragments),
-    });
+    let Headers {
+        mut archive,
+        digest: archive_digest,
+        mut fragments,
+        not_manuscripts,
+    } = read_headers(zip, job)?;
     sort_by_display_order(&mut fragments, |f| &f.record);
     let placed = place(&fragments)?;
     let disambiguated = placed
@@ -478,33 +463,138 @@ pub fn build_with(
             job,
         )?),
     };
-    let built_pdfs: Option<Vec<bool>> = pdfs
-        .as_ref()
-        .map(|states| states.iter().map(|s| s.built().is_some()).collect());
+    write_inventory(
+        staging.path(),
+        &records,
+        &placed,
+        source_label,
+        pdfs.as_deref(),
+    )?;
+    write_root_files(staging.path())?;
+    write_manifest(
+        staging.path(),
+        &records,
+        &placed,
+        &manifest::Source {
+            label: source_label,
+            archive_md5: &archive_digest,
+            not_manuscripts: &not_manuscripts,
+        },
+        &tallies,
+        pdfs.as_deref(),
+    )?;
 
-    // What every document shows, decided once. Both pages are written from
-    // this and neither re-derives a name, a link or a fact of its own — see
-    // [`crate::presentation`].
+    // Validation reads back everything just written; a run cancelled during
+    // the write should not spend six more seconds proving it was written.
+    job.check(Phase::Validating)?;
+    job.report(Event::CheckingPackage);
+    let staged = validate_with(staging.path(), &records, &placed, pdfs.as_deref())?;
+
+    let published = publish(
+        destination,
+        final_root,
+        staging,
+        &records,
+        &placed,
+        pdfs.as_deref(),
+        staged,
+        job,
+    )?;
+
+    Ok(Built {
+        groups: crate::parse::group_runs(&records).count(),
+        documents: placed.len(),
+        fragment_links: published.fragment_links,
+        disambiguated,
+        stylesheet_dropped,
+        pdfs: pdfs.as_deref().map(PdfCount::of),
+    })
+}
+
+/// What pass 1 hands on: the archive, still open, its MD5, every fragment the
+/// gates accept and the entries named like a manuscript that are not one.
+struct Headers {
+    archive: ZipArchive<BufReader<File>>,
+    digest: String,
+    fragments: Vec<Fragment>,
+    not_manuscripts: Vec<String>,
+}
+
+/// Pass 1 and the archive's digest, from one open file.
+fn read_headers(zip: &Path, job: &Job<'_>) -> Result<Headers> {
+    job.report(Event::ReadingHeaders);
+    // **One open file for the whole build, and every answer taken from it.**
+    // The two passes used to open the path themselves and the digest opened it
+    // a third time, so three reads of "the archive" were three reads of
+    // whatever that path named at the moment each of them looked. Replace the
+    // file between them — a corpus re-downloaded beside a running build, a
+    // sync service finishing its work — and the manifest names an archive the
+    // package was not built from, which is the one thing the digest is in the
+    // manifest to rule out. Nothing here notices, and nothing fails: the
+    // reader gets a package that states its own provenance wrongly.
     //
-    // Written and let go in one block, the page and the manifest alike: the
-    // checks below read both back from disk, and nothing after the write reads
-    // the strings. Held to the end of the function they sat beside the
-    // validation's own sets for the whole of both read-backs — 14 MB of text
-    // on the real corpus that nobody would look at again.
+    // A handle is the only thing that survives that. The path is named once,
+    // and the bytes hashed below are the bytes the entries are read from
+    // afterwards because there is no second file to be read from.
+    let mut file = crate::archive::open_zip_file(zip)?;
+    // The archive this package was built from, named in the manifest so a
+    // reader can tell which edition of the corpus they are looking at.
+    //
+    // Hashed before the central directory is parsed, which moves one refusal
+    // later than it used to stand: an archive whose trailer lies about its
+    // entry count is now read through once before the directory it declares is
+    // counted and refused. That is a read of a local file and no allocation —
+    // the ceiling exists to stop a million records being built in memory, and
+    // that half still happens before the parse.
+    let archive_digest = crate::md5::md5_stream(&mut file).map_err(ArunaError::io(zip))?;
+    let mut archive = crate::archive::zip_from_handle(file, zip)?;
+    let (fragments, not_manuscripts) = collect_fragments_from(&mut archive, job)?;
+    job.report(Event::HeadersRead {
+        manuscripts: fragments.len(),
+        groups: distinct_groups(&fragments),
+    });
+    Ok(Headers {
+        archive,
+        digest: archive_digest,
+        fragments,
+        not_manuscripts,
+    })
+}
+
+/// What every document shows, decided once. Both pages are written from
+/// this and neither re-derives a name, a link or a fact of its own — see
+/// [`crate::presentation`].
+///
+/// Written and let go in one block, the page and the manifest alike: the
+/// checks below read both back from disk, and nothing after the write reads
+/// the strings. Held to the end of the function they sat beside the
+/// validation's own sets for the whole of both read-backs — 14 MB of text
+/// on the real corpus that nobody would look at again.
+fn write_inventory(
+    root: &Path,
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    source_label: &str,
+    pdfs: Option<&[PdfState]>,
+) -> Result<()> {
+    let built_pdfs: Option<Vec<bool>> =
+        pdfs.map(|states| states.iter().map(|s| s.built().is_some()).collect());
     {
-        let corpus =
-            crate::presentation::CorpusPresentation::linked(&records, &placed, source_label)
-                .with_pdfs(&placed, built_pdfs.as_deref());
+        let corpus = crate::presentation::CorpusPresentation::linked(records, placed, source_label)
+            .with_pdfs(placed, built_pdfs.as_deref());
         let html = crate::html::render_linked_html(&corpus, "");
-        let inventory = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
+        let inventory = root.join(crate::paths::OUTPUT_FILE_NAME);
         fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
     }
+    Ok(())
+}
 
-    // The font the page needs and the terms it travels under, written from the
-    // bytes compiled into this binary so that the console program and the
-    // window produce the same package. Unmodified, both of them: the terms
-    // forbid distributing a changed file, and `fonts::tests` holds these bytes
-    // against the ones on disk.
+/// The font the page needs and the terms it travels under, written from the
+/// bytes compiled into this binary so that the console program and the
+/// window produce the same package. Unmodified, both of them: the terms
+/// forbid distributing a changed file, and `fonts::tests` holds these bytes
+/// against the ones on disk.
+fn write_root_files(root: &Path) -> Result<()> {
     for (name, bytes) in [
         (
             crate::fonts::PACKAGED_FONT,
@@ -522,34 +612,52 @@ pub fn build_with(
             crate::cth_titles::PACKAGED_TERMS_BYTES,
         ),
     ] {
-        let path = staging.path().join(name);
+        let path = root.join(name);
         fs::write(&path, bytes).map_err(ArunaError::io(path))?;
     }
+    Ok(())
+}
 
+/// The manifest, from the same two slices the inventory is written from.
+fn write_manifest(
+    root: &Path,
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    source: &manifest::Source<'_>,
+    tallies: &Tallies,
+    pdfs: Option<&[PdfState]>,
+) -> Result<()> {
     {
         let manifest_json = manifest::render_manifest(
-            &records,
-            &placed,
-            &manifest::Source {
-                label: source_label,
-                archive_md5: &archive_digest,
-                not_manuscripts: &not_manuscripts,
-            },
+            records,
+            placed,
+            source,
             &tallies.applied,
             &tallies.fonts,
             &tallies.xml,
-            pdfs.as_deref(),
+            pdfs,
         );
-        let manifest_path = staging.path().join(MANIFEST);
+        let manifest_path = root.join(MANIFEST);
         fs::write(&manifest_path, &manifest_json).map_err(ArunaError::io(manifest_path))?;
     }
+    Ok(())
+}
 
-    // Validation reads back everything just written; a run cancelled during
-    // the write should not spend six more seconds proving it was written.
-    job.check(Phase::Validating)?;
-    job.report(Event::CheckingPackage);
-    let staged = validate_with(staging.path(), &records, &placed, pdfs.as_deref())?;
-
+/// Publication: the destination checked again under the lock, the package
+/// already there moved aside, the staged one renamed into place and read back
+/// – and the reader's copy let go only once the read-back equals what was
+/// checked before.
+#[allow(clippy::too_many_arguments)]
+fn publish(
+    destination: &Path,
+    final_root: PathBuf,
+    staging: Staging,
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    pdfs: Option<&[PdfState]>,
+    staged: Validation,
+    job: &Job<'_>,
+) -> Result<Validation> {
     // Only now does it get the name. The package already there is moved aside
     // first, and put back if the publish fails.
     // The last moment at which stopping costs the reader nothing. Past this
@@ -581,7 +689,7 @@ pub fn build_with(
     previous.published();
 
     job.report(Event::CheckingPublished);
-    let published = validate_with(&final_root, &records, &placed, pdfs.as_deref())?;
+    let published = validate_with(&final_root, records, placed, pdfs)?;
 
     // Опубликованное обязано совпасть с собранным – и проверяется это здесь,
     // пока копия читателя еще в `Replaced`, и отказом, а не паникой. Стоял тут
@@ -606,20 +714,7 @@ pub fn build_with(
         job.report(Event::PreviousPackageLeft { path: &left });
     }
 
-    Ok(Built {
-        groups: crate::parse::group_runs(&records).count(),
-        documents: placed.len(),
-        fragment_links: published.fragment_links,
-        disambiguated,
-        stylesheet_dropped,
-        pdfs: pdfs.map(|states| {
-            let built = states.iter().filter(|s| s.built().is_some()).count();
-            PdfCount {
-                built,
-                refused: states.len() - built,
-            }
-        }),
-    })
+    Ok(published)
 }
 
 /// Pass 1: every entry the corpus's own gates accept, as a record and a path.
@@ -732,26 +827,7 @@ fn write_documents(
     tallies: &mut Tallies,
     job: &Job<'_>,
 ) -> Result<u64> {
-    // **One slot per entry name, and the archive is held to it here.**
-    //
-    // `collect` on a map keeps the last value for a repeated key, so an archive
-    // with two entries of the same name used to lose one of the two places
-    // `place` had reserved. Both entries then resolved to the surviving path:
-    // the first write took it, the second met `create_new` and failed as
-    // `AlreadyExists` on a path — an I/O error that named the destination and
-    // said nothing about the archive that caused it, three hundred lines away.
-    // Inserting one at a time turns that into a sentence about the archive.
-    let mut wanted: HashMap<&str, &Path> = HashMap::with_capacity(fragments.len());
-    for (fragment, placement) in fragments.iter().zip(placed) {
-        if wanted
-            .insert(fragment.source.as_str(), placement.relative.as_path())
-            .is_some()
-        {
-            return Err(ArunaError::ArchiveDuplicateEntry {
-                entry: fragment.source.clone(),
-            });
-        }
-    }
+    let wanted = slots(fragments, placed)?;
 
     let mut written = 0usize;
     // The package's own size, accumulated as it is written rather than measured
@@ -764,8 +840,7 @@ fn write_documents(
     let mut normalised = Vec::new();
     // See the write below: the directory this loop made last, and every one it
     // made, with the first document it made it for.
-    let mut last_dir: Option<PathBuf> = None;
-    let mut made: HashMap<PathBuf, String> = HashMap::new();
+    let mut dirs = Dirs::default();
     // Every document the normalisation check refused, in archive order. The
     // build stops on them all the same, but after looking at every one, so the
     // reader hears of each in one run rather than one per run.
@@ -788,22 +863,8 @@ fn write_documents(
             continue;
         };
 
-        bytes.clear();
-        // One byte past the limit is read on purpose: it is what tells a
-        // document that fits from one that does not, and it bounds the read
-        // whatever the entry claims its size to be.
         let name = entry_name(entry.name_raw(), entry.name()).to_string();
-        entry
-            .by_ref()
-            .take(MAX_DOCUMENT + 1)
-            .read_to_end(&mut bytes)
-            .map_err(ArunaError::io(relative))?;
-        if bytes.len() as u64 > MAX_DOCUMENT {
-            return Err(ArunaError::ExportDocumentTooLarge {
-                entry: name,
-                limit: MAX_DOCUMENT,
-            });
-        }
+        read_document(&mut entry, relative, &name, &mut bytes)?;
         normalised.clear();
         normalize::normalize_into(&bytes, &mut normalised);
 
@@ -847,52 +908,9 @@ fn write_documents(
 
         let out = staging.join(relative);
         if let Some(parent) = out.parent() {
-            // The last directory made, remembered. The archive lists a group's
-            // documents together, so 23 936 documents ask about 663
-            // directories — and `create_dir_all` on one that exists is still a
-            // syscall per document, measured at 219 ms of a six-second run.
-            //
-            // Only ever skips a directory this loop made itself, moments ago,
-            // inside a staging directory named for this process. A cache that
-            // is wrong is a cache that is stale, and there is nothing here to
-            // go stale against.
-            if last_dir.as_deref() != Some(parent) {
-                if !made.contains_key(parent) {
-                    // `create_dir`, not `_all`: a group's folder is one level
-                    // under staging, and one that already exists without this
-                    // loop having made it is a folder the disk takes for
-                    // another – APFS does not tell NFC from NFD. The documents
-                    // of two groups would merge into it silently.
-                    match fs::create_dir(parent) {
-                        Ok(()) => {}
-                        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-                            return Err(folder_twin_of(parent, &name, &made, relative));
-                        }
-                        Err(err) => return Err(ArunaError::io(parent)(err)),
-                    }
-                    made.insert(parent.to_path_buf(), name.clone());
-                }
-                last_dir = Some(parent.to_path_buf());
-            }
+            dirs.make(parent, &name, relative)?;
         }
-        // `create_new` rather than `create`: if anything ever computed the same
-        // path twice, the filesystem says so instead of the second silently
-        // replacing the first.
-        let mut handle = match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&out)
-        {
-            Ok(handle) => handle,
-            // The placement found no two names alike, and the filesystem found
-            // one: APFS does not tell NFC from NFD, and `collision_key` only
-            // folds case. That is a collision between two archive entries,
-            // not a disk failure, and it is named as one.
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-                return Err(twin_of(relative, &name, staging, fragments, placed));
-            }
-            Err(err) => return Err(ArunaError::io(&out)(err)),
-        };
+        let mut handle = create_document(&out, relative, &name, staging, fragments, placed)?;
         handle.write_all(&normalised).map_err(ArunaError::io(out))?;
         written += 1;
         if written.is_multiple_of(DOCUMENTS_PER_TICK) {
@@ -926,6 +944,126 @@ fn write_documents(
         });
     }
     Ok(package_bytes)
+}
+
+/// **One slot per entry name, and the archive is held to it here.**
+///
+/// `collect` on a map keeps the last value for a repeated key, so an archive
+/// with two entries of the same name used to lose one of the two places
+/// `place` had reserved. Both entries then resolved to the surviving path:
+/// the first write took it, the second met `create_new` and failed as
+/// `AlreadyExists` on a path — an I/O error that named the destination and
+/// said nothing about the archive that caused it, three hundred lines away.
+/// Inserting one at a time turns that into a sentence about the archive.
+fn slots<'a>(
+    fragments: &'a [Fragment],
+    placed: &'a [Placed],
+) -> Result<HashMap<&'a str, &'a Path>> {
+    let mut wanted: HashMap<&str, &Path> = HashMap::with_capacity(fragments.len());
+    for (fragment, placement) in fragments.iter().zip(placed) {
+        if wanted
+            .insert(fragment.source.as_str(), placement.relative.as_path())
+            .is_some()
+        {
+            return Err(ArunaError::ArchiveDuplicateEntry {
+                entry: fragment.source.clone(),
+            });
+        }
+    }
+    Ok(wanted)
+}
+
+/// One document's bytes, whole, into `bytes`.
+///
+/// One byte past the limit is read on purpose: it is what tells a document
+/// that fits from one that does not, and it bounds the read whatever the entry
+/// claims its size to be.
+fn read_document(entry: impl Read, relative: &Path, name: &str, bytes: &mut Vec<u8>) -> Result<()> {
+    bytes.clear();
+    entry
+        .take(MAX_DOCUMENT + 1)
+        .read_to_end(bytes)
+        .map_err(ArunaError::io(relative))?;
+    if bytes.len() as u64 > MAX_DOCUMENT {
+        return Err(ArunaError::ExportDocumentTooLarge {
+            entry: name.to_string(),
+            limit: MAX_DOCUMENT,
+        });
+    }
+    Ok(())
+}
+
+/// The group folders the write pass made: the last one, and every one with
+/// the first document it was made for.
+#[derive(Default)]
+struct Dirs {
+    last: Option<PathBuf>,
+    made: HashMap<PathBuf, String>,
+}
+
+impl Dirs {
+    /// The folder `parent` of the document `name`, made unless this pass made
+    /// it already.
+    fn make(&mut self, parent: &Path, name: &str, relative: &Path) -> Result<()> {
+        // The last directory made, remembered. The archive lists a group's
+        // documents together, so 23 936 documents ask about 663
+        // directories — and `create_dir_all` on one that exists is still a
+        // syscall per document, measured at 219 ms of a six-second run.
+        //
+        // Only ever skips a directory this loop made itself, moments ago,
+        // inside a staging directory named for this process. A cache that
+        // is wrong is a cache that is stale, and there is nothing here to
+        // go stale against.
+        if self.last.as_deref() != Some(parent) {
+            if !self.made.contains_key(parent) {
+                // `create_dir`, not `_all`: a group's folder is one level
+                // under staging, and one that already exists without this
+                // loop having made it is a folder the disk takes for
+                // another – APFS does not tell NFC from NFD. The documents
+                // of two groups would merge into it silently.
+                match fs::create_dir(parent) {
+                    Ok(()) => {}
+                    Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                        return Err(folder_twin_of(parent, name, &self.made, relative));
+                    }
+                    Err(err) => return Err(ArunaError::io(parent)(err)),
+                }
+                self.made.insert(parent.to_path_buf(), name.to_string());
+            }
+            self.last = Some(parent.to_path_buf());
+        }
+        Ok(())
+    }
+}
+
+/// The document's file, created new.
+///
+/// `create_new` rather than `create`: if anything ever computed the same path
+/// twice, the filesystem says so instead of the second silently replacing the
+/// first.
+fn create_document(
+    out: &Path,
+    relative: &Path,
+    name: &str,
+    staging: &Path,
+    fragments: &[Fragment],
+    placed: &[Placed],
+) -> Result<File> {
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(out)
+    {
+        Ok(handle) => Ok(handle),
+        // The placement found no two names alike, and the filesystem found
+        // one: APFS does not tell NFC from NFD, and `collision_key` only
+        // folds case. That is a collision between two archive entries,
+        // not a disk failure, and it is named as one.
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+            Err(twin_of(relative, name, staging, fragments, placed))
+        }
+        Err(err) => Err(ArunaError::io(out)(err)),
+    }
 }
 
 /// The collision behind a group folder the disk already had: which folder this
