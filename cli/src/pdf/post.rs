@@ -180,24 +180,7 @@ fn font_info(doc: &Document, dict: &lopdf::Dictionary) -> FontInfo {
         .map(<[u8]>::to_vec)
         .unwrap_or_default();
     if subtype != b"Type0" {
-        info.code_bytes = 1;
-        info.default_width = 0.0;
-        if subtype == b"Type3" {
-            if let Ok(m) = dict.get(b"FontMatrix").and_then(|o| o.as_array()) {
-                info.scale = m.first().map_or(0.001, number);
-            }
-        }
-        let first = dict.get(b"FirstChar").map_or(0.0, number) as u32;
-        if let Ok(w) = dict
-            .get(b"Widths")
-            .map(|o| deref(doc, o))
-            .and_then(|o| o.as_array())
-        {
-            for (k, v) in w.iter().enumerate() {
-                info.widths
-                    .insert((first + k as u32) as u16, number(deref(doc, v)));
-            }
-        }
+        simple_font(doc, dict, &subtype, &mut info);
     }
     info.base = dict
         .get(b"BaseFont")
@@ -223,39 +206,69 @@ fn font_info(doc: &Document, dict: &lopdf::Dictionary) -> FontInfo {
         .map(|o| deref(doc, o))
         .and_then(|o| o.as_dict().ok());
     if let Some(cid) = descendant {
-        if let Ok(dw) = cid.get(b"DW") {
-            info.default_width = number(deref(doc, dw));
-        }
-        if let Ok(w) = cid
-            .get(b"W")
-            .map(|o| deref(doc, o))
-            .and_then(|o| o.as_array())
-        {
-            let mut i = 0;
-            while i < w.len() {
-                let first = number(deref(doc, &w[i])) as u32;
-                match w.get(i + 1).map(|o| deref(doc, o)) {
-                    Some(Object::Array(list)) => {
-                        for (k, v) in list.iter().enumerate() {
-                            info.widths
-                                .insert((first + k as u32) as u16, number(deref(doc, v)));
-                        }
-                        i += 2;
-                    }
-                    Some(last) => {
-                        let last = number(last) as u32;
-                        let v = w.get(i + 2).map_or(0.0, |o| number(deref(doc, o)));
-                        for c in first..=last {
-                            info.widths.insert(c as u16, v);
-                        }
-                        i += 3;
-                    }
-                    None => break,
-                }
-            }
-        }
+        cid_widths(doc, cid, &mut info);
     }
     info
+}
+
+/// A simple font – here the Type3 font of the invisible layer: one byte per
+/// code, its own `FontMatrix`, widths from `FirstChar` on.
+fn simple_font(doc: &Document, dict: &lopdf::Dictionary, subtype: &[u8], info: &mut FontInfo) {
+    info.code_bytes = 1;
+    info.default_width = 0.0;
+    if subtype == b"Type3" {
+        if let Ok(m) = dict.get(b"FontMatrix").and_then(|o| o.as_array()) {
+            info.scale = m.first().map_or(0.001, number);
+        }
+    }
+    let first = dict.get(b"FirstChar").map_or(0.0, number) as u32;
+    if let Ok(w) = dict
+        .get(b"Widths")
+        .map(|o| deref(doc, o))
+        .and_then(|o| o.as_array())
+    {
+        for (k, v) in w.iter().enumerate() {
+            info.widths
+                .insert((first + k as u32) as u16, number(deref(doc, v)));
+        }
+    }
+}
+
+/// The widths of a CID font: `DW`, and `W` in both of its forms – a first
+/// code with a list, or a range with one width.
+fn cid_widths(doc: &Document, cid: &lopdf::Dictionary, info: &mut FontInfo) {
+    if let Ok(dw) = cid.get(b"DW") {
+        info.default_width = number(deref(doc, dw));
+    }
+    let Ok(w) = cid
+        .get(b"W")
+        .map(|o| deref(doc, o))
+        .and_then(|o| o.as_array())
+    else {
+        return;
+    };
+    let mut i = 0;
+    while i < w.len() {
+        let first = number(deref(doc, &w[i])) as u32;
+        match w.get(i + 1).map(|o| deref(doc, o)) {
+            Some(Object::Array(list)) => {
+                for (k, v) in list.iter().enumerate() {
+                    info.widths
+                        .insert((first + k as u32) as u16, number(deref(doc, v)));
+                }
+                i += 2;
+            }
+            Some(last) => {
+                let last = number(last) as u32;
+                let v = w.get(i + 2).map_or(0.0, |o| number(deref(doc, o)));
+                for c in first..=last {
+                    info.widths.insert(c as u16, v);
+                }
+                i += 3;
+            }
+            None => break,
+        }
+    }
 }
 
 type M = [f32; 6];
@@ -796,37 +809,14 @@ fn add_invisible_layer(
 ) -> Result<(), PdfError> {
     report.labels = sequence.len();
     let pages: Vec<ObjectId> = doc.get_pages().values().copied().collect();
-    // The label images of each page, in stream order.
-    let mut found: Vec<(ObjectId, i64, [f32; 6], [f32; 6])> = Vec::new();
-    for page in &pages {
-        let scan = scan_page(doc, *page)?;
-        for span in &scan.spans {
-            if let (Some(mcid), Some(c)) = (span.mcid, span.clip) {
-                if span.tag == "Span" && span.glyphs == 0 {
-                    let frame = [c[2] - c[0], 0.0, 0.0, c[3] - c[1], c[0], c[1]];
-                    found.push((*page, mcid, span.ctm, frame));
-                }
-            }
-        }
-    }
+    let found = label_images(doc, &pages)?;
     if found.len() != sequence.len() {
         return Err(PdfError::Invariant(Invariant::LabelsUnplaced {
             in_text: sequence.len(),
             in_file: found.len(),
         }));
     }
-    // One code per code point, as wide as its label, in thousandths of the
-    // size: a reader that assembles lines from geometry sees the glyph fill
-    // the label's place, as the letters of a text label did.
-    let mut cps: Vec<(u32, i64)> = sequence
-        .iter()
-        .map(|l| (l.cp, (l.width_em * 1000.0).round() as i64))
-        .collect();
-    cps.sort_unstable();
-    cps.dedup();
-    if cps.windows(2).any(|w| w[0].0 == w[1].0) {
-        return Err(broken("one code point, two label widths"));
-    }
+    let cps = layer_codes(sequence)?;
     let font = layer_font(doc, &cps);
     let code = |cp: u32| cps.iter().position(|c| c.0 == cp).map_or(0, |i| i + 1);
     let mut k = 0;
@@ -856,30 +846,7 @@ fn add_invisible_layer(
                 report.unmatched += 1;
                 continue;
             };
-            // Text of the size of the line, on its baseline, one glyph as
-            // wide as the image: a reader that assembles lines from
-            // geometry sees one more glyph of the line.
-            let h = frame[3];
-            let size = h / label.height_em;
-            let base = [
-                1.0,
-                0.0,
-                0.0,
-                1.0,
-                frame[4],
-                frame[5] + h * label.depth_share,
-            ];
-            let m = mul(base, inverse(at_open));
-            let layer = format!(
-                "\nq BT 3 Tr /ArunaLabel {size:.4} Tf {:.4} {:.4} {:.4} {:.4} {:.4} {:.4} Tm <{:02X}> Tj ET Q\n",
-                m[0],
-                m[1],
-                m[2],
-                m[3],
-                m[4],
-                m[5],
-                code(label.cp)
-            );
+            let layer = layer_text(at_open, frame, &label, code(label.cp));
             let end = at + needle.len();
             bytes.splice(end..end, layer.into_bytes());
         }
@@ -889,6 +856,65 @@ fn add_invisible_layer(
         return Err(PdfError::Invariant(Invariant::LabelSpans(report.unmatched)));
     }
     Ok(())
+}
+
+/// A label image as found: its page, MCID, the transformation where its
+/// span opens and its clip as a frame.
+type LabelImage = (ObjectId, i64, [f32; 6], [f32; 6]);
+
+/// The label images of each page, in stream order: a `/Span` with an MCID,
+/// a clip and no glyph.
+fn label_images(doc: &Document, pages: &[ObjectId]) -> Result<Vec<LabelImage>, PdfError> {
+    let mut found = Vec::new();
+    for page in pages {
+        let scan = scan_page(doc, *page)?;
+        for span in &scan.spans {
+            if let (Some(mcid), Some(c)) = (span.mcid, span.clip) {
+                if span.tag == "Span" && span.glyphs == 0 {
+                    let frame = [c[2] - c[0], 0.0, 0.0, c[3] - c[1], c[0], c[1]];
+                    found.push((*page, mcid, span.ctm, frame));
+                }
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// One code per code point, as wide as its label, in thousandths of the
+/// size: a reader that assembles lines from geometry sees the glyph fill the
+/// label's place, as the letters of a text label did.
+fn layer_codes(sequence: &[Label]) -> Result<Vec<(u32, i64)>, PdfError> {
+    let mut cps: Vec<(u32, i64)> = sequence
+        .iter()
+        .map(|l| (l.cp, (l.width_em * 1000.0).round() as i64))
+        .collect();
+    cps.sort_unstable();
+    cps.dedup();
+    if cps.windows(2).any(|w| w[0].0 == w[1].0) {
+        return Err(broken("one code point, two label widths"));
+    }
+    Ok(cps)
+}
+
+/// Text of the size of the line, on its baseline, one glyph as wide as the
+/// image: a reader that assembles lines from geometry sees one more glyph of
+/// the line.
+fn layer_text(at_open: [f32; 6], frame: [f32; 6], label: &Label, code: usize) -> String {
+    let h = frame[3];
+    let size = h / label.height_em;
+    let base = [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        frame[4],
+        frame[5] + h * label.depth_share,
+    ];
+    let m = mul(base, inverse(at_open));
+    format!(
+        "\nq BT 3 Tr /ArunaLabel {size:.4} Tf {:.4} {:.4} {:.4} {:.4} {:.4} {:.4} Tm <{:02X}> Tj ET Q\n",
+        m[0], m[1], m[2], m[3], m[4], m[5], code
+    )
 }
 
 use super::layout::combining;
@@ -903,74 +929,91 @@ use super::layout::combining;
 /// reads exactly that cluster, both are wrapped in one `/Span` whose
 /// `/ActualText` is the text of the first: what the source says, once.
 fn wrap_clusters(doc: &mut Document, report: &mut Patched) -> Result<(), PdfError> {
-    use lopdf::content::{Content, Operation};
-    use lopdf::StringFormat;
+    use lopdf::content::Content;
     let pages: Vec<(u32, ObjectId)> = doc.get_pages().into_iter().collect();
     for (n, page) in pages {
-        let scan = scan_page(doc, page)?;
-        let mut wraps: Vec<(usize, usize, String, i64, i64, String)> = Vec::new();
-        // Top-level spans with an MCID, in stream order: the pieces of text.
-        let pieces: Vec<&Span> = scan
-            .spans
-            .iter()
-            .filter(|s| s.mcid.is_some() && s.parent.is_none())
-            .collect();
-        for pair in pieces.windows(2) {
-            let (a, b) = (pair[0], pair[1]);
-            let t = &b.resolved;
-            let mut chars = t.chars();
-            // A cluster: one character and combining marks after it, or
-            // combining marks alone, at least one mark.
-            if chars.next().is_none() || !t.chars().any(combining) || !chars.all(combining) {
-                continue;
-            }
-            // The piece before already reads the whole cluster: through its
-            // own ActualText or through the ToUnicode of its base glyph.
-            if !a.resolved.ends_with(t.as_str()) {
-                continue;
-            }
-            let (Some(ma), Some(mb), Some(close)) = (a.mcid, b.mcid, b.close_op) else {
-                continue;
-            };
-            if wraps.last().is_some_and(|w| w.1 >= a.open_op) {
-                return Err(PdfError::Invariant(Invariant::ClustersOverlap {
-                    page: n,
-                    mcid: ma,
-                }));
-            }
-            wraps.push((a.open_op, close, a.resolved.clone(), ma, mb, t.clone()));
-        }
+        let wraps = repeats(&scan_page(doc, page)?, n)?;
         if wraps.is_empty() {
             continue;
         }
         let content = doc.get_page_content(page);
         let mut ops = Content::decode(&content).map_err(broken)?.operations;
-        for (open, close, text, ma, mb, cluster) in wraps.iter().rev() {
-            ops.insert(*close + 1, Operation::new("EMC", vec![]));
-            let mut props = lopdf::Dictionary::new();
-            let mut utf16 = vec![0xFE, 0xFF];
-            for u in text.encode_utf16() {
-                utf16.extend(u.to_be_bytes());
-            }
-            props.set(
-                "ActualText",
-                Object::String(utf16, StringFormat::Hexadecimal),
-            );
-            ops.insert(
-                *open,
-                Operation::new(
-                    "BDC",
-                    vec![Object::Name(b"Span".to_vec()), Object::Dictionary(props)],
-                ),
-            );
-            report
-                .clusters
-                .push((n as usize, *ma, *mb, cluster.clone(), text.clone()));
-        }
+        wrap(&mut ops, &wraps, n, report);
         let bytes = Content { operations: ops }.encode().map_err(broken)?;
         replace_content(only_stream(doc, page)?, bytes)?;
     }
     Ok(())
+}
+
+/// One cluster read twice: the operations that open the first piece and
+/// close the second, the text of the first, the two MCIDs, the cluster.
+type Repeat = (usize, usize, String, i64, i64, String);
+
+/// The pairs of neighbouring pieces of text on page `n` where the second
+/// reads a cluster the first already reads.
+fn repeats(scan: &PageScan, n: u32) -> Result<Vec<Repeat>, PdfError> {
+    let mut wraps: Vec<Repeat> = Vec::new();
+    // Top-level spans with an MCID, in stream order: the pieces of text.
+    let pieces: Vec<&Span> = scan
+        .spans
+        .iter()
+        .filter(|s| s.mcid.is_some() && s.parent.is_none())
+        .collect();
+    for pair in pieces.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        let t = &b.resolved;
+        let mut chars = t.chars();
+        // A cluster: one character and combining marks after it, or
+        // combining marks alone, at least one mark.
+        if chars.next().is_none() || !t.chars().any(combining) || !chars.all(combining) {
+            continue;
+        }
+        // The piece before already reads the whole cluster: through its
+        // own ActualText or through the ToUnicode of its base glyph.
+        if !a.resolved.ends_with(t.as_str()) {
+            continue;
+        }
+        let (Some(ma), Some(mb), Some(close)) = (a.mcid, b.mcid, b.close_op) else {
+            continue;
+        };
+        if wraps.last().is_some_and(|w| w.1 >= a.open_op) {
+            return Err(PdfError::Invariant(Invariant::ClustersOverlap {
+                page: n,
+                mcid: ma,
+            }));
+        }
+        wraps.push((a.open_op, close, a.resolved.clone(), ma, mb, t.clone()));
+    }
+    Ok(wraps)
+}
+
+/// Wraps each repeat in one `/Span` with the `/ActualText` of its first
+/// piece, from the last so that the indices of the earlier ones hold.
+fn wrap(ops: &mut Vec<lopdf::content::Operation>, wraps: &[Repeat], n: u32, report: &mut Patched) {
+    use lopdf::content::Operation;
+    use lopdf::StringFormat;
+    for (open, close, text, ma, mb, cluster) in wraps.iter().rev() {
+        ops.insert(*close + 1, Operation::new("EMC", vec![]));
+        let mut props = lopdf::Dictionary::new();
+        let mut utf16 = vec![0xFE, 0xFF];
+        for u in text.encode_utf16() {
+            utf16.extend(u.to_be_bytes());
+        }
+        props.set(
+            "ActualText",
+            Object::String(utf16, StringFormat::Hexadecimal),
+        );
+        ops.insert(
+            *open,
+            Operation::new(
+                "BDC",
+                vec![Object::Name(b"Span".to_vec()), Object::Dictionary(props)],
+            ),
+        );
+        report
+            .clusters
+            .push((n as usize, *ma, *mb, cluster.clone(), text.clone()));
+    }
 }
 
 /// The one content stream of a page. Typst writes one per page; a patch that

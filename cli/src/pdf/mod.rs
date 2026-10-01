@@ -150,24 +150,7 @@ pub fn render_page(
     let json = layout::json(fonts, page, TEMPLATE_VERSION, credit)?;
     let world =
         world::PdfWorld::new(fonts, template, json).ok_or(PdfError::Invariant(Invariant::World))?;
-    let warned = typst::compile::<PagedDocument>(&world);
-    let strays = world.strays();
-    if !strays.is_empty() {
-        return Err(PdfError::Invariant(Invariant::WorldAsked(strays)));
-    }
-    let mut refusal: Vec<String> = warned
-        .warnings
-        .iter()
-        .map(|w| format!("warning: {}", w.message))
-        .collect();
-    let document = match warned.output {
-        Ok(document) if refusal.is_empty() => document,
-        Ok(_) => return Err(PdfError::Document(refusal)),
-        Err(errors) => {
-            refusal.extend(messages(&errors));
-            return Err(PdfError::Document(refusal));
-        }
-    };
+    let document = compile(&world)?;
     let options = typst_pdf::PdfOptions {
         ident: Smart::Custom(ident.to_string()),
         creator: Smart::Custom(Some(format!("Aruna {}", env!("CARGO_PKG_VERSION")))),
@@ -181,7 +164,44 @@ pub fn render_page(
             embedded,
         }));
     }
-    let sequence = labels
+    let sequence = post_labels(&labels, fonts)?;
+    let (pdf, patched) = post::finish(&pdf, &sequence, page.has_combining_marks())?;
+    Ok(Rendered {
+        pdf,
+        labels,
+        clusters: patched.clusters.len(),
+        credit,
+        asked: world.asked(),
+    })
+}
+
+/// Typst on the two files of the world. A request for any other file is an
+/// invariant broken; a warning refuses the document as an error does.
+fn compile(world: &world::PdfWorld) -> Result<PagedDocument, PdfError> {
+    let warned = typst::compile::<PagedDocument>(world);
+    let strays = world.strays();
+    if !strays.is_empty() {
+        return Err(PdfError::Invariant(Invariant::WorldAsked(strays)));
+    }
+    let mut refusal: Vec<String> = warned
+        .warnings
+        .iter()
+        .map(|w| format!("warning: {}", w.message))
+        .collect();
+    match warned.output {
+        Ok(document) if refusal.is_empty() => Ok(document),
+        Ok(_) => Err(PdfError::Document(refusal)),
+        Err(errors) => {
+            refusal.extend(messages(&errors));
+            Err(PdfError::Document(refusal))
+        }
+    }
+}
+
+/// What the post-processing needs of each label: its code point and the
+/// measures of its drawing.
+fn post_labels(labels: &[u32], fonts: &Fonts) -> Result<Vec<post::Label>, PdfError> {
+    labels
         .iter()
         .map(|cp| {
             let art = fonts.art(*cp)?;
@@ -192,15 +212,7 @@ pub fn render_page(
                 width_em: art.width_em,
             })
         })
-        .collect::<Result<Vec<_>, PdfError>>()?;
-    let (pdf, patched) = post::finish(&pdf, &sequence, page.has_combining_marks())?;
-    Ok(Rendered {
-        pdf,
-        labels,
-        clusters: patched.clusters.len(),
-        credit,
-        asked: world.asked(),
-    })
+        .collect()
 }
 
 #[cfg(test)]
