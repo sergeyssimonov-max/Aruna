@@ -59,7 +59,7 @@
 
 use quick_xml::errors::{Error, IllFormedError, SyntaxError};
 use quick_xml::events::attributes::AttrError;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 
 /// Why a document is not well-formed XML.
@@ -423,18 +423,8 @@ fn first_refusal(bytes: &[u8]) -> Option<(Refusal, usize)> {
             Ok(Event::Eof) => return None,
             Ok(event) => {
                 if let Event::Start(ref tag) | Event::Empty(ref tag) = event {
-                    for attribute in tag.attributes() {
-                        if let Err(err) = attribute {
-                            let (refusal, offset) = match err {
-                                AttrError::ExpectedEq(at) => (Refusal::NotSeparated, at),
-                                AttrError::ExpectedValue(at) => (Refusal::NotSeparated, at),
-                                AttrError::ExpectedQuote(at, _) => (Refusal::NotSeparated, at),
-                                AttrError::UnquotedValue(at) => (Refusal::NotSeparated, at),
-                                AttrError::Duplicated(at, _) => (Refusal::Duplicated, at),
-                            };
-                            // `AttrError` counts from the first byte after `<`.
-                            return Some((refusal, start + 1 + offset));
-                        }
+                    if let Some(refusal) = attribute_refusal(tag, start) {
+                        return Some(refusal);
                     }
                 }
                 match event {
@@ -447,42 +437,62 @@ fn first_refusal(bytes: &[u8]) -> Option<(Refusal, usize)> {
             }
             Err(err) => {
                 let at = reader.error_position() as usize;
-                let refusal = match err {
-                    Error::IllFormed(IllFormedError::MismatchedEndTag { expected, found }) => {
-                        // `open` still holds what was open when the end tag
-                        // arrived: the reader refuses before popping.
-                        let _ = expected;
-                        Refusal::Mismatched {
-                            end: found,
-                            open: open.clone(),
-                        }
-                    }
-                    // Both quote styles, and only these: an unclosed value
-                    // swallows the rest of the file, which is a different
-                    // defect from a tag that simply runs out of input.
-                    Error::Syntax(SyntaxError::UnclosedDoubleQuotedAttributeValue)
-                    | Error::Syntax(SyntaxError::UnclosedSingleQuotedAttributeValue) => {
-                        Refusal::UnclosedValue
-                    }
-                    // At end of input with elements still open, which is what
-                    // "never closed" means when nothing later contradicts it.
-                    Error::IllFormed(IllFormedError::MissingEndTag(_)) => Refusal::NeverClosed,
-                    // Тег начат и кончился вход. Тот же дефект, что ловит
-                    // `unterminated_start_tag`, только сканеру его не найти:
-                    // там признак – следующий `<`, а здесь за тегом нет
-                    // ничего.
-                    Error::Syntax(SyntaxError::UnclosedTag) => Refusal::Unterminated,
-                    Error::IllFormed(IllFormedError::UnmatchedEndTag(found)) => {
-                        Refusal::Mismatched {
-                            end: found,
-                            open: open.clone(),
-                        }
-                    }
-                    _ => Refusal::Other,
-                };
-                return Some((refusal, at));
+                return Some((reader_refusal(err, &open), at));
             }
         }
+    }
+}
+
+/// The first attribute of `tag` that `quick-xml` refuses, at its offset in
+/// the input; `start` is where the tag's `<` stands.
+fn attribute_refusal(tag: &BytesStart<'_>, start: usize) -> Option<(Refusal, usize)> {
+    for attribute in tag.attributes() {
+        if let Err(err) = attribute {
+            let (refusal, offset) = match err {
+                AttrError::ExpectedEq(at) => (Refusal::NotSeparated, at),
+                AttrError::ExpectedValue(at) => (Refusal::NotSeparated, at),
+                AttrError::ExpectedQuote(at, _) => (Refusal::NotSeparated, at),
+                AttrError::UnquotedValue(at) => (Refusal::NotSeparated, at),
+                AttrError::Duplicated(at, _) => (Refusal::Duplicated, at),
+            };
+            // `AttrError` counts from the first byte after `<`.
+            return Some((refusal, start + 1 + offset));
+        }
+    }
+    None
+}
+
+/// What a reader-level error of `quick-xml` is, with `open` the elements open
+/// when it came.
+fn reader_refusal(err: Error, open: &[String]) -> Refusal {
+    match err {
+        Error::IllFormed(IllFormedError::MismatchedEndTag { expected, found }) => {
+            // `open` still holds what was open when the end tag
+            // arrived: the reader refuses before popping.
+            let _ = expected;
+            Refusal::Mismatched {
+                end: found,
+                open: open.to_vec(),
+            }
+        }
+        // Both quote styles, and only these: an unclosed value
+        // swallows the rest of the file, which is a different
+        // defect from a tag that simply runs out of input.
+        Error::Syntax(SyntaxError::UnclosedDoubleQuotedAttributeValue)
+        | Error::Syntax(SyntaxError::UnclosedSingleQuotedAttributeValue) => Refusal::UnclosedValue,
+        // At end of input with elements still open, which is what
+        // "never closed" means when nothing later contradicts it.
+        Error::IllFormed(IllFormedError::MissingEndTag(_)) => Refusal::NeverClosed,
+        // Тег начат и кончился вход. Тот же дефект, что ловит
+        // `unterminated_start_tag`, только сканеру его не найти:
+        // там признак – следующий `<`, а здесь за тегом нет
+        // ничего.
+        Error::Syntax(SyntaxError::UnclosedTag) => Refusal::Unterminated,
+        Error::IllFormed(IllFormedError::UnmatchedEndTag(found)) => Refusal::Mismatched {
+            end: found,
+            open: open.to_vec(),
+        },
+        _ => Refusal::Other,
     }
 }
 

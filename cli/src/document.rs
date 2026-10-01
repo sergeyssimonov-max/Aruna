@@ -68,7 +68,7 @@ use std::borrow::Cow;
 
 use quick_xml::escape::{resolve_predefined_entity, EscapeError};
 use quick_xml::events::attributes::Attribute as RawAttribute;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::{BytesDecl, BytesPI, BytesRef, BytesStart, Event};
 use quick_xml::name::{PrefixDeclaration, QName, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
 
@@ -355,6 +355,10 @@ struct Builder<'s> {
     pending: Option<(Cow<'s, str>, usize)>,
 }
 
+/// The attributes of one tag: its namespace declarations, and the others by
+/// name with their values.
+type Attributes<'t, 's> = (Vec<Binding<'s>>, Vec<(QName<'t>, Cow<'s, str>)>);
+
 impl<'s> Builder<'s> {
     fn new(source: &'s str) -> Self {
         let mut reader = NsReader::from_str(source);
@@ -386,121 +390,138 @@ impl<'s> Builder<'s> {
             match event {
                 Event::Start(tag) => self.element(&tag, resolved, at, true)?,
                 Event::Empty(tag) => self.element(&tag, resolved, at, false)?,
-                Event::End(_) => {
-                    self.flush()?;
-                    let Some(element) = self.open.pop() else {
-                        return Err(Stop::Parser {
-                            at,
-                            message: "end tag with nothing open".into(),
-                        });
-                    };
-                    let end = self.nodes.len();
-                    if let Some(node) = self.nodes.get_mut(element) {
-                        node.end = end;
-                    }
-                    self.leave_scope();
-                }
+                Event::End(_) => self.close(at)?,
                 Event::Text(text) => self.append(text.xml10_content(), at),
                 Event::CData(data) => self.append(data.xml10_content(), at),
-                Event::GeneralRef(reference) => {
-                    if reference.is_char_ref() {
-                        match reference.resolve_char_ref() {
-                            Ok(Some(ch)) => self.append(Cow::Owned(ch.to_string()), at),
-                            Ok(None) | Err(_) => {
-                                return Err(Stop::Parser {
-                                    at,
-                                    message: format!(
-                                        "invalid character reference `{}`",
-                                        &*reference
-                                    ),
-                                })
-                            }
-                        }
-                    } else if let Some(ch) = resolve_predefined_entity(&reference) {
-                        self.append(Cow::Borrowed(ch), at);
-                    } else {
-                        return Err(self.undecided(Undecided::EntityReference, at));
-                    }
-                }
+                Event::GeneralRef(reference) => self.reference(&reference, at)?,
                 Event::Comment(comment) => {
                     self.flush()?;
                     let text = comment.xml10_content();
                     self.leaf(Kind::Comment(text));
                 }
-                Event::PI(instruction) => {
-                    self.flush()?;
-                    let target = borrowed(self.source, instruction.target());
-                    let data = instruction
-                        .content()
-                        .trim_start_matches([' ', '\t', '\r', '\n']);
-                    let data = normalise_line_ends(borrowed(self.source, data));
-                    self.leaf(Kind::Instruction { target, data });
-                }
-                Event::Decl(declaration) => {
-                    let version = declaration
-                        .version()
-                        .map_err(|err| Stop::Parser {
-                            at,
-                            message: err.to_string(),
-                        })?
-                        .into_owned();
-                    if version != "1.0" {
-                        return Err(self.undecided(Undecided::Version, at));
-                    }
-                    let encoding = match declaration.encoding() {
-                        None => None,
-                        Some(Ok(encoding)) => Some(encoding.into_owned()),
-                        Some(Err(err)) => {
-                            return Err(Stop::Parser {
-                                at,
-                                message: err.to_string(),
-                            })
-                        }
-                    };
-                    if encoding
-                        .as_deref()
-                        .is_some_and(|name| !name.eq_ignore_ascii_case("utf-8"))
-                    {
-                        return Err(self.undecided(Undecided::Encoding, at));
-                    }
-                    let standalone = match declaration.standalone() {
-                        None => None,
-                        Some(Ok(standalone)) => Some(standalone.into_owned()),
-                        Some(Err(err)) => {
-                            return Err(Stop::Parser {
-                                at,
-                                message: err.to_string(),
-                            })
-                        }
-                    };
-                    self.declaration = Some(Declaration {
-                        version: Cow::Owned(version),
-                        encoding: encoding.map(Cow::Owned),
-                        standalone: standalone.map(Cow::Owned),
-                    });
-                }
+                Event::PI(instruction) => self.instruction(&instruction)?,
+                Event::Decl(declaration) => self.declare(&declaration, at)?,
                 Event::DocType(_) => return Err(self.undecided(Undecided::DocumentType, at)),
-                Event::Eof => {
-                    self.flush()?;
-                    if !self.open.is_empty() {
-                        // `quick-xml` is silent on an input that ends with
-                        // elements open; the classifier is not.
-                        return Err(Stop::Parser {
-                            at: self.source.len(),
-                            message: "input ended with elements open".into(),
-                        });
-                    }
-                    let Some(root) = self.root else {
-                        return Err(Stop::Refused(Refusal::NoRoot));
-                    };
-                    return Ok(Document {
-                        declaration: self.declaration,
-                        nodes: self.nodes,
-                        root,
-                    });
-                }
+                Event::Eof => return self.finish(),
             }
         }
+    }
+
+    /// An end tag: the innermost open element ends here.
+    fn close(&mut self, at: usize) -> Result<(), Stop> {
+        self.flush()?;
+        let Some(element) = self.open.pop() else {
+            return Err(Stop::Parser {
+                at,
+                message: "end tag with nothing open".into(),
+            });
+        };
+        let end = self.nodes.len();
+        if let Some(node) = self.nodes.get_mut(element) {
+            node.end = end;
+        }
+        self.leave_scope();
+        Ok(())
+    }
+
+    /// A character reference or one of the five predefined entities; any
+    /// other entity is a question this model does not decide.
+    fn reference(&mut self, reference: &BytesRef<'s>, at: usize) -> Result<(), Stop> {
+        if reference.is_char_ref() {
+            match reference.resolve_char_ref() {
+                Ok(Some(ch)) => self.append(Cow::Owned(ch.to_string()), at),
+                Ok(None) | Err(_) => {
+                    return Err(Stop::Parser {
+                        at,
+                        message: format!("invalid character reference `{}`", &**reference),
+                    })
+                }
+            }
+        } else if let Some(ch) = resolve_predefined_entity(reference) {
+            self.append(Cow::Borrowed(ch), at);
+        } else {
+            return Err(self.undecided(Undecided::EntityReference, at));
+        }
+        Ok(())
+    }
+
+    /// A processing instruction, its data without the leading white space.
+    fn instruction(&mut self, instruction: &BytesPI<'s>) -> Result<(), Stop> {
+        self.flush()?;
+        let target = borrowed(self.source, instruction.target());
+        let data = instruction
+            .content()
+            .trim_start_matches([' ', '\t', '\r', '\n']);
+        let data = normalise_line_ends(borrowed(self.source, data));
+        self.leaf(Kind::Instruction { target, data });
+        Ok(())
+    }
+
+    /// The XML declaration: version 1.0 and UTF-8 only, as they are written.
+    fn declare(&mut self, declaration: &BytesDecl<'_>, at: usize) -> Result<(), Stop> {
+        let version = declaration
+            .version()
+            .map_err(|err| Stop::Parser {
+                at,
+                message: err.to_string(),
+            })?
+            .into_owned();
+        if version != "1.0" {
+            return Err(self.undecided(Undecided::Version, at));
+        }
+        let encoding = match declaration.encoding() {
+            None => None,
+            Some(Ok(encoding)) => Some(encoding.into_owned()),
+            Some(Err(err)) => {
+                return Err(Stop::Parser {
+                    at,
+                    message: err.to_string(),
+                })
+            }
+        };
+        if encoding
+            .as_deref()
+            .is_some_and(|name| !name.eq_ignore_ascii_case("utf-8"))
+        {
+            return Err(self.undecided(Undecided::Encoding, at));
+        }
+        let standalone = match declaration.standalone() {
+            None => None,
+            Some(Ok(standalone)) => Some(standalone.into_owned()),
+            Some(Err(err)) => {
+                return Err(Stop::Parser {
+                    at,
+                    message: err.to_string(),
+                })
+            }
+        };
+        self.declaration = Some(Declaration {
+            version: Cow::Owned(version),
+            encoding: encoding.map(Cow::Owned),
+            standalone: standalone.map(Cow::Owned),
+        });
+        Ok(())
+    }
+
+    /// The end of the input: nothing open, and a root.
+    fn finish(mut self) -> Result<Document<'s>, Stop> {
+        self.flush()?;
+        if !self.open.is_empty() {
+            // `quick-xml` is silent on an input that ends with
+            // elements open; the classifier is not.
+            return Err(Stop::Parser {
+                at: self.source.len(),
+                message: "input ended with elements open".into(),
+            });
+        }
+        let Some(root) = self.root else {
+            return Err(Stop::Refused(Refusal::NoRoot));
+        };
+        Ok(Document {
+            declaration: self.declaration,
+            nodes: self.nodes,
+            root,
+        })
     }
 
     fn element(
@@ -518,38 +539,7 @@ impl<'s> Builder<'s> {
 
         // Attributes first, because the tag's own declarations are in scope for
         // its own name.
-        let mut namespaces = Vec::new();
-        let mut plain: Vec<(QName<'_>, Cow<'s, str>)> = Vec::new();
-        for attribute in tag.attributes() {
-            let attribute: RawAttribute<'_> = attribute.map_err(|err| Stop::Parser {
-                at,
-                message: err.to_string(),
-            })?;
-            let key = attribute.key;
-            let value = match attribute.normalized_value(XmlVersion::Implicit1_0) {
-                Ok(value) => kept(self.source, value),
-                Err(quick_xml::Error::Escape(EscapeError::UnrecognizedEntity(..))) => {
-                    return Err(self.undecided(Undecided::EntityReference, at))
-                }
-                Err(err) => {
-                    return Err(Stop::Parser {
-                        at,
-                        message: err.to_string(),
-                    })
-                }
-            };
-            match key.as_namespace_binding() {
-                Some(PrefixDeclaration::Default) => namespaces.push(Binding {
-                    prefix: None,
-                    uri: value,
-                }),
-                Some(PrefixDeclaration::Named(prefix)) => namespaces.push(Binding {
-                    prefix: Some(borrowed(self.source, prefix)),
-                    uri: value,
-                }),
-                None => plain.push((key, value)),
-            }
-        }
+        let (namespaces, plain) = self.attributes(tag, at)?;
         for binding in &namespaces {
             self.scopes.push(Scoped {
                 depth,
@@ -584,6 +574,48 @@ impl<'s> Builder<'s> {
             self.leave_scope();
         }
         Ok(())
+    }
+
+    /// The attributes of `tag`, in two lists: the namespace declarations, and
+    /// the rest with their values normalised.
+    fn attributes<'t>(
+        &self,
+        tag: &'t BytesStart<'s>,
+        at: usize,
+    ) -> Result<Attributes<'t, 's>, Stop> {
+        let mut namespaces = Vec::new();
+        let mut plain: Vec<(QName<'_>, Cow<'s, str>)> = Vec::new();
+        for attribute in tag.attributes() {
+            let attribute: RawAttribute<'_> = attribute.map_err(|err| Stop::Parser {
+                at,
+                message: err.to_string(),
+            })?;
+            let key = attribute.key;
+            let value = match attribute.normalized_value(XmlVersion::Implicit1_0) {
+                Ok(value) => kept(self.source, value),
+                Err(quick_xml::Error::Escape(EscapeError::UnrecognizedEntity(..))) => {
+                    return Err(self.undecided(Undecided::EntityReference, at))
+                }
+                Err(err) => {
+                    return Err(Stop::Parser {
+                        at,
+                        message: err.to_string(),
+                    })
+                }
+            };
+            match key.as_namespace_binding() {
+                Some(PrefixDeclaration::Default) => namespaces.push(Binding {
+                    prefix: None,
+                    uri: value,
+                }),
+                Some(PrefixDeclaration::Named(prefix)) => namespaces.push(Binding {
+                    prefix: Some(borrowed(self.source, prefix)),
+                    uri: value,
+                }),
+                None => plain.push((key, value)),
+            }
+        }
+        Ok((namespaces, plain))
     }
 
     fn name(&self, qname: QName<'_>, resolved: Resolved, at: usize) -> Result<Name<'s>, Stop> {
