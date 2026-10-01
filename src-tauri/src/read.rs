@@ -13,7 +13,7 @@ use crate::{counted, CommandError};
 /// Числа окно показывает как есть, поэтому здесь они уже такие, какими их надо
 /// показать: пересчета на стороне окна нет.
 #[derive(Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct CorpusStats {
+pub(crate) struct CorpusStats {
     pub(crate) manuscripts: u32,
     pub(crate) groups: u32,
     pub(crate) source: StatsSource,
@@ -35,7 +35,7 @@ pub struct CorpusStats {
 /// в самой большой группе больше фрагментов, чем в четырех сотнях самых
 /// маленьких вместе.
 #[derive(Debug, Default, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct Spread {
+pub(crate) struct Spread {
     /// Самая большая группа. `None` – в пакете нет ни одной.
     pub(crate) largest: Option<GroupSize>,
     /// Групп ровно с одним фрагментом.
@@ -50,14 +50,14 @@ pub struct Spread {
 
 /// Группа и ее размер.
 #[derive(Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct GroupSize {
+pub(crate) struct GroupSize {
     pub(crate) label: String,
     pub(crate) fragments: u32,
 }
 
 /// Что манифест насчитал о письме корпуса при разборе.
 #[derive(Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct Fonts {
+pub(crate) struct Fonts {
     /// Документы, чей текст пришел не в нормальной форме C.
     pub(crate) not_in_nfc: u32,
     /// Документы, где встречаются кодовые точки из области частного
@@ -76,7 +76,7 @@ pub struct Fonts {
 /// документов в нем лежат. Некорректность разметки – свойство исходных данных,
 /// оно мешает превращению документа в PDF, а не его хранению.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct XmlSummary {
+pub(crate) struct XmlSummary {
     /// Документов в пакете – все, и прочитанные, и нет.
     pub(crate) documents: u32,
     /// Из них программа прочитала.
@@ -150,7 +150,7 @@ pub struct XmlSummary {
 
 /// Сколько документов у одной причины.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct XmlReasonCount {
+pub(crate) struct XmlReasonCount {
     /// Ключ причины, как его пишет манифест.
     pub(crate) reason: String,
     pub(crate) documents: u32,
@@ -161,7 +161,7 @@ pub struct XmlReasonCount {
 /// «Непрочитанный», а не «некорректный»: отказ принадлежит нашему разборщику, и
 /// о правилах XML сам по себе не говорит – см. [`XmlSummary::unread`].
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct XmlDocument {
+pub(crate) struct XmlDocument {
     /// Путь внутри пакета.
     pub(crate) file: String,
     pub(crate) reason: String,
@@ -171,7 +171,7 @@ pub struct XmlDocument {
 
 /// Сколько документов у одного класса предела.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct XmlLimitCount {
+pub(crate) struct XmlLimitCount {
     /// Ключ класса, как его пишет манифест.
     pub(crate) limit: String,
     pub(crate) documents: u32,
@@ -183,7 +183,7 @@ pub struct XmlLimitCount {
 /// причина отказа, здесь `limit` – класс того, чего разборщик не увидел. Одно
 /// имя на двоих читалось бы как одно и то же событие, а это разные события.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct XmlLimitDocument {
+pub(crate) struct XmlLimitDocument {
     /// Путь внутри пакета.
     pub(crate) file: String,
     pub(crate) limit: String,
@@ -200,7 +200,7 @@ pub struct XmlLimitDocument {
 /// ответов получен.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
-pub enum StatsSource {
+pub(crate) enum StatsSource {
     Manifest,
     Walk,
 }
@@ -210,7 +210,7 @@ pub enum StatsSource {
 /// Путей в сообщениях нет намеренно – тем же правилом живет ядро: адрес файла
 /// в тексте ошибки попадает в окно, а окно показывают через плечо.
 #[derive(Debug, thiserror::Error)]
-pub enum StatsError {
+pub(crate) enum StatsError {
     #[error("пакет по этому пути не найден")]
     Missing,
     #[error("каталог пакета не читается: {0}")]
@@ -225,7 +225,7 @@ pub enum StatsError {
 /// честный ответ – сказать это, а не пересчитать чужую работу второй раз и
 /// другим кодом.
 #[derive(Debug, thiserror::Error)]
-pub enum XmlSummaryError {
+pub(crate) enum XmlSummaryError {
     #[error("пакет по этому пути не найден")]
     Missing,
     #[error("манифест пакета не читается")]
@@ -292,93 +292,81 @@ pub(crate) fn read_manifest(package: &std::path::Path) -> Option<String> {
     (text.len() as u64 <= MANIFEST_LIMIT).then_some(text)
 }
 
-/// Команда без Tauri, чтобы ветки проверялись тестом.
-///
-/// Один источник – манифест, и обхода в запасе нет намеренно: числа сосчитал
-/// тот же прогон, который раскладывал файлы, а второй счет другим кодом – это
-/// второе поведение, расходящееся с первым при первой же правке.
-pub(crate) fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryError> {
+/// Секция `xml` манифеста – то, что из него читает окно.
+mod manifest_xml {
     /// Из всего манифеста окну нужна одна секция; остальные поля serde
     /// пропускает.
     #[derive(serde::Deserialize)]
-    struct Manifest {
-        xml: Option<XmlSection>,
+    pub(super) struct Manifest {
+        pub(super) xml: Option<XmlSection>,
     }
 
     #[derive(serde::Deserialize)]
-    struct XmlSection {
-        documents: usize,
-        well_formed: usize,
-        not_well_formed: usize,
+    pub(super) struct XmlSection {
+        pub(super) documents: usize,
+        pub(super) well_formed: usize,
+        pub(super) not_well_formed: usize,
         #[serde(default)]
-        by_reason: std::collections::BTreeMap<String, usize>,
+        pub(super) by_reason: std::collections::BTreeMap<String, usize>,
         #[serde(default)]
-        not_well_formed_documents: Vec<Entry>,
+        pub(super) not_well_formed_documents: Vec<Entry>,
         /// Секцию манифест несет с 10.09.2026. Пакет, собранный раньше, ее не
         /// имеет, и это не поломка: `default` дает нули и пустые списки, окно
         /// показывает то, что есть. Отдельного отказа тут не нужно – в отличие
         /// от секции `xml` целиком, отсутствие которой значит «пакет об этом
         /// не знает», здесь известно все, кроме второй половины.
         #[serde(default)]
-        beyond_this_parser: Option<BeyondSection>,
+        pub(super) beyond_this_parser: Option<BeyondSection>,
         #[serde(default)]
-        totals: Option<Totals>,
+        pub(super) totals: Option<Totals>,
     }
 
     #[derive(serde::Deserialize, Default)]
-    struct BeyondSection {
+    pub(super) struct BeyondSection {
         #[serde(default)]
-        documents: usize,
+        pub(super) documents: usize,
         #[serde(default)]
-        by_limit: std::collections::BTreeMap<String, usize>,
+        pub(super) by_limit: std::collections::BTreeMap<String, usize>,
         #[serde(default)]
-        documents_beyond_this_parser: Vec<LimitEntry>,
+        pub(super) documents_beyond_this_parser: Vec<LimitEntry>,
     }
 
     #[derive(serde::Deserialize, Default)]
-    struct Totals {
+    pub(super) struct Totals {
         #[serde(default)]
-        not_well_formed_xml: Total,
+        pub(super) not_well_formed_xml: Total,
         #[serde(default)]
-        objected_to_by_a_conforming_parser: Total,
+        pub(super) objected_to_by_a_conforming_parser: Total,
     }
 
     #[derive(serde::Deserialize, Default)]
-    struct Total {
+    pub(super) struct Total {
         #[serde(default)]
-        documents: usize,
+        pub(super) documents: usize,
     }
 
     #[derive(serde::Deserialize)]
-    struct Entry {
-        file: String,
-        reason: String,
-        line: usize,
-        column: usize,
+    pub(super) struct Entry {
+        pub(super) file: String,
+        pub(super) reason: String,
+        pub(super) line: usize,
+        pub(super) column: usize,
     }
 
     #[derive(serde::Deserialize)]
-    struct LimitEntry {
-        file: String,
-        limit: String,
-        line: usize,
-        column: usize,
+    pub(super) struct LimitEntry {
+        pub(super) file: String,
+        pub(super) limit: String,
+        pub(super) line: usize,
+        pub(super) column: usize,
     }
+}
 
-    if !package.is_dir() {
-        return Err(XmlSummaryError::Missing);
-    }
-    let text = read_manifest(package).ok_or(XmlSummaryError::Unreadable)?;
-    let manifest: Manifest =
-        serde_json::from_str(&text).map_err(|_| XmlSummaryError::Unreadable)?;
-    // Манифест старого пакета секции не несет, и это не поломка: собран он был
-    // до 06.09.2026. Отдельный отказ, а не нули, – ноль некорректных документов
-    // и «пакет об этом не знает» на экране выглядят одинаково, а значат разное.
-    let mut section = manifest.xml.ok_or(XmlSummaryError::Absent)?;
-    let beyond = section.beyond_this_parser.take().unwrap_or_default();
-    let totals = section.totals.take().unwrap_or_default();
+use manifest_xml::{BeyondSection, Manifest, Totals, XmlSection};
 
-    Ok(XmlSummary {
+/// Секция `xml` манифеста – в форме провода.
+fn summary(section: XmlSection, beyond: BeyondSection, totals: Totals) -> XmlSummary {
+    XmlSummary {
         documents: counted(section.documents),
         read: counted(section.well_formed),
         unread: counted(section.not_well_formed),
@@ -425,7 +413,29 @@ pub(crate) fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, 
         // и экран на нем ничего не печатает.
         not_well_formed_xml: counted(totals.not_well_formed_xml.documents),
         objected_to: counted(totals.objected_to_by_a_conforming_parser.documents),
-    })
+    }
+}
+
+/// Команда без Tauri, чтобы ветки проверялись тестом.
+///
+/// Один источник – манифест, и обхода в запасе нет намеренно: числа сосчитал
+/// тот же прогон, который раскладывал файлы, а второй счет другим кодом – это
+/// второе поведение, расходящееся с первым при первой же правке.
+pub(crate) fn read_xml_summary(package: &std::path::Path) -> Result<XmlSummary, XmlSummaryError> {
+    if !package.is_dir() {
+        return Err(XmlSummaryError::Missing);
+    }
+    let text = read_manifest(package).ok_or(XmlSummaryError::Unreadable)?;
+    let manifest: Manifest =
+        serde_json::from_str(&text).map_err(|_| XmlSummaryError::Unreadable)?;
+    // Манифест старого пакета секции не несет, и это не поломка: собран он был
+    // до 06.09.2026. Отдельный отказ, а не нули, – ноль некорректных документов
+    // и «пакет об этом не знает» на экране выглядят одинаково, а значат разное.
+    let mut section = manifest.xml.ok_or(XmlSummaryError::Absent)?;
+    let beyond = section.beyond_this_parser.take().unwrap_or_default();
+    let totals = section.totals.take().unwrap_or_default();
+
+    Ok(summary(section, beyond, totals))
 }
 
 /// Команда без Tauri, чтобы обе ветки проверялись тестом.

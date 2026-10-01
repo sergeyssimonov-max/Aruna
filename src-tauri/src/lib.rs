@@ -6,10 +6,7 @@ use tauri::Manager;
 
 mod read;
 use read::{is_link, named_package, read_stats, read_xml_summary};
-pub use read::{
-    CorpusStats, Fonts, GroupSize, Spread, StatsError, StatsSource, XmlDocument, XmlLimitCount,
-    XmlLimitDocument, XmlReasonCount, XmlSummary, XmlSummaryError,
-};
+use read::{CorpusStats, XmlSummary};
 
 #[cfg(feature = "e2e")]
 fn wdio_webdriver_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
@@ -38,7 +35,7 @@ fn wdio_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
 /// Оболочка ничего не вычисляет сама, иначе одно поведение имело бы две
 /// реализации, расходящиеся при первой же правке ядра.
 #[derive(serde::Serialize, specta::Type)]
-pub struct CorpusLocation {
+pub(crate) struct CorpusLocation {
     downloads: String,
     package: String,
     inventory: String,
@@ -54,7 +51,7 @@ pub struct CorpusLocation {
 /// `Not allowed to open path /Users/…/TLHdig_Beta_0.3.html`, по-английски и с
 /// путем. Теперь опись открывает [`open_inventory`], и отказ приходит отсюда.
 #[derive(Debug, thiserror::Error)]
-pub enum CommandError {
+pub(crate) enum CommandError {
     #[error("не удалось определить папку загрузок")]
     Downloads,
     /// Окну назвали файл, который описью не является.
@@ -221,7 +218,7 @@ fn corpus_xml(path: String) -> Result<XmlSummary, String> {
 /// (правило рядом, у [`StatsError`]): показать, что собрано и где оно лежит, —
 /// и есть работа этого окна.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct BuildReport {
+pub(crate) struct BuildReport {
     /// Идентификатор прогона. Им же помечены события прогресса, так что окно
     /// может отличить отчет своей сборки от чужой.
     pub job: u32,
@@ -250,7 +247,7 @@ pub struct BuildReport {
 /// там не переписан заново, а делегирован клиенту загрузки: две независимые
 /// формулировки того же правила в этом проекте уже расходились.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct BuildFailure {
+pub(crate) struct BuildFailure {
     /// Устойчивый машинный вид: `cancelled`, `network`, `checksum`, …
     pub code: String,
     /// Фаза, на которой это случилось, — `Phase::code` ядра. `null` там, где
@@ -302,7 +299,7 @@ impl BuildFailure {
 /// события, потому что две пары — объявление стадии и ее тик — это одна стадия.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
-pub enum Stage {
+pub(crate) enum Stage {
     CacheUnusable,
     CachedArchiveRejected,
     ArchiveFromCache,
@@ -343,7 +340,7 @@ pub enum Stage {
 /// правилу рядом со [`StatsError`] им сюда нельзя: окно показывают через плечо.
 /// Из таких событий сюда доходит только имя стадии.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type, tauri_specta::Event)]
-pub struct BuildProgress {
+pub(crate) struct BuildProgress {
     /// Чей это прогресс. Тот же номер приходит в [`BuildReport::job`].
     pub job: u32,
     /// На чем прогон сейчас.
@@ -494,7 +491,7 @@ impl aruna::progress::Progress for WindowProgress {
 /// этого случая. `Cancel` клонируется поверх `Arc`, поэтому останавливает не тот
 /// поток, который работает.
 #[derive(Default)]
-pub struct Building(std::sync::Mutex<Option<aruna::job::Cancel>>);
+pub(crate) struct Building(std::sync::Mutex<Option<aruna::job::Cancel>>);
 
 impl Building {
     /// Занять место под сборку, если оно свободно.
@@ -718,17 +715,20 @@ fn contract() -> tauri_specta::Builder<tauri::Wry> {
 /// `Aruna.app/Contents/Resources/fonts/`. Одно место, названное один раз: путь
 /// в конфигурации и путь в коде – это две половины одного решения, и разойтись
 /// им нельзя.
-pub const FONT_RESOURCES: &str = "fonts";
+pub(crate) const FONT_RESOURCES: &str = "fonts";
 
 /// Итог проверки шрифтов при запуске: каталог, который прошел сверку, либо
 /// причина отказа.
 ///
-/// Хранится, а не печатается и забывается: контур PDF, когда он появится,
-/// обязан отказать со ссылкой на эту причину, а не искать шрифт заново. Пока
-/// контура нет, значение читает только сам запуск – и это записано честно, а не
-/// выдано за работающую проверку в продукте.
+/// Хранится, а не печатается и забывается – с расчетом на то, что контур PDF
+/// откажет со ссылкой на эту причину, а не будет искать шрифт заново. Контур
+/// пришел 30.09.2026 и этого итога не читает: `build_corpus` берет каталог из
+/// ресурсов сам. Метод чтения, которого никто не звал, снят 01.10.2026;
+/// перейти ли сборке на этот итог – вопрос поведения, а не уборки.
 #[derive(Default)]
-pub struct FontResources(std::sync::Mutex<Option<std::result::Result<std::path::PathBuf, String>>>);
+pub(crate) struct FontResources(
+    std::sync::Mutex<Option<std::result::Result<std::path::PathBuf, String>>>,
+);
 
 impl FontResources {
     /// Записать итог. Один раз, при запуске.
@@ -736,11 +736,6 @@ impl FontResources {
         if let Ok(mut slot) = self.0.lock() {
             *slot = Some(outcome);
         }
-    }
-
-    /// Каталог со сверенными шрифтами, если сверка прошла.
-    pub fn directory(&self) -> Option<std::path::PathBuf> {
-        self.0.lock().ok()?.as_ref()?.as_ref().ok().cloned()
     }
 }
 
@@ -958,11 +953,6 @@ mod wire {
         assert!(!note.is_empty());
     }
 
-    /// Стадия объявляет знаменатель, тик заполняет числитель.
-    ///
-    /// Обе половины дроби приходят из ядра как есть; окно ничего не считает
-    /// само, и полоса не может показать долю, знаменатель которой разошелся с
-    /// объявленным.
     /// **Фаза PDF окна пока не достигает** (решение владельца 30.09.2026,
     /// вопрос 8): ее события отбрасываются до провода, прочие идут как шли.
     #[test]
@@ -986,6 +976,11 @@ mod wire {
         assert!(!is_pdf_phase(&Core::CheckingPackage));
     }
 
+    /// Стадия объявляет знаменатель, тик заполняет числитель.
+    ///
+    /// Обе половины дроби приходят из ядра как есть; окно ничего не считает
+    /// само, и полоса не может показать долю, знаменатель которой разошелся с
+    /// объявленным.
     #[test]
     fn the_stage_names_the_whole_and_the_tick_fills_it_in() {
         use aruna::progress::Event as Core;
@@ -1148,8 +1143,8 @@ mod wire {
 // `test`: обе отказные ветки проверяются и в сборке с `e2e`, и без нее.
 #[cfg(test)]
 mod opening {
-    use super::read::read_manifest;
-    use super::{named_inventory, named_package, read_xml_summary, CommandError, XmlSummaryError};
+    use super::read::{read_manifest, XmlSummaryError};
+    use super::{named_inventory, named_package, read_xml_summary, CommandError};
     use std::fs;
 
     /// Опись — это файл с тем именем, которое объявило ядро, и лежать он может
@@ -1326,7 +1321,8 @@ mod opening {
 // `test`: ветки проверяются и в сборке с `e2e`, и без нее.
 #[cfg(test)]
 mod markup {
-    use super::{read_xml_summary, XmlSummaryError};
+    use super::read::XmlSummaryError;
+    use super::read_xml_summary;
     use std::fs;
 
     const SECTION: &str = r#"{"schema":1,"counts":{"documents":4,"groups":1},
@@ -1672,6 +1668,7 @@ mod markup {
 // `test`: обе ветки проверяются и в сборке с `e2e`, и без нее.
 #[cfg(test)]
 mod counting {
+    use super::read::{Fonts, GroupSize, Spread, StatsError, StatsSource};
     use super::*;
     use std::fs;
     use std::path::Path;
@@ -2041,8 +2038,6 @@ mod cancelling {
         names
     }
 
-    /// **Нажатие в окне останавливает идущую сборку, и пакета под окончательным
-    /// именем не остается.**
     /// Малый архив в форме корпуса: `count` рукописей в одной группе.
     fn small_archive(dir: &std::path::Path, count: usize) -> std::path::PathBuf {
         use std::io::Write as _;
@@ -2131,6 +2126,8 @@ mod cancelling {
         assert_eq!(left, vec![aruna::export::PACKAGE.to_string()]);
     }
 
+    /// **Нажатие в окне останавливает идущую сборку, и пакета под окончательным
+    /// именем не остается.**
     #[test]
     #[ignore = "читает архив корпуса; запускать явно"]
     fn a_running_build_stops_when_the_window_asks() {
@@ -2138,50 +2135,19 @@ mod cancelling {
             eprintln!("пропуск: архива корпуса нет");
             return;
         };
-        let destination = tempfile::tempdir().expect("каталог назначения");
-
-        let building = Building::default();
-        let cancel = aruna::job::Cancel::new();
-        building.claim(cancel.clone()).expect("место свободно");
-
-        let window = WindowThatStops {
-            at: "WritingDocuments",
-            building: &building,
-            seen: Mutex::new(Vec::new()),
-            presses: AtomicUsize::new(0),
-        };
-        let request = aruna::app::CorpusRequest {
-            local_archive: Some(zip),
-            pdf: aruna::app::PdfRequest::Off,
-        };
-        let outcome = build_once(
-            aruna::job::JobId::next(),
-            &request,
-            Some(destination.path()),
-            &cancel,
-            &window,
-        );
-        building.release();
+        // `run_pressing_at` и проверяет, что после отмены место снова
+        // свободно: следующая сборка не упрется в «сборка уже идет».
+        let (outcome, presses, left, _keep) = run_pressing_at(zip, "WritingDocuments");
 
         let refusal = outcome.expect_err("сборка обязана была остановиться");
         assert_eq!(refusal.code, "cancelled", "отказ не назвался отменой");
         assert!(refusal.cancelled, "отказ не помечен как отмена");
-
-        assert!(
-            window.presses.load(Ordering::SeqCst) >= 1,
-            "окно так и не нажало: стадии {:?}",
-            window.seen.lock().expect("не отравлен")
-        );
+        assert!(presses >= 1, "окно так и не нажало");
         assert_eq!(
-            entries(destination.path()),
+            left,
             Vec::<String>::new(),
             "после отмены в каталоге назначения что-то осталось"
         );
-
-        // Место свободно: следующая сборка не упрется в «сборка уже идет».
-        building
-            .claim(aruna::job::Cancel::new())
-            .expect("после отмены место снова свободно");
     }
 
     /// Отрицательный контроль к тесту выше.
@@ -2196,38 +2162,15 @@ mod cancelling {
             eprintln!("пропуск: архива корпуса нет");
             return;
         };
-        let destination = tempfile::tempdir().expect("каталог назначения");
-
-        let building = Building::default();
-        let cancel = aruna::job::Cancel::new();
-        building.claim(cancel.clone()).expect("место свободно");
-
         // Тот же приемник, но стадии, которой он ждет, в сборке не бывает.
-        let window = WindowThatStops {
-            at: "НетТакойСтадии",
-            building: &building,
-            seen: Mutex::new(Vec::new()),
-            presses: AtomicUsize::new(0),
-        };
-        let request = aruna::app::CorpusRequest {
-            local_archive: Some(zip),
-            pdf: aruna::app::PdfRequest::Off,
-        };
-        let report = build_once(
-            aruna::job::JobId::next(),
-            &request,
-            Some(destination.path()),
-            &cancel,
-            &window,
-        )
-        .expect("без нажатия сборка обязана дойти до конца");
-        building.release();
+        let (outcome, presses, left, _keep) = run_pressing_at(zip, "НетТакойСтадии");
+        let report = outcome.expect("без нажатия сборка обязана дойти до конца");
 
-        assert_eq!(window.presses.load(Ordering::SeqCst), 0, "никто не нажимал");
+        assert_eq!(presses, 0, "никто не нажимал");
         assert_eq!(report.documents, 23936);
         assert_eq!(report.groups, 663);
         assert_eq!(
-            entries(destination.path()),
+            left,
             vec!["TLHdig_Beta_0.3".to_string()],
             "пакет не встал под окончательным именем"
         );
