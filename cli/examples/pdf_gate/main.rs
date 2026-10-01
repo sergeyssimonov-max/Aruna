@@ -319,76 +319,19 @@ fn check_package(package: &Path, fonts: &Path, c14n: bool, pdfkit: bool) -> bool
         if !c.same_composition(&page) {
             t.composition.push(file.clone());
         }
-        let want = expected_tree(&fonts, &page, credit);
-        let got = export_tree(&pdf).expect("tagged");
-        if let Some(d) = tree_difference(&want, &got.xml) {
-            t.tree.push(format!("{file}: {d:?}"));
+        check_tree(
+            &mut t,
+            file,
+            &pdf,
+            &page,
+            &fonts,
+            credit,
+            c14n.then_some(trees.as_path()),
+        );
+        if let Some(label_pdf) = check_labels(&mut t, file, &pdf_path, &page, &fonts, &c) {
+            label_pdfs.push(label_pdf);
         }
-        if got.orphans + got.twice > 0 {
-            t.orphans_or_twice.push(file.clone());
-        }
-        // The credit is the tree's first paragraph where it stands: a known
-        // addition to the text (PDF-ACCEPTANCE §7), expected once.
-        let logical = if credit {
-            format!("{}\n{}", aruna::fonts::CREDIT, expected_text(&page))
-        } else {
-            expected_text(&page)
-        };
-        if first_difference(&cps(&logical), &cps(&tree_text(&got.xml))).is_some() {
-            t.logical.push(file.clone());
-        }
-        if c14n {
-            let stem = trees.join(t.pdfs.to_string());
-            std::fs::write(stem.with_extension("want.xml"), &want).expect("scratch");
-            std::fs::write(stem.with_extension("got.xml"), &got.xml).expect("scratch");
-            if canonical(&stem.with_extension("want.xml"))
-                != canonical(&stem.with_extension("got.xml"))
-            {
-                t.c14n.push(file.clone());
-            }
-        }
-        let labels = page.labels(&fonts);
-        if !labels.is_empty() {
-            t.label_docs += 1;
-            t.labels += labels.len();
-            let mut want: BTreeMap<u32, usize> = BTreeMap::new();
-            for cp in &labels {
-                *want.entry(*cp).or_insert(0) += 1;
-            }
-            let own: usize = want
-                .iter()
-                .map(|(cp, n)| {
-                    let found = c.raw.chars().filter(|ch| u32::from(*ch) == *cp).count();
-                    usize::from(found != *n)
-                })
-                .sum();
-            if own > 0 || c.label_letters > 0 {
-                t.labels_own.push(file.clone());
-            }
-            label_pdfs.push((pdf_path.clone(), want));
-        }
-        // Wrappers: an ActualText span at the top of the stream is ours
-        // (variant A); krilla's sits inside a marked span.
-        let scans = scan_pdf(&pdf).expect("pages");
-        let ours = scans
-            .iter()
-            .flat_map(|s| &s.spans)
-            .filter(|s| s.actual_text.is_some() && s.mcid.is_none() && s.parent.is_none())
-            .count();
-        let krilla = scans
-            .iter()
-            .flat_map(|s| &s.spans)
-            .filter(|s| s.actual_text.is_some() && s.parent.is_some())
-            .count();
-        if ours > 0 {
-            t.wrapped.push(file.clone());
-            if !page.has_combining_marks() {
-                t.wrapper_without_marks.push(file.clone());
-            }
-        }
-        if krilla > 0 {
-            t.krilla_actual_text += 1;
-        }
+        check_wrappers(&mut t, file, &pdf, &page);
         if t.documents.is_multiple_of(2000) {
             eprintln!(
                 "  {} documents, {:.0} s",
@@ -405,6 +348,131 @@ fn check_package(package: &Path, fonts: &Path, c14n: bool, pdfkit: bool) -> bool
         let _ = std::fs::remove_dir_all(&trees);
     }
     report(&t, c14n, pdfkit)
+}
+
+/// The tag tree against the model's – by string, and by `xmllint --c14n` when
+/// `trees` is a scratch directory – and the text of the tree in logical order
+/// against the source.
+fn check_tree(
+    t: &mut Tally,
+    file: &str,
+    pdf: &[u8],
+    page: &Page,
+    fonts: &Fonts,
+    credit: bool,
+    trees: Option<&Path>,
+) {
+    let want = expected_tree(fonts, page, credit);
+    let got = export_tree(pdf).expect("tagged");
+    if let Some(d) = tree_difference(&want, &got.xml) {
+        t.tree.push(format!("{file}: {d:?}"));
+    }
+    if got.orphans + got.twice > 0 {
+        t.orphans_or_twice.push(file.to_string());
+    }
+    // The credit is the tree's first paragraph where it stands: a known
+    // addition to the text (PDF-ACCEPTANCE §7), expected once.
+    let logical = if credit {
+        format!("{}\n{}", aruna::fonts::CREDIT, expected_text(page))
+    } else {
+        expected_text(page)
+    };
+    if first_difference(&cps(&logical), &cps(&tree_text(&got.xml))).is_some() {
+        t.logical.push(file.to_string());
+    }
+    if let Some(trees) = trees {
+        let stem = trees.join(t.pdfs.to_string());
+        std::fs::write(stem.with_extension("want.xml"), &want).expect("scratch");
+        std::fs::write(stem.with_extension("got.xml"), &got.xml).expect("scratch");
+        if canonical(&stem.with_extension("want.xml")) != canonical(&stem.with_extension("got.xml"))
+        {
+            t.c14n.push(file.to_string());
+        }
+    }
+}
+
+/// The labels of one document: the code point of each, as many times as the
+/// page sets it, from this project's reader, and no letters of an inscription.
+/// The PDF and what it should give, for PDFKit, when it has a label.
+fn check_labels(
+    t: &mut Tally,
+    file: &str,
+    pdf_path: &Path,
+    page: &Page,
+    fonts: &Fonts,
+    c: &Checked,
+) -> Option<(PathBuf, BTreeMap<u32, usize>)> {
+    let labels = page.labels(fonts);
+    if labels.is_empty() {
+        return None;
+    }
+    t.label_docs += 1;
+    t.labels += labels.len();
+    let mut want: BTreeMap<u32, usize> = BTreeMap::new();
+    for cp in &labels {
+        *want.entry(*cp).or_insert(0) += 1;
+    }
+    let own: usize = want
+        .iter()
+        .map(|(cp, n)| {
+            let found = c.raw.chars().filter(|ch| u32::from(*ch) == *cp).count();
+            usize::from(found != *n)
+        })
+        .sum();
+    if own > 0 || c.label_letters > 0 {
+        t.labels_own.push(file.to_string());
+    }
+    Some((pdf_path.to_path_buf(), want))
+}
+
+/// Wrappers: an ActualText span at the top of the stream is ours
+/// (variant A); krilla's sits inside a marked span.
+fn check_wrappers(t: &mut Tally, file: &str, pdf: &[u8], page: &Page) {
+    let scans = scan_pdf(pdf).expect("pages");
+    let ours = scans
+        .iter()
+        .flat_map(|s| &s.spans)
+        .filter(|s| s.actual_text.is_some() && s.mcid.is_none() && s.parent.is_none())
+        .count();
+    let krilla = scans
+        .iter()
+        .flat_map(|s| &s.spans)
+        .filter(|s| s.actual_text.is_some() && s.parent.is_some())
+        .count();
+    if ours > 0 {
+        t.wrapped.push(file.to_string());
+        if !page.has_combining_marks() {
+            t.wrapper_without_marks.push(file.to_string());
+        }
+    }
+    if krilla > 0 {
+        t.krilla_actual_text += 1;
+    }
+}
+
+/// The PDFKit rows: the labels it reads and the two teeth it must show.
+fn report_pdfkit(t: &Tally) -> bool {
+    println!(
+        "| label documents PDFKit opened | {} |",
+        t.pdfkit_label_docs
+    );
+    let mut ok = row("labels at PDFKit", &t.pdfkit);
+    for line in &t.pdfkit_teeth {
+        println!("| PDFKit teeth | {line} |");
+        ok &= line.ends_with("caught");
+    }
+    ok &= t.pdfkit_teeth.len() == 2;
+    if let Some(kept) = t.pdfkit_names {
+        println!(
+            "| PDFKit, ToUnicode alone removed | {} |",
+            if kept {
+                "code point kept, from the glyph names"
+            } else {
+                "code point lost"
+            }
+        );
+    }
+    ok
 }
 
 fn canonical(path: &Path) -> Vec<u8> {
@@ -555,18 +623,21 @@ fn controls(package: &Path, fonts: &Fonts, files: &[String], sigla: &[String], t
     }
 }
 
+/// One row of the table: how many failed and the first of them; whether none
+/// did.
+fn row(name: &str, bad: &[String]) -> bool {
+    println!(
+        "| {name} | {} |",
+        if bad.is_empty() {
+            "0".to_string()
+        } else {
+            format!("{} – {}", bad.len(), bad[0])
+        }
+    );
+    bad.is_empty()
+}
+
 fn report(t: &Tally, c14n: bool, pdfkit: bool) -> bool {
-    let row = |name: &str, bad: &[String]| {
-        println!(
-            "| {name} | {} |",
-            if bad.is_empty() {
-                "0".to_string()
-            } else {
-                format!("{} – {}", bad.len(), bad[0])
-            }
-        );
-        bad.is_empty()
-    };
     println!(
         "documents {}, PDFs {}, refused by the model {}",
         t.documents, t.pdfs, t.refused_by_model
@@ -604,26 +675,7 @@ fn report(t: &Tally, c14n: bool, pdfkit: bool) -> bool {
         &t.labels_own,
     );
     if pdfkit {
-        println!(
-            "| label documents PDFKit opened | {} |",
-            t.pdfkit_label_docs
-        );
-        ok &= row("labels at PDFKit", &t.pdfkit);
-        for line in &t.pdfkit_teeth {
-            println!("| PDFKit teeth | {line} |");
-            ok &= line.ends_with("caught");
-        }
-        ok &= t.pdfkit_teeth.len() == 2;
-        if let Some(kept) = t.pdfkit_names {
-            println!(
-                "| PDFKit, ToUnicode alone removed | {} |",
-                if kept {
-                    "code point kept, from the glyph names"
-                } else {
-                    "code point lost"
-                }
-            );
-        }
+        ok &= report_pdfkit(t);
     }
     println!(
         "| documents with our wrappers (variant A) | {} |",
