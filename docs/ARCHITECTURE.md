@@ -17,8 +17,8 @@ document is about the Rust that runs underneath it.
 
 | | |
 |---|---|
-| `cli/` | package `aruna` 2.5.11 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
-| `src-tauri/` | package `aruna-desktop` 0.2.0, library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its two commands ask the core where the package went and count what is in it; the logic stays in `cli/`. |
+| `cli/` | package `aruna` 2.6.2 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
+| `src-tauri/` | package `aruna-desktop` 2.6.2 (the version is the core's since 2026-09-04), library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its six commands ask the core where the package went, read what is in it, open the inventory, and build or stop a build; the logic stays in `cli/`. `lib.rs` holds the commands, the event, the plugins and `run()`; `read.rs` (since 2026-10-01) what the window reads from a finished package. |
 
 They were independent crates with a `Cargo.lock` each until 2026-08-30, when
 they were joined: the root manifest lists both, **one lock file** sits beside it
@@ -48,10 +48,19 @@ row is named by a lower one.
 |---|---|---|
 | **adapter** | `main.rs` | — |
 | **application** | `app` | parse a command line, choose an exit code, print |
-| **presentation** | `presentation`, `style`, `html`, `export/inventory` | read the filesystem, parse XML |
-| **domain** | `parse`, `document`, `xml_wellformed`, `order`, `paths`, `catalog`, `md5`, `export/{naming,normalize,validate,verify,manifest}` | know a renderer exists |
-| **infrastructure** | `archive`, `cache`, `download`, `zenodo`, `xml_scan`, `export/mod` | decide what the corpus means |
+| **presentation** | `presentation`, `style`, `html`, `export/inventory`, `pdf/{mod,layout,world,label,post,fonts}` | read the filesystem, parse XML |
+| **domain** | `parse`, `document`, `xml_wellformed`, `order`, `paths`, `catalog`, `cth_titles`, `fonts`, `md5`, `sha256`, `export/{naming,normalize,validate,verify,manifest,counts}` | know a renderer exists |
+| **infrastructure** | `archive`, `cache`, `download`, `zenodo`, `xml_scan`, `export/{mod,staging,lock,pdf}` | decide what the corpus means |
 | **signals** | `progress`, `job`, `error` | depend on any of the above |
+
+The map as of 2026-10-01, after the clean-up of that day: `export/mod` owns the
+pipeline and is the one part besides `export/staging` (the staging directory,
+its owner's marker, the package held aside, the sweep of abandoned ones) and
+`export/lock` (one publication at a time) that opens a file; `export/pdf` is the
+PDF phase, `pdf/` the renderer it calls – pure, a document in and bytes out,
+with `pdf/post` the one walk over a page's content stream that the product, the
+tests and the gate share. `console` is a module of the binary, not of the
+library: the Russian wording of the console.
 
 `progress` and `job` sit beside the stack rather than in it: every layer may
 report through them, and they know nothing about what is being reported.
@@ -80,13 +89,13 @@ Checked, not asserted:
 ```
 Zenodo / local .zip
   └─ download · cache · archive          infrastructure: fetch, verify MD5, open
-      ├─ document                         bytes → Document: the XML model; nothing consumes it yet
+      ├─ document                         bytes → Document: the XML model, read by the PDF phase
       └─ xml_scan · parse                 bytes → ManuscriptRecord, gates and limits
           └─ order                        the one sort the whole program uses
               └─ presentation             CorpusPresentation: groups, fragments, hrefs
                   ├─ html + style         the self-contained inventory
-                  ├─ export               folders, normalised documents, manifest
-                  └─ (future) PDF         §6
+                  ├─ export               folders, normalised documents, PDFs, manifest
+                  └─ pdf                  one document → its PDF, through Typst (§6)
 ```
 
 **The binary drives the export branch, and only it, since 2.3.0.**
@@ -258,7 +267,8 @@ sections that `style::join` orders. Render markup; leave the CSS where it is.
 (`<'a>`) and is not a serialisation format; an IPC type is an owned projection of
 it, with `serde`, in the shell. That day came on 2026-09-02 and the decision went
 to specta: `BuildReport`, `BuildFailure` and `BuildProgress` are declared in
-`src-tauri/src/lib.rs`, and the TypeScript that reads them is generated from
+`src-tauri/src/lib.rs` (the types of the reading commands in
+`src-tauri/src/read.rs` since 2026-10-01), and the TypeScript that reads them is generated from
 those declarations. ts-rs was the alternative and would have generated the types
 without the command wrappers, which is the half that was going wrong.
 
@@ -292,9 +302,9 @@ cargo audit && cargo deny check && cargo machete
 Coverage is run from the root, for both crates at once and held to floors:
 `pnpm coverage` (`scripts/coverage.sh`, see `docs/TESTING.md`).
 
-`src-tauri/` takes the same battery. It holds **39 tests**, all of them in
-`src/lib.rs` – counted 2026-09-25 with `cargo nextest list --run-ignored all`,
-the same way `docs/TESTING.md` counts the console crate. Eleven are in `wire`
+`src-tauri/` takes the same battery. It holds **40 tests**, all of them in
+`src/lib.rs` – counted 2026-10-01 with `cargo nextest list --run-ignored all`,
+the same way `docs/TESTING.md` counts the console crate. Twelve are in `wire`
 (the generated types the window receives, and the promises about what never
 crosses), seven in `counting`, eight in `markup` (the manifest summary and its
 refusals, and every name it gives reaching the window byte for byte), nine in
@@ -307,17 +317,17 @@ release: the other three are declarations that
 `frontend/tests/spec-guard.test.ts` reads, and this one is the compiler's own
 answer about what the builder registers when the feature is off.
 
-Four of the thirty-nine carry `#[ignore]` and run only when asked explicitly:
+Four of the forty carry `#[ignore]` and run only when asked explicitly:
 `regenerate_the_bindings`, which writes `frontend/src/bindings.ts`, the two
 `cancelling` tests that read the corpus archive, and the `markup` test that
 reads a package built from it. Since 2026-09-24 the cancel from the window is
 also proven in the ordinary run, on an archive the test builds. A default run
-is **35**, and **34** under `--features e2e`, where the gate test is compiled out.
+is **36**, and **35** under `--features e2e`, where the gate test is compiled out.
 
 Two flags need care here. `nextest` runs **without** `--all-features`: that flag
 turns on `e2e`, and the gate test is compiled out under the feature
 (`cfg(all(test, not(feature = "e2e")))`) — the very thing it exists to check.
 Clippy, by contrast, takes `--all-features`, because that branch must be checked
-too. `--no-tests=pass` is no longer a necessity: the other thirty-eight tests sit in
+too. `--no-tests=pass` is no longer a necessity: the other thirty-nine tests sit in
 modules gated on `test` alone and run under the feature as well. It stays as
 insurance for a crate that temporarily has no tests at all.
