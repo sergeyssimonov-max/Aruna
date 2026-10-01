@@ -285,6 +285,38 @@ fn matrix(ops: &[Object]) -> M {
     m
 }
 
+/// The text state parameters (ISO 32000 §9.3), which `q` saves with the rest
+/// of the graphics state (§8.4.1): `Tf`, `Tc`, `Tz`, `TL`, `Ts`.
+#[derive(Clone)]
+struct TextState {
+    font: Vec<u8>,
+    size: f32,
+    tc: f32,
+    tz: f32,
+    tl: f32,
+    rise: f32,
+}
+
+/// The state of one walk over one page, and what it has found so far.
+struct Walk {
+    scan: PageScan,
+    fonts: HashMap<Vec<u8>, FontInfo>,
+    ctm: M,
+    fill: Vec<f32>,
+    text: TextState,
+    saved: Vec<(M, Vec<f32>, TextState)>,
+    tm: M,
+    tlm: M,
+    /// Marked content: index into `scan.spans` for spans, None for others,
+    /// and whether ActualText of an enclosing span replaces the glyphs.
+    mc: Vec<(Option<usize>, bool)>,
+    /// The path under construction, in device space.
+    path: Vec<(f32, f32)>,
+    /// ActualText of a replacing span with no MCID, waiting for the first
+    /// MCID span inside it.
+    pending: Option<String>,
+}
+
 /// Walks one page. `lopdf` decodes the operators; the arithmetic of the text
 /// and graphics state is the part of ISO 32000 §9.4 this output uses: `cm`,
 /// `q`/`Q`, `BT`/`ET`, `Tm`, `Td`, `TD`, `T*`, `TL`, `Tf`, `Tc`, `Tz`, `Ts`,
@@ -312,259 +344,303 @@ pub fn scan_page(doc: &Document, page: ObjectId) -> Result<PageScan, PdfError> {
         .map(|c| c.operations)
         .unwrap_or_default();
 
-    let mut ctm = ID;
-    // `q` saves the whole graphics state, the text state parameters with it
-    // (ISO 32000 §8.4.1): `Tf`, `Tc`, `Tz`, `TL`, `Ts`.
-    #[allow(clippy::type_complexity)]
-    let mut stack: Vec<(M, Vec<f32>, Vec<u8>, f32, f32, f32, f32, f32)> = Vec::new();
-    let mut fill: Vec<f32> = vec![0.0];
-    let (mut tm, mut tlm) = (ID, ID);
-    let (mut font, mut size, mut tc, mut tz, mut tl, mut rise) =
-        (Vec::new(), 0.0f32, 0.0f32, 100.0f32, 0.0f32, 0.0f32);
-    // Marked content: index into `scan.spans` for spans, None for others,
-    // and whether ActualText of an enclosing span replaces the glyphs.
-    let mut mc: Vec<(Option<usize>, bool)> = Vec::new();
-    // The path under construction, in device space.
-    let mut path: Vec<(f32, f32)> = Vec::new();
-
-    // ActualText of a replacing span with no MCID, waiting for the first
-    // MCID span inside it.
-    let mut pending: Option<String> = None;
+    let mut walk = Walk::new(scan, fonts);
     for (index, op) in ops.iter().enumerate() {
+        walk.step(index, op);
+    }
+    Ok(walk.scan)
+}
+
+impl Walk {
+    fn new(scan: PageScan, fonts: HashMap<Vec<u8>, FontInfo>) -> Self {
+        Walk {
+            scan,
+            fonts,
+            ctm: ID,
+            fill: vec![0.0],
+            text: TextState {
+                font: Vec::new(),
+                size: 0.0,
+                tc: 0.0,
+                tz: 100.0,
+                tl: 0.0,
+                rise: 0.0,
+            },
+            saved: Vec::new(),
+            tm: ID,
+            tlm: ID,
+            mc: Vec::new(),
+            path: Vec::new(),
+            pending: None,
+        }
+    }
+
+    fn step(&mut self, index: usize, op: &lopdf::content::Operation) {
         let a = &op.operands;
         match op.operator.as_str() {
-            "q" => stack.push((ctm, fill.clone(), font.clone(), size, tc, tz, tl, rise)),
+            "q" => self
+                .saved
+                .push((self.ctm, self.fill.clone(), self.text.clone())),
             "Q" => {
-                if let Some((c, f, fo, si, c2, z, l, r)) = stack.pop() {
-                    ctm = c;
-                    fill = f;
-                    font = fo;
-                    size = si;
-                    tc = c2;
-                    tz = z;
-                    tl = l;
-                    rise = r;
+                if let Some((ctm, fill, text)) = self.saved.pop() {
+                    self.ctm = ctm;
+                    self.fill = fill;
+                    self.text = text;
                 }
             }
-            "cm" => ctm = mul(matrix(a), ctm),
+            "cm" => self.ctm = mul(matrix(a), self.ctm),
             "sc" | "scn" | "g" | "rg" | "k" => {
-                fill = a
+                self.fill = a
                     .iter()
                     .filter(|o| !matches!(o, Object::Name(_)))
                     .map(number)
                     .collect()
             }
+            "BT" | "Tm" | "Td" | "TD" | "T*" | "TL" | "Tc" | "Tz" | "Ts" | "Tf" => {
+                self.text_operator(op.operator.as_str(), a);
+            }
+            "Tj" => self.show(a.iter().collect()),
+            "TJ" => self.show(
+                a.first()
+                    .and_then(|o| o.as_array().ok())
+                    .map(|v| v.iter().collect())
+                    .unwrap_or_default(),
+            ),
+            "m" | "l" | "c" | "re" => self.path_operator(op.operator.as_str(), a),
+            "BMC" | "BDC" => self.open_span(index, a),
+            "EMC" => {
+                if let Some((Some(s), _)) = self.mc.pop() {
+                    self.scan.spans[s].close_op = Some(index);
+                }
+            }
+            "W" | "W*" => self.clip(),
+            "S" | "s" | "f" | "F" | "f*" | "B" | "B*" | "b" | "b*" | "n" => self.path.clear(),
+            _ => {}
+        }
+    }
+
+    /// The text object and the text state: `BT`, `Tm`, `Td`, `TD`, `T*`,
+    /// `TL`, `Tc`, `Tz`, `Ts`, `Tf`.
+    fn text_operator(&mut self, operator: &str, a: &[Object]) {
+        match operator {
             "BT" => {
-                tm = ID;
-                tlm = ID;
+                self.tm = ID;
+                self.tlm = ID;
             }
             "Tm" => {
-                tm = matrix(a);
-                tlm = tm;
+                self.tm = matrix(a);
+                self.tlm = self.tm;
             }
             "Td" | "TD" => {
                 let (tx, ty) = (a.first().map_or(0.0, number), a.get(1).map_or(0.0, number));
-                if op.operator == "TD" {
-                    tl = -ty;
+                if operator == "TD" {
+                    self.text.tl = -ty;
                 }
-                tlm = mul([1.0, 0.0, 0.0, 1.0, tx, ty], tlm);
-                tm = tlm;
+                self.tlm = mul([1.0, 0.0, 0.0, 1.0, tx, ty], self.tlm);
+                self.tm = self.tlm;
             }
             "T*" => {
-                tlm = mul([1.0, 0.0, 0.0, 1.0, 0.0, -tl], tlm);
-                tm = tlm;
+                self.tlm = mul([1.0, 0.0, 0.0, 1.0, 0.0, -self.text.tl], self.tlm);
+                self.tm = self.tlm;
             }
-            "TL" => tl = a.first().map_or(0.0, number),
-            "Tc" => tc = a.first().map_or(0.0, number),
-            "Tz" => tz = a.first().map_or(100.0, number),
-            "Ts" => rise = a.first().map_or(0.0, number),
+            "TL" => self.text.tl = a.first().map_or(0.0, number),
+            "Tc" => self.text.tc = a.first().map_or(0.0, number),
+            "Tz" => self.text.tz = a.first().map_or(100.0, number),
+            "Ts" => self.text.rise = a.first().map_or(0.0, number),
             "Tf" => {
-                font = a
+                self.text.font = a
                     .first()
                     .and_then(|o| o.as_name().ok())
                     .unwrap_or_default()
                     .to_vec();
-                size = a.get(1).map_or(0.0, number);
+                self.text.size = a.get(1).map_or(0.0, number);
             }
-            "Tj" | "TJ" => {
-                let items: Vec<&Object> = if op.operator == "Tj" {
-                    a.iter().collect()
-                } else {
-                    a.first()
-                        .and_then(|o| o.as_array().ok())
-                        .map(|v| v.iter().collect())
-                        .unwrap_or_default()
-                };
-                let info = fonts.get(&font);
-                let replaced = mc.iter().any(|(_, r)| *r);
-                let open_span = mc.iter().rev().find_map(|(s, _)| *s);
-                for item in items {
-                    match item {
-                        Object::String(bytes, _) => {
-                            let width = info.map_or(2, |f| f.code_bytes);
-                            for pair in bytes.chunks(width) {
-                                let code = if pair.len() == 2 {
-                                    u16::from_be_bytes([pair[0], pair[1]])
-                                } else {
-                                    u16::from(pair[0])
-                                };
-                                let w = info
-                                    .and_then(|f| f.widths.get(&code).copied())
-                                    .unwrap_or_else(|| info.map_or(1000.0, |f| f.default_width))
-                                    * info.map_or(0.001, |f| f.scale);
-                                let trm = mul(
-                                    [size * tz / 100.0, 0.0, 0.0, size, 0.0, rise],
-                                    mul(tm, ctm),
-                                );
-                                let (x0, y) = apply(trm, 0.0, 0.0);
-                                let (x1, _) = apply(trm, w, 0.0);
-                                let base = info.map_or_else(String::new, |f| f.base.clone());
-                                if code == 0 && pair.len() == 2 {
-                                    *scan.notdef.entry(base.clone()).or_insert(0) += 1;
-                                }
-                                let text = info
-                                    .and_then(|f| f.to_unicode.get(&code).cloned())
-                                    .unwrap_or_default();
-                                scan.raw_text.push_str(&text);
-                                if !replaced {
-                                    scan.text.push_str(&text);
-                                    for s in mc.iter().filter_map(|(s, _)| *s) {
-                                        scan.spans[s].resolved.push_str(&text);
-                                    }
-                                }
-                                if let Some(s) = open_span {
-                                    let span = &mut scan.spans[s];
-                                    span.glyphs += 1;
-                                    span.text.push_str(&text);
-                                    if span.fill.is_none() {
-                                        span.fill = Some(fill.clone());
-                                    }
-                                }
-                                scan.glyphs.push(Glyph {
-                                    code,
-                                    font: base,
-                                    x0: x0.min(x1),
-                                    x1: x0.max(x1),
-                                    y,
-                                    text,
-                                });
-                                let tx = (w * size + tc) * tz / 100.0;
-                                tm = mul([1.0, 0.0, 0.0, 1.0, tx, 0.0], tm);
-                            }
-                        }
-                        other => {
-                            let tx = -number(other) / 1000.0 * size * tz / 100.0;
-                            tm = mul([1.0, 0.0, 0.0, 1.0, tx, 0.0], tm);
-                        }
-                    }
-                }
-            }
-            "m" | "l" => {
-                let p = apply(
-                    ctm,
-                    a.first().map_or(0.0, number),
-                    a.get(1).map_or(0.0, number),
-                );
-                scan.path_points.push(p);
-                path.push(p);
-            }
-            "c" => {
-                for k in 0..3 {
-                    let p = apply(
-                        ctm,
-                        a.get(2 * k).map_or(0.0, number),
-                        a.get(2 * k + 1).map_or(0.0, number),
-                    );
-                    scan.path_points.push(p);
-                    path.push(p);
-                }
-            }
-            "re" => {
-                let v: Vec<f32> = a.iter().map(number).collect();
-                if v.len() == 4 {
-                    for (x, y) in [(v[0], v[1]), (v[0] + v[2], v[1] + v[3])] {
-                        let p = apply(ctm, x, y);
-                        scan.path_points.push(p);
-                        path.push(p);
-                    }
-                }
-            }
-            "BMC" | "BDC" => {
-                let tag = a
-                    .first()
-                    .and_then(|o| o.as_name().ok())
-                    .map(|n| String::from_utf8_lossy(n).into_owned())
-                    .unwrap_or_default();
-                let props = a.get(1).and_then(|o| o.as_dict().ok());
-                let mcid = props
-                    .and_then(|d| d.get(b"MCID").ok())
-                    .and_then(|o| o.as_i64().ok());
-                let actual = props
-                    .and_then(|d| d.get(b"ActualText").ok())
-                    .and_then(|o| o.as_str().ok())
-                    .map(decode_text_string);
-                let outer_replaced = mc.iter().any(|(_, r)| *r);
-                if let Some(t) = &actual {
-                    if !outer_replaced {
-                        scan.text.push_str(t);
-                        for s in mc.iter().filter_map(|(s, _)| *s) {
-                            scan.spans[s].resolved.push_str(t);
-                        }
-                        if mcid.is_none()
-                            && !mc
-                                .iter()
-                                .any(|(s, _)| s.is_some_and(|s| scan.spans[s].mcid.is_some()))
-                        {
-                            pending = Some(t.clone());
-                        }
-                    }
-                }
-                scan.spans.push(Span {
-                    mcid,
-                    tag,
-                    actual_text: actual.clone(),
-                    text: String::new(),
-                    fill: None,
-                    ctm,
-                    clip: None,
-                    glyphs: 0,
-                    parent: mc.iter().rev().find_map(|(s, _)| *s),
-                    open_op: index,
-                    close_op: None,
-                    resolved: String::new(),
-                });
-                if mcid.is_some() {
-                    if let Some(t) = pending.take() {
-                        let last = scan.spans.len() - 1;
-                        scan.spans[last].resolved.push_str(&t);
-                    }
-                }
-                mc.push((Some(scan.spans.len() - 1), actual.is_some()));
-            }
-            "EMC" => {
-                if let Some((Some(s), _)) = mc.pop() {
-                    scan.spans[s].close_op = Some(index);
-                }
-            }
-            "W" | "W*" => {
-                if let (Some(s), false) = (mc.iter().rev().find_map(|(s, _)| *s), path.is_empty()) {
-                    if scan.spans[s].clip.is_none() {
-                        let xs = path.iter().map(|p| p.0);
-                        let ys = path.iter().map(|p| p.1);
-                        scan.spans[s].clip = Some([
-                            xs.clone().fold(f32::MAX, f32::min),
-                            ys.clone().fold(f32::MAX, f32::min),
-                            xs.fold(f32::MIN, f32::max),
-                            ys.fold(f32::MIN, f32::max),
-                        ]);
-                    }
-                }
-            }
-            "S" | "s" | "f" | "F" | "f*" | "B" | "B*" | "b" | "b*" | "n" => path.clear(),
             _ => {}
         }
     }
-    Ok(scan)
+
+    /// `Tj` and `TJ`: strings are shown glyph by glyph, numbers move the
+    /// text matrix back by thousandths of the font size.
+    fn show(&mut self, items: Vec<&Object>) {
+        let replaced = self.mc.iter().any(|(_, r)| *r);
+        let open_span = self.mc.iter().rev().find_map(|(s, _)| *s);
+        for item in items {
+            match item {
+                Object::String(bytes, _) => self.show_string(bytes, replaced, open_span),
+                other => {
+                    let tx = -number(other) / 1000.0 * self.text.size * self.text.tz / 100.0;
+                    self.tm = mul([1.0, 0.0, 0.0, 1.0, tx, 0.0], self.tm);
+                }
+            }
+        }
+    }
+
+    /// One string of `Tj` or `TJ`, code by code: where each glyph lands, what
+    /// it reads as, and to which text and spans that reading goes.
+    fn show_string(&mut self, bytes: &[u8], replaced: bool, open_span: Option<usize>) {
+        let info = self.fonts.get(&self.text.font);
+        let (size, tc, tz, rise) = (self.text.size, self.text.tc, self.text.tz, self.text.rise);
+        let width = info.map_or(2, |f| f.code_bytes);
+        for pair in bytes.chunks(width) {
+            let code = if pair.len() == 2 {
+                u16::from_be_bytes([pair[0], pair[1]])
+            } else {
+                u16::from(pair[0])
+            };
+            let w = info
+                .and_then(|f| f.widths.get(&code).copied())
+                .unwrap_or_else(|| info.map_or(1000.0, |f| f.default_width))
+                * info.map_or(0.001, |f| f.scale);
+            let trm = mul(
+                [size * tz / 100.0, 0.0, 0.0, size, 0.0, rise],
+                mul(self.tm, self.ctm),
+            );
+            let (x0, y) = apply(trm, 0.0, 0.0);
+            let (x1, _) = apply(trm, w, 0.0);
+            let base = info.map_or_else(String::new, |f| f.base.clone());
+            if code == 0 && pair.len() == 2 {
+                *self.scan.notdef.entry(base.clone()).or_insert(0) += 1;
+            }
+            let text = info
+                .and_then(|f| f.to_unicode.get(&code).cloned())
+                .unwrap_or_default();
+            self.scan.raw_text.push_str(&text);
+            if !replaced {
+                self.scan.text.push_str(&text);
+                for s in self.mc.iter().filter_map(|(s, _)| *s) {
+                    self.scan.spans[s].resolved.push_str(&text);
+                }
+            }
+            if let Some(s) = open_span {
+                let span = &mut self.scan.spans[s];
+                span.glyphs += 1;
+                span.text.push_str(&text);
+                if span.fill.is_none() {
+                    span.fill = Some(self.fill.clone());
+                }
+            }
+            self.scan.glyphs.push(Glyph {
+                code,
+                font: base,
+                x0: x0.min(x1),
+                x1: x0.max(x1),
+                y,
+                text,
+            });
+            let tx = (w * size + tc) * tz / 100.0;
+            self.tm = mul([1.0, 0.0, 0.0, 1.0, tx, 0.0], self.tm);
+        }
+    }
+
+    /// `m`, `l`, `c`, `re`: the points of the path, in device space.
+    fn path_operator(&mut self, operator: &str, a: &[Object]) {
+        let mut points = Vec::new();
+        match operator {
+            "m" | "l" => points.push(apply(
+                self.ctm,
+                a.first().map_or(0.0, number),
+                a.get(1).map_or(0.0, number),
+            )),
+            "c" => {
+                for k in 0..3 {
+                    points.push(apply(
+                        self.ctm,
+                        a.get(2 * k).map_or(0.0, number),
+                        a.get(2 * k + 1).map_or(0.0, number),
+                    ));
+                }
+            }
+            _ => {
+                let v: Vec<f32> = a.iter().map(number).collect();
+                if v.len() == 4 {
+                    for (x, y) in [(v[0], v[1]), (v[0] + v[2], v[1] + v[3])] {
+                        points.push(apply(self.ctm, x, y));
+                    }
+                }
+            }
+        }
+        for p in points {
+            self.scan.path_points.push(p);
+            self.path.push(p);
+        }
+    }
+
+    /// `BMC` and `BDC`: a span, its MCID and ActualText, and where that
+    /// ActualText goes in the text a reader gets.
+    fn open_span(&mut self, index: usize, a: &[Object]) {
+        let tag = a
+            .first()
+            .and_then(|o| o.as_name().ok())
+            .map(|n| String::from_utf8_lossy(n).into_owned())
+            .unwrap_or_default();
+        let props = a.get(1).and_then(|o| o.as_dict().ok());
+        let mcid = props
+            .and_then(|d| d.get(b"MCID").ok())
+            .and_then(|o| o.as_i64().ok());
+        let actual = props
+            .and_then(|d| d.get(b"ActualText").ok())
+            .and_then(|o| o.as_str().ok())
+            .map(decode_text_string);
+        let outer_replaced = self.mc.iter().any(|(_, r)| *r);
+        if let Some(t) = &actual {
+            if !outer_replaced {
+                self.scan.text.push_str(t);
+                for s in self.mc.iter().filter_map(|(s, _)| *s) {
+                    self.scan.spans[s].resolved.push_str(t);
+                }
+                if mcid.is_none()
+                    && !self
+                        .mc
+                        .iter()
+                        .any(|(s, _)| s.is_some_and(|s| self.scan.spans[s].mcid.is_some()))
+                {
+                    self.pending = Some(t.clone());
+                }
+            }
+        }
+        self.scan.spans.push(Span {
+            mcid,
+            tag,
+            actual_text: actual.clone(),
+            text: String::new(),
+            fill: None,
+            ctm: self.ctm,
+            clip: None,
+            glyphs: 0,
+            parent: self.mc.iter().rev().find_map(|(s, _)| *s),
+            open_op: index,
+            close_op: None,
+            resolved: String::new(),
+        });
+        if mcid.is_some() {
+            if let Some(t) = self.pending.take() {
+                let last = self.scan.spans.len() - 1;
+                self.scan.spans[last].resolved.push_str(&t);
+            }
+        }
+        self.mc
+            .push((Some(self.scan.spans.len() - 1), actual.is_some()));
+    }
+
+    /// `W` and `W*`: the first clipping path inside the innermost span, as a
+    /// box.
+    fn clip(&mut self) {
+        if let (Some(s), false) = (
+            self.mc.iter().rev().find_map(|(s, _)| *s),
+            self.path.is_empty(),
+        ) {
+            if self.scan.spans[s].clip.is_none() {
+                let xs = self.path.iter().map(|p| p.0);
+                let ys = self.path.iter().map(|p| p.1);
+                self.scan.spans[s].clip = Some([
+                    xs.clone().fold(f32::MAX, f32::min),
+                    ys.clone().fold(f32::MAX, f32::min),
+                    xs.fold(f32::MIN, f32::max),
+                    ys.fold(f32::MIN, f32::max),
+                ]);
+            }
+        }
+    }
 }
 
 /// A PDF text string: UTF-16BE with a byte order mark, or PDFDocEncoding,
@@ -766,17 +842,7 @@ fn add_invisible_layer(
             continue;
         }
         add_font_resource(doc, page, font)?;
-        let contents = doc.get_page_contents(page);
-        let [id] = contents.as_slice() else {
-            return Err(broken(format!(
-                "a page with {} content streams",
-                contents.len()
-            )));
-        };
-        let stream = doc
-            .get_object_mut(*id)
-            .and_then(|o| o.as_stream_mut())
-            .map_err(broken)?;
+        let stream = only_stream(doc, page)?;
         let mut bytes = stream.get_plain_content().map_err(broken)?;
         for (mcid, at_open, frame, label) in here {
             let needle = format!("/Span<</MCID {mcid}>>BDC");
@@ -817,8 +883,7 @@ fn add_invisible_layer(
             let end = at + needle.len();
             bytes.splice(end..end, layer.into_bytes());
         }
-        stream.set_plain_content(bytes);
-        stream.compress().map_err(broken)?;
+        replace_content(stream, bytes)?;
     }
     if report.unmatched > 0 {
         return Err(PdfError::Invariant(Invariant::LabelSpans(report.unmatched)));
@@ -903,21 +968,30 @@ fn wrap_clusters(doc: &mut Document, report: &mut Patched) -> Result<(), PdfErro
                 .push((n as usize, *ma, *mb, cluster.clone(), text.clone()));
         }
         let bytes = Content { operations: ops }.encode().map_err(broken)?;
-        let contents = doc.get_page_contents(page);
-        let [id] = contents.as_slice() else {
-            return Err(broken(format!(
-                "a page with {} content streams",
-                contents.len()
-            )));
-        };
-        let stream = doc
-            .get_object_mut(*id)
-            .and_then(|o| o.as_stream_mut())
-            .map_err(broken)?;
-        stream.set_plain_content(bytes);
-        stream.compress().map_err(broken)?;
+        replace_content(only_stream(doc, page)?, bytes)?;
     }
     Ok(())
+}
+
+/// The one content stream of a page. Typst writes one per page; a patch that
+/// met more would not know which of them its bytes belong to.
+fn only_stream(doc: &mut Document, page: ObjectId) -> Result<&mut lopdf::Stream, PdfError> {
+    let contents = doc.get_page_contents(page);
+    let [id] = contents.as_slice() else {
+        return Err(broken(format!(
+            "a page with {} content streams",
+            contents.len()
+        )));
+    };
+    doc.get_object_mut(*id)
+        .and_then(|o| o.as_stream_mut())
+        .map_err(broken)
+}
+
+/// A page's patched content, written back compressed.
+fn replace_content(stream: &mut lopdf::Stream, bytes: Vec<u8>) -> Result<(), PdfError> {
+    stream.set_plain_content(bytes);
+    stream.compress().map_err(broken)
 }
 
 /// Everything done to a PDF after Typst, in one load and one save: the
