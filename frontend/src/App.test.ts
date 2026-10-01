@@ -573,7 +573,7 @@ describe('пакет есть', () => {
     expect(buildCorpus).toHaveBeenCalledWith(null)
   })
 
-  it('отдает опись плагину opener', async () => {
+  it('открывает опись командой ядра', async () => {
     await overPackage()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))

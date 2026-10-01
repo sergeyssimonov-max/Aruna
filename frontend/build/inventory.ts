@@ -43,7 +43,7 @@ export const SCRIPT = 'inventory_filter.js'
  * anything of its own; `screen` is the inventory's own rules; `print` is how it
  * prints, and the future PDF joins there.
  */
-export const SECTIONS = ['canonical', 'screen', 'print'] as const
+const SECTIONS = ['canonical', 'screen', 'print'] as const
 
 /**
  * A placeholder the Rust side finds and replaces when it exports a corpus.

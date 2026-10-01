@@ -6,7 +6,7 @@ export default defineConfig({
   // Top level, not inside the `component` project. Vitest transforms test files
   // through the SSR pipeline, so without this Svelte resolves to its server
   // build and `mount()` throws `lifecycle_function_unavailable` — which is what
-  // `src/lib/Counter.test.ts` did with the condition set on the project alone.
+  // the first component test did with the condition set on the project alone.
   resolve: {
     conditions: ['browser'],
   },

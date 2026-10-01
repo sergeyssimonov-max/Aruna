@@ -2,8 +2,9 @@
  * The committed build products are what these sources produce.
  *
  * Everything in `cli/src/generated/` is built here and compiled into the Rust
- * binary with `include_str!` — the client script and the three stylesheet
- * sections — and all four are committed rather than built by `build.rs` for one
+ * binary with `include_str!` — the client script, the three stylesheet sections
+ * and the markup of the eight components — and all twelve are committed rather
+ * than built by `build.rs` for one
  * reason: `cargo build` must never need Node. That is the
  * premise of the `.app` and the DMG, and it is worth the one thing a committed
  * build product costs — the chance of it going stale, or of someone editing
