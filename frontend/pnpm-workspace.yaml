@@ -7,19 +7,3 @@ overrides:
   '@puppeteer/browsers': '3.2.1'
   deepmerge-ts: '8.0.2'
   serialize-javascript: '7.0.5'
-
-# GHSA-3wwx-pv8p-q78v – undici, denial of service through an unhandled error in
-# WebSocket permessage-deflate decompression; CVSS 5.9, published 2026-09-28.
-# Excepted by the owner's decision of 2026-09-29 as unreachable here: undici
-# comes only with test tools – vitest > jsdom and @wdio/cli > webdriverio – and
-# none of them ships; the frontend opens no WebSocket, and wdio talks only to
-# the local driver. The fixes (6.28.1, 7.29.1, 8.10.2) are not taken by hand:
-# transitive versions are the resolver's, and a release is taken at seven days
-# old at the earliest (specification 5.1) – on 2026-10-05. To be removed in the
-# maintenance task around then, with Tauri 2.12.
-# Guard: tests/audit-exception.test.ts fails from 2026-10-06, and as soon as
-# every undici in pnpm-lock.yaml is at or past its fix – the exception does not
-# outlive its reason.
-audit:
-  ignore:
-    - GHSA-3wwx-pv8p-q78v
