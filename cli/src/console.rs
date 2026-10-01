@@ -85,38 +85,14 @@ pub fn headline(err: &ArunaError) -> String {
             second_group,
             first,
             second,
-        } => {
-            // Регистр виден на экране сам; форма Unicode – нет, и два имени
-            // печатаются одинаково. Тогда называется то, чем они различаются.
-            let apart = aruna::error::spelled_apart(first_group, second_group)
-                .map(|(a, b)| format!(" (различаются формой Unicode: {a} против {b})"))
-                .unwrap_or_default();
-            format!(
-                "папки групп {first_group} и {second_group}{apart} на этом диске – одна папка: в первую ложится {first}, во вторую – {second}"
-            )
-        }
+        } => folder_collision(first_group, second_group, first, second),
         ArchiveDuplicateEntry { entry } => {
             format!("архив называет {entry} дважды; документ может встречаться в нем один раз")
         }
         ExportDocumentTooLarge { entry, limit } => {
             format!("{entry} больше предела в {limit} байт для одного документа")
         }
-        ExportDistorted { entry, reason } => {
-            let mut parts = reason.split(" | ");
-            let mut text = format!(
-                "{entry} исказился бы при нормализации: {}",
-                translated(parts.next().unwrap_or_default())
-            );
-            for more in parts {
-                match more.split_once(": ") {
-                    Some((name, why)) => {
-                        text.push_str(&format!("\n  то же с {name}: {}", translated(why)))
-                    }
-                    None => text.push_str(&format!("\n  то же: {}", translated(more))),
-                }
-            }
-            text
-        }
+        ExportDistorted { entry, reason } => distorted(entry, reason),
         ExportIncomplete { expected, written } => {
             format!("записано {written} документов, а размечено {expected}")
         }
@@ -148,6 +124,35 @@ pub fn headline(err: &ArunaError) -> String {
         DownloadsDir => "не удалось определить каталог Downloads".to_string(),
 
     }
+}
+
+/// Две группы, которые диск кладет в одну папку.
+fn folder_collision(first_group: &str, second_group: &str, first: &str, second: &str) -> String {
+    // Регистр виден на экране сам; форма Unicode – нет, и два имени
+    // печатаются одинаково. Тогда называется то, чем они различаются.
+    let apart = aruna::error::spelled_apart(first_group, second_group)
+        .map(|(a, b)| format!(" (различаются формой Unicode: {a} против {b})"))
+        .unwrap_or_default();
+    format!(
+        "папки групп {first_group} и {second_group}{apart} на этом диске – одна папка: в первую ложится {first}, во вторую – {second}"
+    )
+}
+
+/// Документ, который нормализация исказила бы: первая причина в строке
+/// заголовка, остальные – строкой каждая.
+fn distorted(entry: &str, reason: &str) -> String {
+    let mut parts = reason.split(" | ");
+    let mut text = format!(
+        "{entry} исказился бы при нормализации: {}",
+        translated(parts.next().unwrap_or_default())
+    );
+    for more in parts {
+        match more.split_once(": ") {
+            Some((name, why)) => text.push_str(&format!("\n  то же с {name}: {}", translated(why))),
+            None => text.push_str(&format!("\n  то же: {}", translated(more))),
+        }
+    }
+    text
 }
 
 /// Причина, которую назвала система или сеть, – по ее виду, а не ее словами.
