@@ -88,7 +88,7 @@ pub fn cache_dir() -> Option<PathBuf> {
 /// The digest is in the name rather than only in a sidecar file so that the
 /// question "is this the archive I want?" can be answered by the name, and a
 /// republished archive lands beside the old one instead of over it.
-pub fn archive_name(url: &str, md5: &str) -> String {
+pub(crate) fn archive_name(url: &str, md5: &str) -> String {
     // The last path segment, and nothing before it. This used to split on
     // `/files/` — which the pinned Zenodo URL happens to contain — and a URL
     // without that segment fell through to the whole URL: `rsplit` on a
@@ -118,7 +118,7 @@ pub fn archive_name(url: &str, md5: &str) -> String {
 /// ordinary cold run, and a file under that name that hashes to something else
 /// is worth saying out loud. Returned rather than printed so this module needs
 /// no opinion about who is listening — see [`crate::progress`].
-pub enum Lookup {
+pub(crate) enum Lookup {
     /// There, and still hashing to what its name promises.
     Hit(PathBuf),
     /// Nothing under that name.
@@ -132,7 +132,7 @@ pub enum Lookup {
 /// A file that fails the check is reported as a miss rather than deleted here:
 /// the caller downloads over it, and the rename that lands the new copy
 /// replaces it atomically.
-pub fn lookup(dir: &Path, url: &str, md5: &str) -> Lookup {
+pub(crate) fn lookup(dir: &Path, url: &str, md5: &str) -> Lookup {
     let path = dir.join(archive_name(url, md5));
     if !path.is_file() {
         return Lookup::Absent;
@@ -158,7 +158,7 @@ pub fn lookup(dir: &Path, url: &str, md5: &str) -> Lookup {
 /// right for a cache of our own and destructive anywhere else: [`CACHE_DIR_ENV`]
 /// is a setting a user can point wherever they like, and pointed at a directory
 /// holding other archives it would have deleted them.
-pub fn prune(dir: &Path, keep: &Path) {
+pub(crate) fn prune(dir: &Path, keep: &Path) {
     let Some(keep_name) = keep.file_name().and_then(|n| n.to_str()) else {
         return;
     };
@@ -254,7 +254,7 @@ pub fn sweep_unfinished(dir: &Path) {
 /// otherwise succeed. A directory can be unwritable for ordinary reasons: a
 /// restricted account, a volume mounted read-only, a permissions repair gone
 /// wrong.
-pub fn is_usable(dir: &Path) -> bool {
+pub(crate) fn is_usable(dir: &Path) -> bool {
     if std::fs::create_dir_all(dir).is_err() {
         return false;
     }

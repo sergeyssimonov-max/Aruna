@@ -76,7 +76,7 @@ fn print_section() -> String {
 }
 
 /// The stylesheet for the inventory: shared, then its own, then print.
-pub fn inventory_css() -> String {
+pub(crate) fn inventory_css() -> String {
     join(INVENTORY)
 }
 

@@ -59,7 +59,7 @@ const PDFS_PER_TICK: usize = 250;
 
 /// Builds the PDF of every placed document, in the order they were placed –
 /// the one display order of the program – and writes each beside its XML.
-pub fn write_pdfs(
+pub(crate) fn write_pdfs(
     staging: &Path,
     records: &[ManuscriptRecord],
     placed: &[Placed],
@@ -102,7 +102,7 @@ pub fn write_pdfs(
 /// model: not published, a defect of the program and not of the data – the
 /// sentence the window already has for it. The document and the invariant are
 /// the first problem, two parts the console translates one by one.
-pub fn invariant_broken(root: &Path, document: &str, invariant: &str) -> ArunaError {
+pub(crate) fn invariant_broken(root: &Path, document: &str, invariant: &str) -> ArunaError {
     ArunaError::ExportInvalid {
         root: root.to_path_buf(),
         count: 1,

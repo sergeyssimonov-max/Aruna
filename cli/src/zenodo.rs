@@ -45,7 +45,7 @@ const METADATA_TIMEOUT: Duration = Duration::from_secs(10);
 /// `…/versions/latest` redirects to the record itself while it is current, so
 /// one request answers both questions: what the newest edition is, and — when
 /// that is still ours — what digest it is published with.
-pub fn latest_release(record_id: u64) -> Result<Release> {
+pub(crate) fn latest_release(record_id: u64) -> Result<Release> {
     let url = format!("https://zenodo.org/api/records/{record_id}/versions/latest");
     let body = crate::download::fetch_text(&url, METADATA_TIMEOUT)?;
     parse_release(&body).ok_or_else(|| ArunaError::Network {
@@ -88,7 +88,7 @@ fn parse_release(body: &str) -> Option<Release> {
 /// instead would turn a check of *which* archive arrived into a check of
 /// whether the transfer corrupted it. A republished corpus would then be
 /// accepted in silence, which is the failure this pin exists to prevent.
-pub fn advice(pinned_record: u64, pinned_md5: &str, latest: &Release) -> Option<String> {
+pub(crate) fn advice(pinned_record: u64, pinned_md5: &str, latest: &Release) -> Option<String> {
     if latest.record_id != pinned_record {
         return Some(format!(
             "A newer edition of the corpus is published: Zenodo record {} ({}), file {}.\n\

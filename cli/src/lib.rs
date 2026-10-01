@@ -85,7 +85,7 @@ pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 /// Pinned rather than fetched. The site never talks to Zenodo, and a run served
 /// from the cache stays offline by design — a credit that arrived over the
 /// network would be missing in exactly the places it has to appear.
-pub const CORPUS_AUTHORS: [(&str, &str); 4] = [
+pub(crate) const CORPUS_AUTHORS: [(&str, &str); 4] = [
     ("Gerfrid Müller", "Würzburg"),
     ("Doris Prechel", "Mainz"),
     ("Elisabeth Rieken", "Marburg"),
@@ -96,7 +96,7 @@ pub const CORPUS_AUTHORS: [(&str, &str); 4] = [
 ///
 /// Built in one place because both halves show it and this project keeps
 /// finding out what it costs when they each build their own.
-pub fn corpus_authors_line() -> String {
+pub(crate) fn corpus_authors_line() -> String {
     CORPUS_AUTHORS
         .iter()
         .map(|(name, city)| format!("{name} ({city})"))
@@ -184,7 +184,7 @@ pub fn obtain_archive(url: &str, md5: &str, job: &Job<'_>) -> Result<cache::Arch
 /// request for it. On a day the API answered in eight seconds that cost ten
 /// seconds a test, and one of them asserts it finishes in under two, which is
 /// how this was found rather than read.
-pub type ReleaseLookup = fn(u64) -> Result<zenodo::Release>;
+pub(crate) type ReleaseLookup = fn(u64) -> Result<zenodo::Release>;
 
 /// As [`obtain_archive`], with the release lookup given — the tests need one
 /// that does not reach Zenodo.

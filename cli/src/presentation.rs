@@ -86,7 +86,7 @@ use crate::parse::{group_label, group_runs, ManuscriptRecord, MISSING};
 /// statement about people, not about strings, and this file has no way to check
 /// one. A wrong pair here would quietly merge two scholars, which is worse than
 /// a search that misses rows, so an addition wants someone who knows the field.
-pub const EDITOR_ALIASES: [&[&str]; 3] = [
+pub(crate) const EDITOR_ALIASES: [&[&str]; 3] = [
     &["DS", "Daniel Schwemer"],
     &["FF", "Francesco Fuscagni"],
     &["Andrey Shatskov", "Andrei Shatskov"],
@@ -97,7 +97,7 @@ pub const EDITOR_ALIASES: [&[&str]; 3] = [
 /// Matching ignores case and surrounding space, because the archive's spelling
 /// is what a document happened to type. The spelling given is never returned:
 /// the row already carries it.
-pub fn other_spellings(editor: &str) -> Vec<&'static str> {
+pub(crate) fn other_spellings(editor: &str) -> Vec<&'static str> {
     let editor = editor.trim();
     if editor.is_empty() {
         return Vec::new();
@@ -122,7 +122,7 @@ pub fn other_spellings(editor: &str) -> Vec<&'static str> {
 /// manuscripts that way, so a presentation that re-sorted would be a third
 /// opinion about the corpus.
 #[derive(Debug)]
-pub struct CorpusPresentation<'a> {
+pub(crate) struct CorpusPresentation<'a> {
     /// Where the corpus came from, as the attribution line prints it.
     pub source: &'a str,
     /// The CTH groups, in listing order.
@@ -131,7 +131,7 @@ pub struct CorpusPresentation<'a> {
 
 /// One CTH group, and the manuscripts filed under it.
 #[derive(Debug)]
-pub struct GroupPresentation<'a> {
+pub(crate) struct GroupPresentation<'a> {
     /// The label as a reader sees it: `CTH 5`, or the dash for no group.
     pub label: &'a str,
     pub fragments: Vec<FragmentPresentation<'a>>,
@@ -237,7 +237,7 @@ impl<'a> CorpusPresentation<'a> {
 
     /// The PDFs a build made, linked beside their documents. `built` is
     /// parallel to `placed`, as `placed` is to the records; `None` links none.
-    pub fn with_pdfs(mut self, placed: &[Placed], built: Option<&[bool]>) -> Self {
+    pub(crate) fn with_pdfs(mut self, placed: &[Placed], built: Option<&[bool]>) -> Self {
         let Some(built) = built else { return self };
         let fragments = self.groups.iter_mut().flat_map(|g| g.fragments.iter_mut());
         for ((fragment, place), made) in fragments.zip(placed).zip(built) {

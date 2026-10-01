@@ -44,7 +44,7 @@ pub fn path_component(raw: &str) -> String {
 /// suffix – and the twin came out under its sibling's name, so two documents
 /// the suffix exists to tell apart stopped the build as a collision (review of
 /// 4d6bee1, 25.09.2026). The base is cut instead, and the suffix stays.
-pub fn twin_path(group: &str, base: &str, suffix: &str) -> PathBuf {
+pub(crate) fn twin_path(group: &str, base: &str, suffix: &str) -> PathBuf {
     let whole = escape(&format!("{base} ({suffix})"));
     let tail = escape(&format!(" ({suffix})"));
     let name = if whole.len() <= MAX_COMPONENT || tail.len() * 2 > MAX_COMPONENT {
@@ -91,7 +91,7 @@ fn finish(escaped: &str, limit: usize) -> String {
 /// name. APFS counts characters rather than bytes and would take more, but a
 /// package is copied off the machine it was built on, and a name that fits
 /// only here is a package that does not open elsewhere.
-pub const MAX_COMPONENT: usize = 255 - ".xml".len();
+pub(crate) const MAX_COMPONENT: usize = 255 - ".xml".len();
 
 /// `name` cut on a character boundary to `limit` bytes.
 ///

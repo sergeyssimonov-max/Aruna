@@ -242,7 +242,7 @@ pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &st
 ///
 /// The difference between the two is entirely in the presentation it is handed:
 /// one has hrefs and the other does not, and this renderer never asks why.
-pub fn render_linked_html(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
+pub(crate) fn render_linked_html(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
     render(corpus, generated_at)
 }
 

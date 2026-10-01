@@ -27,14 +27,15 @@ use std::collections::BTreeMap;
 pub const SOURCE_URL: &str = "https://hethport.net/CTH/index.php?lang=EN";
 
 /// The snapshot, compiled in.
-pub const SNAPSHOT: &str = include_str!("../resources/cth/cth-titles.tsv");
+pub(crate) const SNAPSHOT: &str = include_str!("../resources/cth/cth-titles.tsv");
 
 /// The file beside the inventory that says whose titles these are and on what
 /// terms they are reproduced.
 pub const PACKAGED_TERMS: &str = "CTH-TITLES-TERMS.txt";
 
 /// Its bytes, compiled in so that the package cannot ship without them.
-pub const PACKAGED_TERMS_BYTES: &[u8] = include_bytes!("../resources/cth/CTH-TITLES-TERMS.txt");
+pub(crate) const PACKAGED_TERMS_BYTES: &[u8] =
+    include_bytes!("../resources/cth/CTH-TITLES-TERMS.txt");
 
 /// A CTH identifier: the number, and the index after it, if any.
 ///
@@ -296,7 +297,7 @@ fn title_markup_is_valid(title: &str) -> bool {
 /// markup. The catalogue's text goes through [`crate::html::escape_html`]; the
 /// `<sup>` around it is this function's own, the same arrangement as the
 /// editor cell in `html.rs`.
-pub fn title_html(title: &str) -> String {
+pub(crate) fn title_html(title: &str) -> String {
     let mut out = String::with_capacity(title.len() + 16);
     let mut rest = title;
     while let Some(open) = rest.find("<sup>") {
@@ -313,7 +314,7 @@ pub fn title_html(title: &str) -> String {
 }
 
 /// A title as plain text: the superscript kept as its letters.
-pub fn title_text(title: &str) -> String {
+pub(crate) fn title_text(title: &str) -> String {
     title.replace("<sup>", "").replace("</sup>", "")
 }
 

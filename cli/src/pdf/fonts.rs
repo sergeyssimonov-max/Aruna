@@ -21,7 +21,7 @@ use crate::error::ArunaError;
 /// The stack of 3.9 in its order; the main face is the regular cut. The
 /// order is significant: Noto Sans Cuneiform draws cuneiform before
 /// UllikummiA is asked.
-pub const STACK: [&str; 5] = [
+pub(crate) const STACK: [&str; 5] = [
     "Noto Serif",
     "Noto Sans Cuneiform",
     "UllikummiA",
@@ -30,7 +30,7 @@ pub const STACK: [&str; 5] = [
 ];
 
 /// The face whose presence in a file calls for the credit.
-pub const CREDITED: &str = "UllikummiA";
+pub(crate) const CREDITED: &str = "UllikummiA";
 
 /// The fonts of one run: every face of the seven files, the book Typst
 /// resolves families in, the stack's faces, and the labels made so far.

@@ -30,7 +30,7 @@ use crate::xml_scan::find_exact;
 /// The reason travels with the target because the manifest publishes both, and
 /// a rule whose explanation lives somewhere else is a rule that gets dropped
 /// from the explanation.
-pub const DROPPED: [(&str, &str); 2] = [
+pub(crate) const DROPPED: [(&str, &str); 2] = [
     ("xml", "the declaration, replaced by a canonical one"),
     ("xml-stylesheet", "HPMxml.css is not part of the package"),
 ];
@@ -46,12 +46,12 @@ pub const DECLARATION: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 /// invited.
 pub const DROP_BOM: &str = "DROP_BOM";
 /// See [`DROP_BOM`].
-pub const ADD_DECLARATION: &str = "ADD declaration";
+pub(crate) const ADD_DECLARATION: &str = "ADD declaration";
 /// See [`DROP_BOM`].
-pub const REFLOW_PROLOGUE: &str = "REFLOW prologue whitespace";
+pub(crate) const REFLOW_PROLOGUE: &str = "REFLOW prologue whitespace";
 
 /// The name a dropped instruction is counted under.
-pub fn drop_pi(target: &str) -> String {
+pub(crate) fn drop_pi(target: &str) -> String {
     format!("DROP_PI {target}")
 }
 
@@ -62,7 +62,7 @@ pub fn drop_pi(target: &str) -> String {
 /// That is the whole point of returning a name rather than a `bool`: the count
 /// this feeds is keyed by it, and a key taken from the document would be a key
 /// the manifest's `permitted` list never offers.
-pub fn dropped_name(target: &[u8]) -> Option<&'static str> {
+pub(crate) fn dropped_name(target: &[u8]) -> Option<&'static str> {
     DROPPED.iter().find_map(|(name, _)| {
         target
             .eq_ignore_ascii_case(name.as_bytes())

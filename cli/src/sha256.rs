@@ -38,7 +38,7 @@ const K: [u32; 64] = [
 
 /// A SHA-256 in progress: the eight-word state, the bytes not yet a full block,
 /// and how many bytes have been fed in altogether.
-pub struct Sha256 {
+pub(crate) struct Sha256 {
     state: [u32; 8],
     buffer: [u8; BLOCK],
     buffered: usize,
@@ -188,7 +188,7 @@ pub fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
 }
 
 /// Digest everything a reader yields.
-pub fn sha256_stream<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
+pub(crate) fn sha256_stream<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
     let mut hasher = Sha256::new();
     let mut chunk = [0u8; 8192];
     loop {

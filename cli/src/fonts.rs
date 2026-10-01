@@ -130,7 +130,8 @@ pub const PACKAGED_TERMS: &str = "UllikummiA-TERMS.txt";
 pub const PACKAGED_FONT_BYTES: &[u8] = include_bytes!("../resources/fonts/UllikummiA.ttf");
 
 /// The terms file, byte for byte.
-pub const PACKAGED_TERMS_BYTES: &[u8] = include_bytes!("../resources/fonts/UllikummiA-TERMS.txt");
+pub(crate) const PACKAGED_TERMS_BYTES: &[u8] =
+    include_bytes!("../resources/fonts/UllikummiA-TERMS.txt");
 
 /// Check every shipped file in `dir` against the table above.
 ///

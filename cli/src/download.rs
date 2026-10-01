@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Stable Zenodo URL for TLHdig Beta 0.3.
-pub const ZENODO_ZIP_URL: &str =
+pub(crate) const ZENODO_ZIP_URL: &str =
     "https://zenodo.org/records/20328284/files/TLHbasisONLINE25_1_ZENODO_Beta_03.zip?download=1";
 
 /// MD5 published by Zenodo for record 20328284, verified against the fixture.
@@ -111,7 +111,7 @@ pub const MAX_METADATA: u64 = 4 * 1024 * 1024;
 /// connection, a short body, a local write error, and the HTTP statuses that
 /// mean "busy, not wrong". See [`is_retryable`] for what is deliberately left
 /// out.
-pub fn download_verified(
+pub(crate) fn download_verified(
     url: &str,
     dest: &Path,
     expected_md5: Option<&str>,
@@ -454,7 +454,7 @@ fn request_within(url: &str, timeouts: Timeouts) -> Result<ureq::Response> {
 /// Bounded twice over: by `deadline`, and by refusing a body larger than a
 /// metadata response has any business being. A repository answering a question
 /// with a gigabyte is not answering the question.
-pub fn fetch_text(url: &str, deadline: Duration) -> Result<String> {
+pub(crate) fn fetch_text(url: &str, deadline: Duration) -> Result<String> {
     fetch_text_within(url, deadline, MAX_METADATA)
 }
 
@@ -510,7 +510,7 @@ fn fetch_text_within(url: &str, deadline: Duration, limit: u64) -> Result<String
 ///
 /// One place, and derived: [`request_within`] and [`request_answer`] set it,
 /// and the test below is what keeps it from drifting back into a literal.
-pub fn user_agent() -> String {
+pub(crate) fn user_agent() -> String {
     format!(
         "Aruna/{} (+https://github.com/sergeyssimonov-max/Aruna)",
         env!("CARGO_PKG_VERSION")
@@ -549,7 +549,7 @@ fn proxy_among(var: impl Fn(&str) -> Option<String>) -> Option<String> {
 }
 
 /// The variables a proxy is asked of, in the order they are asked.
-pub const PROXY_VARIABLES: [&str; 6] = [
+pub(crate) const PROXY_VARIABLES: [&str; 6] = [
     "HTTPS_PROXY",
     "https_proxy",
     "ALL_PROXY",
@@ -609,7 +609,7 @@ fn usable_proxy(value: &str) -> bool {
 /// The proxy variable the environment names and this crate cannot use, when
 /// it names no usable one – so the run can say it goes direct (owner's
 /// decision, 25.09.2026: direct, and said, rather than refused).
-pub fn unusable_proxy() -> Option<&'static str> {
+pub(crate) fn unusable_proxy() -> Option<&'static str> {
     match proxy_choice(|name| std::env::var(name).ok()) {
         ProxyChoice::Unusable(name) => Some(name),
         ProxyChoice::Use(_) | ProxyChoice::Direct => None,

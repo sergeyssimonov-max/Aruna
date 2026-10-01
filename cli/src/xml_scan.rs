@@ -56,7 +56,7 @@ fn element_name(hay: &[u8], from: usize) -> (&[u8], usize) {
 }
 
 /// Case-insensitive equality of two equal-length byte slices (ASCII).
-pub fn eq_ci(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn eq_ci(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }

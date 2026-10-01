@@ -36,7 +36,7 @@ use std::path::PathBuf;
 ///
 /// A reader that does not recognise it should stop rather than guess. Bumped
 /// when a field changes meaning or leaves; adding a field does not bump it.
-pub const SCHEMA: u32 = 1;
+pub(crate) const SCHEMA: u32 = 1;
 
 /// What the corpus asks of a typesetter, counted from the documents themselves.
 ///
@@ -352,7 +352,7 @@ impl XmlReport {
     /// one of the two defects that parser is known to miss. A refused document
     /// is not asked the second question: the answer would describe the wreckage
     /// after the first error rather than a defect of its own.
-    pub fn examine(&mut self, file: &std::path::Path, bytes: &[u8]) {
+    pub(crate) fn examine(&mut self, file: &std::path::Path, bytes: &[u8]) {
         self.documents += 1;
         match crate::xml_wellformed::classify(bytes) {
             Some(finding) => self
@@ -371,7 +371,7 @@ impl XmlReport {
     ///
     /// Reasons with a count of zero are kept: a breakdown that omits them
     /// cannot be told from one where the classifier never tried them.
-    pub fn by_reason(&self) -> Vec<(&'static str, usize)> {
+    pub(crate) fn by_reason(&self) -> Vec<(&'static str, usize)> {
         Reason::ALL
             .iter()
             .map(|reason| {
@@ -390,7 +390,7 @@ impl XmlReport {
     ///
     /// Zero is kept for the same reason as in [`Self::by_reason`]: a class with
     /// no documents and a class nobody looked for read identically otherwise.
-    pub fn by_limit(&self) -> Vec<(&'static str, usize)> {
+    pub(crate) fn by_limit(&self) -> Vec<(&'static str, usize)> {
         Limit::ALL
             .iter()
             .map(|limit| {
@@ -406,7 +406,7 @@ impl XmlReport {
     }
 
     /// Documents the parser accepts.
-    pub fn well_formed(&self) -> usize {
+    pub(crate) fn well_formed(&self) -> usize {
         self.documents - self.findings.len()
     }
 
@@ -416,7 +416,7 @@ impl XmlReport {
     /// `<` in an attribute value — which XML forbids outright, so a conforming
     /// parser stops on them. `xmllint --noout` over the package of 2026-09-10
     /// reported exactly this set: 206 + 4 = 210, and the four names matched.
-    pub fn not_well_formed_xml(&self) -> usize {
+    pub(crate) fn not_well_formed_xml(&self) -> usize {
         self.findings.len()
             + self
                 .beyond
@@ -431,7 +431,7 @@ impl XmlReport {
     /// with no local part: legal XML 1.0, forbidden by *Namespaces in XML*, and
     /// reported by `libxml2` as a namespace error it still exits zero on.
     /// 206 + 4 + 13 = 223.
-    pub fn objected_to(&self) -> usize {
+    pub(crate) fn objected_to(&self) -> usize {
         self.findings.len() + self.beyond.len()
     }
 }

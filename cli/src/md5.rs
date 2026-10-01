@@ -194,7 +194,7 @@ pub fn md5_file(path: &std::path::Path) -> std::io::Result<String> {
 ///
 /// Reads to the end from wherever the reader stands: a file handle is rewound
 /// by its owner, who is the one who knows what else it is for.
-pub fn md5_stream<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
+pub(crate) fn md5_stream<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
     let mut digest = Md5::new();
     let mut buf = [0u8; 64 * 1024];
     loop {

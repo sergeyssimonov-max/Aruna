@@ -18,10 +18,10 @@ use typst::{Library, LibraryExt, World};
 use super::fonts::Fonts;
 
 /// The two paths that exist.
-pub const MAIN: &str = "/main.typ";
-pub const DATA: &str = "/doc.json";
+pub(crate) const MAIN: &str = "/main.typ";
+pub(crate) const DATA: &str = "/doc.json";
 
-pub struct PdfWorld<'f> {
+pub(crate) struct PdfWorld<'f> {
     library: LazyHash<Library>,
     fonts: &'f Fonts,
     main_id: FileId,
@@ -62,7 +62,7 @@ impl<'f> PdfWorld<'f> {
     }
 
     /// The paths asked for that are neither of the two: empty, always.
-    pub fn strays(&self) -> Vec<String> {
+    pub(crate) fn strays(&self) -> Vec<String> {
         let known = [&MAIN[1..], &DATA[1..]];
         self.log()
             .iter()
@@ -72,7 +72,7 @@ impl<'f> PdfWorld<'f> {
     }
 
     /// Every path asked for.
-    pub fn asked(&self) -> BTreeSet<String> {
+    pub(crate) fn asked(&self) -> BTreeSet<String> {
         self.log().clone()
     }
 }

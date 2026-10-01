@@ -94,7 +94,7 @@ impl Page {
 }
 
 /// A combining mark of the block U+0300–U+036F.
-pub fn combining(c: char) -> bool {
+pub(crate) fn combining(c: char) -> bool {
     ('\u{0300}'..='\u{036F}').contains(&c)
 }
 
@@ -108,7 +108,7 @@ fn title_for(group: &str) -> String {
 }
 
 /// Whitespace as a line keeps it: runs of space, tab, CR and LF to one space.
-pub fn one_space(s: &str) -> String {
+pub(crate) fn one_space(s: &str) -> String {
     s.split([' ', '\t', '\n', '\r'])
         .filter(|w| !w.is_empty())
         .collect::<Vec<_>>()
@@ -258,7 +258,7 @@ pub fn runs(fonts: &Fonts, line: &str) -> Vec<Run> {
 
 /// A JSON string. The one place text is escaped: the template reads data,
 /// never markup.
-pub fn json_str(s: &str) -> String {
+pub(crate) fn json_str(s: &str) -> String {
     let mut o = String::with_capacity(s.len() + 2);
     o.push('"');
     for c in s.chars() {

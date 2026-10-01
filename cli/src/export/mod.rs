@@ -73,7 +73,7 @@ pub const MANIFEST: &str = "manifest.json";
 /// distributed under. The font is here because the page is read on a machine
 /// that has never heard of it — see [`crate::fonts`] — and the terms are here
 /// because they are a condition of carrying it, not a courtesy.
-pub fn is_root_file(name: &str) -> bool {
+pub(crate) fn is_root_file(name: &str) -> bool {
     ROOT_FILES.contains(&name)
 }
 
@@ -117,7 +117,7 @@ pub const MAX_DOCUMENT: u64 = 64 * 1024 * 1024;
 /// The real package is 384 MiB. Eight gibibytes is twenty times that, and a
 /// corpus edition that genuinely crosses it is a decision to take deliberately
 /// rather than a number to discover here.
-pub const MAX_PACKAGE: u64 = 8 * 1024 * 1024 * 1024;
+pub(crate) const MAX_PACKAGE: u64 = 8 * 1024 * 1024 * 1024;
 
 /// How often the write pass says how many documents are out.
 ///
@@ -743,7 +743,7 @@ pub fn collect_fragments(zip: &Path) -> Result<Vec<Fragment>> {
 /// Kept as a second function rather than a changed signature, because
 /// `collect_fragments` is public and a caller that has no job should not have
 /// to invent one.
-pub fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>> {
+pub(crate) fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>> {
     collect_fragments_from(&mut open(zip)?, job).map(|(fragments, _)| fragments)
 }
 

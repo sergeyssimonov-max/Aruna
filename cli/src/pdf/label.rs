@@ -12,14 +12,14 @@ use super::fonts::Fonts;
 use super::{Invariant, PdfError};
 
 /// The size of the label's letters against the text around it.
-pub const LABEL_EM: f32 = 0.62;
+pub(crate) const LABEL_EM: f32 = 0.62;
 
 /// `luma(35%)`, the grey of the label's frame, for its letters.
 const LABEL_FILL: &str = "#595959";
 
 /// One label, drawn.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Art {
+pub(crate) struct Art {
     pub svg: String,
     /// Height of the image and its depth below the baseline, and its width,
     /// in em of the surrounding text.
@@ -73,7 +73,7 @@ impl OutlinePen for SvgPath<'_> {
 impl Fonts {
     /// The label of a code point: made once, from the regular cut of the main
     /// face, then served from the cache of the run.
-    pub fn art(&self, cp: u32) -> Result<Art, PdfError> {
+    pub(crate) fn art(&self, cp: u32) -> Result<Art, PdfError> {
         // A poisoned cache holds labels drawn before the panic that poisoned
         // it, each complete: a label is inserted whole or not at all.
         let mut cache = self.art.lock().unwrap_or_else(PoisonError::into_inner);

@@ -386,7 +386,7 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
 /// package this exporter wrote is recognisable — an inventory of the right name
 /// beside directories of CTH groups — and anything else is left alone with an
 /// explanation.
-pub fn check_destination(root: &Path) -> Result<()> {
+pub(crate) fn check_destination(root: &Path) -> Result<()> {
     let refuse = |reason: String| {
         Err(ArunaError::ExportDestination {
             path: root.to_path_buf(),
