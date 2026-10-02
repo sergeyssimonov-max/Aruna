@@ -490,19 +490,33 @@ impl aruna::progress::Progress for WindowProgress {
 /// когда кадр первого еще не вернулся, — и `Job::with_id` написан ровно для
 /// этого случая. `Cancel` клонируется поверх `Arc`, поэтому останавливает не тот
 /// поток, который работает.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct Building(std::sync::Mutex<Option<aruna::job::Cancel>>);
 
 impl Building {
+    /// Место под замком, и после чужой паники тоже.
+    ///
+    /// Под замком лежит `Option<Cancel>`, а секции, которые его трогают, –
+    /// присваивание, проверка и `Cancel::cancel` (запись в `AtomicBool`) – по
+    /// одному шагу: паника не оставит значение наполовину измененным, и
+    /// отравление ничего о нем не говорит. До 02.10.2026 отравленный замок
+    /// означал «предыдущая сборка оборвалась» на каждую следующую сборку, а
+    /// `release` и `stop` его молча пропускали – окно оставалось занятым до
+    /// перезапуска (находка № 6 refactor-1).
+    fn slot(&self) -> std::sync::MutexGuard<'_, Option<aruna::job::Cancel>> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     /// Занять место под сборку, если оно свободно.
     ///
     /// Отдельной функцией, а не строками внутри команды, по одной причине: это
     /// и есть правило «одна сборка за раз», и проверить его должно быть можно
-    /// без Tauri вокруг.
-    fn claim(&self, cancel: aruna::job::Cancel) -> Result<(), BuildFailure> {
-        let mut slot = self.0.lock().map_err(|_| {
-            BuildFailure::shell("interrupted", "предыдущая сборка оборвалась", true)
-        })?;
+    /// без Tauri вокруг. Место держит возвращенный страж и освобождает, когда
+    /// его отпускают – в том числе раскруткой паники.
+    fn claim(&self, cancel: aruna::job::Cancel) -> Result<Claimed<'_>, BuildFailure> {
+        let mut slot = self.slot();
         if slot.is_some() {
             return Err(BuildFailure::shell(
                 "busy",
@@ -512,23 +526,61 @@ impl Building {
             ));
         }
         *slot = Some(cancel);
-        Ok(())
+        Ok(Claimed(self))
     }
 
-    /// Освободить место, чем бы прогон ни кончился.
+    /// Освободить место, чем бы прогон ни кончился. Зовет его страж.
     fn release(&self) {
-        if let Ok(mut slot) = self.0.lock() {
-            *slot = None;
-        }
+        *self.slot() = None;
     }
 
     /// Попросить текущую сборку остановиться. Молча, если ее нет.
     fn stop(&self) {
-        if let Ok(slot) = self.0.lock() {
-            if let Some(cancel) = slot.as_ref() {
-                cancel.cancel();
-            }
+        if let Some(cancel) = self.slot().as_ref() {
+            cancel.cancel();
         }
+    }
+}
+
+/// Занятое место под сборку: пока страж жив, вторая сборка получает `busy`.
+///
+/// Освобождение держит `Drop`, а не строка после прогона: строка не
+/// исполняется, если до нее долетела паника, а `Drop` исполняется и при
+/// раскрутке.
+#[must_use = "место освобождается, как только страж отпущен"]
+#[derive(Debug)]
+struct Claimed<'a>(&'a Building);
+
+impl Drop for Claimed<'_> {
+    fn drop(&mut self) {
+        self.0.release();
+    }
+}
+
+/// Прогон сборки в занятом месте, без окна вокруг.
+///
+/// Место занимается здесь и освобождается стражем, чем бы `work` ни
+/// кончилась. Работа идет в потоке блокирующих задач; паника в ней
+/// возвращается ошибкой `JoinHandle` (tokio ловит ее сам) и доходит до окна
+/// существующим отказом `interrupted`.
+async fn in_slot<F>(
+    building: &Building,
+    cancel: aruna::job::Cancel,
+    work: F,
+) -> Result<BuildReport, BuildFailure>
+where
+    F: FnOnce() -> Result<BuildReport, BuildFailure> + Send + 'static,
+{
+    let _claimed = building.claim(cancel)?;
+    match tauri::async_runtime::spawn_blocking(work).await {
+        Ok(result) => result,
+        // Задание не вернулось: рабочий поток снят или сорван паникой изнутри
+        // зависимости — в собственном коде паник нет, это правило проекта.
+        Err(_) => Err(BuildFailure::shell(
+            "interrupted",
+            "сборка оборвалась, не сказав почему",
+            true,
+        )),
     }
 }
 
@@ -588,7 +640,6 @@ async fn build_corpus(
 ) -> Result<BuildReport, BuildFailure> {
     let chosen = chosen_destination(destination)?;
     let cancel = aruna::job::Cancel::new();
-    state.claim(cancel.clone())?;
 
     // Шрифты PDF – из каталога ресурсов приложения, того же, что проверен при
     // запуске, и больше ниоткуда (решение владельца 30.09.2026, вопрос 10).
@@ -600,10 +651,11 @@ async fn build_corpus(
         .map(|dir| dir.join(FONT_RESOURCES));
 
     let handle = app.clone();
+    let flag = cancel.clone();
     // Задание строится внутри замыкания, и иначе нельзя: `Job<'a>` заимствует
     // и синк, и флаг, поэтому оно не может жить дольше вызова, который его
     // создал. Через границу потока переходят владеющие половины.
-    let outcome = tauri::async_runtime::spawn_blocking(move || {
+    in_slot(state.inner(), cancel, move || {
         let id = aruna::job::JobId::next();
         let sink = WindowProgress {
             app: handle,
@@ -615,24 +667,9 @@ async fn build_corpus(
             local_archive: None,
             pdf: aruna::app::PdfRequest::On { fonts },
         };
-        build_once(id, &request, chosen.as_deref(), &cancel, &sink)
+        build_once(id, &request, chosen.as_deref(), &flag, &sink)
     })
-    .await;
-
-    // Место освобождается чем бы прогон ни кончился, иначе окно осталось бы
-    // навсегда занятым сборкой, которой уже нет.
-    state.release();
-
-    match outcome {
-        Ok(result) => result,
-        // Задание не вернулось: рабочий поток снят или сорван паникой изнутри
-        // зависимости — в собственном коде паник нет, это правило проекта.
-        Err(_) => Err(BuildFailure::shell(
-            "interrupted",
-            "сборка оборвалась, не сказав почему",
-            true,
-        )),
-    }
+    .await
 }
 
 /// Сборка как работа: тот же путь, которым идет команда, но без Tauri вокруг.
@@ -1019,7 +1056,7 @@ mod wire {
     fn a_second_build_is_refused_while_the_first_is_running() {
         let building = Building::default();
 
-        building
+        let first = building
             .claim(aruna::job::Cancel::new())
             .expect("место свободно");
         let refused = building
@@ -1030,8 +1067,8 @@ mod wire {
         assert!(refused.retryable, "повторить можно — после первой");
         assert!(!refused.cancelled);
 
-        building.release();
-        building
+        drop(first);
+        let _next = building
             .claim(aruna::job::Cancel::new())
             .expect("после прогона место снова свободно");
     }
@@ -1045,7 +1082,7 @@ mod wire {
     fn a_stop_reaches_the_flag_the_running_build_holds() {
         let building = Building::default();
         let cancel = aruna::job::Cancel::new();
-        building.claim(cancel.clone()).expect("место свободно");
+        let _held = building.claim(cancel.clone()).expect("место свободно");
 
         assert!(!cancel.is_cancelled());
         building.stop();
@@ -1056,6 +1093,83 @@ mod wire {
     #[test]
     fn a_stop_with_nothing_running_says_nothing() {
         Building::default().stop();
+    }
+
+    /// **Паника между занятием места и его освобождением места не держит.**
+    ///
+    /// Находка № 6 refactor-1. Команда освобождала место строкой после
+    /// `.await`, и паника потока сборки до нее доходила – tokio отдает ее
+    /// ошибкой `JoinHandle`. Но держала это строка, а не устройство: любой
+    /// вызывающий, у которого между `claim` и `release` случилась паника,
+    /// оставлял окно «занятым» до перезапуска.
+    #[test]
+    fn a_panic_while_building_leaves_the_slot_free() {
+        let building = Building::default();
+        let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _held = building
+                .claim(aruna::job::Cancel::new())
+                .expect("место свободно");
+            panic!("сборка упала, не дойдя до освобождения");
+        }));
+        assert!(unwound.is_err());
+
+        let _next = building
+            .claim(aruna::job::Cancel::new())
+            .expect("после паники место снова свободно");
+    }
+
+    /// **Паника внутри сборки доходит до окна существующим отказом, а место
+    /// освобождается.**
+    ///
+    /// Тот же шов, что у команды: `in_slot` занимает место, отдает работу в
+    /// поток блокирующих задач и отображает ее исход. Окно получает
+    /// `interrupted` – код, который уже был у оборвавшейся сборки, – следующая
+    /// сборка начинается без перезапуска, а «Остановить» отвечает как при
+    /// свободном месте.
+    #[test]
+    fn a_panic_inside_the_build_reaches_the_window_as_interrupted() {
+        let building = Building::default();
+        let refused =
+            tauri::async_runtime::block_on(in_slot(&building, aruna::job::Cancel::new(), || {
+                panic!("паника внутри сборки")
+            }))
+            .expect_err("сборка с паникой не может кончиться успехом");
+
+        assert_eq!(refused.code, "interrupted");
+        assert!(refused.retryable, "повторить можно");
+        assert!(!refused.cancelled, "паника – не отмена");
+
+        building.stop();
+        let _next = building
+            .claim(aruna::job::Cancel::new())
+            .expect("после паники место снова свободно");
+    }
+
+    /// **Отравленный мьютекс места не держит.**
+    ///
+    /// Под блокировкой лежит `Option<Cancel>`, и ни одна секция не оставляет
+    /// его наполовину измененным: присваивание, проверка и `Cancel::cancel` –
+    /// по одному шагу. Читать его после чужой паники безопасно, а отвечать
+    /// «оборвалась» на каждую следующую сборку – значит держать окно мертвым
+    /// до перезапуска.
+    #[test]
+    fn a_poisoned_slot_is_released_and_claimed_again() {
+        let building = Building::default();
+        let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _locked = building.0.lock();
+            panic!("паника под блокировкой");
+        }));
+        assert!(unwound.is_err());
+        assert!(
+            building.0.is_poisoned(),
+            "мьютекс не отравлен – тест ни о чем"
+        );
+
+        building.release();
+        building.stop();
+        let _next = building
+            .claim(aruna::job::Cancel::new())
+            .expect("после отравления место свободно");
     }
 
     /// **Окно называет, куда класть пакет, и не называет, откуда его брать.**
@@ -2077,7 +2191,7 @@ mod cancelling {
         let destination = tempfile::tempdir().expect("каталог назначения");
         let building = Building::default();
         let cancel = aruna::job::Cancel::new();
-        building.claim(cancel.clone()).expect("место свободно");
+        let held = building.claim(cancel.clone()).expect("место свободно");
         let window = WindowThatStops {
             at,
             building: &building,
@@ -2095,8 +2209,8 @@ mod cancelling {
             &cancel,
             &window,
         );
-        building.release();
-        building
+        drop(held);
+        let _next = building
             .claim(aruna::job::Cancel::new())
             .expect("после прогона место снова свободно");
         let presses = window.presses.load(Ordering::SeqCst);
