@@ -20,12 +20,11 @@ memchr = "2"
 quick-xml = { version = "=0.42.0", default-features = false }
 thiserror = "2"
 ureq = { version = "2.12", default-features = true, features = ["tls"] }
-# The 8.x line since 2026-10-02 (owner's decision): 2.x is frozen at 2.4.2.
-# RUSTSEC-2025-0168 (CVE-2025-29787), the reason the floor used to be 2.3, is
-# patched on this line as well. Reading stored and deflated entries is all the
-# core does, so the one feature is the flate2 decoder on zlib-rs – the backend
-# the workspace already had through typst-library, where flate2 prefers zlib-rs
-# over miniz_oxide; `deflate` would bring zopfli back, an encoder nothing calls.
+# The 8.x line since 2026-10-02 (owner's decision): 2.x is frozen at 2.4.2, and
+# RUSTSEC-2025-0168 is patched here too. The core only reads stored and deflated
+# entries: the flate2 decoder on zlib-rs, which typst-library already enabled
+# and flate2 prefers over miniz_oxide. `deflate` would bring back zopfli, an
+# encoder nothing calls.
 zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # The PDF of every document (specification 4.10; owner's decisions of
 # 2026-09-30, questions 2, 9 and 16 of the design note): the typesetting
