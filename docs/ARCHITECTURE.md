@@ -49,7 +49,7 @@ row is named by a lower one.
 | **adapter** | `main.rs` | — |
 | **application** | `app` | parse a command line, choose an exit code, print |
 | **presentation** | `presentation`, `style`, `html`, `export/inventory`, `pdf/{mod,layout,world,label,post,fonts}` | read the filesystem, parse XML |
-| **domain** | `parse`, `document`, `xml_wellformed`, `order`, `paths`, `catalog`, `cth_titles`, `fonts`, `md5`, `sha256`, `export/{naming,normalize,validate,verify,manifest,counts}` | know a renderer exists |
+| **domain** | `parse`, `document`, `xml_wellformed`, `order`, `paths`, `catalog`, `json`, `cth_titles`, `fonts`, `md5`, `sha256`, `export/{naming,normalize,validate,verify,manifest,counts}` | know a renderer exists |
 | **infrastructure** | `archive`, `cache`, `download`, `zenodo`, `xml_scan`, `export/{mod,staging,lock,pdf}` | decide what the corpus means |
 | **signals** | `progress`, `job`, `error` | depend on any of the above |
 
