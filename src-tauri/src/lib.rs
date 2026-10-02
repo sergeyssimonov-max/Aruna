@@ -1317,6 +1317,32 @@ mod opening {
     }
 }
 
+/// Архив корпуса для тяжелых тестов оболочки – один помощник на всех.
+///
+/// `ARUNA_ZIP`, если назван, – окончательно: названный и отсутствующий файл не
+/// подменяется путем по умолчанию, иначе прогон на «другом» архиве прошел бы на
+/// фикстуре репозитория. Без архива – `None` и пропуск, а при
+/// `ARUNA_REQUIRE_FIXTURE` – падение, как в ядре: до 02.10.2026 у тестов отмены
+/// был свой помощник без этой проверки, и без архива они молча зеленели.
+#[cfg(test)]
+fn corpus_fixture() -> Option<std::path::PathBuf> {
+    let zip = std::env::var_os("ARUNA_ZIP")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip")
+        });
+    if zip.is_file() {
+        return Some(zip);
+    }
+    assert!(
+        std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
+        "ARUNA_REQUIRE_FIXTURE is set but the corpus archive is not there: {}",
+        zip.display()
+    );
+    None
+}
+
 // Разбор манифеста к фиче отношения не имеет, поэтому модуль закрыт только
 // `test`: ветки проверяются и в сборке с `e2e`, и без нее.
 #[cfg(test)]
@@ -1640,20 +1666,10 @@ mod markup {
         let package = match std::env::var_os("ARUNA_PACKAGE") {
             Some(named) => std::path::PathBuf::from(named),
             None => {
-                let zip = std::env::var_os("ARUNA_ZIP")
-                    .map(std::path::PathBuf::from)
-                    .unwrap_or_else(|| {
-                        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                            .join("../cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip")
-                    });
-                if !zip.is_file() {
-                    assert!(
-                        std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
-                        "ARUNA_REQUIRE_FIXTURE is set but the corpus archive is not there"
-                    );
+                let Some(zip) = super::corpus_fixture() else {
                     eprintln!("пропуск: ни ARUNA_PACKAGE, ни архива корпуса");
                     return;
-                }
+                };
                 built = tempfile::tempdir().unwrap();
                 aruna::export::build(&zip, built.path(), "test", &aruna::job::Job::unattended())
                     .unwrap();
@@ -1986,16 +2002,6 @@ mod cancelling {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
 
-    /// Архив корпуса, если он на месте. Тест тяжелый и помечен `#[ignore]`.
-    fn fixture() -> Option<std::path::PathBuf> {
-        let named = std::env::var_os("ARUNA_ZIP").map(std::path::PathBuf::from);
-        let path = named.unwrap_or_else(|| {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip")
-        });
-        path.is_file().then_some(path)
-    }
-
     /// Окно, которое нажимает «Остановить», услышав названную стадию.
     ///
     /// Это и есть кнопка: `stop()` — ровно то, что делает команда
@@ -2131,7 +2137,7 @@ mod cancelling {
     #[test]
     #[ignore = "читает архив корпуса; запускать явно"]
     fn a_running_build_stops_when_the_window_asks() {
-        let Some(zip) = fixture() else {
+        let Some(zip) = corpus_fixture() else {
             eprintln!("пропуск: архива корпуса нет");
             return;
         };
@@ -2158,7 +2164,7 @@ mod cancelling {
     #[test]
     #[ignore = "читает архив корпуса; запускать явно"]
     fn the_same_run_without_a_press_builds_the_whole_package() {
-        let Some(zip) = fixture() else {
+        let Some(zip) = corpus_fixture() else {
             eprintln!("пропуск: архива корпуса нет");
             return;
         };
