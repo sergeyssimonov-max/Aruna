@@ -50,10 +50,7 @@ pub fn render_package_inventory(
     source: &str,
     pdfs: Option<&[PdfState]>,
 ) -> String {
-    let built: Option<Vec<bool>> =
-        pdfs.map(|states| states.iter().map(|s| s.built().is_some()).collect());
-    let corpus =
-        CorpusPresentation::linked(records, placed, source).with_pdfs(placed, built.as_deref());
+    let corpus = CorpusPresentation::linked(records, placed, source).with_pdfs(placed, pdfs);
     render_linked_html(&corpus, "")
 }
 

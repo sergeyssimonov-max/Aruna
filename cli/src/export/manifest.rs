@@ -974,15 +974,9 @@ fn comma(i: usize, len: usize) -> &'static str {
     }
 }
 
-/// A JSON string value, escaped, as a fresh `String`.
-///
-/// The escaping itself is [`crate::json::json_str`] — the crate's one answer
-/// to "what does a JSON string look like here", shared with the catalogue and
-/// the page model of the PDF. This name exists because most of the manifest is
-/// assembled with `writeln!` and wants a value it can interpolate.
-fn string(raw: &str) -> String {
-    crate::json::json_string(raw)
-}
+// A JSON string value, escaped, as a fresh `String` – the crate's one
+// escaper, under the short name the manifest's `writeln!` calls use.
+use crate::json::json_string as string;
 
 /// Every string value the manifest gives for `key`, decoded.
 ///

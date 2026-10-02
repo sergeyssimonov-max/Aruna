@@ -11,7 +11,7 @@
 
 use crate::cth_titles::{title_text, Catalog, Match};
 use crate::document::{Document, Kind};
-// The one place text is escaped: the template reads data, never markup.
+// Text reaches the template as JSON data, never as markup.
 use crate::json::json_string;
 
 use super::fonts::{Fonts, CREDITED};

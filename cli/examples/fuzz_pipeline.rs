@@ -5,11 +5,12 @@
 //! inventory never lets a field escape into markup.
 use aruna::export::manifest::{render_manifest, FontContract, Source};
 use aruna::export::{
-    href, normalize_into, pdf_path, place, render_package_inventory, verify, Fragment, PdfState,
+    hrefs, normalize_into, place, render_package_inventory, resolve, verify, Fragment, PdfState,
     Placed,
 };
 use aruna::parse::ManuscriptRecord;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
 struct Rng(u64);
 impl Rng {
@@ -222,7 +223,7 @@ fn main() {
         // With the PDF links, as the build writes it since 2026-09-30: until
         // 2026-10-02 this fuzzed `render_inventory`, the page without them.
         let html = render_package_inventory(&recs, &placed, &text(&mut rng), Some(&pdfs));
-        if let Err(why) = check_html(&html).and_then(|()| check_pdf_links(&html, &placed, &pdfs)) {
+        if let Err(why) = check_html(&html).and_then(|()| check_pdf_links(&html, &pdfs)) {
             html_bad += 1;
             if html_bad <= 3 {
                 eprintln!("BAD HTML (round {round}): {why}");
@@ -241,23 +242,25 @@ fn main() {
 /// document, a refused one is not – the absence of the link is how the page
 /// says it, the reason being the manifest's. Fails on a page rendered without
 /// the PDFs, which is what this harness fuzzed until 2026-10-02.
-fn check_pdf_links(html: &str, placed: &[Placed], pdfs: &[PdfState]) -> Result<(), String> {
-    let mut built = 0usize;
-    for (place, state) in placed.iter().zip(pdfs) {
-        let link = format!(
-            "href=\"{}\"",
-            aruna::html::escape_html(&href(&pdf_path(&place.relative)))
-        );
-        match (state, html.contains(&link)) {
-            (PdfState::Built(_), true) => built += 1,
-            (PdfState::Refused(_), false) => {}
-            (PdfState::Built(_), false) => return Err(format!("built PDF not linked: {link}")),
-            (PdfState::Refused(_), true) => return Err(format!("refused PDF linked: {link}")),
+fn check_pdf_links(html: &str, pdfs: &[PdfState]) -> Result<(), String> {
+    // Read the way the package validator reads it: `hrefs` and `resolve`.
+    let mut linked = BTreeSet::new();
+    for link in hrefs(html).into_iter().filter(|h| h.ends_with(".pdf")) {
+        let path = resolve(link).ok_or_else(|| format!("unresolvable PDF link: {link}"))?;
+        if !linked.insert(path) {
+            return Err(format!("PDF linked twice: {link}"));
         }
     }
-    let links = html.matches(">PDF</a>").count();
-    if links != built {
-        return Err(format!("{links} PDF links for {built} built PDFs"));
+    let built: BTreeSet<PathBuf> = pdfs
+        .iter()
+        .filter_map(|s| s.built().map(Path::to_path_buf))
+        .collect();
+    if linked != built {
+        let unlinked = built.difference(&linked).next();
+        let refused = linked.difference(&built).next();
+        return Err(format!(
+            "built PDF not linked: {unlinked:?}; refused PDF linked: {refused:?}"
+        ));
     }
     Ok(())
 }

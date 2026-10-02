@@ -565,7 +565,7 @@ fn read_headers(zip: &Path, job: &Job<'_>) -> Result<Headers> {
 /// this and neither re-derives a name, a link or a fact of its own — see
 /// [`crate::presentation`].
 ///
-/// Written and let go in one block, the page and the manifest alike: the
+/// Written and let go here, the page and the manifest alike: the
 /// checks below read both back from disk, and nothing after the write reads
 /// the strings. Held to the end of the function they sat beside the
 /// validation's own sets for the whole of both read-backs — 14 MB of text
@@ -577,12 +577,9 @@ fn write_inventory(
     source_label: &str,
     pdfs: Option<&[PdfState]>,
 ) -> Result<()> {
-    {
-        let html = inventory::render_package_inventory(records, placed, source_label, pdfs);
-        let inventory = root.join(crate::paths::OUTPUT_FILE_NAME);
-        fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
-    }
-    Ok(())
+    let html = inventory::render_package_inventory(records, placed, source_label, pdfs);
+    let inventory = root.join(crate::paths::OUTPUT_FILE_NAME);
+    fs::write(&inventory, html).map_err(ArunaError::io(inventory))
 }
 
 /// The font the page needs and the terms it travels under, written from the

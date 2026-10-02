@@ -50,7 +50,7 @@
 //! down.
 
 use crate::export::naming::href;
-use crate::export::Placed;
+use crate::export::{PdfState, Placed};
 use crate::parse::{group_label, group_runs, ManuscriptRecord, MISSING};
 
 /// The spellings the corpus uses for one and the same editor.
@@ -235,13 +235,14 @@ impl<'a> CorpusPresentation<'a> {
         CorpusPresentation { source, groups }
     }
 
-    /// The PDFs a build made, linked beside their documents. `built` is
-    /// parallel to `placed`, as `placed` is to the records; `None` links none.
-    pub(crate) fn with_pdfs(mut self, placed: &[Placed], built: Option<&[bool]>) -> Self {
-        let Some(built) = built else { return self };
+    /// The PDFs a build made, linked beside their documents. `pdfs` is
+    /// parallel to `placed`, as `placed` is to the records; `None` links none,
+    /// and neither does a refused PDF.
+    pub(crate) fn with_pdfs(mut self, placed: &[Placed], pdfs: Option<&[PdfState]>) -> Self {
+        let Some(pdfs) = pdfs else { return self };
         let fragments = self.groups.iter_mut().flat_map(|g| g.fragments.iter_mut());
-        for ((fragment, place), made) in fragments.zip(placed).zip(built) {
-            if *made {
+        for ((fragment, place), state) in fragments.zip(placed).zip(pdfs) {
+            if state.built().is_some() {
                 fragment.pdf_href = Some(href(&crate::export::naming::pdf_path(&place.relative)));
             }
         }
