@@ -179,7 +179,10 @@ mod layout_rules {
 
     #[test]
     fn json_escapes_what_json_has_to() {
-        assert_eq!(json_str("a\"b\\c\u{1}"), "\"a\\\"b\\\\c\\u0001\"");
+        assert_eq!(
+            crate::json::json_string("a\"b\\c\u{1}"),
+            "\"a\\\"b\\\\c\\u0001\""
+        );
     }
 }
 

@@ -11,6 +11,8 @@
 
 use crate::cth_titles::{title_text, Catalog, Match};
 use crate::document::{Document, Kind};
+// The one place text is escaped: the template reads data, never markup.
+use crate::json::json_string;
 
 use super::fonts::{Fonts, CREDITED};
 use super::PdfError;
@@ -256,36 +258,19 @@ pub fn runs(fonts: &Fonts, line: &str) -> Vec<Run> {
     out
 }
 
-/// A JSON string. The one place text is escaped: the template reads data,
-/// never markup.
-pub(crate) fn json_str(s: &str) -> String {
-    let mut o = String::with_capacity(s.len() + 2);
-    o.push('"');
-    for c in s.chars() {
-        match c {
-            '"' => o.push_str("\\\""),
-            '\\' => o.push_str("\\\\"),
-            c if u32::from(c) < 0x20 => o.push_str(&format!("\\u{:04x}", u32::from(c))),
-            c => o.push(c),
-        }
-    }
-    o.push('"');
-    o
-}
-
 /// The runs of a stretch as JSON items, without the brackets.
 fn runs_items(fonts: &Fonts, text: &str) -> Result<Vec<String>, PdfError> {
     runs(fonts, text)
         .iter()
         .map(|r| {
             Ok(match r {
-                Run::Text(s) => format!("{{\"k\":\"t\",\"s\":{}}}", json_str(s)),
-                Run::Series(s) => format!("{{\"k\":\"s\",\"s\":{}}}", json_str(s)),
+                Run::Text(s) => format!("{{\"k\":\"t\",\"s\":{}}}", json_string(s)),
+                Run::Series(s) => format!("{{\"k\":\"s\",\"s\":{}}}", json_string(s)),
                 Run::Label(cp) => {
                     let art = fonts.art(*cp)?;
                     format!(
                         "{{\"k\":\"u\",\"svg\":{},\"h\":{:.4},\"d\":{:.4}}}",
-                        json_str(&art.svg),
+                        json_string(&art.svg),
                         art.height_em,
                         art.depth_em
                     )
@@ -321,12 +306,12 @@ pub fn json(fonts: &Fonts, page: &Page, template: &str, credit: bool) -> Result<
     }
     Ok(format!(
         "{{\"template\":{},\"plain-name\":{},\"head\":{},\"name\":{},\"credit\":{},\"sections\":[{}]}}",
-        json_str(template),
-        json_str(&page.name),
+        json_string(template),
+        json_string(&page.name),
         runs_json(fonts, &page.head)?,
         runs_json(fonts, &page.name)?,
         if credit {
-            json_str(crate::fonts::CREDIT)
+            json_string(crate::fonts::CREDIT)
         } else {
             "null".into()
         },

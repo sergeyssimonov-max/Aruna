@@ -25,6 +25,7 @@
 //! because a format with no producer is how the catalog drifted from the parser
 //! in the first place — and here it can be tested without an archive.
 
+use crate::json::json_str;
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
 use std::collections::HashMap;
 
@@ -132,32 +133,6 @@ impl Pool {
         self.index.insert(s.to_string(), i);
         i
     }
-}
-
-/// A JSON string, escaped as the standard requires and no further.
-///
-/// Non-ASCII is written as itself. Escaping it to `\u` sequences would be valid
-/// JSON and would also make a catalogue of a cuneiform corpus unreadable to the
-/// person debugging it.
-///
-/// `pub(crate)` because this crate writes two JSON documents — this catalogue
-/// and the export's manifest, which the PDF converter will read. They had an
-/// escaper each, character-for-character identical, which is one escape away
-/// from the two documents disagreeing about what a quote is.
-pub(crate) fn json_str(s: &str, out: &mut String) {
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
 }
 
 #[cfg(test)]
