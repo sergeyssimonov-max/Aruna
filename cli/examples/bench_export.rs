@@ -11,7 +11,10 @@
 //!   entry. Bounded by the ZIP, like the CLI's own run.
 //! * **place** — deciding where 24 000 documents go. Pure, in memory, and the
 //!   part an algorithm change would touch.
-//! * **inventory** — rendering the page. Pure, in memory.
+//! * **inventory** — rendering the page the way the build does, with PDF
+//!   links: through `render_package_inventory`, over a synthetic map of PDF
+//!   outcomes (no PDF is compiled). Pure, in memory. Until 2026-10-02 this
+//!   measured `render_inventory`, the path without PDF links.
 //! * **normalise** — the transform alone, over documents already read, with the
 //!   reading not counted. This is what the second pass spends its CPU on.
 //! * **build** — the whole thing including writing 372 MB to disk, which is
@@ -68,6 +71,10 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // The PDF outcomes, invented: about the corpus's own share refused (223 of
+    // 23 936 on 2026-09-30), each with a reason, the rest built. The page
+    // only asks which were built; the reasons go to the manifest.
+    let pdfs = synthetic_pdfs(&placed);
     eprintln!("sampling documents for the normaliser…");
     let documents = sample_documents(&zip, &fragments, 2_000);
     let sampled: usize = documents.iter().map(Vec::len).sum();
@@ -83,7 +90,7 @@ fn main() -> ExitCode {
         black_box(&fresh);
 
         let start = Instant::now();
-        let html = export::render_inventory(&records, &placed, "bench");
+        let html = export::render_package_inventory(&records, &placed, "bench", Some(&pdfs));
         let rendering = start.elapsed();
         black_box(&html);
 
@@ -160,6 +167,22 @@ fn main() -> ExitCode {
     }
 
     ExitCode::SUCCESS
+}
+
+/// One refused PDF in every 107 placed documents, the rest built beside
+/// their XML.
+fn synthetic_pdfs(placed: &[export::Placed]) -> Vec<export::PdfState> {
+    placed
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            if i % 107 == 0 {
+                export::PdfState::Refused(format!("Typst: synthetic refusal {i}"))
+            } else {
+                export::PdfState::Built(export::pdf_path(&p.relative))
+            }
+        })
+        .collect()
 }
 
 /// Read up to `limit` documents out of the archive, for the normaliser to chew

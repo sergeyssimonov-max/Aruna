@@ -16,7 +16,7 @@
 //! nothing and writes nothing, so what it produces can be checked against a
 //! string rather than against a folder on disk.
 
-use super::Placed;
+use super::{PdfState, Placed};
 use crate::html::render_linked_html;
 use crate::parse::ManuscriptRecord;
 use crate::presentation::CorpusPresentation;
@@ -33,6 +33,28 @@ pub fn render_inventory(records: &[ManuscriptRecord], placed: &[Placed], source:
     // URL, and never at a page about the folder, which is the thing this
     // stopped producing.
     render_linked_html(&CorpusPresentation::linked(records, placed, source), "")
+}
+
+/// The package's inventory as a build writes it: [`render_inventory`] with the
+/// PDFs the build made linked beside their documents.
+///
+/// `pdfs` is parallel to `placed`; `None` – a build without PDFs – links none.
+/// A refused PDF gets no link; why it was refused is the manifest's to say.
+/// This is the function the build calls, so that a benchmark or a fuzzer can
+/// call the same one: until 2026-10-02 both exercised [`render_inventory`],
+/// the path without PDF links, which the product does not take (finding № 8
+/// of refactor-1).
+pub fn render_package_inventory(
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    source: &str,
+    pdfs: Option<&[PdfState]>,
+) -> String {
+    let built: Option<Vec<bool>> =
+        pdfs.map(|states| states.iter().map(|s| s.built().is_some()).collect());
+    let corpus =
+        CorpusPresentation::linked(records, placed, source).with_pdfs(placed, built.as_deref());
+    render_linked_html(&corpus, "")
 }
 
 /// The `href="…"` values of an inventory, in the order it lists them.

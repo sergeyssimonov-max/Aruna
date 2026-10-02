@@ -4,7 +4,10 @@
 //! hand: normalising never distorts, the manifest is always valid JSON, and the
 //! inventory never lets a field escape into markup.
 use aruna::export::manifest::{render_manifest, FontContract, Source};
-use aruna::export::{inventory::render_inventory, normalize_into, place, verify, Fragment, Placed};
+use aruna::export::{
+    href, normalize_into, pdf_path, place, render_package_inventory, verify, Fragment, PdfState,
+    Placed,
+};
 use aruna::parse::ManuscriptRecord;
 use std::collections::BTreeMap;
 
@@ -215,12 +218,14 @@ fn main() {
         // fuzzing a pipeline the program does not run. There was a second
         // document here until 2026-08-23, one page per CTH folder; those are no
         // longer written.
-        for html in [render_inventory(&recs, &placed, &text(&mut rng))] {
-            if let Err(why) = check_html(&html) {
-                html_bad += 1;
-                if html_bad <= 3 {
-                    eprintln!("BAD HTML (round {round}): {why}");
-                }
+        //
+        // With the PDF links, as the build writes it since 2026-09-30: until
+        // 2026-10-02 this fuzzed `render_inventory`, the page without them.
+        let html = render_package_inventory(&recs, &placed, &text(&mut rng), Some(&pdfs));
+        if let Err(why) = check_html(&html).and_then(|()| check_pdf_links(&html, &placed, &pdfs)) {
+            html_bad += 1;
+            if html_bad <= 3 {
+                eprintln!("BAD HTML (round {round}): {why}");
             }
         }
     }
@@ -230,6 +235,31 @@ fn main() {
         std::process::exit(1);
     }
     println!("--- ok ---");
+}
+
+/// The page is the one the build writes: a built PDF is linked beside its
+/// document, a refused one is not – the absence of the link is how the page
+/// says it, the reason being the manifest's. Fails on a page rendered without
+/// the PDFs, which is what this harness fuzzed until 2026-10-02.
+fn check_pdf_links(html: &str, placed: &[Placed], pdfs: &[PdfState]) -> Result<(), String> {
+    let mut built = 0usize;
+    for (place, state) in placed.iter().zip(pdfs) {
+        let link = format!(
+            "href=\"{}\"",
+            aruna::html::escape_html(&href(&pdf_path(&place.relative)))
+        );
+        match (state, html.contains(&link)) {
+            (PdfState::Built(_), true) => built += 1,
+            (PdfState::Refused(_), false) => {}
+            (PdfState::Built(_), false) => return Err(format!("built PDF not linked: {link}")),
+            (PdfState::Refused(_), true) => return Err(format!("refused PDF linked: {link}")),
+        }
+    }
+    let links = html.matches(">PDF</a>").count();
+    if links != built {
+        return Err(format!("{links} PDF links for {built} built PDFs"));
+    }
+    Ok(())
 }
 
 /// A strict-enough JSON check without a parser dependency: structure, quoting,

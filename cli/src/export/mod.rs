@@ -31,7 +31,7 @@ pub mod validate;
 pub mod verify;
 
 pub use counts::{count_package, spread, CountError, GroupSize, PackageCounts, Spread};
-pub use inventory::{hrefs, render_inventory};
+pub use inventory::{hrefs, render_inventory, render_package_inventory};
 pub use manifest::{render_manifest, FontContract, XmlReport};
 pub use naming::{
     dir_component, href, output_path, path_component, pdf_path, percent_decode, resolve,
@@ -577,12 +577,8 @@ fn write_inventory(
     source_label: &str,
     pdfs: Option<&[PdfState]>,
 ) -> Result<()> {
-    let built_pdfs: Option<Vec<bool>> =
-        pdfs.map(|states| states.iter().map(|s| s.built().is_some()).collect());
     {
-        let corpus = crate::presentation::CorpusPresentation::linked(records, placed, source_label)
-            .with_pdfs(placed, built_pdfs.as_deref());
-        let html = crate::html::render_linked_html(&corpus, "");
+        let html = inventory::render_package_inventory(records, placed, source_label, pdfs);
         let inventory = root.join(crate::paths::OUTPUT_FILE_NAME);
         fs::write(&inventory, &html).map_err(ArunaError::io(inventory))?;
     }
