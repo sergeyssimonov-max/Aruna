@@ -44,8 +44,8 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
 # own expression.
 allow = [
     "MIT",
-    # `zopfli` (via `zip`) is Apache-2.0 alone, and `Apache-2.0 AND ISC` needs
-    # both halves.
+    # The typst stack and `tao` are Apache-2.0 alone, and `Apache-2.0 AND ISC`
+    # needs both halves. (`zopfli`, the first such crate, left with zip 8.6.)
     "Apache-2.0",
     # `rustls-webpki` and `untrusted`, under `ureq` in the core.
     "ISC",
