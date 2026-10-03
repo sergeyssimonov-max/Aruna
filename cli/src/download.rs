@@ -900,6 +900,10 @@ mod tests {
         /// Hold the connection open and send nothing, not even a status line:
         /// the server that has stopped answering.
         Silent,
+        /// Announce a length, send the start of the body, then hold the
+        /// connection open and send nothing more: the server that went silent
+        /// in the middle of the transfer.
+        StallMidBody,
     }
 
     /// A one-shot HTTP server that serves `replies[i]` to request `i`, counting
@@ -989,6 +993,13 @@ mod tests {
                             let _ = stream.shutdown(std::net::Shutdown::Write);
                         }
                         Some(Reply::Silent) => {
+                            std::thread::sleep(std::time::Duration::from_secs(60));
+                        }
+                        Some(Reply::StallMidBody) => {
+                            let _ = stream.write_all(
+                                b"HTTP/1.1 200 OK\r\nContent-Length: 1024\r\n\r\npartial",
+                            );
+                            let _ = stream.flush();
                             std::thread::sleep(std::time::Duration::from_secs(60));
                         }
                         Some(Reply::Status(status, retry_after)) => {
@@ -1287,10 +1298,8 @@ mod tests {
         // `HTTPS_PROXY`, the first one asked: a proxy the developer's own
         // shell names in any other variable cannot take the request instead.
         std::env::set_var("HTTPS_PROXY", format!("http://127.0.0.1:{port}"));
-        let answer = fetch_text(
-            "http://aruna-proxy-test.invalid/record",
-            Duration::from_secs(10),
-        );
+        // Test's deadline, not the product's: connecting to 127.0.0.1 took 10,165 s (03.10.2026).
+        let answer = fetch_text("http://aruna-proxy-test.invalid/record", QUESTION_GUARD);
         std::env::remove_var("HTTPS_PROXY");
 
         assert_eq!(answer.expect("the answer through the proxy"), "ok");
@@ -2187,6 +2196,159 @@ mod tests {
             "the head was waited for {waited:?} after the request, past the read timeout"
         );
         assert!(!dest.exists());
+    }
+
+    /// Сервер, замолчавший посреди тела, отпускает попытку по сроку на чтение.
+    ///
+    /// Страж решения 03.10.2026 об ureq 3 (вариант Г): в 3.4.2 срока на одно
+    /// чтение нет, тело читается под общим бюджетом или вовсе без срока, и
+    /// переход «как есть» вернул бы дефект 22.09.2026 для середины тела, а
+    /// [`a_server_that_never_answers_is_given_up_on_within_the_read_timeout`]
+    /// этого не заметил бы: его сервер молчит до заголовков. Здесь заголовки и
+    /// начало тела приходят, а дальше – тишина при открытом соединении.
+    /// Утверждается: отказ – истекшее чтение, а не срок попытки (тот – 30 с)
+    /// и не обрыв; повторяемый; код `network`; не раньше срока на чтение и не
+    /// позже его с запасом [`PAST_DEADLINE`] от прихода запроса.
+    #[test]
+    fn a_server_that_goes_silent_mid_body_is_given_up_on_within_the_read_timeout() {
+        let server = FakeServer::start(vec![Reply::StallMidBody]);
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("archive.zip");
+        let timeouts = Timeouts {
+            read: Duration::from_secs(1),
+            attempt: Duration::from_secs(30),
+        };
+
+        let err = attempt_download(&server.url(), &dest, None, &Job::unattended(), timeouts)
+            .expect_err("a body that stops half way is not a download");
+        // From the request, as [`PAST_DEADLINE`] says why.
+        let waited = server.first_request().elapsed();
+
+        let ArunaError::Network { source, .. } = &err else {
+            panic!("not the read timeout: {err:?}");
+        };
+        let io = source
+            .downcast_ref::<std::io::Error>()
+            .unwrap_or_else(|| panic!("not refused while reading the body: {err:?}"));
+        assert!(
+            matches!(
+                io.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ),
+            "not the read timeout: {err:?}"
+        );
+        assert_ne!(
+            io.to_string(),
+            "the attempt ran past its deadline",
+            "the attempt deadline, not the read timeout: {err:?}"
+        );
+        assert!(
+            is_retryable(&err),
+            "a server that went silent deserves another attempt"
+        );
+        assert_eq!(crate::app::Failure::of(&err).code, "network");
+        assert_eq!(server.hits(), 1);
+        assert!(
+            waited >= timeouts.read,
+            "gave up {waited:?} after the request, before the read timeout"
+        );
+        assert!(
+            waited < timeouts.read + PAST_DEADLINE,
+            "the body was waited for {waited:?} after the request, past the read timeout"
+        );
+        assert!(!dest.exists());
+    }
+
+    /// Отмена, поданная, пока сервер молчит посреди тела, доходит не позже
+    /// срока на чтение.
+    ///
+    /// Пара к [`a_cancel_reaches_a_download_whose_server_went_silent`], где
+    /// сервер молчит до заголовков. Отмену подают через 200 мс после прихода
+    /// запроса, а не после старта теста: соединение с 127.0.0.1 на машине
+    /// владельца само ждет до секунд (см. [`PAST_DEADLINE`]), и отмена,
+    /// поданная до начала тела, проверила бы не молчание, а проверку между
+    /// кусками. Чтение, которое ждет, прерывает только его срок; после него
+    /// отмену слышит пауза перед повтором.
+    #[test]
+    fn a_cancel_reaches_a_download_whose_server_went_silent_mid_body() {
+        let server = FakeServer::start(vec![Reply::StallMidBody]);
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("archive.zip");
+        let cancel = crate::job::Cancel::new();
+        let job = Job::new(&crate::progress::Silent, &cancel);
+        let later = cancel.clone();
+        let heads = Arc::clone(&server.heads);
+        std::thread::spawn(move || {
+            while heads.lock().map(|seen| seen.is_empty()).unwrap_or(false) {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            std::thread::sleep(Duration::from_millis(200));
+            later.cancel();
+        });
+        let timeouts = Timeouts {
+            read: Duration::from_secs(1),
+            attempt: Duration::from_secs(30),
+        };
+
+        let err = download_verified_within(&server.url(), &dest, None, &job, timeouts)
+            .expect_err("a body that stops half way is not a download");
+        // From the request, as [`PAST_DEADLINE`] says why.
+        let waited = server.first_request().elapsed();
+
+        assert!(
+            matches!(err, ArunaError::Cancelled { .. }),
+            "unexpected: {err}"
+        );
+        assert_eq!(server.hits(), 1, "a cancelled run must not try again");
+        assert!(
+            waited < timeouts.read + PAST_DEADLINE,
+            "the cancel was heard {waited:?} after the request, not within the read timeout"
+        );
+        assert!(!dest.exists());
+    }
+
+    /// **Прокси из окружения, которым крейт говорить не умеет, не берется –
+    /// запрос идет напрямую.**
+    ///
+    /// Страж дефекта T7 на случай перехода на ureq 3: тот по умолчанию сам
+    /// читает окружение и спрашивает `ALL_PROXY` первым (решение 03.10.2026,
+    /// редакция 125). Clash и Surge выставляют `all_proxy=socks5://…`; здесь
+    /// рядом еще `HTTPS_PROXY` со схемой `https://` на недоступный адрес.
+    /// Выбор – прямое соединение со словом о негодной переменной, и вопрос, и
+    /// загрузка с локального сервера проходят. Прочие четыре переменные
+    /// убираются, чтобы прокси из оболочки разработчика не подменил выбор;
+    /// nextest запускает каждый тест своим процессом, так что окружение
+    /// другим тестам не достается.
+    #[test]
+    fn a_proxy_the_crate_cannot_speak_is_bypassed_and_the_request_goes_direct() {
+        for name in ["https_proxy", "all_proxy", "HTTP_PROXY", "http_proxy"] {
+            std::env::remove_var(name);
+        }
+        std::env::set_var("ALL_PROXY", "socks5://127.0.0.1:1");
+        std::env::set_var("HTTPS_PROXY", "https://127.0.0.1:1");
+        let choice = proxy_choice(|name| std::env::var(name).ok());
+
+        let server = FakeServer::start(vec![
+            Reply::Body(b"answer".to_vec()),
+            Reply::Body(b"archive".to_vec()),
+        ]);
+        let answer = fetch_text(&server.url(), QUESTION_GUARD);
+        let dir = tempdir().expect("tempdir");
+        let dest = dir.path().join("out.zip");
+        let download = download_file(&server.url(), &dest, &Job::unattended());
+        std::env::remove_var("ALL_PROXY");
+        std::env::remove_var("HTTPS_PROXY");
+
+        assert_eq!(choice, ProxyChoice::Unusable("HTTPS_PROXY"));
+        assert_eq!(answer.expect("the answer, directly"), "answer");
+        download.expect("the download, directly");
+        assert_eq!(std::fs::read(&dest).expect("read back"), b"archive");
+        assert_eq!(server.hits(), 2);
+        assert!(
+            server.first_head().starts_with("GET /archive.zip "),
+            "the request went through a proxy: {}",
+            server.first_head()
+        );
     }
 
     /// Сервер, оборвавший тело, – отказ сети, а не диска.
