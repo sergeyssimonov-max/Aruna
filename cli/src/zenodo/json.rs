@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 /// A parsed JSON value. Numbers are `f64` as the format defines them; `as_u64`
 /// is where the one integer this module needs is recovered.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Json {
+pub(crate) enum Json {
     Null,
     Bool(bool),
     Number(f64),
@@ -25,7 +25,7 @@ pub enum Json {
 
 impl Json {
     /// Member of an object, or `None` for anything else.
-    pub fn get(&self, key: &str) -> Option<&Json> {
+    pub(crate) fn get(&self, key: &str) -> Option<&Json> {
         match self {
             Json::Object(map) => map.get(key),
             _ => None,
@@ -33,14 +33,14 @@ impl Json {
     }
 
     /// Element of an array, or `None` for anything else.
-    pub fn at(&self, index: usize) -> Option<&Json> {
+    pub(crate) fn at(&self, index: usize) -> Option<&Json> {
         match self {
             Json::Array(items) => items.get(index),
             _ => None,
         }
     }
 
-    pub fn as_str(&self) -> Option<&str> {
+    pub(crate) fn as_str(&self) -> Option<&str> {
         match self {
             Json::String(s) => Some(s),
             _ => None,
@@ -51,7 +51,7 @@ impl Json {
     ///
     /// Record ids arrive as JSON numbers, which are floating point by
     /// definition; anything fractional or negative is not an id.
-    pub fn as_u64(&self) -> Option<u64> {
+    pub(crate) fn as_u64(&self) -> Option<u64> {
         match self {
             Json::Number(n) if n.is_finite() && *n >= 0.0 && n.fract() == 0.0 => Some(*n as u64),
             _ => None,
@@ -69,7 +69,7 @@ const MAX_DEPTH: usize = 1000;
 ///
 /// Trailing content is rejected: half a document that happens to start well is
 /// not a document.
-pub fn parse(text: &str) -> Option<Json> {
+pub(crate) fn parse(text: &str) -> Option<Json> {
     let mut p = Parser {
         bytes: text.as_bytes(),
         at: 0,
