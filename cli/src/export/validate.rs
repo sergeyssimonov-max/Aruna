@@ -109,46 +109,22 @@ pub fn validate_with(
         .flatten()
         .filter_map(|s| s.built().map(Path::to_path_buf))
         .collect();
-    let mut linked_pdfs: HashSet<PathBuf> = HashSet::new();
     let inventory_path = root.join(crate::paths::OUTPUT_FILE_NAME);
     let html = read_inventory(&inventory_path)?;
 
     let mut errors: Vec<String> = Vec::new();
     let mut counts = Validation::default();
-    let mut linked_files: HashSet<PathBuf> = HashSet::new();
-
-    for href in inventory::hrefs(&html) {
-        let Some(relative) = resolve(href) else {
-            errors.push(format!(
-                "link is not a relative path inside the package: {href}"
-            ));
-            continue;
-        };
-        let target = root.join(&relative);
-
-        // Every link in this document names an XML file. Group headings carried
-        // links to a page inside each CTH folder until 2026-08-23; that page is
-        // no longer written and nothing may link to one, so anything that is not
-        // a fragment is a fault rather than a second kind of link.
-        if pdfs.is_some() && href.ends_with(".pdf") {
-            if expected_pdfs.contains(&relative) && target.is_file() {
-                linked_pdfs.insert(relative);
-            } else {
-                errors.push(format!("PDF link points at no PDF of this build: {href}"));
-            }
-        } else if href.ends_with(".xml") {
-            counts.fragment_links += 1;
-            if target.is_file() {
-                linked_files.insert(relative);
-            } else {
-                errors.push(format!("fragment link points at nothing: {href}"));
-            }
-        } else {
-            errors.push(format!(
-                "the inventory links something that is not a fragment: {href}"
-            ));
-        }
-    }
+    let Linked {
+        files: linked_files,
+        pdfs: linked_pdfs,
+    } = classify_links(
+        &html,
+        root,
+        pdfs.is_some(),
+        &expected_pdfs,
+        &mut counts,
+        &mut errors,
+    );
 
     // The inventory must link exactly what was placed…
     let expected: HashSet<PathBuf> = placed.iter().map(|p| p.relative.clone()).collect();
@@ -231,6 +207,65 @@ pub fn validate_with(
             count: errors.len(),
             first: errors.into_iter().take(10).collect::<Vec<_>>().join("; "),
         })
+    }
+}
+
+/// What the inventory links, by kind: the XML documents and the PDFs.
+struct Linked {
+    files: HashSet<PathBuf>,
+    pdfs: HashSet<PathBuf>,
+}
+
+/// Sort every link of the inventory into a document, a PDF of this build, or
+/// a fault, counting the document links on the way.
+///
+/// The first section of [`validate_with`], taken out whole: what it reports
+/// still comes first among the errors.
+fn classify_links(
+    html: &str,
+    root: &Path,
+    pdf_build: bool,
+    expected_pdfs: &HashSet<PathBuf>,
+    counts: &mut Validation,
+    errors: &mut Vec<String>,
+) -> Linked {
+    let mut linked_files: HashSet<PathBuf> = HashSet::new();
+    let mut linked_pdfs: HashSet<PathBuf> = HashSet::new();
+    for href in inventory::hrefs(html) {
+        let Some(relative) = resolve(href) else {
+            errors.push(format!(
+                "link is not a relative path inside the package: {href}"
+            ));
+            continue;
+        };
+        let target = root.join(&relative);
+
+        // Every link in this document names an XML file. Group headings carried
+        // links to a page inside each CTH folder until 2026-08-23; that page is
+        // no longer written and nothing may link to one, so anything that is not
+        // a fragment is a fault rather than a second kind of link.
+        if pdf_build && href.ends_with(".pdf") {
+            if expected_pdfs.contains(&relative) && target.is_file() {
+                linked_pdfs.insert(relative);
+            } else {
+                errors.push(format!("PDF link points at no PDF of this build: {href}"));
+            }
+        } else if href.ends_with(".xml") {
+            counts.fragment_links += 1;
+            if target.is_file() {
+                linked_files.insert(relative);
+            } else {
+                errors.push(format!("fragment link points at nothing: {href}"));
+            }
+        } else {
+            errors.push(format!(
+                "the inventory links something that is not a fragment: {href}"
+            ));
+        }
+    }
+    Linked {
+        files: linked_files,
+        pdfs: linked_pdfs,
     }
 }
 
