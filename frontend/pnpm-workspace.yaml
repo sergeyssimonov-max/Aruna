@@ -7,3 +7,19 @@ overrides:
   '@puppeteer/browsers': '3.2.1'
   deepmerge-ts: '8.0.2'
   serialize-javascript: '7.0.5'
+
+# GHSA-vfj7-8cjw-p6xm (CVE-2026-93687) – braces, stack exhaustion through deeply
+# nested patterns; high, published 2026-09-18, no fixed release (3.0.3 is the
+# last). Excepted by the owner's decision of 2026-10-03: a dev dependency of the
+# window tests only, it does not ship – @wdio/mocha-framework > mocha 10 >
+# chokidar 3 > braces, loaded with mocha's run-helpers but called only by
+# chokidar.watch in mocha's --watch mode, on patterns from our own config. No
+# update breaks the chain (@wdio/mocha-framework 9.32.0 still wants mocha
+# ^10.8.2, which wants chokidar ^3.5.3), and overrides are not used.
+# Removed by its own commit as soon as either holds: a fixed braces is released,
+# or @wdio/mocha-framework moves to a mocha without chokidar 3.
+# Guard: tests/audit-exception.test.ts fails if braces reaches the tree by any
+# other path or at any version but 3.0.3, or leaves it.
+audit:
+  ignore:
+    - GHSA-vfj7-8cjw-p6xm
