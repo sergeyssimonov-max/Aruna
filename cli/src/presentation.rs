@@ -193,12 +193,16 @@ impl<'a> CorpusPresentation<'a> {
     ///
     /// `placed` is parallel to `records` — the exporter builds it that way and
     /// `crate::export::group_slices` relies on the same invariant.
-    pub fn linked(records: &'a [ManuscriptRecord], placed: &'a [Placed], source: &'a str) -> Self {
+    pub(crate) fn linked(
+        records: &'a [ManuscriptRecord],
+        placed: &'a [Placed],
+        source: &'a str,
+    ) -> Self {
         Self::build(records, Some(placed), source)
     }
 
     /// The corpus as the standalone inventory shows it: no folder, no links.
-    pub fn plain(records: &'a [ManuscriptRecord], source: &'a str) -> Self {
+    pub(crate) fn plain(records: &'a [ManuscriptRecord], source: &'a str) -> Self {
         Self::build(records, None, source)
     }
 
@@ -250,7 +254,7 @@ impl<'a> CorpusPresentation<'a> {
     }
 
     /// How many manuscripts the corpus holds.
-    pub fn manuscripts(&self) -> usize {
+    pub(crate) fn manuscripts(&self) -> usize {
         self.groups.iter().map(|g| g.fragments.len()).sum()
     }
 }

@@ -37,7 +37,7 @@ fn file_id(p: &'static str) -> Option<FileId> {
 }
 
 impl<'f> PdfWorld<'f> {
-    pub fn new(fonts: &'f Fonts, template: &str, json: String) -> Option<Self> {
+    pub(crate) fn new(fonts: &'f Fonts, template: &str, json: String) -> Option<Self> {
         let main_id = file_id(MAIN)?;
         Some(PdfWorld {
             library: LazyHash::new(Library::default()),

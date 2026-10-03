@@ -54,7 +54,7 @@ impl Default for Sha256 {
 impl Sha256 {
     /// The initial state: the first 32 bits of the fractional parts of the
     /// square roots of the first eight primes.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Sha256 {
             state: [
                 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
@@ -67,7 +67,7 @@ impl Sha256 {
     }
 
     /// Feed bytes in. Any number, any number of times.
-    pub fn update(&mut self, mut data: &[u8]) {
+    pub(crate) fn update(&mut self, mut data: &[u8]) {
         self.length = self.length.wrapping_add(data.len() as u64);
 
         if self.buffered > 0 {
@@ -100,7 +100,7 @@ impl Sha256 {
     }
 
     /// Close the message and return the digest as lowercase hexadecimal.
-    pub fn finish_hex(mut self) -> String {
+    pub(crate) fn finish_hex(mut self) -> String {
         // The padding SHA-256 prescribes: a single one bit, then zeroes, then
         // the message length in bits as a big-endian 64-bit number.
         let bits = self.length.wrapping_mul(8);
