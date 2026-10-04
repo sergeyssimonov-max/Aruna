@@ -204,8 +204,9 @@ const BASIC_LATIN: usize = 0;
 
 /// Where [`BLOCKS`] holds the combining marks.
 ///
-/// Pinned by name in the block-table test rather than trusted: the NFC count
-/// rides on this index, and a block inserted above it would move it silently.
+/// Pinned by name in the block-table test rather than trusted: the count of
+/// documents carrying a mark of `U+0300–036F` ([`FontContract::not_nfc`]) rides
+/// on this index, and a block inserted above it would move it silently.
 const COMBINING: usize = 10;
 
 /// The blocks above whose code points no general-purpose font can be expected
@@ -311,10 +312,12 @@ impl FontContract {
         if private {
             self.private_use += 1;
         }
-        // Not a second pass. "Is this text composed?" asks whether it contains
-        // a combining mark, and the loop above has just answered exactly that
-        // for the whole document — the block table has no overlaps, so a code
-        // point in that range matches this block and nothing else.
+        // Not a second pass. What `not_nfc` counts is whether the document
+        // carries a mark of the block `U+0300–036F` – not whether its text is
+        // in NFC, see [`FontContract::not_nfc`] – and the loop above has just
+        // answered exactly that for the whole document: the block table has no
+        // overlaps, so a code point in that range matches this block and
+        // nothing else.
         //
         // Asking again cost a full character-by-character walk of every
         // document. Measured on the corpus with `bench_fonts`: 561 ms before,
