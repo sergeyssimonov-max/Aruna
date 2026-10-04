@@ -539,3 +539,102 @@ describe('diacritics', () => {
     expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['Çorum 12'])
   })
 })
+
+describe('the other spellings of an editor', () => {
+  // `Ayşe Sev` written decomposed: s and U+0327.
+  const decomposed = 'Ayşe Sev'.normalize('NFD')
+
+  beforeEach(() => {
+    inventory([
+      {
+        label: 'CTH 7',
+        rows: [
+          // The visible spelling carries no mark, the one written out of sight
+          // does. No row of the corpus has this shape on 2026-10-04 – every
+          // other spelling in `presentation::EDITOR_ALIASES` is ASCII – so the
+          // names are made up; Oğuz Soysal is the corpus's own editor with a
+          // mark, who has no other spelling there.
+          { siglum: 'KBo 7.1', editor: 'O. S.<span hidden> Oğuz Soysal</span>' },
+          // The shape of a real row of the corpus: Andrey and Andrei Shatskov.
+          { siglum: 'KBo 7.2', editor: 'Andrey Shatskov<span hidden> Andrei Shatskov</span>' },
+          { siglum: 'KBo 7.3', editor: 'Bob' },
+          { siglum: 'KBo 7.4', editor: `A. S.<span hidden> ${decomposed}</span>` },
+        ],
+      },
+    ])
+    attachInventoryFilter(document)
+  })
+
+  const sigla = () => shown().map((tr) => tr.cells[1].textContent)
+
+  it('finds a row by a hidden spelling typed without its marks', () => {
+    type('oguz soysal')
+    expect(sigla()).toEqual(['KBo 7.1'])
+  })
+
+  it('gives the hidden spelling with its marks the same answer', () => {
+    type('oguz soysal')
+    const bare = sigla()
+    type('Oğuz Soysal')
+    expect(sigla()).toEqual(bare)
+  })
+
+  it('still finds a row by its visible spelling', () => {
+    type('o. s.')
+    expect(sigla()).toEqual(['KBo 7.1'])
+    type('andrei shatskov')
+    expect(sigla()).toEqual(['KBo 7.2'])
+  })
+
+  it('does not take another letter for a mark in a hidden spelling', () => {
+    type('oguz soysai')
+    expect(sigla()).toEqual([])
+  })
+
+  it('reads a hidden spelling the same in NFC and NFD', () => {
+    for (const query of ['ayşe sev'.normalize('NFC'), 'ayşe sev'.normalize('NFD'), 'ayse sev']) {
+      type(query)
+      expect(sigla(), query).toEqual(['KBo 7.4'])
+    }
+  })
+
+  it('does not lend a row another row’s hidden spelling', () => {
+    // KBo 7.3 has no other spelling: a query only KBo 7.1 hides leaves it out.
+    type('soysal')
+    expect(sigla()).toEqual(['KBo 7.1'])
+  })
+})
+
+describe('marks in a siglum', () => {
+  beforeEach(() => {
+    inventory([
+      {
+        label: 'CTH 8',
+        rows: [
+          // As in the corpus: İ is U+0130, and München is written composed in
+          // some rows and decomposed in others.
+          { siglum: 'İzmir 1274' },
+          { siglum: 'München 1'.normalize('NFD') },
+          { siglum: 'München 3'.normalize('NFC') },
+        ],
+      },
+    ])
+    attachInventoryFilter(document)
+  })
+
+  const sigla = () => shown().map((tr) => tr.cells[1].textContent)
+
+  it('reads İ as i', () => {
+    for (const query of ['izmir', 'İzmir', 'İZMİR']) {
+      type(query)
+      expect(sigla(), query).toEqual(['İzmir 1274'])
+    }
+  })
+
+  it('finds a siglum in either form by either form', () => {
+    for (const query of ['münchen'.normalize('NFC'), 'münchen'.normalize('NFD'), 'munchen']) {
+      type(query)
+      expect(sigla(), query).toHaveLength(2)
+    }
+  })
+})
