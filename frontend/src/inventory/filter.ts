@@ -31,8 +31,8 @@ const COLLAPSE = 'Collapse fragments'
 const EXPAND = 'Expand fragments'
 
 /**
- * One CTH group: its heading row, its manuscripts, the lowercased text each of
- * them is searched by, and whether the group is folded shut.
+ * One CTH group: its heading row, its manuscripts, the folded text each of
+ * them is searched by (see [`fold`]), and whether the group is folded shut.
  */
 interface Group {
   readonly tr: HTMLElement
@@ -40,6 +40,24 @@ interface Group {
   readonly items: HTMLElement[]
   readonly texts: string[]
   folded: boolean
+}
+
+/**
+ * Text as the search compares it: lower case, and without the marks letters
+ * carry – `Ḫattušili` reads as `hattusili`, and so does what a reader types.
+ *
+ * One function for the index and the query, applied once to each: to every
+ * row and heading when the index is built, and to the query on each input,
+ * never to the rows again. Decomposing (NFD) and dropping every combining mark
+ * (`\p{M}`) takes the marks off every accented letter of the corpus and of the
+ * catalogue's titles – Ḫ, š, ā, ī, ū, É, Ú, ğ, İ, Ṭ and the rest – and makes a
+ * composed and a decomposed spelling the same text. Nothing is transliterated:
+ * `ä` becomes `a`, never `ae`. What has no mark to drop – dashes, quotation
+ * marks, the subscript `₄` – stays as it is (found 2026-10-04, owner's
+ * decision of that day).
+ */
+function fold(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
 }
 
 /**
@@ -67,7 +85,7 @@ function rowText(tr: HTMLTableRowElement): string {
     if (cell.matches(ROW_NUMBER_CELL)) continue
     parts.push(cell.textContent ?? '')
   }
-  return parts.join('\n').toLowerCase()
+  return fold(parts.join('\n'))
 }
 
 /**
@@ -88,11 +106,11 @@ function rowText(tr: HTMLTableRowElement): string {
  */
 function groupText(tr: HTMLElement): string {
   const label = tr.querySelector('.group-label')
-  if (!label) return (tr.textContent ?? '').toLowerCase()
+  if (!label) return fold(tr.textContent ?? '')
   const parts = [label.textContent ?? '']
   const title = tr.querySelector('.group-title')
   if (title) parts.push(title.textContent ?? '')
-  return parts.join('\n').toLowerCase()
+  return fold(parts.join('\n'))
 }
 
 function setFolded(group: Group, folded: boolean): void {
@@ -158,7 +176,7 @@ export function attachInventoryFilter(doc: Document): void {
 
   /** Apply the current query and fold state to every row. */
   function render(): void {
-    const q = (input!.value || '').trim().toLowerCase()
+    const q = fold((input!.value || '').trim())
     let matches = 0
     let onScreen = 0
 

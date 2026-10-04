@@ -30,6 +30,23 @@
 	var COLLAPSE = "Collapse fragments";
 	var EXPAND = "Expand fragments";
 	/**
+	* Text as the search compares it: lower case, and without the marks letters
+	* carry – `Ḫattušili` reads as `hattusili`, and so does what a reader types.
+	*
+	* One function for the index and the query, applied once to each: to every
+	* row and heading when the index is built, and to the query on each input,
+	* never to the rows again. Decomposing (NFD) and dropping every combining mark
+	* (`\p{M}`) takes the marks off every accented letter of the corpus and of the
+	* catalogue's titles – Ḫ, š, ā, ī, ū, É, Ú, ğ, İ, Ṭ and the rest – and makes a
+	* composed and a decomposed spelling the same text. Nothing is transliterated:
+	* `ä` becomes `a`, never `ae`. What has no mark to drop – dashes, quotation
+	* marks, the subscript `₄` – stays as it is (found 2026-10-04, owner's
+	* decision of that day).
+	*/
+	function fold(text) {
+		return text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+	}
+	/**
 	* The text a manuscript row is searched by: what it says, not where it sits.
 	*
 	* The row's own `textContent` was used here, and it begins with the ordinal in
@@ -55,7 +72,7 @@
 			if (cell.matches(ROW_NUMBER_CELL)) continue;
 			parts.push((_cell$textContent = cell.textContent) !== null && _cell$textContent !== void 0 ? _cell$textContent : "");
 		}
-		return parts.join("\n").toLowerCase();
+		return fold(parts.join("\n"));
 	}
 	/**
 	* The text a heading is searched by: the catalogue number it names, and the
@@ -76,11 +93,11 @@
 	function groupText(tr) {
 		var _tr$textContent, _label$textContent, _title$textContent;
 		const label = tr.querySelector(".group-label");
-		if (!label) return ((_tr$textContent = tr.textContent) !== null && _tr$textContent !== void 0 ? _tr$textContent : "").toLowerCase();
+		if (!label) return fold((_tr$textContent = tr.textContent) !== null && _tr$textContent !== void 0 ? _tr$textContent : "");
 		const parts = [(_label$textContent = label.textContent) !== null && _label$textContent !== void 0 ? _label$textContent : ""];
 		const title = tr.querySelector(".group-title");
 		if (title) parts.push((_title$textContent = title.textContent) !== null && _title$textContent !== void 0 ? _title$textContent : "");
-		return parts.join("\n").toLowerCase();
+		return fold(parts.join("\n"));
 	}
 	function setFolded(group, folded) {
 		group.folded = folded;
@@ -137,7 +154,7 @@
 		}
 		/** Apply the current query and fold state to every row. */
 		function render() {
-			const q = (input.value || "").trim().toLowerCase();
+			const q = fold((input.value || "").trim());
 			let matches = 0;
 			let onScreen = 0;
 			for (const group of groups) {

@@ -418,3 +418,124 @@ describe('catalogue titles', () => {
     expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KUB 31.1', 'KBo 3.1'])
   })
 })
+
+describe('diacritics', () => {
+  // `Ḫattušili` written decomposed: H and U+032E, s and U+030C. A document can
+  // carry either form, and so can what a reader types.
+  const decomposed = 'Annals of Ḫattušili I'.normalize('NFD')
+
+  beforeEach(() => {
+    inventory([
+      { label: 'CTH 4', cthTitle: 'Annals of Ḫattušili I', rows: [{ siglum: 'KBo 3.1' }] },
+      { label: 'CTH 40', cthTitle: 'Deeds of Šuppiluliuma I', rows: [{ siglum: 'KBo 5.6' }] },
+      { label: 'CTH 409', cthTitle: 'Rituals of Tunnawiya', rows: [{ siglum: 'KUB 7.53' }] },
+      {
+        label: 'CTH 231',
+        cthTitle: 'Lists of administrators (<sup>LÚ</sup>AGRIG)',
+        rows: [{ siglum: 'KUB 31.1' }],
+      },
+      { label: 'CTH 6', cthTitle: decomposed, rows: [{ siglum: 'KBo 3.6' }] },
+      {
+        // Every field of a row and of a heading carries a mark here, so that
+        // each one is shown to be folded: the label, the note a status without
+        // a title gets, the siglum, the language, the corpus, the editor and
+        // the editor's other spelling, written out of sight.
+        label: 'Ḫurri 1',
+        cthStatus: 'unassigned',
+        cthTitle: 'unāssigned in the CTH catalogue',
+        rows: [
+          {
+            siglum: 'Çorum 12',
+            lang: 'Lūw',
+            corpus: 'Ğazi',
+            editor: 'Ayşe<span hidden> Görke</span>',
+            year: '2021',
+          },
+        ],
+      },
+    ])
+    attachInventoryFilter(document)
+  })
+
+  const visibleGroups = () =>
+    headings()
+      .filter((tr) => !tr.hidden)
+      .map((tr) => (tr.querySelector('.group-label') as HTMLElement).textContent)
+
+  it('finds Ḫattušili written without its marks, in any case', () => {
+    for (const query of ['hattusili', 'Hattusili', 'HATTUSILI']) {
+      type(query)
+      expect(visibleGroups(), query).toEqual(['CTH 4', 'CTH 6'])
+    }
+  })
+
+  it('gives the marked and the bare spelling the same answer', () => {
+    type('hattusili')
+    const bare = visibleGroups()
+    for (const query of ['Ḫattušili', 'ḫattušili']) {
+      type(query)
+      expect(visibleGroups(), query).toEqual(bare)
+    }
+  })
+
+  it('takes a spelling that marks only some of its letters', () => {
+    for (const query of ['ḫattusili', 'hattušili']) {
+      type(query)
+      expect(visibleGroups(), query).toEqual(['CTH 4', 'CTH 6'])
+    }
+  })
+
+  it('reads a composed and a decomposed form alike, in the text and in the query', () => {
+    // CTH 6 holds the decomposed text, CTH 4 the composed one.
+    type('ḫattušili'.normalize('NFC'))
+    expect(visibleGroups()).toEqual(['CTH 4', 'CTH 6'])
+    type('ḫattušili'.normalize('NFD'))
+    expect(visibleGroups()).toEqual(['CTH 4', 'CTH 6'])
+  })
+
+  it('finds a fragment inside a word and a word after a superscript', () => {
+    type('ttusil')
+    expect(visibleGroups()).toEqual(['CTH 4', 'CTH 6'])
+    type('suppiluliuma')
+    expect(visibleGroups()).toEqual(['CTH 40'])
+    type('administrators (luagrig)')
+    expect(visibleGroups()).toEqual(['CTH 231'])
+    type('luagrig')
+    expect(visibleGroups()).toEqual(['CTH 231'])
+  })
+
+  it('does not take another letter for a mark', () => {
+    type('hatusili')
+    expect(visibleGroups()).toEqual([])
+  })
+
+  it('leaves the number searched as it was', () => {
+    type('cth 4')
+    expect(visibleGroups()).toEqual(['CTH 4', 'CTH 40', 'CTH 409'])
+  })
+
+  it('keeps the count out of what a heading is searched by', () => {
+    type('hattusili i1')
+    expect(visibleGroups()).toEqual([])
+  })
+
+  it('folds every field of a heading', () => {
+    type('hurri 1')
+    expect(visibleGroups()).toEqual(['Ḫurri 1'])
+    type('unassigned in')
+    expect(visibleGroups()).toEqual(['Ḫurri 1'])
+  })
+
+  it('folds every field of a row', () => {
+    for (const query of ['corum 12', 'luw', 'gazi', 'ayse', 'gorke']) {
+      type(query)
+      expect(
+        shown().map((tr) => tr.cells[1].textContent),
+        query,
+      ).toEqual(['Çorum 12'])
+    }
+    // The year has nothing to fold, and is still found.
+    type('2021')
+    expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['Çorum 12'])
+  })
+})
