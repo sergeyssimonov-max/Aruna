@@ -49,7 +49,13 @@ pub(crate) const SCHEMA: u32 = 1;
 pub struct FontContract {
     /// Block name → how many documents contain at least one of its code points.
     pub blocks: BTreeMap<&'static str, usize>,
-    /// Documents whose text is not in Unicode NFC.
+    /// Documents that carry a combining mark of the block `U+0300–036F` – 78
+    /// in this corpus, 13 of them in NFC all the same. Not the documents
+    /// outside NFC: by Unicode's definition those are 2 127 of 23 936, about
+    /// 9 %, most of them for `U+2329`/`U+232A` and not for a mark
+    /// (specification 4.14, `docs/XML-CONTRACT.md`). The name and the
+    /// manifest's `documents_not_in_nfc` say more than the count; renaming the
+    /// key would change the manifest's contract (specification 7.3).
     ///
     /// Recorded rather than corrected: the corpus mixes forms, and a renderer
     /// that assumes composed diacritics will place marks wrongly on the rest.

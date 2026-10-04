@@ -38,7 +38,10 @@ const DOCUMENTS: usize = 23_936;
 /// attribute error before it. Every one of them is inside the 210 it rejects.
 const TAGS_DO_NOT_BALANCE: usize = 121;
 
-/// Documents whose text is not in Unicode NFC.
+/// Documents that carry a combining mark of the block `U+0300–036F`, as the
+/// manifest counts them under `documents_not_in_nfc` – 13 of the 78 are in NFC
+/// all the same. Not the documents outside NFC: by Unicode's definition those
+/// are 2 127 of 23 936, about 9 % (specification 4.14, `docs/XML-CONTRACT.md`).
 ///
 /// Recorded rather than corrected — the corpus mixes forms and this program
 /// does not touch a source document — so the number is an anchor like the two
