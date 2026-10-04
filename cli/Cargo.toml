@@ -43,6 +43,12 @@ lopdf = "=0.45.0"
 # tree: it carries an unmaintained advisory (RUSTSEC-2026-0192), which
 # cargo-deny rightly refuses for a direct dependency.
 skrifa = "=0.42.1"
+# NFC, for one question only: whether a name the disk lists is the name the
+# package placed, spelled by the filesystem in another form – HFS+ hands back
+# NFD whatever was written (task hfs-validate-1, owner's decision 2026-10-04).
+# Already in the tree through Typst (hayagriva, biblatex); this names it.
+# Nothing written to the package goes through it.
+unicode-normalization = "=0.1.25"
 
 [features]
 # Opens `parse::fields` for measurement. Off by default and never enabled by the

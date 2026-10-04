@@ -126,6 +126,7 @@ dependencies = [
  "typst",
  "typst-layout",
  "typst-pdf",
+ "unicode-normalization",
  "ureq",
  "zip",
 ]

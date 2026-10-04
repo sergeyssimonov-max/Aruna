@@ -153,15 +153,17 @@ pub fn validate_with(
     for missing in expected_pdfs.difference(&linked_pdfs) {
         errors.push(format!("PDF built but not linked: {}", missing.display()));
     }
-    for missing in expected_pdfs.difference(&pdfs_on_disk) {
+    let pdfs_against_disk = against_disk(&expected_pdfs, &pdfs_on_disk);
+    for missing in &pdfs_against_disk.missing {
         errors.push(format!("PDF built but not on disk: {}", missing.display()));
     }
-    for stray in pdfs_on_disk.difference(&expected_pdfs) {
+    for stray in &pdfs_against_disk.orphans {
         errors.push(format!(
             "PDF on disk that no document built: {}",
             stray.display()
         ));
     }
+    pdfs_against_disk.twins_into(&mut errors, true);
 
     // Четыре корневых файла обязаны быть на месте. Обход их только терпел –
     // «это не сирота», – а требования не предъявлял никто: опись спрашивалась
@@ -174,12 +176,14 @@ pub fn validate_with(
             errors.push(format!("the package is missing {required}"));
         }
     }
-    for orphan in on_disk.difference(&expected) {
+    let documents_against_disk = against_disk(&expected, &on_disk);
+    for orphan in &documents_against_disk.orphans {
         errors.push(format!("orphan file in the package: {}", orphan.display()));
     }
-    for absent in expected.difference(&on_disk) {
+    for absent in &documents_against_disk.missing {
         errors.push(format!("expected document missing: {}", absent.display()));
     }
+    documents_against_disk.twins_into(&mut errors, false);
 
     // The manifest describes the same package, and is checked against the same
     // model rather than against the inventory: two documents agreeing with each
@@ -208,6 +212,139 @@ pub fn validate_with(
             first: errors.into_iter().take(10).collect::<Vec<_>>().join("; "),
         })
     }
+}
+
+/// What placed and what the disk lists, once set against each other.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct AgainstDisk {
+    /// Placed, and on the disk under no spelling of its name.
+    missing: Vec<PathBuf>,
+    /// On the disk, and placed under no spelling of its name.
+    orphans: Vec<PathBuf>,
+    /// Two placed paths that differ only in Unicode form, and one file on the
+    /// disk for both.
+    twins_placed: Vec<(PathBuf, PathBuf)>,
+    /// Two files on the disk whose names differ only in Unicode form.
+    twins_on_disk: Vec<(PathBuf, PathBuf)>,
+}
+
+impl AgainstDisk {
+    /// The two kinds of twin as errors, the placed ones named as documents or
+    /// as PDFs. Whole sentences rather than a word put into one: the console
+    /// translates each phrase as written, and an English word inside a Russian
+    /// sentence is what that rule is there to prevent.
+    fn twins_into(&self, errors: &mut Vec<String>, pdfs: bool) {
+        for (a, b) in &self.twins_placed {
+            let (a, b) = (a.display(), b.display());
+            errors.push(if pdfs {
+                format!("two PDFs differ only in Unicode form and the disk holds one file for both: {a} and {b}")
+            } else {
+                format!("two documents differ only in Unicode form and the disk holds one file for both: {a} and {b}")
+            });
+        }
+        for (a, b) in &self.twins_on_disk {
+            errors.push(format!(
+                "two files on the disk differ only in Unicode form: {} and {}",
+                a.display(),
+                b.display()
+            ));
+        }
+    }
+}
+
+/// Set the paths placed against the names the walk found: byte for byte
+/// first, and in NFC for what that leaves, one to one.
+///
+/// **The disk may hand a name back in another Unicode form than it was
+/// written in.** HFS+ stores every name decomposed, so the walk reads
+/// `Mu◌̈nchen 3.xml` where the export wrote `München 3.xml`; compared byte for
+/// byte, the twelve documents of the corpus whose sigla are composed were
+/// reported missing and their files orphans – 24 errors on a whole package,
+/// and the build refused (task hfs-validate-1, 04.10.2026). APFS keeps the form
+/// it was given, which is why this was never seen on the build machine.
+///
+/// Only this pairing is form-blind, and only for names left without a pair by
+/// bytes. What is held strictly stays strict: the inventory's links and the
+/// manifest's entries are set against the placed paths byte for byte above and
+/// in [`check_manifest`], since both are written here from one model; and a
+/// link still has to open its file through the filesystem (`is_file` in
+/// [`classify_links`]), so on a disk that does tell the forms apart – Linux – a
+/// document written under another form is still a link to nothing.
+///
+/// Nothing may merge on the way. Two placed paths that differ only in form
+/// over one file, or two files of one name in two forms, are reported as
+/// such: one to one, or an error. On Linux the first are two real files and
+/// pair byte for byte, as [`super::place`] allows there.
+///
+/// NFC is computed only when bytes leave something unpaired, which on a clean
+/// package on APFS is never.
+fn against_disk(expected: &HashSet<PathBuf>, on_disk: &HashSet<PathBuf>) -> AgainstDisk {
+    use std::collections::BTreeMap;
+    use unicode_normalization::UnicodeNormalization as _;
+
+    let mut found = AgainstDisk::default();
+    let placed_left: Vec<&PathBuf> = expected.difference(on_disk).collect();
+    let disk_left: Vec<&PathBuf> = on_disk.difference(expected).collect();
+    if placed_left.is_empty() && disk_left.is_empty() {
+        return found;
+    }
+
+    let key = |path: &Path| path.to_string_lossy().nfc().collect::<String>();
+    let by_key = |paths: &mut dyn Iterator<Item = &PathBuf>| {
+        let mut map: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
+        for path in paths {
+            map.entry(key(path)).or_default().push(path.to_path_buf());
+        }
+        for list in map.values_mut() {
+            list.sort();
+        }
+        map
+    };
+    // Every name on each side by its key, paired or not – what makes a
+    // leftover a twin rather than simply absent or extra. Built once: asked
+    // per leftover, a package of a thousand orphans would have normalised the
+    // whole corpus a thousand times.
+    let all_placed = by_key(&mut expected.iter());
+    let all_disk = by_key(&mut on_disk.iter());
+    let twin_of = |all: &BTreeMap<String, Vec<PathBuf>>, one: &Path, of: &str| {
+        all.get(of)
+            .and_then(|names| names.iter().find(|other| other.as_path() != one))
+            .cloned()
+    };
+    let mut disk_left = by_key(&mut disk_left.into_iter());
+
+    for (of, placed) in by_key(&mut placed_left.into_iter()) {
+        let disk = disk_left.remove(&of).unwrap_or_default();
+        // The one case this is for: one name, spelled by the disk in another
+        // form.
+        if placed.len() == 1 && disk.len() == 1 {
+            continue;
+        }
+        // A twin only where the disk holds a file of this name at all; two
+        // placed names with nothing behind either are simply missing.
+        let on_the_disk = all_disk.contains_key(&of);
+        for path in placed {
+            match twin_of(&all_placed, &path, &of).filter(|_| on_the_disk) {
+                Some(twin) => found.twins_placed.push((path, twin)),
+                None => found.missing.push(path),
+            }
+        }
+        for path in disk {
+            match twin_of(&all_disk, &path, &of) {
+                Some(twin) => found.twins_on_disk.push((path, twin)),
+                None => found.orphans.push(path),
+            }
+        }
+    }
+    for (of, disk) in disk_left {
+        for path in disk {
+            match twin_of(&all_disk, &path, &of) {
+                Some(twin) => found.twins_on_disk.push((path, twin)),
+                None => found.orphans.push(path),
+            }
+        }
+    }
+    found
 }
 
 /// What the inventory links, by kind: the XML documents and the PDFs.
@@ -649,6 +786,208 @@ mod tests {
 
         let counts = validate(dir.path(), &records(&fragments), &placed).expect("valid");
         assert_eq!(counts.fragment_links, 3);
+    }
+
+    /// `CTH 470/München 3.xml` with the `ü` composed, as the corpus spells it.
+    const NFC_PATH: &str = "CTH 470/M\u{fc}nchen 3.xml";
+    /// The same name as HFS+ lists it: `u` and a combining diaeresis.
+    const NFD_PATH: &str = "CTH 470/Mu\u{308}nchen 3.xml";
+
+    fn paths(list: &[&str]) -> HashSet<PathBuf> {
+        list.iter().map(PathBuf::from).collect()
+    }
+
+    /// **Сборка на HFS+ не дает ложных ошибок** (задание hfs-validate-1,
+    /// 04.10.2026). HFS+ хранит имя в NFD, что бы в него ни записали, и обход
+    /// получает назад `Mu◌̈nchen 3.xml` на месте записанного `München 3.xml`.
+    /// Сравнение байт в байт объявляло такой документ потерянным, а имя на
+    /// диске сиротой: 24 ошибки на корпусе, 12 NFC-шифров, и сборка
+    /// отказывала при целом пакете.
+    #[test]
+    fn a_listing_in_nfd_matches_the_paths_placed_in_nfc() {
+        let found = against_disk(
+            &paths(&[NFC_PATH, "CTH 5/KBo 1.1.xml"]),
+            &paths(&[NFD_PATH, "CTH 5/KBo 1.1.xml"]),
+        );
+        assert_eq!(found, AgainstDisk::default());
+    }
+
+    /// Отличие формы не прощает отсутствия: файла нет ни в какой форме.
+    #[test]
+    fn a_document_absent_in_every_form_is_still_missing() {
+        let found = against_disk(
+            &paths(&[NFC_PATH, "CTH 5/KBo 1.1.xml"]),
+            &paths(&[NFD_PATH]),
+        );
+        assert_eq!(found.missing, vec![PathBuf::from("CTH 5/KBo 1.1.xml")]);
+        assert!(found.orphans.is_empty(), "{found:?}");
+    }
+
+    /// Другое имя – не другая форма: `Munchen` без знака не `München`.
+    #[test]
+    fn a_name_that_differs_in_more_than_form_is_still_an_orphan() {
+        let found = against_disk(&paths(&[NFC_PATH]), &paths(&["CTH 470/Munchen 3.xml"]));
+        assert_eq!(found.missing, vec![PathBuf::from(NFC_PATH)]);
+        assert_eq!(found.orphans, vec![PathBuf::from("CTH 470/Munchen 3.xml")]);
+    }
+
+    /// Два размещенных пути, различающихся только формой, при одном файле на
+    /// диске – коллизия, а не молчаливое слияние: один документ из двух
+    /// пропал бы, и ни одно сравнение «по форме» не должно этого скрыть.
+    #[test]
+    fn two_placed_paths_that_differ_only_in_form_over_one_file_are_a_collision() {
+        let found = against_disk(&paths(&[NFC_PATH, NFD_PATH]), &paths(&[NFD_PATH]));
+        assert_eq!(
+            found.twins_placed,
+            vec![(PathBuf::from(NFC_PATH), PathBuf::from(NFD_PATH))]
+        );
+        let mut errors = Vec::new();
+        found.twins_into(&mut errors, false);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("differ only in Unicode form")),
+            "{errors:?}"
+        );
+    }
+
+    /// Два файла на диске, различающиеся только формой, при одном размещенном
+    /// пути – ошибка: второй экспорт не писал.
+    #[test]
+    fn two_files_on_the_disk_that_differ_only_in_form_are_an_error() {
+        let found = against_disk(&paths(&[NFC_PATH]), &paths(&[NFC_PATH, NFD_PATH]));
+        assert_eq!(
+            found.twins_on_disk,
+            vec![(PathBuf::from(NFD_PATH), PathBuf::from(NFC_PATH))]
+        );
+        assert!(
+            found.missing.is_empty() && found.orphans.is_empty(),
+            "{found:?}"
+        );
+        let mut errors = Vec::new();
+        found.twins_into(&mut errors, false);
+        assert_eq!(
+            errors,
+            vec![format!(
+                "two files on the disk differ only in Unicode form: {NFD_PATH} and {NFC_PATH}"
+            )]
+        );
+    }
+
+    /// `ệ` пишется тремя способами: составной U+1EC7, `e` с U+0323 и U+0302,
+    /// и `ê` с U+0323 – все три сводятся к одному NFC.
+    const DOT_NFC: &str = "CTH 1/K\u{1ec7} 1.xml";
+    const DOT_NFD: &str = "CTH 1/Ke\u{323}\u{302} 1.xml";
+    const DOT_MIXED: &str = "CTH 1/K\u{ea}\u{323} 1.xml";
+
+    /// Неоднозначность не разрешается догадкой: два размещенных пути одного
+    /// ключа против одного имени на диске – оба называются близнецами, а
+    /// имя на диске, которому пары не досталось, – сиротой. Для PDF фраза
+    /// своя, целиком.
+    #[test]
+    fn two_placed_paths_against_one_name_of_a_third_form_are_not_paired_by_guess() {
+        let found = against_disk(&paths(&[DOT_NFC, DOT_NFD]), &paths(&[DOT_MIXED]));
+        assert_eq!(
+            found.twins_placed,
+            vec![
+                (PathBuf::from(DOT_NFD), PathBuf::from(DOT_NFC)),
+                (PathBuf::from(DOT_NFC), PathBuf::from(DOT_NFD)),
+            ]
+        );
+        assert_eq!(found.orphans, vec![PathBuf::from(DOT_MIXED)]);
+        assert!(found.missing.is_empty(), "{found:?}");
+        let mut errors = Vec::new();
+        found.twins_into(&mut errors, true);
+        assert!(
+            errors.iter().all(|e| e.starts_with("two PDFs differ only")),
+            "{errors:?}"
+        );
+    }
+
+    /// И в обратную сторону: один размещенный путь против двух имен на диске
+    /// того же ключа – путь не найден, оба имени на диске – близнецы.
+    #[test]
+    fn one_placed_path_against_two_names_of_other_forms_is_not_paired_by_guess() {
+        let found = against_disk(&paths(&[DOT_NFC]), &paths(&[DOT_NFD, DOT_MIXED]));
+        assert_eq!(found.missing, vec![PathBuf::from(DOT_NFC)]);
+        assert_eq!(found.twins_on_disk.len(), 2, "{found:?}");
+        assert!(
+            found.orphans.is_empty() && found.twins_placed.is_empty(),
+            "{found:?}"
+        );
+    }
+
+    /// Целый пакет, документ которого лежит на диске под NFD-именем, – то,
+    /// что обход видит на HFS+. На APFS имя NFC открывает тот же файл, и
+    /// пакет цел; на Linux это два разных имени, и ссылка описи ведет в
+    /// пустоту – отказ, как и был.
+    #[test]
+    fn a_package_whose_document_the_disk_lists_in_nfd_passes_where_the_name_opens_it() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = vec![
+            fragment("M\u{fc}nchen 3", "CTH 470", "root/CTH 470_XML_TLH/a.xml"),
+            fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/b.xml"),
+        ];
+        let placed = package(dir.path(), &fragments);
+        assert_eq!(placed[0].relative, PathBuf::from(NFC_PATH));
+        let body = fs::read(dir.path().join(NFC_PATH)).expect("read");
+        fs::remove_file(dir.path().join(NFC_PATH)).expect("remove");
+        fs::write(dir.path().join(NFD_PATH), body).expect("write");
+
+        let checked = validate(dir.path(), &records(&fragments), &placed);
+        if cfg!(target_os = "macos") {
+            let counts = checked.expect("the disk's spelling of a placed name is that name");
+            assert_eq!(counts.fragment_links, 2);
+        } else {
+            let err = checked.expect_err("a link to a name the disk does not have");
+            assert!(format!("{err}").contains("points at nothing"), "{err}");
+        }
+    }
+
+    /// Опись и манифест – наши артефакты, форма у них одна, и сверяются они с
+    /// моделью строго: строка манифеста в другой форме – ошибка.
+    #[test]
+    fn the_manifest_is_held_to_the_placed_form_byte_for_byte() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = vec![fragment(
+            "M\u{fc}nchen 3",
+            "CTH 470",
+            "root/CTH 470_XML_TLH/a.xml",
+        )];
+        let placed = package(dir.path(), &fragments);
+        let path = dir.path().join(MANIFEST);
+        let json = fs::read_to_string(&path).expect("read");
+        let turned = json.replace(NFC_PATH, NFD_PATH);
+        assert_ne!(turned, json, "the entry was not turned");
+        fs::write(&path, turned).expect("write");
+
+        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        assert!(format!("{err}").contains("manifest"), "{err}");
+    }
+
+    /// И ссылка описи в другой форме – ошибка, хотя на APFS она открывает тот
+    /// же файл: опись обязана называть размещенный путь его байтами.
+    #[test]
+    fn an_inventory_link_is_held_to_the_placed_form_byte_for_byte() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = vec![fragment(
+            "M\u{fc}nchen 3",
+            "CTH 470",
+            "root/CTH 470_XML_TLH/a.xml",
+        )];
+        let placed = package(dir.path(), &fragments);
+        let path = dir.path().join(format!("{PACKAGE}.html"));
+        let html = fs::read_to_string(&path).expect("read");
+        let turned = html.replace("M%C3%BCnchen", "Mu%CC%88nchen");
+        assert_ne!(turned, html, "the link was not turned");
+        fs::write(&path, turned).expect("write");
+
+        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        let text = format!("{err}");
+        assert!(
+            text.contains("not linked") || text.contains("points at nothing"),
+            "{text}"
+        );
     }
 
     /// Прочитанное заново дерево должно нести все четыре корневых файла.

@@ -321,6 +321,14 @@ pub const PHRASES: &[(&str, &str)] = &[
     ("the package is missing {}", "в пакете нет {}"),
     ("orphan file in the package: {}", "в пакете лишний файл: {}"),
     ("expected document missing: {}", "нет ожидаемого документа: {}"),
+    (
+        "two documents differ only in Unicode form and the disk holds one file for both: {} and {}",
+        "два документа различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
+    ),
+    (
+        "two files on the disk differ only in Unicode form: {} and {}",
+        "два файла на диске различаются только формой Unicode: {} и {}",
+    ),
     ("group without a folder: {}", "у группы нет папки: {}"),
     ("the manifest cannot be read: {}", "манифест не читается: {}"),
     (
@@ -388,6 +396,10 @@ pub const PHRASES: &[(&str, &str)] = &[
     ("PDF built but not linked: {}", "PDF построен, но опись на него не ссылается: {}"),
     ("PDF built but not on disk: {}", "PDF построен, но на диске его нет: {}"),
     ("PDF on disk that no document built: {}", "PDF на диске, которого не строил ни один документ: {}"),
+    (
+        "two PDFs differ only in Unicode form and the disk holds one file for both: {} and {}",
+        "два PDF различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
+    ),
     (
         "the PDF of {} broke an invariant of this program",
         "PDF документа {} нарушил правило программы",
