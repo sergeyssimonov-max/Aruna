@@ -258,8 +258,9 @@ by that fact.
 
 **Everything after the prologue is byte-identical.** Not "equivalent", not "the
 same once both sides are normalised" — identical. Comparing normalised forms
-would hide exactly the corruption this exists to catch, and 78 documents in this
-corpus are not in NFC.
+would hide exactly the corruption this exists to catch, and 2 127 documents in
+this corpus are not in NFC (measured 04.10.2026, Python 3.9.6, Unicode 13.0;
+see the next section for what the manifest's 78 counts instead).
 
 Enforced before each document is written, not after: a document that fails stops
 the build (`ArunaError::ExportDistorted`) rather than being published with the
@@ -499,9 +500,16 @@ Consequences for the font choice, in order of how much trouble they cause:
   visible rather than a blank box.
 - **Enclosed Alphanumerics (`① Ⓐ`) in 7 474 documents.** Missing from most text
   faces and a classic source of silent tofu.
-- **78 documents are not in NFC.** A renderer that assumes composed diacritics
-  will place marks wrongly on the rest. Normalising the text would change it and
-  is therefore not an option; the renderer must handle both forms.
+- **78 documents carry combining diacritical marks (`U+0300–036F`).** A
+  renderer that assumes composed diacritics will place marks wrongly in them.
+  This is the number the manifest publishes as `documents_not_in_nfc`, and the
+  name says more than the count: 13 of the 78 are in NFC (marks with no
+  composed form), and **2 127 documents are not in NFC** in all, 2 062 of them
+  without a single combining mark – mostly `U+2329`/`U+232A`, which NFC
+  replaces (`docs/PDF-ACCEPTANCE.md` §2). Measured 04.10.2026 on the archive,
+  Python 3.9.6, Unicode 13.0. The field keeps its name, since renaming it would
+  change the manifest. Normalising the text would change it and is therefore
+  not an option; the renderer must handle both forms.
 
 Before any font is bundled: check the licence for redistribution **and** for
 embedding, and record both. Do not convert text to outlines — it destroys
