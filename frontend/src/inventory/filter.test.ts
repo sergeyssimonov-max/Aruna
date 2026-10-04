@@ -348,10 +348,67 @@ describe('catalogue titles', () => {
     type('cth 409')
     expect(shown()).toHaveLength(2)
     expect(headings().filter((tr) => !tr.hidden)).toHaveLength(1)
-    // The title is not searched: a group is still found by its number, and a
-    // word of its title reaches nothing.
+    // Since 2026-10-04 the title is searched as well (owner's decision): the
+    // number still finds its group exactly as it did, and nothing else.
+    type('cth 231')
+    expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KUB 31.1'])
+    expect(headings().filter((tr) => !tr.hidden)).toHaveLength(1)
+  })
+
+  /** The labels of the headings left on screen. */
+  const visibleGroups = () =>
+    headings()
+      .filter((tr) => !tr.hidden)
+      .map((tr) => (tr.querySelector('.group-label') as HTMLElement).textContent)
+
+  it('finds a group by a word of its title', () => {
+    // Until 2026-10-04 this reached nothing: the heading was searched by its
+    // number alone, and a reader looking for a text by name found no text.
     type('tunnawiya')
-    expect(shown()).toHaveLength(0)
+    expect(visibleGroups()).toEqual(['CTH 409'])
+    expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KBo 21.1', 'KUB 7.53'])
+  })
+
+  it('finds a group by the whole of its title', () => {
+    type('Rituals of Tunnawiya')
+    expect(visibleGroups()).toEqual(['CTH 409'])
+    expect(shown()).toHaveLength(2)
+  })
+
+  it('finds a group by a fragment of its title', () => {
+    type('als of tunn')
+    expect(visibleGroups()).toEqual(['CTH 409'])
+  })
+
+  it('finds a title in another case', () => {
+    type('RITUALS')
+    expect(visibleGroups()).toEqual(['CTH 409'])
+  })
+
+  it('reads a superscript in a title as its letters', () => {
+    // `<sup>LÚ</sup>AGRIG` is text to the search, as it is to `textContent`:
+    // the markup is not searched, what it holds is.
+    for (const query of ['lú', 'agrig', 'lúagrig', 'administrators']) {
+      type(query)
+      expect(visibleGroups(), query).toEqual(['CTH 231'])
+      expect(
+        shown().map((tr) => tr.cells[1].textContent),
+        query,
+      ).toEqual(['KUB 31.1'])
+    }
+    type('sup')
+    expect(visibleGroups()).toEqual([])
+  })
+
+  it('keeps the count out of what a heading is searched by', () => {
+    // The tally sits right after the title, with nothing in between: were it
+    // read with the title, `tunnawiya2` would find CTH 409 with its two
+    // manuscripts.
+    type('tunnawiya2')
+    expect(visibleGroups()).toEqual([])
+    // Nor does the number run into the title.
+    type('409 rituals')
+    expect(visibleGroups()).toEqual([])
   })
 
   it('leaves the heading a control that folds its group', () => {

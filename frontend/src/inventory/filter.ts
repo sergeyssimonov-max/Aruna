@@ -71,16 +71,28 @@ function rowText(tr: HTMLTableRowElement): string {
 }
 
 /**
- * The text a heading is searched by: the catalogue number it names.
+ * The text a heading is searched by: the catalogue number it names, and the
+ * title the catalogue gives that number.
  *
  * Its `textContent` also carries the tally beside the label, with nothing in
  * between — the heading of `CTH 1` with six manuscripts reads `CTH 16`. A
  * search for `CTH 16` therefore opened `CTH 1` and counted all six of its
- * manuscripts as matches, and `CTH 316` did the same to `CTH 3`.
+ * manuscripts as matches, and `CTH 316` did the same to `CTH 3`. So the tally
+ * is left out, and the number and the title are read on their own.
+ *
+ * The title was left out with it until 2026-10-04, and a reader looking for a
+ * text by name – `Tunnawiya`, `Ḫattušili` – found nothing. It is read as text:
+ * a superscript such as `<sup>LÚ</sup>` is its letters, as on the screen. The
+ * two are joined with a newline, as the cells of a row are, so a query cannot
+ * run from the number into the title.
  */
 function groupText(tr: HTMLElement): string {
   const label = tr.querySelector('.group-label')
-  return ((label ? label.textContent : tr.textContent) ?? '').toLowerCase()
+  if (!label) return (tr.textContent ?? '').toLowerCase()
+  const parts = [label.textContent ?? '']
+  const title = tr.querySelector('.group-title')
+  if (title) parts.push(title.textContent ?? '')
+  return parts.join('\n').toLowerCase()
 }
 
 function setFolded(group: Group, folded: boolean): void {
