@@ -884,8 +884,14 @@ fn write_documents(
             }
         }
 
-        // The font contract is counted from what is actually shipped.
-        tallies.fonts.observe(&String::from_utf8_lossy(&normalised));
+        // The font contract is counted from what is actually shipped. The same
+        // text as `from_utf8_lossy` gives, which borrows whenever the bytes are
+        // UTF-8: `from_utf8` answers that first, and costs less than the lossy
+        // walk over 340 MB of documents. Measured 2026-10-05.
+        match std::str::from_utf8(&normalised) {
+            Ok(text) => tallies.fonts.observe(text),
+            Err(_) => tallies.fonts.observe(&String::from_utf8_lossy(&normalised)),
+        }
 
         // And so is the parser's verdict: the normalised bytes, because those
         // are the ones the package holds and the ones whose line numbers the
