@@ -39,6 +39,21 @@ status-level = "fail"
 # retrying it here would hide exactly the intermittent failures this suite
 # exists to catch.
 
+# Start order only: every test is still its own process with the same
+# deadlines, and what it asserts does not depend on when it starts. Measured
+# 2026-10-05: in nextest's default order the whole-corpus binaries and the
+# download tests that wait out real deadlines (up to 79 s and 49 s) started
+# late, and the suite ran 69 s without the heavy set and 121 s with it, against
+# 564 s and 790 s of tests over ten threads. Higher runs sooner; overrides of
+# this profile apply to `ci` as well.
+[[profile.default.overrides]]
+filter = 'binary(corpus) | binary(document_model) | binary(authenticity)'
+priority = 100
+
+[[profile.default.overrides]]
+filter = "(package(aruna) & kind(lib) & test(/^download::tests::/)) | binary(cli_process) | binary(cache_concurrency) | binary(cache_lifecycle)"
+priority = 50
+
 [profile.ci]
 # Same guards, more said out loud: CI has no one watching it run.
 slow-timeout = { period = "30s", terminate-after = 4 }
