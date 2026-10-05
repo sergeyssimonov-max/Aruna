@@ -16,7 +16,7 @@ use aruna::error::ArunaError;
 use aruna::job::Phase;
 
 /// Этап, на котором остановлен прогон, словами.
-pub fn phase(phase: Phase) -> &'static str {
+pub(crate) fn phase(phase: Phase) -> &'static str {
     match phase {
         Phase::Obtaining => "получение архива",
         Phase::Parsing => "разбор архива",
@@ -29,7 +29,7 @@ pub fn phase(phase: Phase) -> &'static str {
 /// Что случилось, одной строкой: вариант, а в нем – его данные.
 ///
 /// `match` без `_`: новый вариант без заголовка здесь не соберется.
-pub fn headline(err: &ArunaError) -> String {
+pub(crate) fn headline(err: &ArunaError) -> String {
     use ArunaError::*;
     match err {
         Network { url, .. } => format!("сетевой сбой при загрузке {url}"),
@@ -156,7 +156,7 @@ fn distorted(entry: &str, reason: &str) -> String {
 }
 
 /// Причина, которую назвала система или сеть, – по ее виду, а не ее словами.
-pub fn cause(err: &ArunaError) -> Option<String> {
+pub(crate) fn cause(err: &ArunaError) -> Option<String> {
     match err {
         ArunaError::Io { source, .. } | ArunaError::Replace { source, .. } => Some(io(source)),
         ArunaError::Network { source, .. } => Some(network(source.as_ref())),
@@ -286,7 +286,7 @@ fn zip(err: &zip::result::ZipError) -> String {
 /// `{}` – место для данных: имени, пути, значения. Слева – текст ядра с
 /// `{}` на месте каждой подстановки, справа – русский с теми же местами в том
 /// же порядке.
-pub const PHRASES: &[(&str, &str)] = &[
+pub(crate) const PHRASES: &[(&str, &str)] = &[
     // export::verify – сверка нормализации
     (
         "the source declares encoding=\"{}\" and the canonical declaration says UTF-8; the bytes would be kept and their meaning changed",
@@ -447,7 +447,7 @@ pub const PHRASES: &[(&str, &str)] = &[
 ///
 /// Незнакомой в выпуске быть не должно – это держит тест ниже, – но и
 /// потерять текст отказа хуже, чем показать его по-английски.
-pub fn translated(text: &str) -> String {
+pub(crate) fn translated(text: &str) -> String {
     PHRASES
         .iter()
         .find_map(|(english, russian)| fill(russian, holes(english, text)?))
