@@ -808,7 +808,8 @@ struct Tallies {
 
 /// Pass 2: read each document whole, normalise it, write it where it belongs.
 ///
-/// Returns nothing but success. Everything this pass counts goes into
+/// Returns the bytes written, which the caller carries on into the PDF phase
+/// against the package ceiling. Everything this pass counts goes into
 /// [`Tallies`], which the manifest reads and which the caller now reads too —
 /// the stylesheet count used to come back as a return value counted a second
 /// way, and the two ways disagreed.
