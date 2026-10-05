@@ -286,11 +286,11 @@ fn unterminated_start_tag(bytes: &[u8], at: usize) -> Option<usize> {
         }
         let rest = &bytes[start..];
         if rest.starts_with(b"<!--") {
-            i = memchr_after(bytes, start + 4, b"-->");
+            i = skip_past(bytes, start + 4, b"-->");
             continue;
         }
         if rest.starts_with(b"<![CDATA[") {
-            i = memchr_after(bytes, start + 9, b"]]>");
+            i = skip_past(bytes, start + 9, b"]]>");
             continue;
         }
         let end = end_of_tag(bytes, start);
@@ -351,7 +351,7 @@ fn end_of_tag(bytes: &[u8], start: usize) -> usize {
 }
 
 /// One past `needle` searched from `from`, or the end of input.
-fn memchr_after(bytes: &[u8], from: usize, needle: &[u8]) -> usize {
+fn skip_past(bytes: &[u8], from: usize, needle: &[u8]) -> usize {
     if from >= bytes.len() {
         return bytes.len();
     }
@@ -577,11 +577,11 @@ pub fn beyond_the_parser(bytes: &[u8]) -> Option<Beyond> {
         let start = i + memchr::memchr(b'<', &bytes[i..])?;
         let rest = &bytes[start..];
         if rest.starts_with(b"<!--") {
-            i = memchr_after(bytes, start + 4, b"-->");
+            i = skip_past(bytes, start + 4, b"-->");
             continue;
         }
         if rest.starts_with(b"<![CDATA[") {
-            i = memchr_after(bytes, start + 9, b"]]>");
+            i = skip_past(bytes, start + 9, b"]]>");
             continue;
         }
         // One walk of the tag, not two: `scan_tag` is `end_of_tag` with the
