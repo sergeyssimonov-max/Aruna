@@ -148,9 +148,7 @@ pub fn compare(source: &[u8], normalised: &[u8]) -> Result<Report, String> {
     // No declaration at all is safe: XML already reads an undeclared document
     // as UTF-8, so writing that down states what was true rather than
     // something new.
-    if let Some(encoding) = source_pis.iter().find_map(|pi| {
-        (target_of(pi).eq_ignore_ascii_case(b"xml")).then(|| declared_encoding(pi))?
-    }) {
+    if let Some(encoding) = first_declared(&source_pis, declared_encoding) {
         if !is_utf8_name(encoding) {
             return Err(format!(
                 "the source declares encoding=\"{}\" and the canonical declaration says UTF-8; \
@@ -164,9 +162,7 @@ pub fn compare(source: &[u8], normalised: &[u8]) -> Result<Report, String> {
     // ends and its permitted characters differently. Until 2026-09-22 only the
     // encoding was checked, and a 1.1 document went out declaring 1.0. None of
     // the corpus's 442 declarations says anything but 1.0.
-    if let Some(version) = source_pis.iter().find_map(|pi| {
-        (target_of(pi).eq_ignore_ascii_case(b"xml")).then(|| pseudo_attribute(pi, b"version"))?
-    }) {
+    if let Some(version) = first_declared(&source_pis, |pi| pseudo_attribute(pi, b"version")) {
         if version != b"1.0" {
             return Err(format!(
                 "the source declares version=\"{}\" and the canonical declaration says 1.0; \
@@ -175,9 +171,7 @@ pub fn compare(source: &[u8], normalised: &[u8]) -> Result<Report, String> {
             ));
         }
     }
-    let added_declaration = !source_pis
-        .iter()
-        .any(|pi| target_of(pi).eq_ignore_ascii_case(b"xml"));
+    let added_declaration = !source_pis.iter().any(|pi| is_declaration(pi));
 
     // Every instruction the source carried is either kept verbatim or is one
     // the permit list names.
@@ -253,6 +247,24 @@ fn leading_space(bytes: &[u8]) -> usize {
         .iter()
         .position(|b| !matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
         .unwrap_or(bytes.len())
+}
+
+/// Whether an instruction is an XML declaration, `<?xml …?>`.
+fn is_declaration(pi: &[u8]) -> bool {
+    target_of(pi).eq_ignore_ascii_case(b"xml")
+}
+
+/// A pseudo-attribute's value in the first XML declaration that has it.
+///
+/// Not the attribute of the first declaration: with two declarations, the
+/// first may name no encoding and the second a foreign one, and it is the
+/// second's that is read. `tests/verify_two_declarations.rs` holds that.
+fn first_declared<'a>(
+    pis: &[&'a [u8]],
+    value: impl Fn(&'a [u8]) -> Option<&'a [u8]>,
+) -> Option<&'a [u8]> {
+    pis.iter()
+        .find_map(|pi| is_declaration(pi).then(|| value(pi))?)
 }
 
 /// The `encoding` pseudo-attribute of an XML declaration, if it has one.
