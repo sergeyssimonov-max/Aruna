@@ -1166,11 +1166,11 @@ fn open(zip: &Path) -> Result<ZipArchive<BufReader<File>>> {
     crate::archive::open_zip(zip)
 }
 
-fn create_dir(path: &Path) -> Result<()> {
+fn create_dir_all(path: &Path) -> Result<()> {
     fs::create_dir_all(path).map_err(ArunaError::io(path))
 }
 
-fn remove_dir(path: &Path) -> Result<()> {
+fn remove_dir_all(path: &Path) -> Result<()> {
     fs::remove_dir_all(path).map_err(ArunaError::io(path))
 }
 

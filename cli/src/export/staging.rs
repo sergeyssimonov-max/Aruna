@@ -6,7 +6,7 @@
 //! guards are what make a failed or cancelled build leave the destination as
 //! it was found, and they are read together.
 
-use super::{create_dir, remove_dir, PACKAGE};
+use super::{create_dir_all, remove_dir_all, PACKAGE};
 use crate::error::{ArunaError, Result};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -75,7 +75,7 @@ impl Replaced {
             return Ok(held);
         }
         if aside.exists() {
-            remove_dir(&aside)?;
+            remove_dir_all(&aside)?;
         }
         fs::rename(target, &aside).map_err(ArunaError::io(&target))?;
         held.aside = Some(aside);
@@ -103,7 +103,7 @@ impl Replaced {
         self.aside
             .iter()
             .chain(self.stale.iter())
-            .filter(|path| remove_dir(path).is_err())
+            .filter(|path| remove_dir_all(path).is_err())
             .cloned()
             .collect()
     }
@@ -172,9 +172,9 @@ impl Staging {
     pub(super) fn fresh(path: PathBuf) -> Result<Self> {
         let owner = Owner::claim(owner_marker(&path));
         if path.exists() {
-            remove_dir(&path)?;
+            remove_dir_all(&path)?;
         }
-        create_dir(&path)?;
+        create_dir_all(&path)?;
         Ok(Self {
             path,
             published: false,
