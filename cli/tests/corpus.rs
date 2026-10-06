@@ -577,6 +577,7 @@ fn no_entry_name_is_read_through_a_foreign_code_page() {
 fn canonical_form(bytes: &[u8], at: &std::path::Path) -> Option<Vec<u8>> {
     std::fs::write(at, bytes).expect("write");
     let out = std::process::Command::new("xmllint")
+        .arg("--nonet")
         .arg("--c14n")
         .arg(at)
         .output()

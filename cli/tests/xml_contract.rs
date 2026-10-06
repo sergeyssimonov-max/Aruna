@@ -333,6 +333,7 @@ fn a_missing_instrument_is_told_from_a_present_one() {
 fn canonical(bytes: &[u8], at: &Path) -> Option<Vec<u8>> {
     std::fs::write(at, bytes).expect("write");
     let out = std::process::Command::new("xmllint")
+        .arg("--nonet")
         .arg("--c14n")
         .arg(at)
         .output()
@@ -467,6 +468,7 @@ fn the_siglum_is_what_an_independent_extractor_reads() {
         let record = parse_manuscript(&archive_path(&name), &head);
         std::fs::write(&doc, &bytes).expect("write");
         let out = std::process::Command::new("xsltproc")
+            .arg("--nonet")
             .arg(&sheet)
             .arg(&doc)
             .output()
