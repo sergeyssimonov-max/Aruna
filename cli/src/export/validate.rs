@@ -98,7 +98,7 @@ pub fn validate(
 /// each placed document's PDF, `None` when the build made none. Every PDF
 /// built is on disk, linked once from the inventory and named in the
 /// manifest; no other PDF is anywhere.
-pub fn validate_with(
+pub(crate) fn validate_with(
     root: &Path,
     records: &[ManuscriptRecord],
     placed: &[Placed],

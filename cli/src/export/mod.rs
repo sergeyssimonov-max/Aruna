@@ -38,7 +38,8 @@ pub use naming::{
 };
 pub use normalize::{normalize_document, normalize_into};
 pub use pdf::{Pdf, PdfState};
-pub use validate::{validate, validate_with, Validation};
+pub(crate) use validate::validate_with;
+pub use validate::{validate, Validation};
 
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, Phase};
