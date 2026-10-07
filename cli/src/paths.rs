@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 pub const OUTPUT_FILE_NAME: &str = "TLHdig_Beta_0.3.html";
 
 /// Resolve `~/Downloads/TLHdig_Beta_0.3.html`.
-pub fn output_html_path() -> Result<PathBuf> {
+pub(crate) fn output_html_path() -> Result<PathBuf> {
     Ok(downloads_dir()?.join(OUTPUT_FILE_NAME))
 }
 
@@ -117,7 +117,7 @@ pub(crate) fn scratch_base(name: &str) -> Option<&str> {
 ///
 /// `Relaxed` is enough: `fetch_add` is atomic whatever the ordering, and
 /// nothing here depends on the counter ordering against other memory.
-pub fn run_tag() -> String {
+pub(crate) fn run_tag() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
 
@@ -203,7 +203,7 @@ fn replace_with_retries(scratch: &Path, path: &Path) -> Result<()> {
 /// The probe writes and removes a scratch file rather than reading permission
 /// bits, which are not the whole answer on macOS — sandboxing and ACLs decide
 /// too, and only an attempt reflects them.
-pub fn check_output_writable(path: &Path) -> Result<()> {
+pub(crate) fn check_output_writable(path: &Path) -> Result<()> {
     ensure_output_parent(path)?;
     let probe = scratch_sibling(path);
     std::fs::write(&probe, b"").map_err(ArunaError::io(&probe))?;
