@@ -150,7 +150,7 @@ impl Reason {
     ///
     /// A breakdown that omits the empty reasons cannot be told from one where
     /// the classifier never tried them.
-    pub const ALL: [Reason; 11] = [
+    pub(crate) const ALL: [Reason; 11] = [
         Reason::UnterminatedStartTag,
         Reason::AttributeNotSeparated,
         Reason::AttributeValueUnclosed,
@@ -544,7 +544,7 @@ impl Limit {
     }
 
     /// Both of them, so a breakdown can list a class with no documents.
-    pub const ALL: [Limit; 2] = [
+    pub(crate) const ALL: [Limit; 2] = [
         Limit::RawLessThanInAttributeValue,
         Limit::ColonWithoutLocalName,
     ];
