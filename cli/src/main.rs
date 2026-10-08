@@ -40,8 +40,10 @@ fn main() -> ExitCode {
     // same one a window will call, and a binary that reached past it would be
     // the second answer to "what does building the inventory come to" — which
     // is the arrangement that layer exists to prevent.
-    // The PDF beside each document: on unless `ARUNA_PDF=off`, and set in the
-    // fonts of `ARUNA_FONTS` – a directory, named, never searched for (owner's
+    // The PDF beside each document: only when asked for with `ARUNA_PDF=on`
+    // (owner's decision of 2026-10-06 – off by default in 2.6.3, the switch
+    // is the path of the release gate and the tests), and set in the fonts of
+    // `ARUNA_FONTS` – a directory, named, never searched for (owner's
     // decisions of 2026-09-30, questions 3 and 10). Without it the core
     // refuses before any work and names the file it wanted.
     let pdf = match pdf_request(
@@ -80,8 +82,8 @@ fn main() -> ExitCode {
     }
 }
 
-/// `ARUNA_PDF` and `ARUNA_FONTS` as a request: `off` or `0` builds no PDF,
-/// `on`, `1` or nothing builds one beside each document in the fonts named.
+/// `ARUNA_PDF` and `ARUNA_FONTS` as a request: `on` or `1` builds a PDF beside
+/// each document in the fonts named, `off`, `0` or nothing builds none.
 /// Any other value is refused rather than guessed at.
 fn pdf_request(
     switch: Option<&std::ffi::OsStr>,
@@ -91,8 +93,8 @@ fn pdf_request(
         .map(|v| v.to_string_lossy().to_lowercase())
         .as_deref()
     {
-        None | Some("on" | "1") => Ok(aruna::app::PdfRequest::On { fonts }),
-        Some("off" | "0") => Ok(aruna::app::PdfRequest::Off),
+        Some("on" | "1") => Ok(aruna::app::PdfRequest::On { fonts }),
+        None | Some("off" | "0") => Ok(aruna::app::PdfRequest::Off),
         Some(other) => Err(format!(
             "ARUNA_PDF={other} не понято: нужно off или 0 – без PDF, on или 1 – с ним"
         )),
@@ -141,7 +143,7 @@ fn usage() -> String {
          \n\
          ARUNA_ZIP=/путь/к/архиву.zip – взять готовый архив вместо загрузки.\n\
          ARUNA_FONTS=/путь/к/шрифтам – каталог семи шрифтов docs/FONTS.md для PDF.\n\
-         ARUNA_PDF=off – собрать пакет без PDF (по умолчанию PDF строится).\n",
+         ARUNA_PDF=on – собрать пакет с PDF (по умолчанию без PDF).\n",
         env!("CARGO_PKG_VERSION")
     )
 }

@@ -83,12 +83,15 @@ fn build_package_with(
     })
 }
 
-/// Whether the package carries a PDF of every document – on unless asked
-/// otherwise (owner's decision of 2026-09-30, question 3) – and the fonts it
-/// is set in.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Whether the package carries a PDF of every document, and the fonts it is
+/// set in. Off unless asked for: in 2.6.3 the PDF is built only on an explicit
+/// request – the console's `ARUNA_PDF=on`, the release gate, the tests – and
+/// the window asks for none (owner's decision of 2026-10-06, refining question
+/// 3 of 2026-09-30). On by default returns with the window in 2.7.0.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum PdfRequest {
-    /// The package without PDFs; everything else as with them.
+    /// The package without PDFs; everything else as with them. The default.
+    #[default]
     Off,
     /// A PDF beside each document, set in the seven files of `docs/FONTS.md`
     /// in `fonts`. The window gives its resource directory, the console the
@@ -100,12 +103,6 @@ pub enum PdfRequest {
 /// What a font directory nobody named would have covered: the PDF.
 pub const NO_FONT_DIRECTORY: &str =
     "the PDF, and no directory of fonts was named (ARUNA_FONTS in the console)";
-
-impl Default for PdfRequest {
-    fn default() -> Self {
-        PdfRequest::On { fonts: None }
-    }
-}
 
 impl PdfRequest {
     /// The fonts, read and checked, or `None` for no PDFs.
@@ -195,7 +192,7 @@ pub struct CorpusRequest {
     /// offline runs pass a path; so will a window that lets someone choose a
     /// file they already have.
     pub local_archive: Option<PathBuf>,
-    /// Whether a PDF goes beside each document: on by default.
+    /// Whether a PDF goes beside each document: off by default.
     pub pdf: PdfRequest,
 }
 
@@ -490,16 +487,17 @@ impl From<&ArunaError> for Failure {
 #[cfg(test)]
 mod tests {
 
-    /// **The PDF is on by default, and without fonts the run stops before it
-    /// reads anything** – here before an archive that does not exist is
-    /// even looked at (owner's decisions of 2026-09-30, questions 3 and 10).
+    /// **A request for PDFs without fonts stops before it reads anything** –
+    /// here before an archive that does not exist is even looked at (owner's
+    /// decisions of 2026-09-30, questions 3 and 10). Until 2026-10-06 this was
+    /// the default request; since the owner's decision of that day the PDF is
+    /// asked for explicitly, and the name of the test is kept.
     #[test]
     fn a_default_request_wants_pdfs_and_is_refused_without_fonts_before_any_work() {
         let request = CorpusRequest {
             local_archive: Some(PathBuf::from("/nonexistent/archive.zip")),
-            ..CorpusRequest::default()
+            pdf: PdfRequest::On { fonts: None },
         };
-        assert_eq!(request.pdf, PdfRequest::On { fonts: None });
         let dir = tempfile::tempdir().expect("tempdir");
         let err = build_corpus_into(&request, dir.path(), &Job::unattended()).expect_err("refused");
         match &err {
@@ -511,6 +509,26 @@ mod tests {
         }
         assert_eq!(Failure::of(&err).code, "font_missing");
         assert_eq!(std::fs::read_dir(dir.path()).expect("readable").count(), 0);
+    }
+
+    /// **By default no PDF, and so no fonts wanted** (owner's decision of
+    /// 2026-10-06): the same request without the switch gets past the fonts
+    /// and fails only on the archive that is not there.
+    #[test]
+    fn the_default_request_builds_no_pdf_and_wants_no_fonts() {
+        assert_eq!(PdfRequest::default(), PdfRequest::Off);
+        assert_eq!(CorpusRequest::default().pdf, PdfRequest::Off);
+        let request = CorpusRequest {
+            local_archive: Some(PathBuf::from("/nonexistent/archive.zip")),
+            ..CorpusRequest::default()
+        };
+        let dir = tempfile::tempdir().expect("tempdir");
+        let err =
+            build_corpus_into(&request, dir.path(), &Job::unattended()).expect_err("no archive");
+        assert!(
+            !matches!(err, ArunaError::FontMissing { .. }),
+            "a request without PDFs asked for fonts: {err}"
+        );
     }
 
     #[test]

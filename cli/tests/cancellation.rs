@@ -523,6 +523,7 @@ fn the_binary_still_runs_to_completion() {
             "ARUNA_FONTS",
             concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
         )
+        .env("ARUNA_PDF", "on")
         .env("ARUNA_CACHE_DIR", home.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
         .env_remove("XDG_DOWNLOAD_DIR")

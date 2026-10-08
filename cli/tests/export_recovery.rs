@@ -310,6 +310,7 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
             "ARUNA_FONTS",
             concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
         )
+        .env("ARUNA_PDF", "on")
         .env("ARUNA_CACHE_DIR", home.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
         .env_remove("XDG_DOWNLOAD_DIR")
