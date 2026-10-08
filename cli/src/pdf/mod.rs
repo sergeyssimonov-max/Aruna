@@ -15,7 +15,10 @@
 //! A failure of any of these is a defect of this program, not of the
 //! document, and stops the whole build ([`PdfError::Invariant`]). A document
 //! Typst refuses is the document's failure and is recorded, not fatal
-//! ([`PdfError::Document`]; `PDF-ACCEPTANCE.md` §5).
+//! ([`PdfError::Document`]; `PDF-ACCEPTANCE.md` §5). So is a document with
+//! two repeated clusters in a row, whose wrappers would overlap
+//! ([`PdfError::Clusters`], owner's decision of 2026-10-02): until that day
+//! it stopped the whole build as an invariant.
 //!
 //! The file carries only what does not change between runs (question 13):
 //! the relative path as `ident`, "Aruna <version>" as `creator`, the template
@@ -59,8 +62,6 @@ pub enum Invariant {
     LabelsUnplaced { in_text: usize, in_file: usize },
     #[error("{0} label spans not found exactly once in their stream")]
     LabelSpans(usize),
-    #[error("page {page}: two repeated clusters overlap at MCID {mcid}")]
-    ClustersOverlap { page: u32, mcid: i64 },
     #[error("{}", if *predicted {
         "the credit was predicted and UllikummiA is not embedded"
     } else {
@@ -82,6 +83,14 @@ pub enum PdfError {
     /// Typst refused this document: recorded, the build goes on.
     #[error("Typst refused the document: {}", .0.join("; "))]
     Document(Vec<String>),
+    /// Two repeated clusters in a row – `Š̃Š̃`, or a stack of combining marks
+    /// set apart – so that the wrappers of variant A would overlap: this
+    /// document gets no PDF and a record, the build goes on (owner's
+    /// decision of 2026-10-02). One repeat, or two apart, is wrapped as ever.
+    // The sentence of the invariant it was until 2026-10-02, and the console
+    // already has it in Russian.
+    #[error("page {page}: two repeated clusters overlap at MCID {mcid}")]
+    Clusters { page: u32, mcid: i64 },
     /// A defect of this program: the build stops.
     #[error("{0}")]
     Invariant(Invariant),
@@ -93,7 +102,7 @@ pub enum PdfError {
 impl PdfError {
     /// Whether this failure stops the whole build.
     pub fn is_invariant(&self) -> bool {
-        !matches!(self, PdfError::Document(_))
+        !matches!(self, PdfError::Document(_) | PdfError::Clusters { .. })
     }
 }
 

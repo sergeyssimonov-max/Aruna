@@ -271,15 +271,31 @@ fn a_repeated_cluster_is_wrapped_and_nothing_else_is() {
     assert_eq!(ok(finish(&plain, &[], true)).0, plain);
 }
 
+/// Two repeats in a row share a piece: the PDF of this document is refused,
+/// not wrapped twice over itself. Until the owner's decision of 2026-10-02
+/// this stopped the whole build as an invariant; the name of the test is kept.
 #[test]
 fn two_clusters_over_one_piece_stop_the_build() {
     let pdf = cluster_page(
         "BT /F 10 Tf /P<</MCID 0>>BDC (C) Tj EMC /P<</MCID 1>>BDC (B) Tj EMC /P<</MCID 2>>BDC (B) Tj EMC ET",
     );
     match finish(&pdf, &[], true) {
-        Err(PdfError::Invariant(Invariant::ClustersOverlap { page: 1, mcid: 1 })) => {}
+        Err(e @ PdfError::Clusters { page: 1, mcid: 1 }) => assert!(!e.is_invariant()),
         other => panic!("{:?}", other.map(|(_, r)| r)),
     }
+}
+
+/// Two repeats with a piece between them are two wrappers and no refusal.
+#[test]
+fn two_clusters_apart_are_both_wrapped() {
+    let pdf = cluster_page(
+        "BT /F 10 Tf /P<</MCID 0>>BDC (C) Tj EMC /P<</MCID 1>>BDC (B) Tj EMC /P<</MCID 2>>BDC (A) Tj EMC /P<</MCID 3>>BDC (C) Tj EMC /P<</MCID 4>>BDC (B) Tj EMC ET",
+    );
+    let (out, report) = ok(finish(&pdf, &[], true));
+    assert_eq!(report.clusters.len(), 2, "{:?}", report.clusters);
+    let doc = ok(Document::load_mem(&out).map_err(broken));
+    let page = doc.get_pages().values().copied().next().unwrap_or((0, 0));
+    assert_eq!(ok(scan_page(&doc, page)).text, "A\u{301}AA\u{301}");
 }
 
 #[test]

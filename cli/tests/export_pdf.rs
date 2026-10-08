@@ -194,11 +194,15 @@ fn the_switch_changes_nothing_but_the_pdfs_and_what_names_them() {
     );
 }
 
+/// **Two repeated clusters in a row refuse this document only** (owner's
+/// decision of 2026-10-02): the wrappers of variant A would overlap, and the
+/// document gets no PDF and a record in the manifest, while the build goes on
+/// and the others get theirs. Until that day this stopped the whole build as
+/// a broken invariant – the name of the test is kept.
 #[test]
 fn a_broken_invariant_stops_the_build_and_names_the_document() {
     let dir = tempdir().expect("tempdir");
-    // Two repeated clusters side by side: the wrapper of variant A would
-    // overlap itself (known limit of the rule, no corpus document has it).
+    // Two repeated clusters side by side (no corpus document has it).
     let zip = corpus(
         dir.path(),
         &[(
@@ -207,21 +211,67 @@ fn a_broken_invariant_stops_the_build_and_names_the_document() {
         )],
     );
     let out = dir.path().join("out");
-    let err = build(&zip, &out, Pdf::On(fonts())).expect_err("stopped");
-    let text = err.to_string();
-    assert!(text.contains("CTH 12/IBoT 1.3.xml"), "{text}");
-    assert!(
-        text.contains("broke an invariant of this program"),
-        "{text}"
-    );
-    assert!(text.contains("overlap"), "{text}");
-    assert_eq!(aruna::app::Failure::of(&err).code, "package_invalid");
-    assert!(!out.join(PACKAGE).exists(), "a package was published");
+    let built = build(&zip, &out, Pdf::On(fonts())).expect("the build goes on");
     assert_eq!(
-        std::fs::read_dir(&out).expect("readable").count(),
-        0,
-        "staging left behind"
+        built.pdfs,
+        Some(export::PdfCount {
+            built: 4,
+            refused: 2
+        })
     );
+    let root = out.join(PACKAGE);
+    assert!(!root.join("CTH 12/IBoT 1.3.pdf").exists(), "a PDF of it");
+    assert!(
+        root.join("CTH 12/IBoT 1.3.xml").is_file(),
+        "its XML is gone"
+    );
+    assert!(
+        root.join("CTH 12/IBoT 1.1.pdf").is_file(),
+        "the others lost theirs"
+    );
+    let manifest = std::fs::read_to_string(root.join(export::MANIFEST)).expect("manifest");
+    let at = manifest
+        .find("\"file\": \"CTH 12/IBoT 1.3.xml\"")
+        .expect("its entry");
+    let entry = &manifest[at..at + manifest[at..].find('}').expect("closed")];
+    assert!(
+        entry.contains("\"pdf\": { \"refused\": \"page 1: two repeated clusters overlap at MCID"),
+        "{entry}"
+    );
+}
+
+/// **One repeated cluster, or two apart, is wrapped and the PDF is built** –
+/// the decision of 2026-10-02 refuses only two in a row.
+#[test]
+fn one_repeated_cluster_or_two_apart_still_get_their_pdf() {
+    let dir = tempdir().expect("tempdir");
+    let zip = corpus(
+        dir.path(),
+        &[
+            (
+                "root/CTH 12_XML_HFR/IBoT 1.4.xml",
+                with_body("IBoT 1.4", "<lb/> \u{160}\u{303}"),
+            ),
+            (
+                "root/CTH 12_XML_HFR/IBoT 1.5.xml",
+                with_body("IBoT 1.5", "<lb/> \u{160}\u{303} a \u{160}\u{303}"),
+            ),
+        ],
+    );
+    let out = dir.path().join("out");
+    let built = build(&zip, &out, Pdf::On(fonts())).expect("builds");
+    assert_eq!(
+        built.pdfs,
+        Some(export::PdfCount {
+            built: 6,
+            refused: 1
+        })
+    );
+    let root = out.join(PACKAGE);
+    for pdf in ["CTH 12/IBoT 1.4.pdf", "CTH 12/IBoT 1.5.pdf"] {
+        let bytes = std::fs::read(root.join(pdf)).expect("the PDF is there");
+        assert!(bytes.starts_with(b"%PDF-"), "{pdf}");
+    }
 }
 
 #[test]

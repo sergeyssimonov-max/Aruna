@@ -9,9 +9,10 @@
 //! after each one ([`crate::pdf::render`]).
 //!
 //! A document Typst refuses, or one the model refuses, gets no PDF and a
-//! record in the manifest, and the build goes on (`PDF-ACCEPTANCE.md` §5). A
-//! broken invariant of this program stops the whole build and names the
-//! document and the invariant.
+//! record in the manifest, and the build goes on (`PDF-ACCEPTANCE.md` §5) –
+//! as does one with two repeated clusters in a row (owner's decision of
+//! 2026-10-02). A broken invariant of this program stops the whole build and
+//! names the document and the invariant.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -142,6 +143,8 @@ fn one(
         Err(PdfError::Document(messages)) => {
             Ok(PdfState::Refused(format!("Typst: {}", messages.join("; "))))
         }
+        // Owner's decision of 2026-10-02: this document only, recorded.
+        Err(clusters @ PdfError::Clusters { .. }) => Ok(PdfState::Refused(clusters.to_string())),
         Err(PdfError::Fonts(error)) => Err(error),
         Err(PdfError::Invariant(invariant)) => Err(invariant_broken(
             staging,

@@ -976,11 +976,11 @@ fn repeats(scan: &PageScan, n: u32) -> Result<Vec<Repeat>, PdfError> {
         let (Some(ma), Some(mb), Some(close)) = (a.mcid, b.mcid, b.close_op) else {
             continue;
         };
+        // Two repeats in a row share a piece: their wrappers would
+        // overlap, and the document is refused (owner's decision of
+        // 2026-10-02) rather than the build stopped.
         if wraps.last().is_some_and(|w| w.1 >= a.open_op) {
-            return Err(PdfError::Invariant(Invariant::ClustersOverlap {
-                page: n,
-                mcid: ma,
-            }));
+            return Err(PdfError::Clusters { page: n, mcid: ma });
         }
         wraps.push((a.open_op, close, a.resolved.clone(), ma, mb, t.clone()));
     }
