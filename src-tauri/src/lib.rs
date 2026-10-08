@@ -2319,21 +2319,33 @@ mod cancelling {
         found
     }
 
-    /// Сборка запросом окна на `zip`: архив с диска вместо Zenodo, все прочее –
-    /// как просит окно, в том числе PDF.
-    fn build_as_the_window(zip: std::path::PathBuf, into: &std::path::Path) -> BuildReport {
+    /// Сборка запросом окна на `zip` в `into` – архив с диска вместо Zenodo,
+    /// все прочее, PDF в том числе, как просит окно, – и проверка, что в
+    /// пакете нет ни одного PDF, а манифест и опись не называют ни одного.
+    fn the_window_builds_without_pdfs(
+        zip: std::path::PathBuf,
+        into: &std::path::Path,
+    ) -> BuildReport {
         let request = aruna::app::CorpusRequest {
             local_archive: Some(zip),
             ..window_request()
         };
-        build_once(
+        let report = build_once(
             aruna::job::JobId::next(),
             &request,
             Some(into),
             &aruna::job::Cancel::new(),
             &aruna::progress::Silent,
         )
-        .expect("окно собирает пакет")
+        .expect("окно собирает пакет");
+        let package = into.join(aruna::export::PACKAGE);
+        assert_eq!(pdfs_under(&package), Vec::<std::path::PathBuf>::new());
+        let manifest =
+            std::fs::read_to_string(package.join(aruna::export::MANIFEST)).expect("манифест");
+        assert!(!manifest.contains("\"pdf"), "манифест называет PDF");
+        let inventory = std::fs::read_to_string(&report.inventory).expect("опись");
+        assert!(!inventory.contains(".pdf"), "опись ссылается на PDF");
+        report
     }
 
     /// **Окно PDF не строит** (решение владельца 06.10.2026): запрос окна –
@@ -2343,18 +2355,10 @@ mod cancelling {
     fn the_window_asks_for_no_pdf_and_its_package_has_none() {
         assert_eq!(window_request().pdf, aruna::app::PdfRequest::Off);
         assert_eq!(window_request().local_archive, None);
-
         let dir = tempfile::tempdir().expect("tempdir");
         let out = tempfile::tempdir().expect("каталог назначения");
-        let report = build_as_the_window(small_archive(dir.path(), 5), out.path());
+        let report = the_window_builds_without_pdfs(small_archive(dir.path(), 5), out.path());
         assert_eq!(report.documents, 5);
-        let package = out.path().join(aruna::export::PACKAGE);
-        assert_eq!(pdfs_under(&package), Vec::<std::path::PathBuf>::new());
-        let manifest =
-            std::fs::read_to_string(package.join(aruna::export::MANIFEST)).expect("манифест");
-        assert!(!manifest.contains("\"pdf"), "манифест называет PDF");
-        let inventory = std::fs::read_to_string(&report.inventory).expect("опись");
-        assert!(!inventory.contains(".pdf"), "опись ссылается на PDF");
     }
 
     /// **То же на архиве корпуса.** Пакет кладется в каталог `ARUNA_WINDOW_PACKAGE`,
@@ -2363,18 +2367,11 @@ mod cancelling {
     #[test]
     #[ignore = "читает архив корпуса; запускать явно"]
     fn the_window_builds_the_corpus_without_pdfs() {
-        let Some(zip) = corpus_fixture() else {
-            eprintln!("пропуск: архива корпуса нет");
-            return;
-        };
+        let Some(zip) = corpus_fixture() else { return };
         let temporary = tempfile::tempdir().expect("tempdir");
-        let into = std::env::var_os("ARUNA_WINDOW_PACKAGE")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| temporary.path().to_path_buf());
-        let report = build_as_the_window(zip, &into);
-        assert_eq!(report.documents, 23936);
-        assert_eq!(report.groups, 663);
-        let package = into.join(aruna::export::PACKAGE);
-        assert_eq!(pdfs_under(&package), Vec::<std::path::PathBuf>::new());
+        let into = std::env::var_os("ARUNA_WINDOW_PACKAGE").map(std::path::PathBuf::from);
+        let report =
+            the_window_builds_without_pdfs(zip, into.as_deref().unwrap_or(temporary.path()));
+        assert_eq!((report.documents, report.groups), (23936, 663));
     }
 }
