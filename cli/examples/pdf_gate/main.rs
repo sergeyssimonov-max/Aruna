@@ -477,6 +477,7 @@ fn report_pdfkit(t: &Tally) -> bool {
 
 fn canonical(path: &Path) -> Vec<u8> {
     Command::new("xmllint")
+        .arg("--nonet")
         .arg("--c14n")
         .arg(path)
         .output()
