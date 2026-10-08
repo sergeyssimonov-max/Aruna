@@ -140,16 +140,72 @@ fn one(
             std::io::Write::write_all(&mut handle, &rendered.pdf).map_err(ArunaError::io(&out))?;
             Ok(PdfState::Built(relative))
         }
-        Err(PdfError::Document(messages)) => {
+        Err(error) => not_built(staging, &place.relative, error),
+    }
+}
+
+/// What a PDF that was not built comes to: the document refused with a
+/// record, or the build stopped.
+fn not_built(staging: &Path, document: &Path, error: PdfError) -> Result<PdfState> {
+    match error {
+        PdfError::Document(messages) => {
             Ok(PdfState::Refused(format!("Typst: {}", messages.join("; "))))
         }
         // Owner's decision of 2026-10-02: this document only, recorded.
-        Err(clusters @ PdfError::Clusters { .. }) => Ok(PdfState::Refused(clusters.to_string())),
-        Err(PdfError::Fonts(error)) => Err(error),
-        Err(PdfError::Invariant(invariant)) => Err(invariant_broken(
+        clusters @ PdfError::Clusters { .. } => Ok(PdfState::Refused(clusters.to_string())),
+        PdfError::Fonts(error) => Err(error),
+        PdfError::Invariant(invariant) => Err(invariant_broken(
             staging,
-            &place.relative.to_string_lossy(),
+            &document.to_string_lossy(),
             &invariant.to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// **A broken invariant is told as a package that does not match its
+    /// model**, naming the document and the invariant – the sentence the
+    /// window and the console already have. No document of a corpus reaches
+    /// an invariant (that is what makes it one), so the telling is held here;
+    /// until 2026-10-02 two repeated clusters in a row did reach it, and the
+    /// export test that held this then holds the refusal now.
+    #[test]
+    fn a_broken_invariant_names_the_document_and_the_invariant() {
+        let err = not_built(
+            Path::new("/staging"),
+            Path::new("CTH 12/IBoT 1.3.xml"),
+            PdfError::Invariant(crate::pdf::Invariant::World),
+        )
+        .expect_err("the build stops");
+        let text = err.to_string();
+        assert!(text.contains("CTH 12/IBoT 1.3.xml"), "{text}");
+        assert!(
+            text.contains("broke an invariant of this program"),
+            "{text}"
+        );
+        assert!(
+            text.contains("the world of the template could not be built"),
+            "{text}"
+        );
+        assert_eq!(crate::app::Failure::of(&err).code, "package_invalid");
+    }
+
+    /// The two refusals of one document are records, not stops.
+    #[test]
+    fn a_refused_document_is_recorded_and_the_build_goes_on() {
+        let refused = |e| not_built(Path::new("/staging"), Path::new("CTH 1/A.xml"), e);
+        assert_eq!(
+            refused(PdfError::Document(vec!["a".into(), "b".into()])).ok(),
+            Some(PdfState::Refused("Typst: a; b".into()))
+        );
+        assert_eq!(
+            refused(PdfError::Clusters { page: 2, mcid: 7 }).ok(),
+            Some(PdfState::Refused(
+                "page 2: two repeated clusters overlap at MCID 7".into()
+            ))
+        );
     }
 }
