@@ -31,7 +31,8 @@
   "bundle": {
     "active": true,
     "resources": {
-      "../cli/resources/fonts/": "fonts/"
+      "../cli/resources/fonts/": "fonts/",
+      "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md"
     },
     "targets": [
       "app",
