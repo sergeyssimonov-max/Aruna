@@ -11,8 +11,8 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Five references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, v2.5.11 and v2.6.1",
-    "are earlier 2.x releases, and v2.6.2 is the current one, published on 2026-09-29. A release",
+    "Six references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, v2.5.11, v2.6.1 and",
+    "v2.6.2 are earlier 2.x releases, and v2.6.3 is the current one, published on 2026-10-08. A release",
     "cannot record itself — the commit it names is the commit that carries it, and no file",
     "can contain its own hash — so each entry here is added by the commit after the release",
     "it describes.",
@@ -66,7 +66,14 @@
       "commit": "4590c1afdb46403feec7e723c65a932f09dc912d",
       "published": "2026-09-29T19:25:52Z",
       "dmg_sha256": "a58bef0fb459a1c6e021e3111365286fef4a6626b0212887bb2152e73667526b",
-      "why": "The current release and the fifth reference, beside v2.6.1. A run that waits through many holders of the publish lock takes the lock itself instead of publishing beside another run; in 2.6.1 the race was counted as unstable inode numbers (d18e1dd, simplified in ccd122a). Tauri 2.11.6 binds channel data and large invoke replies to the webview they were made for, GHSA-w28w-mhc8-qvjv; Aruna has one webview, so there was no direct exposure. The package it builds hashes to the unchanged 83392544…3dc99 over 23 941 files, the byte mirror to 7cfcdce4…35d0. The application the runner built, 509c98d8…ff3b, is byte-for-byte the one the release gate built twice on the owner's machine from 55c2df9; the tag's commit differs from it only in documents. Revisions 105–112."
+      "why": "The fifth reference, beside v2.6.1. A run that waits through many holders of the publish lock takes the lock itself instead of publishing beside another run; in 2.6.1 the race was counted as unstable inode numbers (d18e1dd, simplified in ccd122a). Tauri 2.11.6 binds channel data and large invoke replies to the webview they were made for, GHSA-w28w-mhc8-qvjv; Aruna has one webview, so there was no direct exposure. The package it builds hashes to the unchanged 83392544…3dc99 over 23 941 files, the byte mirror to 7cfcdce4…35d0. The application the runner built, 509c98d8…ff3b, is byte-for-byte the one the release gate built twice on the owner's machine from 55c2df9; the tag's commit differs from it only in documents. Revisions 105–112."
+    },
+    {
+      "tag": "v2.6.3",
+      "commit": "7d21bc4f35846987427858d9f7890669158ce98c",
+      "published": "2026-10-08T12:11:22Z",
+      "dmg_sha256": "e3137106d3af0354e318096d075b8bb01838e50750b13067df9df0d7250952c9",
+      "why": "The current release, the last without PDFs. The conversion to PDF is in the core and off everywhere by default: the window asks for none, the console builds them only with ARUNA_PDF=on. The inventory's search finds a CTH group by its catalogue title and folds diacritics in every field; a build on HFS+ no longer refuses names the disk keeps in another Unicode form; THIRD-PARTY-NOTICES.md ships in the application. The package it builds without PDFs hashes to 3a9d93fc…693a over 23 941 files, with PDFs (ARUNA_PDF=on) to a8100765…65b8 over 47 654. The application the runner built, 3b608042…2ac5, is byte-for-byte the one the owner's machine built from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 113–143."
     }
   ]
 }
