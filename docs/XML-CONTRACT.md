@@ -15,6 +15,11 @@ Amended 2026-09-30, second entry: §5 question 5, how the shift of `text:tab`
 is drawn, by the owner's decision of the same day on question 4 of the design
 note. Marked below.
 
+Amended 2026-10-06: §3.3, the opening of §4, the authenticity options of §4
+and the heading of §5 – by the owner's decision of 2026-10-06 on authenticity
+(option 2), and to state that the converter exists. Written on 2026-10-08.
+Marked below.
+
 ---
 
 ## 1. The source is not ours to change
@@ -293,21 +298,31 @@ under `source.not_manuscripts`. Neither occurs in TLHdig Beta 0.3 (442
 declarations, all `1.0` and UTF-8; no UTF-16). The decision is revisited with
 the first such document.
 
-### 3.3 The future PDF
+### 3.3 ~~The future PDF~~ The PDF
 
-§4. This level does not exist yet and must not be faked.
+~~§4. This level does not exist yet and must not be faked.~~
+
+*Amended 2026-10-06.* The converter exists since the task pdf-converter-2
+(2026-09-30): the module `cli/src/pdf/` builds one PDF beside each XML document
+of the package, in a phase of `export` (§4). In release 2.6.3 it is off by
+default, in the window and in the console, and runs only when asked for
+explicitly (`ARUNA_PDF=on` in the console) – the path of the release gate,
+`pdf_gate` and the tests. On by default returns with the window in 2.7.0.
 
 ---
 
 ## 4. XML → internal model → PDF
 
-There is no PDF converter. There is, since 2026-09-13, a **document model**:
+~~There is no PDF converter.~~ *Amended 2026-10-06:* there is a PDF converter
+since 2026-09-30, the module `cli/src/pdf/`, off by default in release 2.6.3
+(§3.3). There is, since 2026-09-13, a **document model**:
 `cli/src/document.rs`, over the parser adopted on 2026-09-05 (§5), with no new
 dependency. It is the XML Information Set of one document — line ends and
 attribute values normalised, the predefined entities and character references
 replaced, adjacent character data one node — and it holds nothing the document
 does not: no siglum, no CTH number, no editor, no default for anything absent.
-Nothing consumes it yet. The inventory fields are still produced by a scan of
+~~Nothing consumes it yet.~~ *Amended 2026-10-06:* the PDF phase consumes it –
+each document is read back into the model before it is laid out. The inventory fields are still produced by a scan of
 the first 16 KiB, and deriving them from the model is the next step, together
 with the semantic manifest of `PDF-ACCEPTANCE.md` §2.
 
@@ -366,20 +381,29 @@ is what showed it; measured over the archive that day.
 
 ### Authenticity: the original beside the PDF
 
-Three options, to be decided before the converter is written, not during:
+**Decided 2026-10-06 by the owner: option 2.** The XML stands next to the PDF
+in the same folder, and the manifest records the pairing plus the SHA-256 of
+the source. Options 1 and 3 are rejected, not to be revisited.
 
-1. **Embed the XML as a PDF file attachment.** One file to move; every reader
+~~Three options, to be decided before the converter is written, not during:~~
+*Amended 2026-10-06.*
+
+1. ~~**Embed the XML as a PDF file attachment.** One file to move; every reader
    can extract it; nothing is lost. Costs about the size of the XML again
-   (339 MB across the corpus) and not every viewer surfaces attachments.
+   (339 MB across the corpus) and not every viewer surfaces attachments.~~
+   *Rejected 2026-10-06, not to be revisited.*
 2. **Ship the XML next to the PDF** in the same folder, as the package already
    does, and record the pairing plus SHA-256 in the manifest. Costs nothing new
    — the package is already this — but the two can be separated.
-3. **Reference only**: PDF metadata carries the source path and its SHA-256.
-   Smallest, and useless if the corpus is not to hand.
+   *Decided 2026-10-06.*
+3. ~~**Reference only**: PDF metadata carries the source path and its SHA-256.
+   Smallest, and useless if the corpus is not to hand.~~
+   *Rejected 2026-10-06, not to be revisited.*
 
 Recommendation is (2) with the digest, because the package already holds both
-and the manifest already names both, and (1) as an option for single-document
-export. This is written down here rather than chosen silently.
+and the manifest already names both~~, and (1) as an option for single-document
+export~~. This is written down here rather than chosen silently. *Amended
+2026-10-06: the option for single-document export is rejected with option 1.*
 
 Each PDF must in any case allow its source to be identified: original path,
 SHA-256, converter version, run identifier, template version, and the status of
@@ -387,7 +411,10 @@ the completeness check.
 
 ---
 
-## 5. Policy needed before the converter is written
+## 5. ~~Policy needed before the converter is written~~ Policy for the converter
+
+*Amended 2026-10-06.* The converter is written (§3.3); the questions below are
+kept with their decisions.
 
 Open questions, each of which changes what the converter does:
 
