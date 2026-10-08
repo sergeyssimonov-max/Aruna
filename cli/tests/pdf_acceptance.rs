@@ -155,3 +155,20 @@ fn sips_rasterises_a_page_to_its_size_and_refuses_a_broken_file() {
         "sips produced an image from a file cut to a quarter"
     );
 }
+
+/// **The release gate holds the PDF phase of the whole set to 135 s** – the
+/// product's limit since the owner's decision of 2026-10-02, 125 s before it
+/// (specification 4.10, 6.8). The gate is an example and runs no tests of its
+/// own, so the number is read from its source.
+#[test]
+fn the_gate_holds_the_pdf_phase_to_the_product_limit() {
+    let gate = include_str!("../examples/pdf_gate/main.rs");
+    assert!(
+        gate.contains("\nconst LIMIT: f64 = 135.0;\n"),
+        "the limit of pdf_gate is not 135 s"
+    );
+    assert!(
+        !gate.contains("125.0"),
+        "the old limit is still in pdf_gate"
+    );
+}
