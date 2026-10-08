@@ -311,3 +311,78 @@ fn the_pdf_phase_reports_its_progress_to_the_end() {
     .expect("builds");
     assert_eq!(ticks.0.lock().expect("unpoisoned").last(), Some(&(5, 4, 5)));
 }
+
+/// **Authenticity, option 2 of `XML-CONTRACT.md` §4** (owner's decision of
+/// 2026-10-06): every PDF stands in the folder of its XML, the manifest names
+/// the pair, and the PDF itself carries no copy of the source – no embedded
+/// file, no digest of it – only the constant fields of decision 13, which
+/// `pdf_module::the_file_carries_no_date_and_builds_the_same_twice` holds.
+/// Without PDFs the manifest and the inventory name none
+/// (`the_switch_changes_nothing_but_the_pdfs_and_what_names_them`).
+///
+/// The SHA-256 of the source that the decision also puts in the manifest is
+/// not written by the export today, and this test does not claim it: found on
+/// 2026-10-08, left to the owner before 2.7.0 (specification 7.3).
+#[test]
+fn each_pdf_is_paired_with_its_xml_and_carries_no_copy_of_it() {
+    let dir = tempdir().expect("tempdir");
+    let zip = corpus(dir.path(), &[]);
+    let out = dir.path().join("on");
+    build(&zip, &out, Pdf::On(fonts())).expect("builds");
+    let root = out.join(PACKAGE);
+    let files = tree(&root);
+    let manifest = String::from_utf8_lossy(&files[Path::new(export::MANIFEST)]).into_owned();
+
+    let pdfs: Vec<&PathBuf> = files
+        .keys()
+        .filter(|p| p.extension().is_some_and(|e| e == "pdf"))
+        .collect();
+    assert_eq!(pdfs.len(), 4, "{pdfs:?}");
+    for pdf in pdfs {
+        let xml = pdf.with_extension("xml");
+        assert!(files.contains_key(&xml), "{pdf:?} without its XML");
+        assert_eq!(pdf.parent(), xml.parent(), "{pdf:?}");
+
+        // The manifest's entry of this document: its "file" is the XML, its
+        // "pdf" the PDF, in the same entry.
+        let named = format!("\"pdf\": \"{}\"", pdf.to_string_lossy());
+        let at = manifest.find(&named).expect("the manifest names the PDF");
+        let entry = &manifest[manifest[..at].rfind('{').expect("an entry")..at];
+        assert!(
+            entry.contains(&format!("\"file\": \"{}\"", xml.to_string_lossy())),
+            "{entry}"
+        );
+
+        // No copy of the source in the PDF: no embedded file, no digest of
+        // the XML, raw or in any decoded stream.
+        let bytes = &files[pdf];
+        let source = &files[&xml];
+        let digest = aruna::sha256::sha256_hex(source);
+        let doc = lopdf::Document::load_mem(bytes).expect("readable");
+        let mut texts = vec![bytes.clone()];
+        for object in doc.objects.values() {
+            if let Ok(stream) = object.as_stream() {
+                texts.push(
+                    stream
+                        .decompressed_content()
+                        .unwrap_or_else(|_| stream.content.clone()),
+                );
+            }
+        }
+        for text in &texts {
+            for needle in [
+                b"/EmbeddedFile".as_slice(),
+                b"/Filespec",
+                digest.as_bytes(),
+                digest.to_uppercase().as_bytes(),
+                b"<AOxml",
+            ] {
+                assert!(
+                    memchr::memmem::find(text, needle).is_none(),
+                    "{pdf:?} carries {}",
+                    String::from_utf8_lossy(needle)
+                );
+            }
+        }
+    }
+}
