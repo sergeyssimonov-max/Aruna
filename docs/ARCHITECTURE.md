@@ -17,8 +17,8 @@ document is about the Rust that runs underneath it.
 
 | | |
 |---|---|
-| `cli/` | package `aruna` 2.6.2 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
-| `src-tauri/` | package `aruna-desktop` 2.6.2 (the version is the core's since 2026-09-04), library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its six commands ask the core where the package went, read what is in it, open the inventory, and build or stop a build; the logic stays in `cli/`. `lib.rs` holds the commands, the event, the plugins and `run()`; `read.rs` (since 2026-10-01) what the window reads from a finished package. |
+| `cli/` | package `aruna` 2.6.3 — the program. A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
+| `src-tauri/` | package `aruna-desktop` 2.6.3 (the version is the core's since 2026-09-04), library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its six commands ask the core where the package went, read what is in it, open the inventory, and build or stop a build; the logic stays in `cli/`. `lib.rs` holds the commands, the event, the plugins and `run()`; `read.rs` (since 2026-10-01) what the window reads from a finished package. |
 
 They were independent crates with a `Cargo.lock` each until 2026-08-30, when
 they were joined: the root manifest lists both, **one lock file** sits beside it
