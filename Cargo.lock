@@ -113,7 +113,7 @@ checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
 name = "aruna"
-version = "2.6.2"
+version = "2.6.3"
 dependencies = [
  "dirs 5.0.1",
  "insta",
@@ -133,7 +133,7 @@ dependencies = [
 
 [[package]]
 name = "aruna-desktop"
-version = "2.6.2"
+version = "2.6.3"
 dependencies = [
  "aruna",
  "log",
