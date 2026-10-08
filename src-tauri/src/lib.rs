@@ -641,15 +641,6 @@ async fn build_corpus(
     let chosen = chosen_destination(destination)?;
     let cancel = aruna::job::Cancel::new();
 
-    // Шрифты PDF – из каталога ресурсов приложения, того же, что проверен при
-    // запуске, и больше ниоткуда (решение владельца 30.09.2026, вопрос 10).
-    // Каталог не найден – ядро откажет до начала работы и назовет файл.
-    let fonts = app
-        .path()
-        .resource_dir()
-        .ok()
-        .map(|dir| dir.join(FONT_RESOURCES));
-
     let handle = app.clone();
     let flag = cancel.clone();
     // Задание строится внутри замыкания, и иначе нельзя: `Job<'a>` заимствует
@@ -661,15 +652,25 @@ async fn build_corpus(
             app: handle,
             job: counted(id.get()),
         };
-        // Ядро умеет читать архив с диска, окно этой возможностью не
-        // пользуется: `None` — закрепленная запись Zenodo через кеш.
-        let request = aruna::app::CorpusRequest {
-            local_archive: None,
-            pdf: aruna::app::PdfRequest::On { fonts },
-        };
-        build_once(id, &request, chosen.as_deref(), &flag, &sink)
+        build_once(id, &window_request(), chosen.as_deref(), &flag, &sink)
     })
     .await
+}
+
+/// Что окно просит у ядра: пакет из закрепленной записи Zenodo и без PDF.
+///
+/// Ядро умеет читать архив с диска, окно этой возможностью не пользуется:
+/// `None` — закрепленная запись Zenodo через кеш. PDF окно не просит
+/// (решение владельца 06.10.2026: в 2.6.3 PDF по умолчанию выключен везде,
+/// окно его не строит и не показывает – это третья часть переноса, 2.7.0).
+/// Шрифты окно по-прежнему проверяет при запуске (`FONT_RESOURCES`), они
+/// понадобятся третьей части. До 06.10.2026 здесь стояло
+/// `PdfRequest::On { fonts }` с каталогом ресурсов приложения.
+fn window_request() -> aruna::app::CorpusRequest {
+    aruna::app::CorpusRequest {
+        local_archive: None,
+        pdf: aruna::app::PdfRequest::Off,
+    }
 }
 
 /// Сборка как работа: тот же путь, которым идет команда, но без Tauri вокруг.
@@ -2298,5 +2299,82 @@ mod cancelling {
             vec!["TLHdig_Beta_0.3".to_string()],
             "пакет не встал под окончательным именем"
         );
+    }
+
+    /// Файлы PDF под `root`, на любой глубине.
+    fn pdfs_under(root: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let mut found = Vec::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("каталог читается").flatten()
+            {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|e| e == "pdf") {
+                    found.push(path);
+                }
+            }
+        }
+        found
+    }
+
+    /// Сборка запросом окна на `zip`: архив с диска вместо Zenodo, все прочее –
+    /// как просит окно, в том числе PDF.
+    fn build_as_the_window(zip: std::path::PathBuf, into: &std::path::Path) -> BuildReport {
+        let request = aruna::app::CorpusRequest {
+            local_archive: Some(zip),
+            ..window_request()
+        };
+        build_once(
+            aruna::job::JobId::next(),
+            &request,
+            Some(into),
+            &aruna::job::Cancel::new(),
+            &aruna::progress::Silent,
+        )
+        .expect("окно собирает пакет")
+    }
+
+    /// **Окно PDF не строит** (решение владельца 06.10.2026): запрос окна –
+    /// без PDF, и пакет, собранный им, не несет ни одного PDF, а манифест и
+    /// опись не называют ни одного.
+    #[test]
+    fn the_window_asks_for_no_pdf_and_its_package_has_none() {
+        assert_eq!(window_request().pdf, aruna::app::PdfRequest::Off);
+        assert_eq!(window_request().local_archive, None);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let out = tempfile::tempdir().expect("каталог назначения");
+        let report = build_as_the_window(small_archive(dir.path(), 5), out.path());
+        assert_eq!(report.documents, 5);
+        let package = out.path().join(aruna::export::PACKAGE);
+        assert_eq!(pdfs_under(&package), Vec::<std::path::PathBuf>::new());
+        let manifest =
+            std::fs::read_to_string(package.join(aruna::export::MANIFEST)).expect("манифест");
+        assert!(!manifest.contains("\"pdf"), "манифест называет PDF");
+        let inventory = std::fs::read_to_string(&report.inventory).expect("опись");
+        assert!(!inventory.contains(".pdf"), "опись ссылается на PDF");
+    }
+
+    /// **То же на архиве корпуса.** Пакет кладется в каталог `ARUNA_WINDOW_PACKAGE`,
+    /// если он назван, – чтобы его сумму можно было сверить с опорной суммой
+    /// пакета без PDF, – иначе во временный.
+    #[test]
+    #[ignore = "читает архив корпуса; запускать явно"]
+    fn the_window_builds_the_corpus_without_pdfs() {
+        let Some(zip) = corpus_fixture() else {
+            eprintln!("пропуск: архива корпуса нет");
+            return;
+        };
+        let temporary = tempfile::tempdir().expect("tempdir");
+        let into = std::env::var_os("ARUNA_WINDOW_PACKAGE")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| temporary.path().to_path_buf());
+        let report = build_as_the_window(zip, &into);
+        assert_eq!(report.documents, 23936);
+        assert_eq!(report.groups, 663);
+        let package = into.join(aruna::export::PACKAGE);
+        assert_eq!(pdfs_under(&package), Vec::<std::path::PathBuf>::new());
     }
 }
