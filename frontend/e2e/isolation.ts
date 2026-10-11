@@ -168,18 +168,23 @@ export function isolate(
 }
 
 /**
- * Ends the run: the application stopped, its home and WebKit's temporary
- * folder removed, and the real `Library` compared with the picture taken
- * before. Anything of Aruna's that appeared or changed there is a failure of
- * the run, named path by path.
+ * Ends the run: the application stopped by `stop`, its home and WebKit's
+ * temporary folder removed, and the real `Library` compared with the picture
+ * taken before. Anything of Aruna's that appeared or changed there is a
+ * failure of the run, named path by path.
+ *
+ * `stop` is given rather than called here: the run passes
+ * [`stopApplication`], which asks `ps`, and the unit tests pass nothing to stop
+ * – under a sandbox `ps` cannot be started at all (`spawnSync ps EPERM`,
+ * 2026-10-11).
  */
 export async function finish(
   run: Isolation,
-  binary: string,
+  stop: () => Promise<void>,
   library = join(homedir(), 'Library'),
 ): Promise<void> {
   try {
-    await stopApplication(binary)
+    await stop()
   } finally {
     rmSync(run.root, { recursive: true, force: true })
     if (!run.webkitTemporaryBefore) rmSync(run.webkitTemporary, { recursive: true, force: true })

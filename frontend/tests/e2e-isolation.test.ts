@@ -5,17 +5,23 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { changed, finish, isolate, traces } from '../e2e/isolation.ts'
 
+/** A run whose application is already gone: nothing to stop. */
+const nothing = async () => {}
+
 /**
  * The guard of the E2E contour against the real `~/Library` (owner's decision
  * of 2026-10-11): a run that leaves a file of Aruna's there fails. Held here
- * against a `Library` of its own, so the teeth are shown without touching the
- * real one.
+ * against a `Library` and a temporary directory of its own, so the teeth are
+ * shown without touching the real ones – and both go in `afterEach`, so a
+ * failing test leaves nothing behind either.
  */
 describe('E2E isolation', () => {
   let library: string
+  let temporary: string
 
   beforeEach(() => {
     library = mkdtempSync(join(tmpdir(), 'aruna-library-'))
+    temporary = mkdtempSync(join(tmpdir(), 'aruna-temporary-'))
     mkdirSync(join(library, 'WebKit'))
     mkdirSync(join(library, 'Application Support', 'Someone Else'), { recursive: true })
     writeFileSync(join(library, 'Application Support', 'Someone Else', 'state'), 'x')
@@ -23,6 +29,7 @@ describe('E2E isolation', () => {
 
   afterEach(() => {
     rmSync(library, { recursive: true, force: true })
+    rmSync(temporary, { recursive: true, force: true })
   })
 
   it('sees only what is Aruna’s', () => {
@@ -61,32 +68,28 @@ describe('E2E isolation', () => {
 
   it('gives the application a home of its own and fails the run that wrote outside it', async () => {
     const env: Record<string, string> = {}
-    const run = isolate(env, library)
+    const run = isolate(env, library, temporary)
     expect(env.HOME).toBe(join(run.root, 'home'))
     expect(env.CFFIXED_USER_HOME).toBe(env.HOME)
     expect(env.TMPDIR).toBe(`${join(run.root, 'tmp')}/`)
 
     mkdirSync(join(library, 'WebKit', 'aruna-desktop'))
-    await expect(finish(run, 'no-such-binary-of-aruna', library)).rejects.toThrow(
+    await expect(finish(run, nothing, library)).rejects.toThrow(
       `Aruna E2E wrote into the real Library:\nappeared: ${join(library, 'WebKit', 'aruna-desktop')}`,
     )
   })
 
   it('removes the home of the run when it ends', async () => {
-    const temporary = mkdtempSync(join(tmpdir(), 'aruna-temporary-'))
     const run = isolate({}, library, temporary)
     mkdirSync(join(temporary, 'aruna-desktop', 'WebKit'), { recursive: true })
-    await finish(run, 'no-such-binary-of-aruna', library)
+    await finish(run, nothing, library)
     expect(existsSync(run.root)).toBe(false)
     expect(existsSync(join(temporary, 'aruna-desktop'))).toBe(false)
-    rmSync(temporary, { recursive: true })
   })
 
   it('leaves WebKit’s temporary folder alone when it was there before the run', async () => {
-    const temporary = mkdtempSync(join(tmpdir(), 'aruna-temporary-'))
     mkdirSync(join(temporary, 'aruna-desktop'))
-    await finish(isolate({}, library, temporary), 'no-such-binary-of-aruna', library)
+    await finish(isolate({}, library, temporary), nothing, library)
     expect(existsSync(join(temporary, 'aruna-desktop'))).toBe(true)
-    rmSync(temporary, { recursive: true })
   })
 })

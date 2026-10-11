@@ -1,4 +1,4 @@
-import { finish, freePort, isolate, type Isolation } from './e2e/isolation'
+import { finish, freePort, isolate, stopApplication, type Isolation } from './e2e/isolation'
 
 // Where the application under test keeps what it writes. macOS takes WebKit
 // data, caches and saved window state from CoreFoundation's home directory,
@@ -78,6 +78,6 @@ export const config: WebdriverIO.Config = {
     await windowAnswers()
   },
   onComplete: async () => {
-    if (run) await finish(run, 'aruna-desktop')
+    if (run) await finish(run, () => stopApplication('aruna-desktop'))
   },
 }
