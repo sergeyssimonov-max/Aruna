@@ -1,20 +1,50 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { finish, freePort, isolate, type Isolation } from './e2e/isolation'
 
-// Where the application under test keeps its WebKit data, caches and saved
-// window state. macOS takes these from CoreFoundation's home directory, which
-// ignores `HOME` and reads `CFFIXED_USER_HOME`; without it every run wrote into
-// the real `~/Library` (`WebKit/aruna-desktop`, `Caches/aruna-desktop`), and
-// those had to be removed by hand after each run. `HOME` itself is left alone:
-// the core resolves the Downloads folder through it, and the scenarios read
-// what is there.
+// Where the application under test keeps what it writes. macOS takes WebKit
+// data, caches and saved window state from CoreFoundation's home directory,
+// which ignores `HOME` and reads `CFFIXED_USER_HOME`; the core and the
+// window-state plugin take theirs from `HOME`; WebKit keeps its temporary
+// files under `TMPDIR`. Until 2026-09-24 every run wrote into the real
+// `~/Library` (`WebKit/aruna-desktop`, `Caches/aruna-desktop`); until
+// 2026-10-11 only the first was moved, and a run of the release of 2.6.3 left
+// `Application Support/com.sergeyssimonov.aruna/.window-state.json` behind
+// (owner's decision of 2026-10-11, question 3 of that release). Now all three
+// point into one directory of the run, removed when it ends, and the run fails
+// if anything of Aruna's appeared or changed in the real `Library` (`finish`).
 //
-// The directory is made in `onPrepare`, not at the top of the file: every
-// worker loads this file again, and a directory made on load was left behind
-// by each of them. `onPrepare` runs once, in the launcher, before the service's
-// own `onPrepare` spawns the application with this object as its environment.
+// Made in `onPrepare`, not at the top of the file: every worker loads this
+// file again, and a directory made on load was left behind by each of them.
+// `onPrepare` runs once, in the launcher, before the service's own
+// `onPrepare` spawns the application with this object as its environment.
 const appEnv: Record<string, string> = {}
+let run: Isolation | undefined
+
+// The binary the service starts, as `ps` shows it.
+const application = '../target/debug/aruna-desktop'
+
+// How long the window may take to answer once the service has its driver, and
+// the sentence a run that waits that long ends with. The service polls the
+// driver's `/status` before the session; the first command after it was the
+// race – ECONNREFUSED in the first attempt at the acceptance of 2.6.3 – and
+// it is waited for here, with a limit, rather than taken as the test's failure.
+const READY_MS = 30_000
+
+async function windowAnswers(): Promise<void> {
+  const deadline = Date.now() + READY_MS
+  let last: unknown
+  while (Date.now() < deadline) {
+    try {
+      if ((await browser.execute(() => document.readyState)) === 'complete') return
+    } catch (error) {
+      last = error
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  throw new Error(
+    `Aruna E2E: the window did not answer within ${READY_MS} ms after the driver started` +
+      (last ? `; last error: ${String(last)}` : ''),
+  )
+}
 
 // `WebdriverIO.Config`, not `Options.Testrunner`: the second is the shape of a
 // standalone remote session and has no `capabilities` key, so this file was
@@ -28,7 +58,7 @@ export const config: WebdriverIO.Config = {
     {
       browserName: 'tauri',
       'tauri:options': {
-        application: '../target/debug/aruna-desktop',
+        application,
       },
     } as WebdriverIO.Capabilities,
   ],
@@ -37,10 +67,17 @@ export const config: WebdriverIO.Config = {
   reporters: ['spec'],
   logLevel: 'warn',
   mochaOpts: { ui: 'bdd', timeout: 60000 },
-  onPrepare: () => {
-    appEnv.CFFIXED_USER_HOME = mkdtempSync(join(tmpdir(), 'aruna-e2e-home-'))
+  onPrepare: async () => {
+    run = isolate(appEnv)
+    // A port nothing holds, rather than the service's fixed one: a run that
+    // starts while the last one's application is still going away would
+    // otherwise meet its driver.
+    process.env.TAURI_WEBDRIVER_PORT = String(await freePort())
   },
-  onComplete: () => {
-    if (appEnv.CFFIXED_USER_HOME) rmSync(appEnv.CFFIXED_USER_HOME, { recursive: true, force: true })
+  before: async () => {
+    await windowAnswers()
+  },
+  onComplete: async () => {
+    if (run) await finish(run, 'aruna-desktop')
   },
 }
