@@ -205,6 +205,7 @@ fn main() {
             &applied,
             &fonts,
             &Default::default(),
+            &[],
             Some(&pdfs),
         );
         if let Err(why) = check_json(&json) {

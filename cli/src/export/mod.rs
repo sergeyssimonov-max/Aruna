@@ -629,6 +629,7 @@ fn write_manifest(
             &tallies.applied,
             &tallies.fonts,
             &tallies.xml,
+            &tallies.sums,
             pdfs,
         );
         let manifest_path = root.join(MANIFEST);
@@ -805,6 +806,9 @@ struct Tallies {
     fonts: manifest::FontContract,
     /// Which documents are not well-formed XML, and why.
     xml: manifest::XmlReport,
+    /// The two digests of each document, in the order of `placed` (owner's
+    /// decision of 2026-10-08): of what was written and of what was read.
+    sums: Vec<manifest::Sums>,
 }
 
 /// Pass 2: read each document whole, normalise it, write it where it belongs.
@@ -823,6 +827,7 @@ fn write_documents(
     job: &Job<'_>,
 ) -> Result<u64> {
     let wanted = slots(fragments, placed)?;
+    tallies.sums = vec![manifest::Sums::default(); placed.len()];
 
     let mut written = 0usize;
     // The package's own size, accumulated as it is written rather than measured
@@ -851,12 +856,13 @@ fn write_documents(
         job.check(Phase::Exporting)?;
 
         let mut entry = archive.by_index(i)?;
-        let Some(relative) = wanted
+        let Some(index) = wanted
             .get(entry_name(entry.name_raw(), entry.name()))
             .copied()
         else {
             continue;
         };
+        let relative = placed[index].relative.as_path();
 
         let name = entry_name(entry.name_raw(), entry.name()).to_string();
         read_document(&mut entry, relative, &name, &mut bytes)?;
@@ -913,6 +919,12 @@ fn write_documents(
         }
         let mut handle = create_document(&out, relative, &name, staging, fragments, placed)?;
         handle.write_all(&normalised).map_err(ArunaError::io(out))?;
+        // The two digests of the manifest, from the bytes in hand: the ones
+        // just written and the ones the archive gave – never a file read again.
+        tallies.sums[index] = manifest::Sums {
+            sha256: crate::sha256::sha256_hex(&normalised),
+            source_sha256: crate::sha256::sha256_hex(&bytes),
+        };
         written += 1;
         if written.is_multiple_of(DOCUMENTS_PER_TICK) {
             job.report(Event::DocumentsWritten {
@@ -956,16 +968,13 @@ fn write_documents(
 /// `AlreadyExists` on a path — an I/O error that named the destination and
 /// said nothing about the archive that caused it, three hundred lines away.
 /// Inserting one at a time turns that into a sentence about the archive.
-fn slots<'a>(
-    fragments: &'a [Fragment],
-    placed: &'a [Placed],
-) -> Result<HashMap<&'a str, &'a Path>> {
-    let mut wanted: HashMap<&str, &Path> = HashMap::with_capacity(fragments.len());
-    for (fragment, placement) in fragments.iter().zip(placed) {
-        if wanted
-            .insert(fragment.source.as_str(), placement.relative.as_path())
-            .is_some()
-        {
+///
+/// The slot is the document's index in `placed`, which is also its place among
+/// the manifest's digests.
+fn slots<'a>(fragments: &'a [Fragment], placed: &[Placed]) -> Result<HashMap<&'a str, usize>> {
+    let mut wanted: HashMap<&str, usize> = HashMap::with_capacity(fragments.len());
+    for (index, (fragment, _)) in fragments.iter().zip(placed).enumerate() {
+        if wanted.insert(fragment.source.as_str(), index).is_some() {
             return Err(ArunaError::ArchiveDuplicateEntry {
                 entry: fragment.source.clone(),
             });

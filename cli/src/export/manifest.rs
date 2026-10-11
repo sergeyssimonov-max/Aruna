@@ -36,7 +36,44 @@ use std::path::PathBuf;
 ///
 /// A reader that does not recognise it should stop rather than guess. Bumped
 /// when a field changes meaning or leaves; adding a field does not bump it.
-pub(crate) const SCHEMA: u32 = 1;
+///
+/// **3 since the owner's decision of 2026-10-08** (authenticity, option 2 of
+/// `XML-CONTRACT.md` §4): the run, and the two digests of every document. The
+/// number was 1 until then and there was never a 2 – the PDF entries of
+/// 2026-09-30 were added under 1, by the rule above; the jump is the owner's,
+/// so that the shape of 3.0.0 has a number of its own.
+pub(crate) const SCHEMA: u32 = 3;
+
+/// The form of the run identifier, the first line of what it hashes. A new
+/// form takes a new name here rather than changing what this one means.
+pub const RUN_ID_FORM: &str = "aruna-run-v1";
+
+/// The run identifier: the SHA-256, in lower-case hex, of the UTF-8 text
+/// `aruna-run-v1\n<archive_md5>\n<version of Aruna>\n<version of the PDF
+/// template>\n` (owner's decision of 2026-10-08; `XML-CONTRACT.md` §4).
+///
+/// Deterministic by design: one archive, one program and one template give
+/// one identifier, so two builds of the same package stay byte for byte one
+/// package, and any of the three changing changes it. The template's version
+/// is the same with and without PDFs – the identifier names what the program
+/// would make of the archive, not which switch was set.
+pub fn run_id(archive_md5: &str, version: &str, template: &str) -> String {
+    crate::sha256::sha256_hex(
+        format!("{RUN_ID_FORM}\n{archive_md5}\n{version}\n{template}\n").as_bytes(),
+    )
+}
+
+/// The two digests of one document (owner's decision of 2026-10-08): of the
+/// bytes the package holds, and of the bytes the archive gave before
+/// normalisation. Both are taken from the bytes in hand as they are written
+/// and as they were read – never by reading a file again.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Sums {
+    /// SHA-256 of the document as written into the package.
+    pub sha256: String,
+    /// SHA-256 of the entry as the archive gave it.
+    pub source_sha256: String,
+}
 
 /// What the corpus asks of a typesetter, counted from the documents themselves.
 ///
@@ -474,6 +511,11 @@ pub struct Source<'a> {
 /// `records` and `placed` are the same two slices the inventory is written
 /// from, in the same order, so the two documents cannot describe different
 /// packages.
+///
+/// `sums` are the two digests of each document, in the order of `placed`; a
+/// document without them – only a fixture builds one – is written without the
+/// two keys.
+#[allow(clippy::too_many_arguments)]
 pub fn render_manifest(
     records: &[ManuscriptRecord],
     placed: &[Placed],
@@ -481,11 +523,13 @@ pub fn render_manifest(
     normalisation: &BTreeMap<String, usize>,
     fonts: &FontContract,
     xml: &XmlReport,
+    sums: &[Sums],
     pdfs: Option<&[super::PdfState]>,
 ) -> String {
-    // The real manifest averages about 350 bytes per document; 1 MiB for an
-    // 8.3 MB result meant four reallocations and settling at 16 MiB.
-    let mut out = String::with_capacity(placed.len() * 384 + 8192);
+    // The real manifest averaged about 350 bytes per document; 1 MiB for an
+    // 8.3 MB result meant four reallocations and settling at 16 MiB. The two
+    // digests of schema 3 add about 170 more.
+    let mut out = String::with_capacity(placed.len() * 576 + 8192);
     let groups = group_runs(records).count();
 
     out.push_str("{\n");
@@ -496,6 +540,7 @@ pub fn render_manifest(
         "  \"inventory\": {},",
         string(crate::paths::OUTPUT_FILE_NAME)
     );
+    render_run(&mut out, source.archive_md5);
 
     if let Some(states) = pdfs {
         render_pdfs(&mut out, states);
@@ -515,9 +560,27 @@ pub fn render_manifest(
     render_cth_titles(&mut out, records);
 
     render_xml(&mut out, xml);
-    render_groups(&mut out, records, placed, groups, pdfs);
+    render_groups(&mut out, records, placed, groups, sums, pdfs);
     out.push_str("  ]\n}\n");
     out
+}
+
+/// The run: its identifier and the two versions it is made of beside the
+/// archive's digest, which `source` gives. Written in both modes – without
+/// PDFs too – so that the identifier can be computed again from the manifest
+/// alone.
+fn render_run(out: &mut String, archive_md5: &str) {
+    let version = env!("CARGO_PKG_VERSION");
+    let template = crate::pdf::TEMPLATE_VERSION;
+    let _ = writeln!(out, "  \"run\": {{");
+    let _ = writeln!(
+        out,
+        "    \"id\": {},",
+        string(&run_id(archive_md5, version, template))
+    );
+    let _ = writeln!(out, "    \"aruna\": {},", string(version));
+    let _ = writeln!(out, "    \"template\": {}", string(template));
+    out.push_str("  },\n");
 }
 
 /// What the PDF phase did, when there was one (owner's decisions of
@@ -812,6 +875,7 @@ fn render_groups(
     records: &[ManuscriptRecord],
     placed: &[Placed],
     groups: usize,
+    sums: &[Sums],
     pdfs: Option<&[super::PdfState]>,
 ) {
     out.push_str("  \"groups\": [\n");
@@ -838,6 +902,14 @@ fn render_groups(
                 "          \"href\": {},",
                 string(&href(&place.relative))
             );
+            if let Some(sums) = sums.get(index) {
+                let _ = writeln!(out, "          \"sha256\": {},", string(&sums.sha256));
+                let _ = writeln!(
+                    out,
+                    "          \"source_sha256\": {},",
+                    string(&sums.source_sha256)
+                );
+            }
             render_pdf_field(out, pdfs.and_then(|states| states.get(index)));
             index += 1;
             let _ = writeln!(out, "          \"lang\": {},", string(&record.lang));
@@ -1102,6 +1174,13 @@ mod tests {
             archive_md5: "abc123",
             not_manuscripts: &refused,
         };
+        // Two digests per document, told apart by what they were taken of.
+        let sums: Vec<Sums> = (0..placed.len())
+            .map(|i| Sums {
+                sha256: crate::sha256::sha256_hex(format!("written {i}").as_bytes()),
+                source_sha256: crate::sha256::sha256_hex(format!("read {i}").as_bytes()),
+            })
+            .collect();
         // Every document with its PDF built: the manifest of a build with the
         // PDF phase, which is the one by default.
         let pdfs: Vec<super::super::PdfState> = placed
@@ -1115,6 +1194,7 @@ mod tests {
             &applied,
             &fonts,
             &xml,
+            &sums,
             Some(&pdfs),
         )
     }
@@ -1132,7 +1212,8 @@ mod tests {
         assert!(!text.contains(",\n  ]"), "trailing comma before a close");
         assert!(!text.contains(",\n    }"), "trailing comma before a close");
 
-        assert!(text.contains("\"schema\": 1"));
+        // 3 since the owner's decision of 2026-10-08; 1 before it.
+        assert!(text.contains("\"schema\": 3"));
         assert!(text.contains("\"groups\": 2"));
         assert!(text.contains("\"documents\": 3"));
         assert!(
@@ -1141,6 +1222,101 @@ mod tests {
             ),
             "{text}"
         );
+    }
+
+    /// **The run identifier in its canonical form** (owner's decision of
+    /// 2026-10-08, `XML-CONTRACT.md` §4): the value is computed outside this
+    /// program – `printf 'aruna-run-v1\nf9acbc8db3111cc7dd88d82f7819a912\n2.6.3\naruna-pdf-template 1\n' | shasum -a 256`
+    /// on 2026-10-11 – for the archive of TLHdig Beta 0.3, so that the form is
+    /// held by something that did not come from it.
+    #[test]
+    fn the_run_identifier_is_the_sha256_of_its_canonical_form() {
+        assert_eq!(
+            run_id(
+                "f9acbc8db3111cc7dd88d82f7819a912",
+                "2.6.3",
+                "aruna-pdf-template 1"
+            ),
+            "a55712da507f510c27c40fef5e80e7321d945b22b3ad957e55616c8be9fa32fd"
+        );
+    }
+
+    /// One archive, one version and one template – one identifier; any of
+    /// the three changed – another.
+    #[test]
+    fn the_run_identifier_changes_with_each_of_its_three_inputs_and_nothing_else() {
+        let base = run_id("abc123", "2.6.3", "aruna-pdf-template 1");
+        assert_eq!(base, run_id("abc123", "2.6.3", "aruna-pdf-template 1"));
+        assert_eq!(base.len(), 64);
+        assert!(base
+            .chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)));
+        for other in [
+            run_id("abc124", "2.6.3", "aruna-pdf-template 1"),
+            run_id("abc123", "3.0.0", "aruna-pdf-template 1"),
+            run_id("abc123", "2.6.3", "aruna-pdf-template 2"),
+            // The separators are part of the form: moving a character from
+            // one field to the next is another run.
+            run_id("abc12", "32.6.3", "aruna-pdf-template 1"),
+        ] {
+            assert_ne!(base, other);
+        }
+    }
+
+    /// The head names the run, and with it the two versions the identifier
+    /// is made of beside the archive's digest – so it can be computed again
+    /// from the manifest alone, with or without PDFs.
+    #[test]
+    fn the_head_names_the_run_and_what_it_is_made_of() {
+        let version = env!("CARGO_PKG_VERSION");
+        let expected = format!(
+            "  \"run\": {{\n    \"id\": \"{}\",\n    \"aruna\": \"{version}\",\n    \"template\": \"aruna-pdf-template 1\"\n  }},\n",
+            run_id("abc123", version, crate::pdf::TEMPLATE_VERSION)
+        );
+        assert!(manifest().contains(&expected), "{}", manifest());
+        let (records, placed) = built();
+        let off = render_manifest(
+            &records,
+            &placed,
+            &Source {
+                label: "test",
+                archive_md5: "abc123",
+                not_manuscripts: &[],
+            },
+            &BTreeMap::new(),
+            &FontContract::default(),
+            &XmlReport::default(),
+            &[],
+            None,
+        );
+        assert!(off.contains(&expected), "{off}");
+    }
+
+    /// Each document carries its two digests, after its file and before its
+    /// PDF, in the order of the documents.
+    #[test]
+    fn each_document_carries_the_digest_of_what_was_written_and_of_what_was_read() {
+        let whole = manifest();
+        // `file` is a key of the XML findings too; the documents are below.
+        let text = &whole[whole.find("\"groups\": [").expect("the groups")..];
+        let (_, placed) = built();
+        for (i, place) in placed.iter().enumerate() {
+            let file = place.relative.to_string_lossy();
+            let at = text
+                .find(&format!("\"file\": {}", string(&file)))
+                .expect("the document");
+            let entry = &text[at..at + text[at..].find('}').expect("closed")];
+            let written = crate::sha256::sha256_hex(format!("written {i}").as_bytes());
+            let read = crate::sha256::sha256_hex(format!("read {i}").as_bytes());
+            let sha = entry
+                .find(&format!("\"sha256\": \"{written}\","))
+                .expect(entry);
+            let source = entry
+                .find(&format!("\"source_sha256\": \"{read}\","))
+                .expect(entry);
+            let pdf = entry.find("\"pdf\": ").expect(entry);
+            assert!(sha < source && source < pdf, "{entry}");
+        }
     }
 
     /// An archive with nothing turned away says so with an empty list, not by
@@ -1155,6 +1331,7 @@ mod tests {
             &BTreeMap::new(),
             &FontContract::default(),
             &XmlReport::default(),
+            &[],
             None,
         );
         assert!(text.contains("\"entries\": []\n    }\n  },"), "{text}");
@@ -1191,6 +1368,7 @@ mod tests {
             &BTreeMap::new(),
             &fonts,
             &XmlReport::default(),
+            &[],
             None,
         );
         assert!(text.contains("𒀀 source"));

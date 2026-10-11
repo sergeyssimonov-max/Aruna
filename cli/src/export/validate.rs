@@ -660,6 +660,7 @@ mod tests {
                 &Default::default(),
                 &Default::default(),
                 &Default::default(),
+                &[],
                 None,
             ),
         )

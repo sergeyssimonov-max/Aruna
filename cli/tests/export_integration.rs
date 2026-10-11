@@ -404,3 +404,88 @@ fn a_failed_build_takes_its_half_written_package_with_it() {
         "the failed build left {leftovers:?} behind"
     );
 }
+
+/// **Schema 3: the run and the two digests of every document, without PDFs
+/// too** (owner's decision of 2026-10-08, `XML-CONTRACT.md` §4). The run
+/// identifier is computed again from the archive's MD5 and the two versions;
+/// each document's `sha256` is that of the file in the package, and its
+/// `source_sha256` that of the archive entry it was normalised from – found
+/// here by normalising every entry again, not by asking the export.
+#[test]
+fn the_manifest_names_the_run_and_the_two_digests_of_every_document() {
+    use aruna::export::manifest::{run_id, values_of};
+    use aruna::sha256::sha256_hex;
+    use std::io::Read as _;
+
+    let dir = tempdir().expect("tempdir");
+    let (_, root) = built(dir.path());
+    let manifest = fs::read_to_string(root.join(export::MANIFEST)).expect("manifest");
+    assert!(manifest.contains("\"schema\": 3,"), "{manifest}");
+    let md5 = aruna::md5::md5_file(&dir.path().join("corpus.zip")).expect("md5");
+    let id = run_id(
+        &md5,
+        env!("CARGO_PKG_VERSION"),
+        aruna::pdf::TEMPLATE_VERSION,
+    );
+    assert!(
+        manifest.contains(&format!("  \"run\": {{\n    \"id\": \"{id}\",")),
+        "{manifest}"
+    );
+    assert!(
+        !manifest.contains("\"pdf\""),
+        "a build without PDFs names one"
+    );
+
+    // Every entry of the archive, normalised: what each would be in the
+    // package, and the digest of what the archive gave.
+    let mut zip =
+        zip::ZipArchive::new(fs::File::open(dir.path().join("corpus.zip")).expect("archive"))
+            .expect("readable");
+    let mut sources: Vec<(Vec<u8>, String)> = Vec::new();
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i).expect("entry");
+        let mut bytes = Vec::new();
+        entry.read_to_end(&mut bytes).expect("read");
+        sources.push((export::normalize_document(&bytes), sha256_hex(&bytes)));
+    }
+
+    let groups = &manifest[manifest.find("\"groups\": [").expect("groups")..];
+    let files = values_of(groups, "file");
+    let written = values_of(groups, "sha256");
+    let read = values_of(groups, "source_sha256");
+    assert_eq!(files.len(), 4);
+    assert_eq!((written.len(), read.len()), (4, 4), "{groups}");
+    for ((file, sha), source) in files.iter().zip(&written).zip(&read) {
+        let bytes = fs::read(root.join(file)).expect(file);
+        assert_eq!(sha, &sha256_hex(&bytes), "{file}");
+        let from = sources
+            .iter()
+            .find(|(normalised, _)| normalised == &bytes)
+            .map(|(_, digest)| digest)
+            .expect("an archive entry normalises to it");
+        assert_eq!(source, from, "{file}");
+        assert_ne!(sha, source, "{file}: normalisation changed its bytes");
+    }
+}
+
+/// Two builds of one archive give one manifest, byte for byte – the run
+/// identifier among it: it names the archive and the program, not the hour.
+#[test]
+fn two_builds_give_one_manifest() {
+    let dir = tempdir().expect("tempdir");
+    let (_, root) = built(dir.path());
+    let first = fs::read(root.join(export::MANIFEST)).expect("manifest");
+    let other = dir.path().join("again");
+    fs::create_dir(&other).expect("destination");
+    export::build(
+        &dir.path().join("corpus.zip"),
+        &other,
+        "test source",
+        &aruna::job::Job::unattended(),
+    )
+    .expect("builds again");
+    assert_eq!(
+        first,
+        fs::read(other.join(PACKAGE).join(export::MANIFEST)).expect("manifest")
+    );
+}

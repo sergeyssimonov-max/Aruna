@@ -370,9 +370,12 @@ fn the_pdf_phase_reports_its_progress_to_the_end() {
 /// Without PDFs the manifest and the inventory name none
 /// (`the_switch_changes_nothing_but_the_pdfs_and_what_names_them`).
 ///
-/// The SHA-256 of the source that the decision also puts in the manifest is
-/// not written by the export today, and this test does not claim it: found on
-/// 2026-10-08, left to the owner before 2.7.0 (specification 7.3).
+/// The manifest's entry of the pair also carries the SHA-256 of the XML in the
+/// package and of its source – since 2026-10-11, by the owner's decision of
+/// 2026-10-08 (schema 3); until then the export did not write them and this
+/// test did not claim them. The digests themselves are held by
+/// `export_integration::the_manifest_names_the_run_and_the_two_digests_of_every_document`;
+/// here, that the entry of each PDF names the digest of the XML beside it.
 #[test]
 fn each_pdf_is_paired_with_its_xml_and_carries_no_copy_of_it() {
     let dir = tempdir().expect("tempdir");
@@ -402,6 +405,14 @@ fn each_pdf_is_paired_with_its_xml_and_carries_no_copy_of_it() {
             entry.contains(&format!("\"file\": \"{}\"", xml.to_string_lossy())),
             "{entry}"
         );
+        assert!(
+            entry.contains(&format!(
+                "\"sha256\": \"{}\"",
+                aruna::sha256::sha256_hex(&files[&xml])
+            )),
+            "{entry}"
+        );
+        assert!(entry.contains("\"source_sha256\": \""), "{entry}");
 
         // No copy of the source in the PDF: no embedded file, no digest of
         // the XML, raw or in any decoded stream.
