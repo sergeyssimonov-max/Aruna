@@ -171,7 +171,7 @@ fn push_percent(out: &mut String, byte: u8) {
 
 /// Turn one URL segment back into the name it stands for.
 ///
-/// The inverse of [`encode_uri_component`], and the validator's half of the
+/// The inverse of `encode_uri_component`, and the validator's half of the
 /// round trip: a link is only checked against the file it names if the name can
 /// be recovered from it.
 pub fn percent_decode(segment: &str) -> String {

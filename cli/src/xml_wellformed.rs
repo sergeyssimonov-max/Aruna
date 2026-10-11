@@ -567,7 +567,7 @@ pub struct Beyond {
 ///
 /// Meant for documents [`classify`] returned `None` for; it is safe on any
 /// input, but on a document that is already refused the answer describes
-/// wreckage. The scan walks tags the way [`unterminated_start_tag`] does —
+/// wreckage. The scan walks tags the way `unterminated_start_tag` does —
 /// comments, CDATA, declarations and processing instructions stepped over,
 /// quoted values walked through — because those are the places where a `<` and
 /// a `:` mean nothing.

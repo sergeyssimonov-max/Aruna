@@ -1,7 +1,7 @@
 //! Proof that normalising a document changed nothing it was not allowed to.
 //!
 //! The permit list is the whole of what [`super::normalize`] may do, and it is
-//! written once — in [`DROPPED`] and the constants beside it — rather than in
+//! written once — in `DROPPED` and the constants beside it — rather than in
 //! prose here, in the normaliser, and again in the manifest. It used to be all
 //! three, and they had already drifted: the normaliser dropped an instruction
 //! whose target matched without regard to case, and this module recognised only
@@ -85,7 +85,7 @@ pub struct Report {
     /// instructions contributes two.
     ///
     /// `&'static str` rather than `String` so the type says what the values
-    /// are: entries of [`DROPPED`] and nothing else.
+    /// are: entries of `DROPPED` and nothing else.
     pub dropped: Vec<&'static str>,
     /// Whether a leading U+FEFF was removed.
     ///

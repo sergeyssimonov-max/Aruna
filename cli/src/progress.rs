@@ -39,7 +39,7 @@ pub enum Event<'a> {
     /// The archive was already downloaded and still hashes as promised.
     ArchiveFromCache { path: &'a Path },
     /// Zenodo says something about the record that differs from what this build
-    /// expects. Prose, because [`crate::zenodo::advice`] composes it and its
+    /// expects. Prose, because `crate::zenodo::advice` composes it and its
     /// wording is what the test suite pins.
     ZenodoNotice { message: &'a str },
     /// The record could not be checked. Advisory: the download goes ahead.

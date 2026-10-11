@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 /// renamed the file the exporter writes and left the window reporting
 /// `inventory_exists: false` about a package that was right there. Everything
 /// now joins this constant, and
-/// [`the_inventory_is_named_after_the_package`] holds the relationship the
+/// `the_inventory_is_named_after_the_package` holds the relationship the
 /// name still carries.
 pub const OUTPUT_FILE_NAME: &str = "TLHdig_Beta_0.3.html";
 
@@ -54,7 +54,7 @@ pub fn downloads_dir() -> Result<PathBuf> {
 /// The quieter half is worse. The digest is checked on the scratch file and the
 /// rename happens after, so with a shared name the bytes that were verified and
 /// the bytes that were moved into place need not be the same ones. Nothing
-/// downstream would say so; only [`crate::cache::lookup`] rehashing the file on
+/// downstream would say so; only `crate::cache::lookup` rehashing the file on
 /// the next run would catch it, a run later and as a mysterious miss.
 ///
 /// The CLI is one download per process and never met this. The crate is a

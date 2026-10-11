@@ -2,9 +2,9 @@
 //!
 //! The layout this reads is the one [`super`] writes: a directory per CTH
 //! group, the group's manuscripts inside it, and the inventory and the manifest
-//! at the root ([`super::is_root_file`]). Reading it back therefore belongs
+//! at the root (`super::is_root_file`). Reading it back therefore belongs
 //! here, beside the code that laid it out, for the same reason
-//! [`super::is_root_file`] exists at all — the rule was written twice once, and
+//! `super::is_root_file` exists at all — the rule was written twice once, and
 //! the second copy is the one that goes stale.
 //!
 //! It was written twice again. Until 2026-09-06 the desktop shell walked the

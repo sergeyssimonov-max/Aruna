@@ -49,7 +49,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Zenodo record this build is pinned to.
 ///
 /// Derived from nothing: it is written here and checked against
-/// [`download::ZENODO_ZIP_URL`] by `the_pinned_record_is_the_one_downloaded`,
+/// `download::ZENODO_ZIP_URL` by `the_pinned_record_is_the_one_downloaded`,
 /// so the two cannot name different records.
 pub const ZENODO_RECORD: u64 = 20328284;
 
@@ -64,7 +64,7 @@ pub const ZENODO_RECORD: u64 = 20328284;
 /// It names the record and the edition, not the file: the ZIP's name told a
 /// reader nothing they could act on — the record number is what identifies the
 /// data and what a citation needs. `source_label_names_the_record_it_downloads`
-/// keeps it and [`download::ZENODO_ZIP_URL`] from drifting apart when the
+/// keeps it and `download::ZENODO_ZIP_URL` from drifting apart when the
 /// archive is republished.
 pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 

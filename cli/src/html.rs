@@ -13,8 +13,8 @@
 //! many of each fragment there are.
 //!
 //! The document is still assembled from three kinds of thing, kept apart on
-//! purpose: [`DOCUMENT`], which is the page as the frontend wrote it; the
-//! fragments it repeats, one per group, manuscript and column; and [`COLUMNS`],
+//! purpose: `DOCUMENT`, which is the page as the frontend wrote it; the
+//! fragments it repeats, one per group, manuscript and column; and `COLUMNS`,
 //! the one description of the table's columns, which stays here because a
 //! second list of them in TypeScript is exactly the duplication this project
 //! has paid for before.
@@ -227,7 +227,7 @@ fn separator(template: &str, name: &str) -> String {
 /// Nothing is linked, because nothing is placed beside it: this renderer is
 /// handed a presentation without hrefs. It was what the program wrote until
 /// 2.3.0, and what it writes now is the package's own inventory —
-/// [`render_linked_html`] — which links at the documents around it. This one
+/// `render_linked_html` — which links at the documents around it. This one
 /// remains as a library capability, exercised by `tests/integration.rs`.
 pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &str) -> String {
     render(&CorpusPresentation::plain(records, source), generated_at)

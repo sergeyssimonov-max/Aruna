@@ -21,7 +21,7 @@
 //! it stopped the whole build as an invariant.
 //!
 //! The file carries only what does not change between runs (question 13):
-//! the relative path as `ident`, "Aruna <version>" as `creator`, the template
+//! the relative path as `ident`, `"Aruna <version>"` as `creator`, the template
 //! version as the keywords; no date, no run identifier, nothing random.
 
 pub mod fonts;

@@ -184,7 +184,7 @@ fn nibble(v: u8) -> char {
 /// chances to pick a different buffer size and wonder why the numbers differ.
 ///
 /// The export no longer opens a path to be digested — it hashes the handle it
-/// already reads the entries from, through [`md5_stream`] — so what is left
+/// already reads the entries from, through `md5_stream` — so what is left
 /// here are the callers that have a path and nothing else.
 pub fn md5_file(path: &std::path::Path) -> std::io::Result<String> {
     md5_stream(std::fs::File::open(path)?)

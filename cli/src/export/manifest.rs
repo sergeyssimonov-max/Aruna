@@ -381,7 +381,7 @@ pub struct XmlReport {
     pub findings: Vec<(String, Finding)>,
     /// The ones it accepts that a conforming parser objects to.
     ///
-    /// Disjoint from `findings` by construction — [`Self::examine`] asks the
+    /// Disjoint from `findings` by construction — `Self::examine` asks the
     /// second question only of documents that answered the first with "yes" —
     /// and that is the whole reason the two lists are filled in one place
     /// rather than by two callers. A document counted in both would make the
@@ -1063,7 +1063,7 @@ use crate::json::json_string as string;
 ///
 /// A reader for the one document this program writes, not a JSON parser: it
 /// finds `"key": "` and takes the string that follows. It understands every
-/// escape JSON defines, which is a superset of the five [`string`] emits —
+/// escape JSON defines, which is a superset of the five `string` emits —
 /// decoding more than the writer produces costs nothing and means the reader
 /// does not have to be revisited if the writer ever escapes more.
 ///

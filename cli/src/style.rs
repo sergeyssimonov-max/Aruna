@@ -16,7 +16,7 @@
 //! written to override — the page's own screen rules are what it has to undo —
 //! and a rule that has to win is easier to read at the end than dressed in
 //! specificity in the middle. **The order is the whole of the cascade here, and
-//! it is decided in [`join`] and nowhere else**, which is why the sections stay
+//! it is decided in `join` and nowhere else**, which is why the sections stay
 //! three files rather than being bundled into one.
 //!
 //! **The sources are not here.** They live in `frontend/src/inventory/`, and

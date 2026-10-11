@@ -7,8 +7,8 @@
 //!
 //! * this module owns the record, and the windows a document is read through —
 //!   the decisions every field depends on;
-//! * [`fields`] pulls one column each out of those windows;
-//! * [`classify`] answers a different question entirely — whether an archive
+//! * `fields` pulls one column each out of those windows;
+//! * `classify` answers a different question entirely — whether an archive
 //!   entry is a manuscript at all — and is the only part [`crate::archive`]
 //!   consults before deciding to read an entry.
 
@@ -84,7 +84,7 @@ pub fn truncate_on_char_boundary(s: &str, max: usize) -> &str {
 /// `İzmir 1270+.xml`, `Çorum 2.xml`, `HT 1.I – II 16.xml` — and CP437 turns the
 /// first of them into `Mu╠ênchen 5.xml`: characters the source does not have,
 /// which is what specification 4.9.6 forbids. The entry name is the last resort
-/// of the siglum chain ([`fields::extract_sigla`]), the one place a document
+/// of the siglum chain (`fields::extract_sigla`), the one place a document
 /// whose own `docID` cannot be read gets its package file named from — so
 /// reading the name wrong is reading it wrong exactly where it is needed.
 ///

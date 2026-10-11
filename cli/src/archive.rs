@@ -23,7 +23,7 @@ use zip::ZipArchive;
 ///
 /// Collected by the same function that ships rather than by a second one built
 /// for measuring: a benchmark that runs a different shape from the program
-/// measures the benchmark. What makes that affordable is [`Probe`] — the
+/// measures the benchmark. What makes that affordable is `Probe` — the
 /// program runs this pipeline with a probe that has no clock in it at all.
 ///
 /// `#[non_exhaustive]`: stages are what this type is for, and adding one should
@@ -243,7 +243,7 @@ fn read_archive<P: Probe>(
 /// answered — `download::MAX_DOWNLOAD` bounds what may arrive — but a local
 /// file handed over with `ARUNA_ZIP` had no bound at all. The count is declared
 /// in the End of Central Directory record at the very end of the file, so
-/// [`declared_entries`] reads it in one short read and the refusal happens
+/// `declared_entries` reads it in one short read and the refusal happens
 /// before the directory is touched.
 pub const MAX_ENTRIES: usize = 500_000;
 

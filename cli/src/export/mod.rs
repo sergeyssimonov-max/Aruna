@@ -11,7 +11,7 @@
 //! * [`naming`] decides where a document goes — strings in, paths out;
 //! * [`normalize`] turns one archive document into the one that ships;
 //! * [`inventory`] writes the page and reads its links back;
-//! * [`validate`] checks a finished package against the model it came from;
+//! * [`validate`](mod@validate) checks a finished package against the model it came from;
 //! * this module owns the pipeline, and is the only part that opens a file –
 //!   together with `staging`, which holds a build until it is published and
 //!   puts things back when it is not.
@@ -80,7 +80,7 @@ pub(crate) fn is_root_file(name: &str) -> bool {
 
 /// Те же пять файлов списком.
 ///
-/// [`is_root_file`] отвечает о файле, который уже нашли; валидатору нужен
+/// `is_root_file` отвечает о файле, который уже нашли; валидатору нужен
 /// список, потому что «терпеть файл» и «требовать файл» – два разных вопроса,
 /// и второго до 18.09.2026 не задавал никто: пакет без шрифта и без текста его
 /// условий читался заново как целый.
@@ -210,7 +210,7 @@ fn collision_key(relative: &Path) -> String {
 /// distinct XML paths cannot become one PDF path: the check could never fire on
 /// its own. Because it ran first it did fire — naming the `.pdf` path in every
 /// collision error for a clash that was between two `.xml` files. The manifest
-/// is still held to distinct PDF names by [`validate`], which reads them back
+/// is still held to distinct PDF names by [`validate()`], which reads them back
 /// from the published file rather than trusting the rule.
 pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
     let mut taken: HashMap<String, String> = HashMap::with_capacity(fragments.len());

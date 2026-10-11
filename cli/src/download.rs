@@ -16,7 +16,7 @@ pub(crate) const ZENODO_ZIP_URL: &str =
 /// MD5 published by Zenodo for record 20328284, verified against the fixture.
 ///
 /// If Zenodo ever republishes the archive this has to be updated together with
-/// [`ZENODO_ZIP_URL`]; the mismatch error prints both digests, so the diagnosis
+/// `ZENODO_ZIP_URL`; the mismatch error prints both digests, so the diagnosis
 /// is immediate.
 ///
 /// **What a republish costs, decided before it happens.** Every copy of this
@@ -47,7 +47,7 @@ const MAX_ATTEMPTS: u32 = 3;
 
 /// Download `url` into `dest`, retrying transient failures.
 ///
-/// No integrity check — see [`download_verified`] for that.
+/// No integrity check — see `download_verified` for that.
 pub fn download_file(url: &str, dest: &Path, job: &Job<'_>) -> Result<()> {
     download_verified(url, dest, None, job)
 }
