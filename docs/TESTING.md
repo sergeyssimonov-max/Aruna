@@ -392,6 +392,23 @@ Baselines are in `PERFORMANCE.md`.
   request the local server never saw — ten seconds each on a day the API was
   slow. The lookup is now a parameter (`aruna::ReleaseLookup`), and the tests
   pass `support::obtain_archive`, which answers it instead of asking.
+- **Under a sandbox that denies the network, two tests can fail without a defect
+  of theirs** (measured 2026-10-11, task pre-3.0.0-hardening). The offline runs
+  of the acceptance use `sandbox-exec` with a profile that denies all outbound
+  traffic and allows `(remote ip "localhost:*")`. On this machine such a profile
+  refuses a connection to 127.0.0.1 now and then: 8 of 72 000 `connect` calls
+  to a listener on 127.0.0.1 failed with `EPERM` (one with `ETIMEDOUT`), against
+  0 of 60 000 without a sandbox and 0 of 30 000 under a profile that allows
+  everything. Nothing reaches the sandbox's log, and the machine runs two
+  network filters (Cisco AnyConnect's socket filter and LuLu), so where the
+  refusal is made is not known; that it is made by the profile is. The tests
+  that meet it are `download::tests::a_proxy_named_in_the_environment_carries_the_request`
+  (one connection to the proxy, so a refused one is the test's failure) and
+  `cache_lifecycle::a_redirect_is_followed_and_the_result_still_has_to_hash_right`
+  (the download retries the refused connection and the test, which counts
+  requests, sees two). Both are right as written and are not changed: a refused
+  loopback connection is the environment's. A red offline run on one of them is
+  read against this paragraph and repeated, not fixed in the test.
 - No `sleep` is used for synchronisation.
 - No random seed is unfixed: the fuzz harnesses use a constant seed and print it.
 - Temporary directories are removed by `Drop`, including on failure.

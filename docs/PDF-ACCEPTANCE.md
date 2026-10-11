@@ -372,6 +372,14 @@ and the outcome of the completeness check.
 Golden tests must normalise the run identifier and any timestamp, or they will
 fail on the second run for no reason.
 
+*Amended 2026-10-11.* The run identifier is deterministic since the owner's
+decision of 2026-10-08 – the SHA-256 of the archive's digest and the versions
+of the program and the template, in the form `XML-CONTRACT.md` §4 gives – so
+there is nothing in it to normalise, and the PDF carries no timestamp. Where
+each item of the list above stands, the manifest's schema 3 says
+(`XML-CONTRACT.md` §4, "What the manifest says about the PDF and its source");
+the outcome of the completeness check is the one item still open.
+
 ---
 
 ## 5. Batch behaviour
@@ -399,6 +407,18 @@ the start, the middle and the end; a crash after the temporary file exists but
 before the rename; a re-run after a partial one; an XML changed between
 inventory and conversion; an XML deleted mid-run; a bounded number of parallel
 tasks.
+
+*Amended 2026-10-11.* How "continue past a single document's failure" is
+kept: a document whose PDF is not built gets `"pdf": { "refused": "<why>" }`
+in the manifest, the phase's tally counts it under `"pdfs"."refused"`, and the
+build goes on – for a document the model does not read, one Typst refuses, and
+two repeated clusters in a row (owner's decisions of 2026-09-30, question 11,
+and of 2026-10-02). An incomplete PDF is to be refused the same way, by the
+owner's decision of 2026-10-08, once the check that finds it is chosen
+(`XML-CONTRACT.md` §4). Where it is not safe to go on – a broken invariant of
+this program: a label without its place, the credit not where it belongs –
+the build stops and names the document and the invariant; that, and not the
+refusal of a document, is what decision 11 makes a stop.
 
 Two of these are already solved for the export and the same shapes should be
 reused: `Staging` (a half-built package that removes itself unless published)

@@ -307,7 +307,13 @@ the first such document.
 of the package, in a phase of `export` (§4). In release 2.6.3 it is off by
 default, in the window and in the console, and runs only when asked for
 explicitly (`ARUNA_PDF=on` in the console) – the path of the release gate,
-`pdf_gate` and the tests. On by default returns with the window in 2.7.0.
+`pdf_gate` and the tests. On by default returns with the window in ~~2.7.0~~
+3.0.0.
+
+*Amended 2026-10-11.* The next release is 3.0.0, not 2.7.0 (owner's decision
+of 2026-10-08). On by default is back in the console since 2026-10-11 –
+`ARUNA_PDF=off` turns it off – by the owner's decision of that day; the window
+asks for no PDF until the third part of the transfer, in 3.0.0.
 
 ---
 
@@ -408,6 +414,82 @@ export~~. This is written down here rather than chosen silently. *Amended
 Each PDF must in any case allow its source to be identified: original path,
 SHA-256, converter version, run identifier, template version, and the status of
 the completeness check.
+
+### What the manifest says about the PDF and its source
+
+*Amended 2026-10-11*, task pre-3.0.0-hardening, by the owner's decision of
+2026-10-08 on option 2. Until this day the contract did not say what the
+manifest carries for the PDF at all; the code did, and this is it, schema 3.
+
+**The head.**
+
+- `"schema": 3`. It was 1 from 2026-08-19 and there was never a 2: the PDF
+  entries of 2026-09-30 were added under 1, since adding a field does not bump
+  it; the jump to 3 is the owner's, for the shape of 3.0.0.
+- `"run"`: `"id"`, `"aruna"` – the version of the program – and
+  `"template"` – the version of the PDF template. The identifier is the
+  SHA-256, in lower-case hex, of the UTF-8 text
+
+  ```
+  aruna-run-v1\n<archive_md5>\n<version of Aruna>\n<version of the template>\n
+  ```
+
+  with `archive_md5` as `"source"` gives it, every line ended by one `\n`,
+  the last too. It is deterministic: one archive, one program, one template –
+  one identifier, so two builds remain one package byte for byte. The template's
+  version is the same with PDFs and without them, and the block is written in
+  both modes, so the identifier can be computed again from the manifest alone.
+  For TLHdig Beta 0.3 (`f9acbc8db3111cc7dd88d82f7819a912`), Aruna 2.6.3 and
+  `aruna-pdf-template 1` it is
+  `a55712da507f510c27c40fef5e80e7321d945b22b3ad957e55616c8be9fa32fd`,
+  computed with `shasum -a 256` and held by
+  `manifest::tests::the_run_identifier_is_the_sha256_of_its_canonical_form`.
+- `"pdfs"`, only when the build made PDFs: `"template"`, `"built"`,
+  `"refused"` – the tally of the phase; `built + refused` is the number of
+  documents.
+
+**Each document**, in `"groups"`:
+
+- `"file"` – the XML in the package, and `"href"`, its link;
+- `"sha256"` – the SHA-256 of that XML as written into the package, the
+  normalised copy of §3.2;
+- `"source_sha256"` – the SHA-256 of the entry as the archive gave it, before
+  normalisation. The two differ wherever the prologue was rewritten – in TLHdig
+  Beta 0.3 that is all 23 936 documents (measured 2026-10-11) – and would agree
+  only where normalisation changed nothing. Both are taken from the bytes in hand as they are read and written,
+  never by reading a file again; both are written always, with PDFs and
+  without them;
+- `"pdf"` – with PDFs only: the path of the PDF beside the XML when it was
+  built, or `{ "refused": "<why>" }` when it was not. A refused document –
+  the model does not read it, Typst refuses it, two repeated clusters in a row
+  (owner's decision of 2026-10-02) – gets this record, and the build goes on
+  (`PDF-ACCEPTANCE.md` §5). A broken invariant of this program is not a
+  refusal: it stops the whole build and names the document and the invariant
+  (owner's decision 11 of 2026-09-30).
+
+**The outcome of the completeness check is not written yet.** The owner's
+decision of 2026-10-08 places it in the entry of each document with a PDF, and
+an incomplete PDF is to be a refusal of that document with its record, not a
+stop. Which check it is, the decision does not say: the export runs only the
+checks of near-zero cost, (a)–(d) of the specification's 4.10, and their
+failure is a broken invariant, never a refusal; the semantic completeness of
+`PDF-ACCEPTANCE.md` §2 runs in the tests and at the release gate only. The
+choice and its price against the limit of the PDF phase are put to the owner
+(specification 7.3).
+
+**The two modes.** Without PDFs there is no `"pdfs"` and no `"pdf"`; every
+other line of the manifest is the same as with them, the run and the digests
+included (`export_pdf::the_switch_changes_nothing_but_the_pdfs_and_what_names_them`).
+
+Where the items of the paragraph above now are: the original path – **not
+written**: the manifest names the group, the siglum and the file in the
+package, not the entry of the archive it came from (`root/CTH 5_XML_HFR/…`);
+`"source_sha256"` identifies the entry's bytes, not its name, and whether the
+name is wanted is put to the owner with the completeness check; the relative
+path – `"file"`; the SHA-256 – `"sha256"` and `"source_sha256"`; the converter
+version – `"run"."aruna"` and the PDF's `creator`; the run identifier –
+`"run"."id"`; the template version – `"run"."template"` and the PDF itself;
+the status of the completeness check – open, as above.
 
 ---
 
