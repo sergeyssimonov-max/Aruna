@@ -408,7 +408,12 @@ Baselines are in `PERFORMANCE.md`.
   (the download retries the refused connection and the test, which counts
   requests, sees two). Both are right as written and are not changed: a refused
   loopback connection is the environment's. A red offline run on one of them is
-  read against this paragraph and repeated, not fixed in the test.
+  read against this paragraph and repeated, not fixed in the test. The same
+  day's full offline run met a third: `cache_concurrency::a_stale_part_file_is_swept_and_a_fresh_one_is_left_alone`,
+  a download from a local server, hung past nextest's 120 s and was ended; run
+  again 30 times under the sandbox and 30 without, it passed every time. It is
+  recorded here as the same class – the profile also once answered a
+  connection with `ETIMEDOUT` – rather than as proved to be.
 - No `sleep` is used for synchronisation.
 - No random seed is unfixed: the fuzz harnesses use a constant seed and print it.
 - Temporary directories are removed by `Drop`, including on failure.
