@@ -119,7 +119,6 @@ impl Sandbox {
                 "ARUNA_FONTS",
                 concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
             )
-            .env("ARUNA_PDF", "on")
             .env("ARUNA_CACHE_DIR", self.path().join("cache"))
             // Not inherited: a stray one from the developer's shell would make
             // the test depend on their machine.
@@ -514,7 +513,6 @@ fn a_local_archive_run_makes_no_network_request() {
             "ARUNA_FONTS",
             concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
         )
-        .env("ARUNA_PDF", "on")
         .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
         .env("http_proxy", "http://127.0.0.1:1")
         .env("https_proxy", "http://127.0.0.1:1")
@@ -586,7 +584,6 @@ fn an_interrupted_run_leaves_no_half_written_inventory() {
             "ARUNA_FONTS",
             concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
         )
-        .env("ARUNA_PDF", "on")
         .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
         .stdin(Stdio::null())
         .stderr(Stdio::piped())
@@ -664,7 +661,6 @@ fn a_run_killed_mid_build_leaves_nothing_after_the_next_one() {
             "ARUNA_FONTS",
             concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
         )
-        .env("ARUNA_PDF", "on")
         .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
         .stdin(Stdio::null())
@@ -759,7 +755,6 @@ fn two_runs_at_once_do_not_interfere() {
                 "ARUNA_FONTS",
                 concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
             )
-            .env("ARUNA_PDF", "on")
             .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -877,7 +872,6 @@ fn run_with_a_closed(sandbox: &Sandbox, archive: &Path, which: u8) -> std::proce
             "ARUNA_FONTS",
             concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
         )
-        .env("ARUNA_PDF", "on")
         .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
         .stdin(Stdio::null());
@@ -953,14 +947,12 @@ fn run_pdf(sandbox: &Sandbox, archive: &Path, vars: &[(&str, &str)], drop_fonts:
     command.output().expect("the binary runs")
 }
 
-/// **Asked for, a PDF stands beside each document**, set in the fonts the run
-/// was told of, and the inventory links it. Until 2026-10-06 this was the
-/// default; since the owner's decision of that day the PDF is asked for with
-/// `ARUNA_PDF=on`, and the name of the test is kept.
+/// **By default a PDF stands beside each document**, set in the fonts the run
+/// was told of, and the inventory links it.
 #[test]
 fn a_run_builds_a_pdf_beside_each_document_by_default() {
     let sandbox = Sandbox::new();
-    let out = run_pdf(&sandbox, &sandbox.corpus(), &[("ARUNA_PDF", "on")], false);
+    let out = run_pdf(&sandbox, &sandbox.corpus(), &[], false);
     assert_no_panic(&out);
     assert!(out.status.success(), "{}", stderr(&out));
     let (root, _, inventory) = package(&sandbox.downloads());
@@ -975,13 +967,12 @@ fn a_run_builds_a_pdf_beside_each_document_by_default() {
     );
 }
 
-/// **PDF asked for and no fonts named, no PDF and no work**: the refusal
-/// comes before the archive is read, names the file it wanted, and says how
-/// to go on.
+/// **No fonts named, no PDF and no work**: the refusal comes before the
+/// archive is read, names the file it wanted, and says how to go on.
 #[test]
 fn without_a_font_directory_the_run_is_refused_before_any_work() {
     let sandbox = Sandbox::new();
-    let out = run_pdf(&sandbox, &sandbox.corpus(), &[("ARUNA_PDF", "on")], true);
+    let out = run_pdf(&sandbox, &sandbox.corpus(), &[], true);
     assert_no_panic(&out);
     assert!(!out.status.success());
     let said = format!("{}{}", stdout(&out), stderr(&out));
@@ -993,24 +984,6 @@ fn without_a_font_directory_the_run_is_refused_before_any_work() {
         !sandbox.downloads().join(PACKAGE).exists(),
         "a package was written"
     );
-}
-
-/// **Without the switch no PDF is built** (owner's decision of 2026-10-06):
-/// no fonts are wanted, no PDF is written and the inventory links none, as
-/// with `ARUNA_PDF=off` below.
-#[test]
-fn a_run_without_the_switch_builds_no_pdf_and_needs_no_fonts() {
-    let sandbox = Sandbox::new();
-    let out = run_pdf(&sandbox, &sandbox.corpus(), &[], true);
-    assert_no_panic(&out);
-    assert!(out.status.success(), "{}", stderr(&out));
-    let (root, _, inventory) = package(&sandbox.downloads());
-    assert!(!root.join("CTH 5/KBo 1.1.pdf").exists());
-    assert!(!fs::read_to_string(inventory)
-        .expect("read")
-        .contains(".pdf"));
-    let manifest = fs::read_to_string(root.join("manifest.json")).expect("manifest");
-    assert!(!manifest.contains("\"pdf"), "the manifest names a PDF");
 }
 
 /// **`ARUNA_PDF=off` builds the package as before**: no PDF, no link to one.
@@ -1052,10 +1025,7 @@ fn a_font_directory_missing_a_file_is_refused_by_its_name() {
     let out = run_pdf(
         &sandbox,
         &sandbox.corpus(),
-        &[
-            ("ARUNA_PDF", "on"),
-            ("ARUNA_FONTS", empty.to_str().expect("utf-8")),
-        ],
+        &[("ARUNA_FONTS", empty.to_str().expect("utf-8"))],
         true,
     );
     assert!(!out.status.success());
