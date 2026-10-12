@@ -44,6 +44,10 @@ use std::path::PathBuf;
 /// so that the shape of 3.0.0 has a number of its own.
 pub(crate) const SCHEMA: u32 = 3;
 
+/// The outcome of a completeness check in the manifest. The only one written:
+/// a check that fails stops the build (owner's decision 11 of 2026-09-30).
+pub const PASSED: &str = "passed";
+
 /// The form of the run identifier, the first line of what it hashes. A new
 /// form takes a new name here rather than changing what this one means.
 pub const RUN_ID_FORM: &str = "aruna-run-v1";
@@ -66,13 +70,19 @@ pub fn run_id(archive_md5: &str, version: &str, template: &str) -> String {
 /// The two digests of one document (owner's decision of 2026-10-08): of the
 /// bytes the package holds, and of the bytes the archive gave before
 /// normalisation. Both are taken from the bytes in hand as they are written
-/// and as they were read – never by reading a file again.
+/// and as they were read – never by reading a file again. And the entry those
+/// bytes were read from (owner's decision of 2026-10-11).
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Sums {
     /// SHA-256 of the document as written into the package.
     pub sha256: String,
     /// SHA-256 of the entry as the archive gave it.
     pub source_sha256: String,
+    /// The name of that entry as the zip's catalogue spells it: its bytes,
+    /// read as UTF-8 ([`crate::parse::entry_name`]), no Unicode
+    /// normalisation, `/` between components. Written as `source_entry`: the
+    /// head's `source` describes the archive as a whole.
+    pub source_entry: String,
 }
 
 /// What the corpus asks of a typesetter, counted from the documents themselves.
@@ -909,6 +919,11 @@ fn render_groups(
                     "          \"source_sha256\": {},",
                     string(&sums.source_sha256)
                 );
+                let _ = writeln!(
+                    out,
+                    "          \"source_entry\": {},",
+                    string(&sums.source_entry)
+                );
             }
             render_pdf_field(out, pdfs.and_then(|states| states.get(index)));
             index += 1;
@@ -927,6 +942,11 @@ fn render_groups(
 /// This document's PDF: its path when it was built, why not when it was
 /// refused, nothing when the build made no PDFs. The path is
 /// `naming::pdf_path`, the one naming rule for it.
+///
+/// A built PDF carries the outcome of the completeness check beside it, one
+/// line: the checks of [`crate::pdf::COMPLETENESS`], each passed – a failed
+/// one stops the build, so no manifest names one (owner's decisions 1 and 2
+/// of 2026-10-11). A refused document has none.
 fn render_pdf_field(out: &mut String, state: Option<&super::PdfState>) {
     match state {
         Some(super::PdfState::Built(pdf)) => {
@@ -934,6 +954,15 @@ fn render_pdf_field(out: &mut String, state: Option<&super::PdfState>) {
                 out,
                 "          \"pdf\": {},",
                 string(&pdf.to_string_lossy())
+            );
+            let checks: Vec<String> = crate::pdf::COMPLETENESS
+                .iter()
+                .map(|check| format!("{}: {}", string(check), string(PASSED)))
+                .collect();
+            let _ = writeln!(
+                out,
+                "          \"completeness\": {{ {} }},",
+                checks.join(", ")
             );
         }
         Some(super::PdfState::Refused(reason)) => {
@@ -1179,6 +1208,7 @@ mod tests {
             .map(|i| Sums {
                 sha256: crate::sha256::sha256_hex(format!("written {i}").as_bytes()),
                 source_sha256: crate::sha256::sha256_hex(format!("read {i}").as_bytes()),
+                source_entry: format!("corpus/entry {i}.xml"),
             })
             .collect();
         // Every document with its PDF built: the manifest of a build with the
@@ -1292,8 +1322,9 @@ mod tests {
         assert!(off.contains(&expected), "{off}");
     }
 
-    /// Each document carries its two digests, after its file and before its
-    /// PDF, in the order of the documents.
+    /// Each document carries its two digests and the entry they were read
+    /// from, after its file and before its PDF, in the order of the documents;
+    /// the outcome of the completeness check follows its PDF.
     #[test]
     fn each_document_carries_the_digest_of_what_was_written_and_of_what_was_read() {
         let whole = manifest();
@@ -1314,9 +1345,52 @@ mod tests {
             let source = entry
                 .find(&format!("\"source_sha256\": \"{read}\","))
                 .expect(entry);
+            let named = entry
+                .find(&format!("\"source_entry\": \"corpus/entry {i}.xml\","))
+                .expect(entry);
             let pdf = entry.find("\"pdf\": ").expect(entry);
-            assert!(sha < source && source < pdf, "{entry}");
+            // The entry is cut at its first `}`, the close of this object.
+            let completeness = entry
+                .find("\"completeness\": { \"world\": \"passed\", \"labels\": \"passed\", \"clusters\": \"passed\", \"credit\": \"passed\" ")
+                .expect(entry);
+            assert!(sha < source && source < named && named < pdf, "{entry}");
+            assert!(pdf < completeness, "{entry}");
         }
+    }
+
+    /// **The outcome of the completeness check is at a built PDF and nowhere
+    /// else** (owner's decisions 1 and 2 of 2026-10-11): not at a refused
+    /// document, and not in a build without PDFs.
+    #[test]
+    fn only_a_built_pdf_carries_the_outcome_of_the_completeness_check() {
+        let (records, placed) = built();
+        let render = |pdfs: Option<&[super::super::PdfState]>| {
+            render_manifest(
+                &records,
+                &placed,
+                &Source::default(),
+                &BTreeMap::new(),
+                &FontContract::default(),
+                &XmlReport::default(),
+                &[],
+                pdfs,
+            )
+        };
+        let mut states: Vec<super::super::PdfState> = placed
+            .iter()
+            .map(|p| super::super::PdfState::Built(super::super::pdf_path(&p.relative)))
+            .collect();
+        states[1] = super::super::PdfState::Refused("Typst: no".into());
+        let text = render(Some(&states));
+        assert_eq!(
+            text.matches("\"completeness\": ").count(),
+            placed.len() - 1,
+            "{text}"
+        );
+        let refused = &text[text.find("\"pdf\": { \"refused\"").expect("the refusal")..];
+        let next = refused.find("\"lang\"").expect("the entry goes on");
+        assert!(!refused[..next].contains("completeness"), "{refused}");
+        assert!(!render(None).contains("completeness"));
     }
 
     /// An archive with nothing turned away says so with an empty list, not by

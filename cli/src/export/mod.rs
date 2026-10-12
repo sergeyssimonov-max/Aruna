@@ -920,10 +920,12 @@ fn write_documents(
         let mut handle = create_document(&out, relative, &name, staging, fragments, placed)?;
         handle.write_all(&normalised).map_err(ArunaError::io(out))?;
         // The two digests of the manifest, from the bytes in hand: the ones
-        // just written and the ones the archive gave – never a file read again.
+        // just written and the ones the archive gave – never a file read again;
+        // and the name of the entry that gave them, as its catalogue spells it.
         tallies.sums[index] = manifest::Sums {
             sha256: crate::sha256::sha256_hex(&normalised),
             source_sha256: crate::sha256::sha256_hex(&bytes),
+            source_entry: name,
         };
         written += 1;
         if written.is_multiple_of(DOCUMENTS_PER_TICK) {

@@ -46,6 +46,19 @@ pub const TEMPLATE: &str = include_str!("template.typ");
 /// with every change of `template.typ` that changes what a page shows.
 pub const TEMPLATE_VERSION: &str = "aruna-pdf-template 1";
 
+/// The checks of nearly no cost every built PDF has passed, under the keys
+/// the manifest gives them (`XML-CONTRACT.md` §4, owner's decisions 1 and 2 of
+/// 2026-10-11): (a) `world` – Typst asked the world for `/main.typ` and
+/// `/doc.json` and nothing else; (b) `labels` – every label found its place in
+/// the file; (c) `clusters` – the ActualText wrapper stands at exactly every
+/// repeated cluster the rule finds; (d) `credit` – the credit was predicted
+/// exactly where UllikummiA is embedded. A failure of any of them is an
+/// [`Invariant`] and stops the build, so a PDF that exists has passed all
+/// four: the manifest records which checks ran, and their outcome is always
+/// passed. A document with no label, or with no combining mark, gives (b) or
+/// (c) nothing to find – the property holds all the same.
+pub const COMPLETENESS: [&str; 4] = ["world", "labels", "clusters", "credit"];
+
 /// The width of the shift one `text:tab` makes, as `template.typ` writes it:
 /// 2 em, 20 pt at the body size of 10 pt. Chosen against the page of
 /// `CTH 746/KUB 28.15` set as a table in the fourth trial, where the text after

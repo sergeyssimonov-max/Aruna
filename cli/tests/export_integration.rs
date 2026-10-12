@@ -468,6 +468,111 @@ fn the_manifest_names_the_run_and_the_two_digests_of_every_document() {
     }
 }
 
+/// Bit 11 of the general purpose flag – «the name is UTF-8» – cleared in
+/// every local and central header of a small archive, as the corpus archive
+/// has it on none of its 26 910 entries.
+fn clear_the_utf8_flag(zip: &Path) {
+    let mut bytes = fs::read(zip).expect("archive");
+    let u16_at = |b: &[u8], at: usize| u16::from_le_bytes([b[at], b[at + 1]]) as usize;
+    let u32_at =
+        |b: &[u8], at: usize| u32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]) as usize;
+    let end = bytes.len() - 22;
+    assert_eq!(
+        &bytes[end..end + 4],
+        b"PK\x05\x06",
+        "no comment, end record last"
+    );
+    let (entries, mut at) = (u16_at(&bytes, end + 10), u32_at(&bytes, end + 16));
+    for _ in 0..entries {
+        assert_eq!(&bytes[at..at + 4], b"PK\x01\x02");
+        bytes[at + 9] &= !0x08;
+        let local = u32_at(&bytes, at + 42);
+        assert_eq!(&bytes[local..local + 4], b"PK\x03\x04");
+        bytes[local + 7] &= !0x08;
+        at += 46 + u16_at(&bytes, at + 28) + u16_at(&bytes, at + 30) + u16_at(&bytes, at + 32);
+    }
+    fs::write(zip, bytes).expect("archive");
+}
+
+/// **Each document names the archive entry it was read from, byte for byte**
+/// (owner's decision of 2026-10-11, `XML-CONTRACT.md` §4): `source_entry` is
+/// the name in the zip's catalogue – no Unicode normalisation, `/` between
+/// components – of the entry whose bytes `source_sha256` is the digest of.
+/// Here `München` in NFD, as macOS writes it, with the UTF-8 flag of the
+/// archive and without it: `zip` reads an unflagged name as CP437, and the
+/// manifest must still carry the bytes.
+#[test]
+fn each_document_names_its_archive_entry_byte_for_byte() {
+    use aruna::export::manifest::values_of;
+    use aruna::sha256::sha256_hex;
+    use std::io::{Read as _, Write as _};
+
+    let nfd = "root/CTH 5_XML_HFR/Mu\u{308}nchen 5.xml";
+    let nfc = "root/CTH 5_XML_HFR/M\u{fc}nchen 5.xml";
+    for flagged in [true, false] {
+        let dir = tempdir().expect("tempdir");
+        let zip = dir.path().join("corpus.zip");
+        let mut writer = ZipWriter::new(fs::File::create(&zip).expect("archive"));
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        for (name, siglum) in [
+            (nfd, "München 5"),
+            ("root/CTH 9_XML_HFR/KUB 2.1.xml", "KUB 2.1"),
+        ] {
+            writer.start_file(name, options).expect("entry");
+            writer
+                .write_all(manuscript(siglum).as_bytes())
+                .expect("write");
+        }
+        writer.finish().expect("finish");
+        if !flagged {
+            clear_the_utf8_flag(&zip);
+        }
+
+        // The catalogue as the archive gives it: each name's bytes, and the
+        // digest of what the entry holds.
+        let mut archive =
+            zip::ZipArchive::new(fs::File::open(&zip).expect("archive")).expect("zip");
+        let mut catalogue = Vec::new();
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i).expect("entry");
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).expect("read");
+            catalogue.push((
+                entry.name_raw().to_vec(),
+                entry.name().to_string(),
+                sha256_hex(&bytes),
+            ));
+        }
+        assert_eq!(catalogue[0].0, nfd.as_bytes());
+        // Without the flag `zip` reads the name as CP437: not what the bytes say.
+        assert_eq!(catalogue[0].1 == nfd, flagged, "{}", catalogue[0].1);
+
+        export::build(
+            &zip,
+            dir.path(),
+            "test source",
+            &aruna::job::Job::unattended(),
+        )
+        .expect("the package builds");
+        let manifest =
+            fs::read_to_string(dir.path().join(PACKAGE).join(export::MANIFEST)).expect("manifest");
+        let groups = &manifest[manifest.find("\"groups\": [").expect("groups")..];
+        let entries = values_of(groups, "source_entry");
+        let digests = values_of(groups, "source_sha256");
+        assert_eq!(entries.len(), 2, "{groups}");
+        assert!(entries.iter().any(|e| e == nfd), "{entries:?}");
+        assert!(!manifest.contains(nfc), "the name was normalised");
+        for (entry, digest) in entries.iter().zip(&digests) {
+            let (_, _, read) = catalogue
+                .iter()
+                .find(|(raw, _, _)| raw == entry.as_bytes())
+                .unwrap_or_else(|| panic!("{entry:?} is not a name of the archive"));
+            assert_eq!(read, digest, "{entry}");
+        }
+    }
+}
+
 /// Two builds of one archive give one manifest, byte for byte – the run
 /// identifier among it: it names the archive and the program, not the hour.
 #[test]

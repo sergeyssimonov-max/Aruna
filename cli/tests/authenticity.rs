@@ -363,6 +363,63 @@ fn the_whole_corpus_reaches_the_package_once_and_unchanged() {
     );
 }
 
+/// **Every document of the corpus names the archive entry its source digest
+/// was taken of** (owner's decision of 2026-10-11, `XML-CONTRACT.md` §4): each
+/// of the 23 936 `source_entry` values is the name of an entry of the archive,
+/// byte for byte, the bytes of that entry give the document's `source_sha256`,
+/// and no two documents name one entry. The catalogue is read by index and
+/// by each name's bytes, not by `by_name`: `zip` reads the names of this
+/// archive as CP437, and sixteen of them are UTF-8 all the same.
+///
+/// Heavy for the same reason as the test above, and `#[ignore]` with it.
+#[test]
+#[ignore = "builds the whole corpus; run with --run-ignored ignored-only"]
+fn every_document_names_the_entry_its_source_digest_was_taken_of() {
+    use aruna::export::manifest::values_of;
+    use aruna::sha256::sha256_hex;
+    use std::collections::{HashMap, HashSet};
+
+    let Some(archive) = fixture() else { return };
+    let dir = tempdir().expect("tempdir");
+    let (built, root) = build(dir.path(), &archive);
+    assert_eq!(built.documents, DOCUMENTS);
+
+    let manifest = std::fs::read_to_string(root.join(export::MANIFEST)).expect("manifest");
+    let groups = &manifest[manifest.find("\"groups\": [").expect("groups")..];
+    let entries = values_of(groups, "source_entry");
+    let digests = values_of(groups, "source_sha256");
+    assert_eq!((entries.len(), digests.len()), (DOCUMENTS, DOCUMENTS));
+    let distinct: HashSet<&String> = entries.iter().collect();
+    assert_eq!(distinct.len(), DOCUMENTS, "two documents name one entry");
+
+    let mut zip =
+        zip::ZipArchive::new(std::fs::File::open(&archive).expect("archive")).expect("readable");
+    let mut catalogue: HashMap<Vec<u8>, String> = HashMap::with_capacity(zip.len());
+    let mut bytes = Vec::new();
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i).expect("entry");
+        if entry.is_dir() {
+            continue;
+        }
+        bytes.clear();
+        entry.read_to_end(&mut bytes).expect("read");
+        catalogue.insert(entry.name_raw().to_vec(), sha256_hex(&bytes));
+    }
+    let mut non_ascii = 0;
+    for (entry, digest) in entries.iter().zip(&digests) {
+        let read = catalogue
+            .get(entry.as_bytes())
+            .unwrap_or_else(|| panic!("{entry:?} is not a name of the archive"));
+        assert_eq!(read, digest, "{entry}");
+        non_ascii += usize::from(!entry.is_ascii());
+    }
+    // The names `zip` alone would have read wrong are among them.
+    assert!(
+        non_ascii > 0,
+        "no document of the corpus has a name beyond ASCII"
+    );
+}
+
 /// `source.not_manuscripts.entries` of the package's manifest, read as text:
 /// the crate's JSON reader is private, and the writer puts one entry per line.
 fn not_manuscripts(root: &Path) -> Vec<String> {

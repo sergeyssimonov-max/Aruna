@@ -82,7 +82,8 @@ fn tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 }
 
 /// The inventory with the PDF links taken out, and the manifest with its
-/// PDF entries taken out: what the package says apart from the PDFs.
+/// PDF entries and the outcome of their completeness check taken out: what
+/// the package says apart from the PDFs.
 fn without_pdfs(name: &Path, bytes: &[u8]) -> String {
     let text = String::from_utf8_lossy(bytes).into_owned();
     if name == Path::new(export::MANIFEST) {
@@ -97,7 +98,8 @@ fn without_pdfs(name: &Path, bytes: &[u8]) -> String {
                 in_block = line != "  },";
                 continue;
             }
-            if line.trim_start().starts_with("\"pdf\": ") {
+            let line_key = line.trim_start();
+            if line_key.starts_with("\"pdf\": ") || line_key.starts_with("\"completeness\": ") {
                 continue;
             }
             out.push_str(line);
@@ -272,6 +274,47 @@ fn one_repeated_cluster_or_two_apart_still_get_their_pdf() {
         let bytes = std::fs::read(root.join(pdf)).expect("the PDF is there");
         assert!(bytes.starts_with(b"%PDF-"), "{pdf}");
     }
+}
+
+/// **The outcome of the completeness check, at each PDF and only there**
+/// (owner's decisions 1 and 2 of 2026-10-11, `XML-CONTRACT.md` §4): the four
+/// checks (a)–(d) of the export under their keys, each passed, one line after
+/// the PDF's path; the refused document has none, and a build without PDFs
+/// has none at all.
+#[test]
+fn each_pdf_and_only_a_pdf_carries_the_outcome_of_the_completeness_check() {
+    let dir = tempdir().expect("tempdir");
+    let zip = corpus(dir.path(), &[]);
+    build(&zip, &dir.path().join("on"), Pdf::On(fonts())).expect("builds with");
+    build(&zip, &dir.path().join("off"), Pdf::Off).expect("builds without");
+    let read = |mode: &str| {
+        std::fs::read_to_string(dir.path().join(mode).join(PACKAGE).join(export::MANIFEST))
+            .expect("manifest")
+    };
+    let on = read("on");
+    let checks = "\"completeness\": { \"world\": \"passed\", \"labels\": \"passed\", \"clusters\": \"passed\", \"credit\": \"passed\" },";
+    let lines: Vec<&str> = on.lines().map(str::trim_start).collect();
+    let mut built = 0;
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("\"completeness\": ") {
+            assert_eq!(*line, checks, "the keys and the outcome");
+            assert!(
+                lines[i - 1].starts_with("\"pdf\": \""),
+                "not after a built PDF: {}",
+                lines[i - 1]
+            );
+        }
+        if line.starts_with("\"pdf\": \"") {
+            built += 1;
+            assert_eq!(lines[i + 1], checks, "{line}");
+        }
+        if line.starts_with("\"pdf\": { \"refused\"") {
+            assert!(!lines[i + 1].starts_with("\"completeness\""), "{line}");
+        }
+    }
+    assert_eq!(built, 4);
+    assert_eq!(on.matches("\"completeness\"").count(), 4);
+    assert!(!read("off").contains("completeness"));
 }
 
 #[test]
