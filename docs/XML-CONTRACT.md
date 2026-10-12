@@ -459,15 +459,56 @@ manifest carries for the PDF at all; the code did, and this is it, schema 3.
   only where normalisation changed nothing. Both are taken from the bytes in hand as they are read and written,
   never by reading a file again; both are written always, with PDFs and
   without them;
+- `"source_entry"` – *added 2026-10-12, by the owner's decision of
+  2026-10-11*: the name of the archive entry whose bytes `"source_sha256"` is
+  the digest of, exactly as the zip's catalogue spells it – no Unicode
+  normalisation, `/` between components, the archive's own top folder
+  included (`TLHbasisONLINE25_1_ZENODO_Beta_03/CTH 5_XML_HFR/…`). Written
+  always, with PDFs and without them, and unique: two documents never name
+  one entry. The name is the catalogue's bytes read as UTF-8, which every name
+  of TLHdig Beta 0.3 is, although the archive sets the UTF-8 flag on none of
+  its entries; a name that is not UTF-8 would be read as CP437, as the zip
+  format says, and none is. The key is not `"source"`: the head's `"source"`
+  describes the archive as a whole – its label, its MD5, the entries turned
+  away – and a document's key of that name would read as a second
+  description of it. `source_entry` pairs with `source_sha256`: the name and
+  the bytes of one entry;
 - `"pdf"` – with PDFs only: the path of the PDF beside the XML when it was
   built, or `{ "refused": "<why>" }` when it was not. A refused document –
   the model does not read it, Typst refuses it, two repeated clusters in a row
   (owner's decision of 2026-10-02) – gets this record, and the build goes on
   (`PDF-ACCEPTANCE.md` §5). A broken invariant of this program is not a
   refusal: it stops the whole build and names the document and the invariant
-  (owner's decision 11 of 2026-09-30).
+  (owner's decision 11 of 2026-09-30);
+- `"completeness"` – *added 2026-10-12, by the owner's decisions 1 and 2 of
+  2026-10-11*: with PDFs, at each document whose PDF was built and only there,
+  one line after `"pdf"`:
 
-**The outcome of the completeness check is not written yet.** The owner's
+  ```
+  "completeness": { "world": "passed", "labels": "passed", "clusters": "passed", "credit": "passed" },
+  ```
+
+  The checks (a)–(d) the export runs on every PDF (specification 4.10), under
+  stable keys, with their outcome: `world` – Typst asked the world for
+  `/main.typ` and `/doc.json` and nothing else; `labels` – every label found
+  its place in the PDF; `clusters` – the ActualText wrapper stands at exactly
+  every repeated cluster the general rule finds; `credit` – the footnote
+  crediting UllikummiA was predicted from the font stack exactly where the
+  subset is embedded. **The outcome is always `"passed"`**, and that is the
+  rule, not the luck of a corpus: a failure of any of the four is a broken
+  invariant of this program and stops the whole build (owner's decision 11 of
+  2026-09-30), so a manifest with a failed check is never written. What the
+  object records is which checks ran. The keys are the same four at every
+  PDF: a document with no label gives `labels` nothing to place, and one with
+  no combining mark of `U+0300–036F` gives `clusters` nothing to find – the
+  post-processing returns such a PDF as Typst wrote it, and the property holds
+  all the same. A refused document has no such object, and a build without
+  PDFs has none at all. The semantic completeness of `PDF-ACCEPTANCE.md` §2 –
+  the code points of the text, the tag tree and the logical text against the
+  model – is not this check: it runs in the tests and at the release gate,
+  and the limit of the PDF phase, 135 s, does not change.
+
+~~**The outcome of the completeness check is not written yet.** The owner's
 decision of 2026-10-08 places it in the entry of each document with a PDF, and
 an incomplete PDF is to be a refusal of that document with its record, not a
 stop. Which check it is, the decision does not say: the export runs only the
@@ -475,21 +516,30 @@ checks of near-zero cost, (a)–(d) of the specification's 4.10, and their
 failure is a broken invariant, never a refusal; the semantic completeness of
 `PDF-ACCEPTANCE.md` §2 runs in the tests and at the release gate only. The
 choice and its price against the limit of the PDF phase are put to the owner
-(specification 7.3).
+(specification 7.3).~~
 
-**The two modes.** Without PDFs there is no `"pdfs"` and no `"pdf"`; every
+*Amended 2026-10-12*, by the owner's decisions 1 and 2 of 2026-10-11: the
+outcome is written – `"completeness"` above, the checks (a)–(d), always
+passed. **An incomplete PDF** is what already refuses a document with
+`"pdf": { "refused": … }`: Typst refuses it, the model does not read it, or it
+holds two repeated clusters in a row. No new kind of refusal is introduced.
+
+**The two modes.** Without PDFs there is no `"pdfs"`, no `"pdf"` and no
+`"completeness"`; every
 other line of the manifest is the same as with them, the run and the digests
 included (`export_pdf::the_switch_changes_nothing_but_the_pdfs_and_what_names_them`).
 
-Where the items of the paragraph above now are: the original path – **not
-written**: the manifest names the group, the siglum and the file in the
+Where the items of the paragraph above now are: the original path –
+~~**not written**: the manifest names the group, the siglum and the file in the
 package, not the entry of the archive it came from (`root/CTH 5_XML_HFR/…`);
 `"source_sha256"` identifies the entry's bytes, not its name, and whether the
-name is wanted is put to the owner with the completeness check; the relative
+name is wanted is put to the owner with the completeness check~~
+`"source_entry"` (*amended 2026-10-12*); the relative
 path – `"file"`; the SHA-256 – `"sha256"` and `"source_sha256"`; the converter
 version – `"run"."aruna"` and the PDF's `creator`; the run identifier –
 `"run"."id"`; the template version – `"run"."template"` and the PDF itself;
-the status of the completeness check – open, as above.
+the status of the completeness check – ~~open, as above~~ `"completeness"`
+(*amended 2026-10-12*).
 
 ---
 

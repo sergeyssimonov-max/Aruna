@@ -380,6 +380,14 @@ each item of the list above stands, the manifest's schema 3 says
 (`XML-CONTRACT.md` §4, "What the manifest says about the PDF and its source");
 the outcome of the completeness check is the one item still open.
 
+*Amended 2026-10-12*, by the owner's decisions of 2026-10-11: no item is open.
+The source XML is named by `"file"` and by `"source_entry"` – the name of the
+archive entry, as the zip's catalogue spells it, whose bytes
+`"source_sha256"` is the digest of; the outcome of the completeness check is
+`"completeness"`, at each built PDF: the checks (a)–(d) of the export under
+the keys `world`, `labels`, `clusters` and `credit`, each `"passed"`
+(`XML-CONTRACT.md` §4).
+
 ---
 
 ## 5. Batch behaviour
@@ -413,9 +421,21 @@ kept: a document whose PDF is not built gets `"pdf": { "refused": "<why>" }`
 in the manifest, the phase's tally counts it under `"pdfs"."refused"`, and the
 build goes on – for a document the model does not read, one Typst refuses, and
 two repeated clusters in a row (owner's decisions of 2026-09-30, question 11,
-and of 2026-10-02). An incomplete PDF is to be refused the same way, by the
+and of 2026-10-02). ~~An incomplete PDF is to be refused the same way, by the
 owner's decision of 2026-10-08, once the check that finds it is chosen
-(`XML-CONTRACT.md` §4). Where it is not safe to go on – a broken invariant of
+(`XML-CONTRACT.md` §4).~~
+
+*Amended 2026-10-12*, by the owner's decisions 1 and 2 of 2026-10-11. **An
+incomplete PDF is exactly what already gets that record**: Typst refuses the
+document, the model does not read it, or it holds two repeated clusters in a
+row; no new kind of refusal is introduced. The outcome of the completeness
+check is the checks (a)–(d) the export runs on every PDF (specification
+4.10), written at each built PDF as `"completeness"` with the keys `world`,
+`labels`, `clusters` and `credit` (`XML-CONTRACT.md` §4). It is always
+`"passed"`: a failure of any of them is a broken invariant and stops the
+build, so a manifest with a failed check is never written. The full semantic
+check of §2 stays with the tests and the release gate; the limit of the PDF
+phase, 135 s, is unchanged. Where it is not safe to go on – a broken invariant of
 this program: a label without its place, the credit not where it belongs –
 the build stops and names the document and the invariant; that, and not the
 refusal of a document, is what decision 11 makes a stop.
