@@ -459,7 +459,7 @@ manifest carries for the PDF at all; the code did, and this is it, schema 3.
   only where normalisation changed nothing. Both are taken from the bytes in hand as they are read and written,
   never by reading a file again; both are written always, with PDFs and
   without them;
-- `"source_entry"` – *added 2026-10-12, by the owner's decision of
+- `"source_entry"` – *added 2026-10-13, by the owner's decision of
   2026-10-11*: the name of the archive entry whose bytes `"source_sha256"` is
   the digest of, exactly as the zip's catalogue spells it – no Unicode
   normalisation, `/` between components, the archive's own top folder
@@ -480,7 +480,7 @@ manifest carries for the PDF at all; the code did, and this is it, schema 3.
   (`PDF-ACCEPTANCE.md` §5). A broken invariant of this program is not a
   refusal: it stops the whole build and names the document and the invariant
   (owner's decision 11 of 2026-09-30);
-- `"completeness"` – *added 2026-10-12, by the owner's decisions 1 and 2 of
+- `"completeness"` – *added 2026-10-13, by the owner's decisions 1 and 2 of
   2026-10-11*: with PDFs, at each document whose PDF was built and only there,
   one line after `"pdf"`:
 
@@ -518,7 +518,7 @@ failure is a broken invariant, never a refusal; the semantic completeness of
 choice and its price against the limit of the PDF phase are put to the owner
 (specification 7.3).~~
 
-*Amended 2026-10-12*, by the owner's decisions 1 and 2 of 2026-10-11: the
+*Amended 2026-10-13*, by the owner's decisions 1 and 2 of 2026-10-11: the
 outcome is written – `"completeness"` above, the checks (a)–(d), always
 passed. **An incomplete PDF** is what already refuses a document with
 `"pdf": { "refused": … }`: Typst refuses it, the model does not read it, or it
@@ -534,12 +534,12 @@ Where the items of the paragraph above now are: the original path –
 package, not the entry of the archive it came from (`root/CTH 5_XML_HFR/…`);
 `"source_sha256"` identifies the entry's bytes, not its name, and whether the
 name is wanted is put to the owner with the completeness check~~
-`"source_entry"` (*amended 2026-10-12*); the relative
+`"source_entry"` (*amended 2026-10-13*); the relative
 path – `"file"`; the SHA-256 – `"sha256"` and `"source_sha256"`; the converter
 version – `"run"."aruna"` and the PDF's `creator`; the run identifier –
 `"run"."id"`; the template version – `"run"."template"` and the PDF itself;
 the status of the completeness check – ~~open, as above~~ `"completeness"`
-(*amended 2026-10-12*).
+(*amended 2026-10-13*).
 
 ---
 

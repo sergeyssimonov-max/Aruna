@@ -378,9 +378,9 @@ of the program and the template, in the form `XML-CONTRACT.md` §4 gives – so
 there is nothing in it to normalise, and the PDF carries no timestamp. Where
 each item of the list above stands, the manifest's schema 3 says
 (`XML-CONTRACT.md` §4, "What the manifest says about the PDF and its source");
-the outcome of the completeness check is the one item still open.
+~~the outcome of the completeness check is the one item still open.~~
 
-*Amended 2026-10-12*, by the owner's decisions of 2026-10-11: no item is open.
+*Amended 2026-10-13*, by the owner's decisions of 2026-10-11: no item is open.
 The source XML is named by `"file"` and by `"source_entry"` – the name of the
 archive entry, as the zip's catalogue spells it, whose bytes
 `"source_sha256"` is the digest of; the outcome of the completeness check is
@@ -425,7 +425,7 @@ and of 2026-10-02). ~~An incomplete PDF is to be refused the same way, by the
 owner's decision of 2026-10-08, once the check that finds it is chosen
 (`XML-CONTRACT.md` §4).~~
 
-*Amended 2026-10-12*, by the owner's decisions 1 and 2 of 2026-10-11. **An
+*Amended 2026-10-13*, by the owner's decisions 1 and 2 of 2026-10-11. **An
 incomplete PDF is exactly what already gets that record**: Typst refuses the
 document, the model does not read it, or it holds two repeated clusters in a
 row; no new kind of refusal is introduced. The outcome of the completeness
