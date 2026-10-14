@@ -67,6 +67,58 @@
 #
 # Removed with the Typst release that drops each one; reviewed at every Typst
 # release, as the two advisories above are.
+#
+# **Four advisories in rustls 0.23.45, excepted for one week** – owner's
+# decision of 2026-10-15 (task «rustls-interim-ignore»), the one departure from
+# the rule that a task brings no new exception. RUSTSEC-2026-0346, -0347,
+# -0348 and -0349 were published on 2026-10-14; all four are fixed in rustls
+# 0.23.46, published 2026-10-14 09:54:15 UTC, which specification 5.1 lets in
+# from 2026-10-21 09:54 UTC. Valid through 2026-10-22 inclusive (UTC); the task
+# «rustls-0.23.46» removes the four entries here, in deny.toml and the guard.
+#
+# Who depends on it: rustls 0.23.45 ← ureq 2.12.1 ← aruna (cli/Cargo.toml:22,
+# `features = ["tls"]`). ureq asks for rustls without default features and
+# with `ring`, `logging`, `std`, `tls12` (ureq Cargo.toml:156–165); `cargo
+# tree -i rustls -e features` shows nothing more. No `aws-lc-rs` or
+# `aws-lc-sys` is in Cargo.lock, and the rustls entry there names no brotli.
+#
+# How the connection is configured: every agent of this crate is built by
+# `ureq::AgentBuilder` without `tls_config` or `tls_connector`
+# (cli/src/download.rs:441–448, 626–637; the maintainer's example
+# cli/examples/cth_titles.rs), so ureq's own configuration applies –
+# `rustls::ClientConfig::builder_with_provider(ring::default_provider())`,
+# TLS 1.2 and 1.3, webpki roots, no client auth (ureq src/rtls.rs:119–136,
+# taken by src/agent.rs:265). No source under cli/ or src-tauri/ names rustls.
+# The hosts are zenodo.org (cli/src/download.rs:14, cli/src/zenodo.rs:49) and
+# where it redirects, through a proxy from the environment if one is named;
+# hethport.net only from the maintainer's example.
+#
+# - RUSTSEC-2026-0346, session secrets in `Debug` of `Tls12ClientSessionValue`
+#   and `Tls13ClientSessionValue`: reached only by a custom
+#   `ClientSessionStore` that formats them. Neither this tree nor ureq has
+#   one; resumption is rustls's built-in in-memory store (rustls
+#   src/client/builder.rs:172, src/client/client_conn.rs:530–541), whose
+#   `Debug` omits its contents (src/client/handy.rs:183–189), and rustls
+#   formats no session value in any log line.
+# - RUSTSEC-2026-0347, application data sent after an ECH rejection: only with
+#   `EchMode::Enable`, set solely by `ConfigBuilder::with_ech` (rustls
+#   src/client/builder.rs:27–33); the default is `None` (src/builder.rs:259)
+#   and ureq does not call it.
+# - RUSTSEC-2026-0348, Brotli certificate decompression: only with rustls's
+#   non-default `brotli` feature (rustls Cargo.toml:64–68), not enabled here.
+#   (ureq's own `brotli` feature decodes response bodies and is not this one.)
+# - RUSTSEC-2026-0349, downgrade to classical key exchange: the loss is of the
+#   post-quantum hybrid X25519MLKEM768. The ring provider offers X25519,
+#   SECP256R1 and SECP384R1 only (rustls src/crypto/ring/mod.rs:177–181);
+#   MLKEM exists only in the aws-lc-rs provider (src/crypto/mod.rs:29–30,
+#   src/crypto/aws_lc_rs/pq/), not compiled here. Every connection is
+#   classical already, so there is nothing to downgrade.
+#
+# Guard: cli/tests/rustls_interim_guard.rs – fails if any of the four is
+# missing from either file or another one appears, if a manifest names brotli,
+# if rustls in Cargo.lock depends on brotli, if aws-lc-rs or aws-lc-sys
+# reaches the lock, if a source names rustls, ECH or a session store, if
+# rustls is at 0.23.46 or later while the four stand, and after 2026-10-22.
 [advisories]
 ignore = [
     "RUSTSEC-2026-0194",
@@ -75,4 +127,9 @@ ignore = [
     "RUSTSEC-2024-0320",
     "RUSTSEC-2026-0206",
     "RUSTSEC-2026-0192",
+    # временно до 2026-10-22, rustls 0.23.46 созревает 2026-10-21 09:54 UTC, правило 5.1
+    "RUSTSEC-2026-0346",
+    "RUSTSEC-2026-0347",
+    "RUSTSEC-2026-0348",
+    "RUSTSEC-2026-0349",
 ]
