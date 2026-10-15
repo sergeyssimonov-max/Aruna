@@ -16,7 +16,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1463 – crates 752, npm 711. Distinct licence texts: 683. Requires review: 168.
+Packages: 1464 – crates 752, npm 712. Distinct licence texts: 683. Requires review: 168.
 
 ## Packages
 
@@ -925,6 +925,7 @@ Packages: 1463 – crates 752, npm 711. Distinct licence texts: 683. Requires re
 | @types/mocha | 10.0.10 | npm | MIT | T3 |
 | @types/node | 20.19.43 | npm | MIT | T3 |
 | @types/node | 22.20.2 | npm | MIT | T3 |
+| @types/node | 22.20.5 | npm | MIT | T3 |
 | @types/normalize-package-data | 2.4.4 | npm | MIT | T3 |
 | @types/sinonjs__fake-timers | 8.1.5 | npm | MIT | T3 |
 | @types/stack-utils | 2.0.3 | npm | MIT | T3 |
@@ -1108,7 +1109,7 @@ Packages: 1463 – crates 752, npm 711. Distinct licence texts: 683. Requires re
 | eslint-visitor-keys | 3.4.3 | npm | Apache-2.0 | T103 |
 | eslint-visitor-keys | 4.2.1 | npm | Apache-2.0 | T103 |
 | eslint-visitor-keys | 5.0.1 | npm | Apache-2.0 | T103 |
-| eslint | 10.11.0 | npm | MIT | T130 |
+| eslint | 10.12.0 | npm | MIT | T130 |
 | esm-env | 1.2.2 | npm | MIT | T417 |
 | espree | 10.4.0 | npm | BSD-2-Clause | T123 |
 | espree | 11.2.0 | npm | BSD-2-Clause | T123 |
@@ -1903,7 +1904,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T3
 
-SHA-256 `c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383`. Used by: windows 0.61.3 (license-mit), windows-collections 0.2.0 (license-mit), windows-core 0.61.2 (license-mit), windows-core 0.62.2 (license-mit), windows-future 0.2.1 (license-mit), windows-implement 0.60.2 (license-mit), windows-interface 0.59.3 (license-mit), windows-link 0.1.3 (license-mit), windows-link 0.2.1 (license-mit), windows-numerics 0.2.0 (license-mit), windows-result 0.3.4 (license-mit), windows-result 0.4.1 (license-mit), windows-strings 0.4.2 (license-mit), windows-strings 0.5.1 (license-mit), windows-sys 0.45.0 (license-mit), windows-sys 0.48.0 (license-mit), windows-sys 0.52.0 (license-mit), windows-sys 0.59.0 (license-mit), windows-sys 0.60.2 (license-mit), windows-sys 0.61.2 (license-mit), windows-targets 0.42.2 (license-mit), windows-targets 0.48.5 (license-mit), windows-targets 0.52.6 (license-mit), windows-targets 0.53.5 (license-mit), windows-threading 0.1.0 (license-mit), windows-version 0.1.7 (license-mit), windows_aarch64_gnullvm 0.42.2 (license-mit), windows_aarch64_gnullvm 0.48.5 (license-mit), windows_aarch64_gnullvm 0.52.6 (license-mit), windows_aarch64_gnullvm 0.53.1 (license-mit), windows_aarch64_msvc 0.42.2 (license-mit), windows_aarch64_msvc 0.48.5 (license-mit), windows_aarch64_msvc 0.52.6 (license-mit), windows_aarch64_msvc 0.53.1 (license-mit), windows_i686_gnu 0.42.2 (license-mit), windows_i686_gnu 0.48.5 (license-mit), windows_i686_gnu 0.52.6 (license-mit), windows_i686_gnu 0.53.1 (license-mit), windows_i686_gnullvm 0.52.6 (license-mit), windows_i686_gnullvm 0.53.1 (license-mit), windows_i686_msvc 0.42.2 (license-mit), windows_i686_msvc 0.48.5 (license-mit), windows_i686_msvc 0.52.6 (license-mit), windows_i686_msvc 0.53.1 (license-mit), windows_x86_64_gnu 0.42.2 (license-mit), windows_x86_64_gnu 0.48.5 (license-mit), windows_x86_64_gnu 0.52.6 (license-mit), windows_x86_64_gnu 0.53.1 (license-mit), windows_x86_64_gnullvm 0.42.2 (license-mit), windows_x86_64_gnullvm 0.48.5 (license-mit), windows_x86_64_gnullvm 0.52.6 (license-mit), windows_x86_64_gnullvm 0.53.1 (license-mit), windows_x86_64_msvc 0.42.2 (license-mit), windows_x86_64_msvc 0.48.5 (license-mit), windows_x86_64_msvc 0.52.6 (license-mit), windows_x86_64_msvc 0.53.1 (license-mit), @types/aria-query 5.0.4 (LICENSE), @types/chai 5.2.3 (LICENSE), @types/deep-eql 4.0.2 (LICENSE), @types/esrecurse 4.3.1 (LICENSE), @types/estree 1.0.9 (LICENSE), @types/istanbul-lib-coverage 2.0.6 (LICENSE), @types/istanbul-lib-report 3.0.3 (LICENSE), @types/istanbul-reports 3.0.4 (LICENSE), @types/json-schema 7.0.15 (LICENSE), @types/mocha 10.0.10 (LICENSE), @types/node 20.19.43 (LICENSE), @types/node 22.20.2 (LICENSE), @types/normalize-package-data 2.4.4 (LICENSE), @types/sinonjs__fake-timers 8.1.5 (LICENSE), @types/stack-utils 2.0.3 (LICENSE), @types/which 2.0.2 (LICENSE), @types/ws 8.18.1 (LICENSE), @types/yargs-parser 21.0.3 (LICENSE), @types/yargs 17.0.35 (LICENSE).
+SHA-256 `c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383`. Used by: windows 0.61.3 (license-mit), windows-collections 0.2.0 (license-mit), windows-core 0.61.2 (license-mit), windows-core 0.62.2 (license-mit), windows-future 0.2.1 (license-mit), windows-implement 0.60.2 (license-mit), windows-interface 0.59.3 (license-mit), windows-link 0.1.3 (license-mit), windows-link 0.2.1 (license-mit), windows-numerics 0.2.0 (license-mit), windows-result 0.3.4 (license-mit), windows-result 0.4.1 (license-mit), windows-strings 0.4.2 (license-mit), windows-strings 0.5.1 (license-mit), windows-sys 0.45.0 (license-mit), windows-sys 0.48.0 (license-mit), windows-sys 0.52.0 (license-mit), windows-sys 0.59.0 (license-mit), windows-sys 0.60.2 (license-mit), windows-sys 0.61.2 (license-mit), windows-targets 0.42.2 (license-mit), windows-targets 0.48.5 (license-mit), windows-targets 0.52.6 (license-mit), windows-targets 0.53.5 (license-mit), windows-threading 0.1.0 (license-mit), windows-version 0.1.7 (license-mit), windows_aarch64_gnullvm 0.42.2 (license-mit), windows_aarch64_gnullvm 0.48.5 (license-mit), windows_aarch64_gnullvm 0.52.6 (license-mit), windows_aarch64_gnullvm 0.53.1 (license-mit), windows_aarch64_msvc 0.42.2 (license-mit), windows_aarch64_msvc 0.48.5 (license-mit), windows_aarch64_msvc 0.52.6 (license-mit), windows_aarch64_msvc 0.53.1 (license-mit), windows_i686_gnu 0.42.2 (license-mit), windows_i686_gnu 0.48.5 (license-mit), windows_i686_gnu 0.52.6 (license-mit), windows_i686_gnu 0.53.1 (license-mit), windows_i686_gnullvm 0.52.6 (license-mit), windows_i686_gnullvm 0.53.1 (license-mit), windows_i686_msvc 0.42.2 (license-mit), windows_i686_msvc 0.48.5 (license-mit), windows_i686_msvc 0.52.6 (license-mit), windows_i686_msvc 0.53.1 (license-mit), windows_x86_64_gnu 0.42.2 (license-mit), windows_x86_64_gnu 0.48.5 (license-mit), windows_x86_64_gnu 0.52.6 (license-mit), windows_x86_64_gnu 0.53.1 (license-mit), windows_x86_64_gnullvm 0.42.2 (license-mit), windows_x86_64_gnullvm 0.48.5 (license-mit), windows_x86_64_gnullvm 0.52.6 (license-mit), windows_x86_64_gnullvm 0.53.1 (license-mit), windows_x86_64_msvc 0.42.2 (license-mit), windows_x86_64_msvc 0.48.5 (license-mit), windows_x86_64_msvc 0.52.6 (license-mit), windows_x86_64_msvc 0.53.1 (license-mit), @types/aria-query 5.0.4 (LICENSE), @types/chai 5.2.3 (LICENSE), @types/deep-eql 4.0.2 (LICENSE), @types/esrecurse 4.3.1 (LICENSE), @types/estree 1.0.9 (LICENSE), @types/istanbul-lib-coverage 2.0.6 (LICENSE), @types/istanbul-lib-report 3.0.3 (LICENSE), @types/istanbul-reports 3.0.4 (LICENSE), @types/json-schema 7.0.15 (LICENSE), @types/mocha 10.0.10 (LICENSE), @types/node 20.19.43 (LICENSE), @types/node 22.20.2 (LICENSE), @types/node 22.20.5 (LICENSE), @types/normalize-package-data 2.4.4 (LICENSE), @types/sinonjs__fake-timers 8.1.5 (LICENSE), @types/stack-utils 2.0.3 (LICENSE), @types/which 2.0.2 (LICENSE), @types/ws 8.18.1 (LICENSE), @types/yargs-parser 21.0.3 (LICENSE), @types/yargs 17.0.35 (LICENSE).
 
 ```text
     MIT License
@@ -9397,7 +9398,7 @@ END OF TERMS AND CONDITIONS
 
 ### T130
 
-SHA-256 `3b6be04f862a077a4b97929dbf247299360824d9365f8603c263769303ace18c`. Used by: @eslint/js 10.0.1 (LICENSE), eslint 10.11.0 (LICENSE).
+SHA-256 `3b6be04f862a077a4b97929dbf247299360824d9365f8603c263769303ace18c`. Used by: @eslint/js 10.0.1 (LICENSE), eslint 10.12.0 (LICENSE).
 
 ```text
 Copyright OpenJS Foundation and other contributors, <www.openjsf.org>
