@@ -25,6 +25,8 @@ cli/fixtures/*.zip
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+# Vitest 5 writes reports and `context.annotate` attachments here.
+frontend/.vitest/
 
 # tauri
 src-tauri/target/
