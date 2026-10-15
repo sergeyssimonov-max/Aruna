@@ -392,33 +392,181 @@ Baselines are in `PERFORMANCE.md`.
   request the local server never saw — ten seconds each on a day the API was
   slow. The lookup is now a parameter (`aruna::ReleaseLookup`), and the tests
   pass `support::obtain_archive`, which answers it instead of asking.
-- **Under a sandbox that denies the network, two tests can fail without a defect
-  of theirs** (measured 2026-10-11, task pre-3.0.0-hardening). The offline runs
-  of the acceptance use `sandbox-exec` with a profile that denies all outbound
-  traffic and allows `(remote ip "localhost:*")`. On this machine such a profile
-  refuses a connection to 127.0.0.1 now and then: 8 of 72 000 `connect` calls
-  to a listener on 127.0.0.1 failed with `EPERM` (one with `ETIMEDOUT`), against
-  0 of 60 000 without a sandbox and 0 of 30 000 under a profile that allows
-  everything. Nothing reaches the sandbox's log, and the machine runs two
-  network filters (Cisco AnyConnect's socket filter and LuLu), so where the
-  refusal is made is not known; that it is made by the profile is. The tests
-  that meet it are `download::tests::a_proxy_named_in_the_environment_carries_the_request`
-  (one connection to the proxy, so a refused one is the test's failure) and
-  `cache_lifecycle::a_redirect_is_followed_and_the_result_still_has_to_hash_right`
-  (the download retries the refused connection and the test, which counts
-  requests, sees two). Both are right as written and are not changed: a refused
-  loopback connection is the environment's. A red offline run on one of them is
-  read against this paragraph and repeated, not fixed in the test. The same
-  day's full offline run met a third: `cache_concurrency::a_stale_part_file_is_swept_and_a_fresh_one_is_left_alone`,
-  a download from a local server, hung past nextest's 120 s and was ended; run
-  again 30 times under the sandbox and 30 without, it passed every time. It is
-  recorded here as the same class – the profile also once answered a
-  connection with `ETIMEDOUT` – rather than as proved to be.
+- **Under a sandbox that denies the network, the tests that go to loopback can
+  fail without a defect of theirs.** Which they are, how many, and what the
+  offline runs measured: *Tests that go to loopback*, below.
 - No `sleep` is used for synchronisation.
 - No random seed is unfixed: the fuzz harnesses use a constant seed and print it.
 - Temporary directories are removed by `Drop`, including on failure.
 - The heavy fixtures are generated inside the test that needs them, not
   committed: their size is the point and the repository is not the place for it.
+
+### Tests that go to loopback
+
+No test leaves the machine, but 43 open a socket on 127.0.0.1: a local server
+the download is pointed at, a local proxy, or a port where nothing listens so
+that the download fails. All 43 are in the ordinary run of 727 and none is
+behind `#[ignore]`; all are in the `aruna` crate, the shell has none. Counted
+on 2026-10-15 at `7f0ae50`.
+
+`frontend/tests/loopback-record.test.ts` holds the two tables below to the
+sources, and fails naming the tests that are missing from them, the ones they
+name that the sources do not give, and a number that is not the length of its
+table. It looks where they were found, in `cli/src`, `cli/tests` and
+`src-tauri/src`, by the same signals: a test opens a socket when its body calls
+`TcpListener::bind`, `TcpStream::connect` or `UdpSocket::bind`, or reaches a
+function that does – of its own file, or of `tests/support/mod.rs` for a binary
+that declares `mod support` – directly, through another such function, or
+through the type such a function belongs to (`FakeServer`, `Origin`). A test
+that only writes a loopback address down is found too, and which table it goes
+in is a person's call, made by reading it: four of them send the download to a
+closed port and are in the first table, five never open a socket and are in the
+second. Moving a test from one table to the other is the one mistake the guard
+cannot see.
+
+**43 tests open a socket on loopback.**
+
+| binary | test | file | opens | through |
+|---|---|---|---|---|
+| `aruna::bin/aruna` | `console::tests::a_proxy_refusal_is_named_as_one` | `cli/src/console.rs` | listens as a proxy; `ureq` connects; the test joins the thread that waits in `accept` | the test body |
+| `aruna` | `download::tests::the_user_agent_carries_the_version_from_the_manifest` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::truncated_body_is_rejected` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::transient_failure_is_retried` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::checksum_mismatch_is_reported_without_downloading_again` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_question_behind_a_silent_proxy_ends_by_its_deadline` | `cli/src/download.rs` | listens as a proxy; the question connects | the test body |
+| `aruna` | `download::tests::a_proxy_named_in_the_environment_carries_the_request` | `cli/src/download.rs` | listens as a proxy; the question connects | the test body |
+| `aruna` | `download::tests::server_unavailable_is_retried` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::not_found_is_reported_once_and_as_a_status` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::matching_checksum_is_accepted` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::asking_a_question_fails_as_an_error_rather_than_a_surprise` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::an_answer_that_is_not_text_is_refused` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_response_with_no_stated_length_still_arrives_whole` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_refused_download_leaves_nothing_behind` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_flood_is_refused_by_size` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_cut_inside_a_character_is_still_a_refusal` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::the_metadata_cap_is_a_refusal_and_not_a_prefix` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::an_endless_answer_is_given_up_on_by_its_deadline` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_server_that_dribbles_for_ever_is_given_up_on` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_cancel_reaches_a_download_whose_server_went_silent` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_server_that_never_answers_is_given_up_on_within_the_read_timeout` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_server_that_goes_silent_mid_body_is_given_up_on_within_the_read_timeout` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_cancel_reaches_a_download_whose_server_went_silent_mid_body` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_proxy_the_crate_cannot_speak_is_bypassed_and_the_request_goes_direct` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::a_body_cut_by_the_server_is_a_network_failure_not_a_disk_one` | `cli/src/download.rs` | listens; the code under test connects | `FakeServer`, `cli/src/download.rs` |
+| `aruna` | `download::tests::network_error_on_unreachable_host` | `cli/src/download.rs` | the download connects to `127.0.0.1:1`, where nothing listens | `download_file` |
+| `aruna` | `download::tests::failed_download_leaves_no_files_behind` | `cli/src/download.rs` | the download connects to `127.0.0.1:1`, where nothing listens | `download_file` |
+| `aruna` | `download::tests::failed_download_preserves_previous_file` | `cli/src/download.rs` | the download connects to `127.0.0.1:1`, where nothing listens | `download_file` |
+| `aruna` | `tests::an_unusable_proxy_is_said_before_the_download` | `cli/src/lib.rs` | the download connects to `127.0.0.1:9`, where nothing listens | `download_archive` |
+| `aruna::cache_concurrency` | `runs_racing_for_one_archive_all_get_a_whole_one` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
+| `aruna::cache_concurrency` | `a_second_wave_is_served_entirely_from_the_cache` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
+| `aruna::cache_concurrency` | `repeated_downloads_do_not_accumulate_connections_or_descriptors` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
+| `aruna::cache_concurrency` | `a_stale_part_file_is_swept_and_a_fresh_one_is_left_alone` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
+| `aruna::cache_lifecycle` | `a_cold_run_downloads_and_a_warm_one_does_not` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+| `aruna::cache_lifecycle` | `an_archive_that_hashes_wrong_is_refused_and_not_cached` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+| `aruna::cache_lifecycle` | `a_republished_archive_replaces_the_edition_it_supersedes` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+| `aruna::cache_lifecycle` | `an_unwritable_cache_directory_falls_back_to_a_run_of_its_own` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+| `aruna::cache_lifecycle` | `an_unreachable_source_fails_without_leaving_anything_behind` | `cli/tests/cache_lifecycle.rs` | binds a port and lets it go; the download connects to it | the test body |
+| `aruna::cache_lifecycle` | `a_failed_download_leaves_no_scratch_directory_behind` | `cli/tests/cache_lifecycle.rs` | binds a port and lets it go; the download connects to it | the test body |
+| `aruna::cache_lifecycle` | `a_redirect_is_followed_and_the_result_still_has_to_hash_right` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+| `aruna::cache_lifecycle` | `a_redirect_loop_gives_up_instead_of_going_round_for_ever` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+| `aruna::cache_lifecycle` | `a_newer_edition_is_announced_and_the_pinned_archive_still_arrives` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+| `aruna::cache_lifecycle` | `a_file_where_the_cache_directory_belongs_does_not_fail_the_run` | `cli/tests/cache_lifecycle.rs` | listens; the download connects; `Drop` connects to wake `accept` | `Origin` of the file |
+
+**5 tests write a loopback address down and open no socket.**
+
+| binary | test | file | the address is | – |
+|---|---|---|---|---|
+| `aruna` | `cache::tests::the_name_is_always_a_single_path_component` | `cli/src/cache.rs` | a URL the cache file is named after | – |
+| `aruna` | `cache::tests::a_plain_url_is_named_after_its_file` | `cli/src/cache.rs` | a URL the cache file is named after | – |
+| `aruna` | `download::tests::the_proxy_is_chosen_as_curl_chooses_it` | `cli/src/download.rs` | proxy settings, parsed and never used | – |
+| `aruna` | `download::tests::a_proxy_that_cannot_be_used_is_named` | `cli/src/download.rs` | proxy settings, parsed and never used | – |
+| `aruna::cli_process` | `a_local_archive_run_makes_no_network_request` | `cli/tests/cli_process.rs` | proxy variables a run that reads a local archive must not use | – |
+
+#### What the no-network profile does to them
+
+The offline runs of the acceptance use `sandbox-exec -f nonet.sb` – the profile
+lives beside each task's report, not in this repository – and run the ordinary
+set as `cargo nextest run --locked --offline --workspace --no-tests=pass
+--no-fail-fast`. The profile is four rules:
+
+```
+(version 1)
+(allow default)
+(deny network-outbound)
+(allow network-outbound (remote ip "localhost:*"))
+(allow network-outbound (remote unix-socket))
+```
+
+Loopback is allowed by its text, and refused in practice now and then: on
+2026-10-11, 8 of 72 000 `connect` calls to a listener on 127.0.0.1 failed with
+`EPERM` (and one with `ETIMEDOUT`) under it, against 0 of 60 000 with no
+sandbox and 0 of 30 000 under a profile that allows everything (task
+pre-3.0.0-hardening). Nothing reaches the sandbox's log, and the machine runs
+two network filters (Cisco AnyConnect's socket filter and LuLu), so where the
+refusal is made is not known; that it comes with the profile is.
+
+How many tests it turns red is not a constant, and is recorded as measured:
+
+| date, tree | run | not passed |
+|---|---|---|
+| 2026-10-11, pre-3.0.0-hardening | offline runs of the acceptance | `download::tests::a_proxy_named_in_the_environment_carries_the_request`, `cache_lifecycle::a_redirect_is_followed_and_the_result_still_has_to_hash_right`; in the full offline run `cache_concurrency::a_stale_part_file_is_swept_and_a_fresh_one_is_left_alone` hung past 120 s |
+| 2026-10-14, `0481b5e` | ordinary set | FAIL `cache_lifecycle::a_redirect_loop_gives_up_instead_of_going_round_for_ever` – "the loop was walked 7 times, so it is being retried"; TIMEOUT `console::tests::a_proxy_refusal_is_named_as_one` |
+| 2026-10-15, `534e095` and the tree of the first group of updates for 3.0.0 that became `7f0ae50` | ordinary set, once on each | none on `534e095`; FAIL `download::tests::asking_a_question_fails_as_an_error_rather_than_a_surprise` – `Operation not permitted (os error 1)` – on the updated tree |
+| 2026-10-15, `7f0ae50` | ordinary set, first of two in a row; host 80 % idle, 221 s | 6 FAIL, 2 TIMEOUT – below |
+| 2026-10-15, `7f0ae50` | ordinary set, second of the two; host 88 % idle, 76 s | none: 727 of 727 |
+
+The first of the two runs of 2026-10-15, test by test:
+
+| test | outcome | what it said |
+|---|---|---|
+| `download::tests::asking_a_question_fails_as_an_error_rather_than_a_surprise` | FAIL, 11.1 s | status 500 came back as a network error: `Connect error: Operation not permitted (os error 1)` |
+| `download::tests::transient_failure_is_retried` | FAIL, 66.4 s | "should have taken exactly two attempts", 3 against 2 |
+| `download::tests::server_unavailable_is_retried` | FAIL, 67.7 s | 3 attempts against 2 |
+| `cache_lifecycle::a_cold_run_downloads_and_a_warm_one_does_not` | FAIL, 44.9 s | "the second run went back to the network instead of using the cache", 2 against 1 |
+| `cache_concurrency::runs_racing_for_one_archive_all_get_a_whole_one` | FAIL, 65.1 s | "six racing runs made 12 requests; that is more than one each" |
+| `cache_concurrency::a_second_wave_is_served_entirely_from_the_cache` | FAIL, 72.7 s | "the cold run made 3 requests", against 1 |
+| `cache_concurrency::a_stale_part_file_is_swept_and_a_fresh_one_is_left_alone` | TIMEOUT, 120 s | ended by nextest |
+| `console::tests::a_proxy_refusal_is_named_as_one` | TIMEOUT, 120 s | ended by nextest |
+
+Every test that has gone red under the profile, eleven in all, is in the first
+table above. The difference between the two runs of the day is a fact and is
+left as one: the binaries were the same (the build before them compiled
+nothing), the first ran on a busier host, and why it met eight refusals and the
+second none was not found.
+
+Read by the code, a refusal shows in three ways:
+
+- **One request too many – FAIL on a count.** The download takes a connection
+  that does not go through for a passing fault of the network and tries again;
+  that is its job. The local server counts connections, and on this machine it
+  accepts one before the client's `connect` is let go (`download.rs`, the note
+  on `PAST_DEADLINE`), so a connection held and then given up on is counted
+  and the retry is counted again. Tests that assert how many requests arrived
+  see one more than they expect – the two retry tests, the cache tests, and the
+  redirect loop of 2026-10-14, which walked its chain seven times against six –
+  and the waits before the retries are what made those runs 45–73 s long.
+- **The refusal is the error – FAIL with `EPERM` in its text.** Where the path
+  under test does not retry, the refusal comes back as what the test sees:
+  `asking_a_question…` expected the server's status 500 and got
+  `Operation not permitted (os error 1)`.
+- **A wait for a connection that never comes – TIMEOUT.** Two tests wait on a
+  connection of their own. `a_proxy_refusal_is_named_as_one` starts a proxy
+  thread that blocks in `accept` and joins it once `ureq` is done; when the
+  client's `connect` is refused the thread is never woken, the join waits, and
+  nextest ends the test at 120 s. The `Origin` of `tests/support/mod.rs` is
+  stopped by `Drop`, which connects once to wake its own `accept` and then
+  joins the thread; when that connection is refused the join waits the same
+  way – `a_stale_part_file…`. (The comment there reads a failed wake-up as "it
+  is already gone"; under this profile it is not.)
+
+None of this is a defect of the tests or of the code: a refused loopback
+connection is the environment's, and every one of these tests is green in an
+ordinary run and on CI. They are not changed for it, **and the answer is
+neither a retry nor leaving them out** – retries are absent from
+`.config/nextest.toml` on purpose, and excluding a test from the run or
+skipping it by environment is barred (owner's decision, 2026-10-15). A red
+offline run is read against this section: a test that went red and is in the
+first table is this; one that is not is a finding.
 
 ---
 
