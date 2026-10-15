@@ -495,10 +495,16 @@ cannot see.
 
 #### What the no-network profile does to them
 
-The offline runs of the acceptance use `sandbox-exec -f nonet.sb` – the profile
-lives beside each task's report, not in this repository – and run the ordinary
-set as `cargo nextest run --locked --offline --workspace --no-tests=pass
---no-fail-fast`. The profile is four rules:
+The offline runs of the acceptance use the profile `scripts/nonet.sb` (in this
+repository since 2026-10-16; before that a copy lay beside each task's report)
+and run the ordinary set from the repository root as
+
+```
+sandbox-exec -f scripts/nonet.sb cargo nextest run --locked --offline --workspace --no-tests=pass --no-fail-fast
+```
+
+The profile is four rules; the block below is the text of `scripts/nonet.sb`
+as it stands:
 
 ```
 (version 1)
