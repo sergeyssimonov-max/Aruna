@@ -68,4 +68,4 @@ tempfile = "3"
 # (no colours, two packages). Run with INSTA_UPDATE=no in every check; a
 # snapshot is rewritten only by a deliberate local INSTA_UPDATE=always and
 # committed apart, with its reason.
-insta = { version = "=1.48.0", default-features = false }
+insta = { version = "=1.49.0", default-features = false }
