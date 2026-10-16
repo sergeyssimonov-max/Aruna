@@ -16,7 +16,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires review: 167.
+Packages: 1457 – crates 752, npm 705. Distinct licence texts: 679. Requires review: 167.
 
 ## Packages
 
@@ -28,15 +28,15 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | aho-corasick | 1.1.5 | crate | Unlicense OR MIT | T21, T24, T18 |
 | alloc-no-stdlib | 2.0.4 | crate | BSD-3-Clause | T98 |
 | alloc-stdlib | 0.2.4 | crate | BSD-3-Clause | requires review |
-| android_log-sys | 0.3.2 | crate | MIT OR Apache-2.0 | T353, T562 |
+| android_log-sys | 0.3.2 | crate | MIT OR Apache-2.0 | T353, T561 |
 | android_logger | 0.15.1 | crate | MIT OR Apache-2.0 | T498, T309 |
 | android_system_properties | 0.1.6 | crate | MIT OR Apache-2.0 | T260, T453 |
 | anyhow | 1.0.104 | crate | MIT OR Apache-2.0 | T6, T2 |
 | approx | 0.5.1 | crate | Apache-2.0 | T321 |
-| ar_archive_writer | 0.5.3 | crate | Apache-2.0 WITH LLVM-exception | T662 |
+| ar_archive_writer | 0.5.3 | crate | Apache-2.0 WITH LLVM-exception | T661 |
 | arrayref | 0.3.9 | crate | BSD-2-Clause | T246 |
 | arrayvec | 0.7.8 | crate | MIT OR Apache-2.0 | T1, T354 |
-| async-broadcast | 0.7.2 | crate | MIT OR Apache-2.0 | T626, T271 |
+| async-broadcast | 0.7.2 | crate | MIT OR Apache-2.0 | T625, T271 |
 | async-channel | 2.5.0 | crate | Apache-2.0 OR MIT | T1, T2 |
 | async-executor | 1.14.0 | crate | Apache-2.0 OR MIT | T1, T2 |
 | async-io | 2.6.0 | crate | Apache-2.0 OR MIT | T1, T2 |
@@ -55,14 +55,14 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | az | 1.3.0 | crate | MIT/Apache-2.0 | T1, T403 |
 | base64 | 0.21.7 | crate | MIT OR Apache-2.0 | T1, T112 |
 | base64 | 0.22.1 | crate | MIT OR Apache-2.0 | T1, T112 |
-| base64 | 0.23.1 | crate | MIT OR Apache-2.0 | T1, T535 |
+| base64 | 0.23.1 | crate | MIT OR Apache-2.0 | T1, T534 |
 | biblatex | 0.12.0 | crate | MIT OR Apache-2.0 | T437, T2 |
 | bincode | 1.3.3 | crate | MIT | T268 |
 | bit-set | 0.8.0 | crate | Apache-2.0 OR MIT | T40, T198 |
 | bit-vec | 0.8.0 | crate | Apache-2.0 OR MIT | T40, T198 |
 | bitflags | 1.3.2 | crate | MIT/Apache-2.0 | T1, T29 |
 | bitflags | 2.13.2 | crate | MIT OR Apache-2.0 | T1, T29 |
-| block-buffer | 0.10.4 | crate | MIT OR Apache-2.0 | T13, T599 |
+| block-buffer | 0.10.4 | crate | MIT OR Apache-2.0 | T13, T598 |
 | block-buffer | 0.12.1 | crate | MIT OR Apache-2.0 | T13, T158 |
 | block-padding | 0.4.2 | crate | MIT OR Apache-2.0 | T13, T158 |
 | block2 | 0.6.2 | crate | MIT | requires review |
@@ -71,7 +71,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | brotli-decompressor | 5.0.3 | crate | BSD-3-Clause/MIT | T98 |
 | bs58 | 0.5.1 | crate | MIT/Apache-2.0 | T1, T331 |
 | bumpalo | 3.20.3 | crate | MIT OR Apache-2.0 | T1, T397 |
-| by_address | 1.2.1 | crate | MIT OR Apache-2.0 | T1, T606 |
+| by_address | 1.2.1 | crate | MIT OR Apache-2.0 | T1, T605 |
 | bytemuck | 1.25.2 | crate | Zlib OR Apache-2.0 OR MIT | T188, T162, T90 |
 | bytemuck_derive | 1.12.1 | crate | Zlib OR Apache-2.0 OR MIT | T188, T162, T90 |
 | byteorder | 1.5.0 | crate | Unlicense OR MIT | T21, T24, T18 |
@@ -82,15 +82,15 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | camino | 1.2.5 | crate | MIT OR Apache-2.0 | T1, T2 |
 | cargo-platform | 0.1.9 | crate | MIT OR Apache-2.0 | T52, T2 |
 | cargo_metadata | 0.19.2 | crate | MIT | T2 |
-| cargo_toml | 0.22.3 | crate | Apache-2.0 OR MIT | T644 |
+| cargo_toml | 0.22.3 | crate | Apache-2.0 OR MIT | T643 |
 | cbc | 0.2.1 | crate | MIT OR Apache-2.0 | T13, T393 |
 | cc | 1.4.4 | crate | MIT OR Apache-2.0 | T1, T17 |
 | cesu8 | 1.1.0 | crate | Apache-2.0/MIT | T380 |
-| cfb | 0.7.3 | crate | MIT | T638 |
+| cfb | 0.7.3 | crate | MIT | T637 |
 | cfg-expr | 0.15.8 | crate | MIT OR Apache-2.0 | T40, T108 |
 | cfg-expr | 0.20.9 | crate | MIT OR Apache-2.0 | T40, T108 |
 | cfg-if | 1.0.5 | crate | MIT OR Apache-2.0 | T1, T17 |
-| chacha20 | 0.10.2 | crate | MIT OR Apache-2.0 | T13, T558 |
+| chacha20 | 0.10.2 | crate | MIT OR Apache-2.0 | T13, T557 |
 | chinese-number | 0.7.8 | crate | MIT | T139 |
 | chinese-variant | 1.1.6 | crate | MIT | T139 |
 | chrono | 0.4.45 | crate | MIT OR Apache-2.0 | T486 |
@@ -98,8 +98,8 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | ciborium-io | 0.2.2 | crate | Apache-2.0 | T9 |
 | ciborium-ll | 0.2.2 | crate | Apache-2.0 | T9 |
 | cipher | 0.5.2 | crate | MIT OR Apache-2.0 | T13, T489 |
-| citationberg | 0.7.0 | crate | MIT OR Apache-2.0 | T356, T2, T621 |
-| cobs | 0.3.0 | crate | MIT OR Apache-2.0 | T11, T620 |
+| citationberg | 0.7.0 | crate | MIT OR Apache-2.0 | T356, T2, T620 |
+| cobs | 0.3.0 | crate | MIT OR Apache-2.0 | T11, T619 |
 | codex | 0.3.0 | crate | Apache-2.0 | T6 |
 | color | 0.3.3 | crate | Apache-2.0 OR MIT | T26, T25 |
 | color_quant | 1.1.0 | crate | MIT | T370 |
@@ -108,24 +108,24 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | comemo-macros | 0.5.1 | crate | MIT OR Apache-2.0 | requires review |
 | concurrent-queue | 2.5.0 | crate | Apache-2.0 OR MIT | T1, T2 |
 | const-oid | 0.10.2 | crate | Apache-2.0 OR MIT | T13, T148 |
-| cookie | 0.18.2 | crate | MIT OR Apache-2.0 | T278, T652 |
+| cookie | 0.18.2 | crate | MIT OR Apache-2.0 | T278, T651 |
 | core-foundation | 0.10.1 | crate | MIT OR Apache-2.0 | T1, T38 |
 | core-foundation-sys | 0.8.7 | crate | MIT OR Apache-2.0 | T1, T38 |
 | core-graphics | 0.25.0 | crate | MIT OR Apache-2.0 | T193, T1, T38 |
 | core-graphics-types | 0.2.0 | crate | MIT OR Apache-2.0 | T1, T38 |
 | core_detect | 1.0.0 | crate | MIT/Apache-2.0 | T43, T458 |
-| core_maths | 0.1.1 | crate | MIT | T511 |
+| core_maths | 0.1.1 | crate | MIT | T510 |
 | cpubits | 0.1.1 | crate | MIT OR Apache-2.0 | T13, T204 |
-| cpufeatures | 0.2.17 | crate | MIT OR Apache-2.0 | T13, T540 |
+| cpufeatures | 0.2.17 | crate | MIT OR Apache-2.0 | T13, T539 |
 | cpufeatures | 0.3.1 | crate | MIT OR Apache-2.0 | T13, T148 |
 | crc32fast | 1.5.2 | crate | MIT OR Apache-2.0 | T11, T390 |
-| crossbeam-channel | 0.5.17 | crate | MIT OR Apache-2.0 | T1, T58, T544 |
+| crossbeam-channel | 0.5.17 | crate | MIT OR Apache-2.0 | T1, T58, T543 |
 | crossbeam-deque | 0.8.8 | crate | MIT OR Apache-2.0 | T1, T58 |
 | crossbeam-epoch | 0.9.21 | crate | MIT OR Apache-2.0 | T1, T58 |
 | crossbeam-utils | 0.8.23 | crate | MIT OR Apache-2.0 | T1, T58 |
 | crunchy | 0.2.4 | crate | MIT | T323 |
 | crypto-common | 0.1.7 | crate | MIT OR Apache-2.0 | T13, T310 |
-| crypto-common | 0.2.2 | crate | MIT OR Apache-2.0 | T13, T595 |
+| crypto-common | 0.2.2 | crate | MIT OR Apache-2.0 | T13, T594 |
 | cssparser | 0.36.0 | crate | MPL-2.0 | T200 |
 | cssparser-macros | 0.6.1 | crate | MPL-2.0 | T200 |
 | csv | 1.4.0 | crate | Unlicense/MIT | T21, T24, T18 |
@@ -140,11 +140,11 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | defmt | 1.1.1 | crate | MIT OR Apache-2.0 | T40, T124 |
 | defmt-macros | 1.1.1 | crate | MIT OR Apache-2.0 | T40, T124 |
 | defmt-parser | 1.0.0 | crate | MIT OR Apache-2.0 | requires review |
-| deranged | 0.5.8 | crate | MIT OR Apache-2.0 | T642, T267 |
+| deranged | 0.5.8 | crate | MIT OR Apache-2.0 | T641, T267 |
 | derive_more | 2.1.1 | crate | MIT | T153 |
 | derive_more-impl | 2.1.1 | crate | MIT | T153 |
 | digest | 0.10.7 | crate | MIT OR Apache-2.0 | T13, T508 |
-| digest | 0.11.3 | crate | MIT OR Apache-2.0 | T13, T541 |
+| digest | 0.11.3 | crate | MIT OR Apache-2.0 | T13, T540 |
 | dirs | 5.0.1 | crate | MIT OR Apache-2.0 | T74, T59 |
 | dirs | 6.0.0 | crate | MIT OR Apache-2.0 | T74, T59 |
 | dirs-sys | 0.4.1 | crate | MIT OR Apache-2.0 | T74, T59 |
@@ -154,24 +154,24 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | dlopen2 | 0.8.2 | crate | MIT | requires review |
 | dlopen2_derive | 0.4.3 | crate | MIT | requires review |
 | dom_query | 0.27.0 | crate | MIT | T428 |
-| dpi | 0.1.2 | crate | Apache-2.0 AND MIT | T144, T513 |
+| dpi | 0.1.2 | crate | Apache-2.0 AND MIT | T144, T512 |
 | dtoa | 1.0.11 | crate | MIT OR Apache-2.0 | T6, T2 |
 | dtoa-short | 0.3.5 | crate | MPL-2.0 | T250 |
 | dtor | 0.3.0 | crate | Apache-2.0 OR MIT | T67, T71 |
 | dtor-proc-macro | 0.0.6 | crate | Apache-2.0 OR MIT | T67, T71 |
 | dunce | 1.0.5 | crate | CC0-1.0 OR MIT-0 OR Apache-2.0 | T163 |
 | dyn-clone | 1.0.20 | crate | MIT OR Apache-2.0 | T6, T2 |
-| ecb | 0.2.1 | crate | MIT OR Apache-2.0 | T13, T653 |
+| ecb | 0.2.1 | crate | MIT OR Apache-2.0 | T13, T652 |
 | ecow | 0.2.6 | crate | MIT OR Apache-2.0 | T6, T25 |
 | either | 1.18.0 | crate | MIT OR Apache-2.0 | T1, T86 |
 | embed-resource | 3.0.11 | crate | MIT | T244 |
-| embed_plist | 1.2.2 | crate | MIT OR Apache-2.0 | T20, T607 |
+| embed_plist | 1.2.2 | crate | MIT OR Apache-2.0 | T20, T606 |
 | encoding_rs | 0.8.42 | crate | (Apache-2.0 OR MIT) AND BSD-3-Clause | T229, T20, T47, T456 |
 | endi | 1.1.1 | crate | MIT | T2 |
 | enum-ordinalize | 4.4.2 | crate | MIT | T183 |
 | enum-ordinalize-derive | 4.4.2 | crate | MIT | T183 |
 | enumflags2 | 0.7.12 | crate | MIT OR Apache-2.0 | T328, T294 |
-| enumflags2_derive | 0.7.12 | crate | MIT OR Apache-2.0 | T401, T592 |
+| enumflags2_derive | 0.7.12 | crate | MIT OR Apache-2.0 | T401, T591 |
 | env_filter | 0.1.4 | crate | MIT OR Apache-2.0 | T11, T22 |
 | equivalent | 1.0.2 | crate | Apache-2.0 OR MIT | T1, T424 |
 | erased-serde | 0.4.10 | crate | MIT OR Apache-2.0 | T6, T2 |
@@ -179,7 +179,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | euclid | 0.22.14 | crate | MIT OR Apache-2.0 | T193, T1, T38 |
 | event-listener | 5.4.2 | crate | Apache-2.0 OR MIT | T1, T2 |
 | event-listener-strategy | 0.5.4 | crate | Apache-2.0 OR MIT | T1, T2 |
-| fancy-regex | 0.16.2 | crate | MIT | T600, T319 |
+| fancy-regex | 0.16.2 | crate | MIT | T599, T319 |
 | fastrand | 2.5.0 | crate | Apache-2.0 OR MIT | T1, T2 |
 | fdeflate | 0.3.7 | crate | MIT OR Apache-2.0 | T10, T99 |
 | fearless_simd | 0.4.1 | crate | Apache-2.0 OR MIT | T26, T56 |
@@ -189,7 +189,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | flate2 | 1.1.10 | crate | MIT OR Apache-2.0 | T1, T210 |
 | float-cmp | 0.9.0 | crate | MIT | T327 |
 | fnv | 1.0.7 | crate | Apache-2.0 / MIT | T1, T399 |
-| foldhash | 0.2.0 | crate | Zlib | T543 |
+| foldhash | 0.2.0 | crate | Zlib | T542 |
 | font-types | 0.11.3 | crate | MIT OR Apache-2.0 | T65, T61 |
 | fontconfig-parser | 0.5.8 | crate | MIT | T251 |
 | fontdb | 0.23.0 | crate | MIT | T85 |
@@ -213,7 +213,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | gdkwayland-sys | 0.18.2 | crate | MIT | T7 |
 | gdkx11 | 0.18.2 | crate | MIT | T23, T7 |
 | gdkx11-sys | 0.18.2 | crate | MIT | T7 |
-| generic-array | 0.14.7 | crate | MIT | T568 |
+| generic-array | 0.14.7 | crate | MIT | T567 |
 | getrandom | 0.2.17 | crate | MIT OR Apache-2.0 | T68, T332 |
 | getrandom | 0.3.4 | crate | MIT OR Apache-2.0 | T68, T285 |
 | getrandom | 0.4.3 | crate | MIT OR Apache-2.0 | T68, T361 |
@@ -235,11 +235,11 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | gtk | 0.18.2 | crate | MIT | T23, T7 |
 | gtk-sys | 0.18.2 | crate | MIT | T7 |
 | gtk3-macros | 0.18.2 | crate | MIT | T23, T7 |
-| guillotiere | 0.7.0 | crate | MIT/Apache-2.0 | T394, T585 |
+| guillotiere | 0.7.0 | crate | MIT/Apache-2.0 | T394, T584 |
 | half | 2.7.1 | crate | MIT OR Apache-2.0 | T26, T25 |
 | hashbrown | 0.12.3 | crate | MIT OR Apache-2.0 | T1, T202 |
 | hashbrown | 0.17.1 | crate | MIT OR Apache-2.0 | T1, T202 |
-| hayagriva | 0.10.1 | crate | MIT OR Apache-2.0 | T674, T2, T573 |
+| hayagriva | 0.10.1 | crate | MIT OR Apache-2.0 | T673, T2, T572 |
 | hayro | 0.7.1 | crate | Apache-2.0 OR MIT | T16, T28 |
 | hayro-ccitt | 0.3.0 | crate | Apache-2.0 OR MIT | T16, T28 |
 | hayro-cmap | 0.1.0 | crate | Apache-2.0 OR MIT | T16, T28 |
@@ -253,9 +253,9 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | heck | 0.4.1 | crate | MIT OR Apache-2.0 | T1, T39 |
 | heck | 0.5.0 | crate | MIT OR Apache-2.0 | T1, T39 |
 | hermit-abi | 0.5.2 | crate | MIT OR Apache-2.0 | T1, T2 |
-| hex | 0.4.3 | crate | MIT OR Apache-2.0 | T11, T664 |
+| hex | 0.4.3 | crate | MIT OR Apache-2.0 | T11, T663 |
 | html5ever | 0.38.0 | crate | MIT OR Apache-2.0 | T1, T91 |
-| http | 1.5.0 | crate | MIT OR Apache-2.0 | T470, T612 |
+| http | 1.5.0 | crate | MIT OR Apache-2.0 | T470, T611 |
 | http-body | 1.1.0 | crate | MIT | T121 |
 | http-body-util | 0.1.5 | crate | MIT | T121 |
 | httparse | 1.10.1 | crate | MIT OR Apache-2.0 | T1, T315 |
@@ -292,7 +292,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | indexmap | 1.9.3 | crate | Apache-2.0 OR MIT | T1, T194 |
 | indexmap | 2.14.2 | crate | Apache-2.0 OR MIT | T1, T194 |
 | infer | 0.19.0 | crate | MIT | T276 |
-| inout | 0.2.2 | crate | MIT OR Apache-2.0 | T13, T519 |
+| inout | 0.2.2 | crate | MIT OR Apache-2.0 | T13, T518 |
 | insta | 1.49.0 | crate | Apache-2.0 | T1 |
 | ipnet | 2.12.1 | crate | MIT OR Apache-2.0 | T463, T346 |
 | is-docker | 0.2.0 | crate | MIT | T146 |
@@ -305,7 +305,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | jiff-static | 0.2.35 | crate | Unlicense OR MIT | T21, T24, T18 |
 | jiff-tzdb | 0.1.8 | crate | Unlicense OR MIT | T21, T24, T18 |
 | jiff-tzdb-platform | 0.1.3 | crate | Unlicense OR MIT | T21, T24, T18 |
-| jni | 0.21.1 | crate | MIT/Apache-2.0 | T1, T679 |
+| jni | 0.21.1 | crate | MIT/Apache-2.0 | T1, T678 |
 | jni-sys | 0.3.1 | crate | MIT OR Apache-2.0 | T11, T119 |
 | jni-sys | 0.4.1 | crate | MIT OR Apache-2.0 | T11, T119 |
 | jni-sys-macros | 0.4.1 | crate | MIT OR Apache-2.0 | requires review |
@@ -317,11 +317,11 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | krilla | 0.8.2 | crate | MIT OR Apache-2.0 | requires review |
 | krilla-svg | 0.8.1 | crate | MIT OR Apache-2.0 | requires review |
 | kurbo | 0.13.1 | crate | Apache-2.0 OR MIT | T20, T56 |
-| libappindicator | 0.9.0 | crate | Apache-2.0 OR MIT | T1, T636 |
+| libappindicator | 0.9.0 | crate | Apache-2.0 OR MIT | T1, T635 |
 | libappindicator-sys | 0.9.0 | crate | Apache-2.0 OR MIT | requires review |
 | libc | 0.2.190 | crate | MIT OR Apache-2.0 | T6, T230 |
 | libdbus-sys | 0.2.7 | crate | Apache-2.0/MIT | T134, T185 |
-| libloading | 0.7.4 | crate | ISC | T547 |
+| libloading | 0.7.4 | crate | ISC | T546 |
 | libm | 0.2.16 | crate | MIT | T313 |
 | libredox | 0.1.25 | crate | MIT | T474 |
 | linebender_resource_handle | 0.1.1 | crate | Apache-2.0 OR MIT | T480, T26, T25 |
@@ -333,30 +333,30 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | log | 0.4.34 | crate | MIT OR Apache-2.0 | T1, T29 |
 | lopdf | 0.45.0 | crate | MIT | T297 |
 | markup5ever | 0.38.0 | crate | MIT OR Apache-2.0 | T1, T91 |
-| matchit | 0.8.4 | crate | MIT AND BSD-3-Clause | T616, T235 |
+| matchit | 0.8.4 | crate | MIT AND BSD-3-Clause | T615, T235 |
 | md-5 | 0.11.0 | crate | MIT OR Apache-2.0 | T13, T151 |
 | memchr | 2.8.3 | crate | Unlicense OR MIT | T21, T24, T18 |
 | memmap2 | 0.9.11 | crate | MIT OR Apache-2.0 | T214, T227 |
 | memoffset | 0.9.1 | crate | MIT | T304 |
-| mime | 0.3.17 | crate | MIT OR Apache-2.0 | T1, T618 |
+| mime | 0.3.17 | crate | MIT OR Apache-2.0 | T1, T617 |
 | miniz_oxide | 0.8.9 | crate | MIT OR Zlib OR Apache-2.0 | T131, T10, T150, T109 |
 | miniz_oxide | 0.9.1 | crate | MIT OR Zlib OR Apache-2.0 | T131, T10, T150, T109 |
 | mio | 1.2.2 | crate | MIT | T221 |
 | moxcms | 0.8.1 | crate | BSD-3-Clause OR Apache-2.0 | T94, T77 |
-| muda | 0.19.3 | crate | Apache-2.0 OR MIT | T1, T125, T559 |
-| multiversion_no_op | 1.0.0 | crate | Apache-2.0 OR MIT | T594, T20, T47 |
+| muda | 0.19.3 | crate | Apache-2.0 OR MIT | T1, T125, T558 |
+| multiversion_no_op | 1.0.0 | crate | Apache-2.0 OR MIT | T593, T20, T47 |
 | mutate_once | 0.1.2 | crate | BSD-2-Clause | T226 |
 | ndk | 0.9.0 | crate | MIT OR Apache-2.0 | requires review |
 | ndk-sys | 0.6.0+11769913 | crate | MIT OR Apache-2.0 | requires review |
-| new_debug_unreachable | 1.0.6 | crate | MIT | T663 |
+| new_debug_unreachable | 1.0.6 | crate | MIT | T662 |
 | nom | 8.0.0 | crate | MIT | T355 |
 | num-bigint | 0.4.8 | crate | MIT OR Apache-2.0 | T1, T29 |
-| num-conv | 0.2.2 | crate | MIT OR Apache-2.0 | T10, T624 |
+| num-conv | 0.2.2 | crate | MIT OR Apache-2.0 | T10, T623 |
 | num-integer | 0.1.47 | crate | MIT OR Apache-2.0 | T1, T29 |
 | num-traits | 0.2.19 | crate | MIT OR Apache-2.0 | T1, T29 |
 | num_enum | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T6, T111, T2 |
 | num_enum_derive | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T6, T111, T2 |
-| num_threads | 0.1.7 | crate | MIT OR Apache-2.0 | T575, T551 |
+| num_threads | 0.1.7 | crate | MIT OR Apache-2.0 | T574, T550 |
 | objc2 | 0.6.4 | crate | MIT | requires review |
 | objc2-app-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
 | objc2-cloud-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
@@ -379,7 +379,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | objc2-web-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
 | object | 0.39.1 | crate | Apache-2.0 OR MIT | T1, T224 |
 | once_cell | 1.21.4 | crate | MIT OR Apache-2.0 | T1, T2 |
-| open | 5.4.2 | crate | MIT | T629 |
+| open | 5.4.2 | crate | MIT | T628 |
 | option-ext | 0.2.0 | crate | MPL-2.0 | T400 |
 | ordered-stream | 0.2.0 | crate | MIT OR Apache-2.0 | T1, T2 |
 | palette | 0.7.7 | crate | MIT OR Apache-2.0 | T1, T97 |
@@ -392,7 +392,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | parking_lot_core | 0.9.12 | crate | MIT OR Apache-2.0 | T1, T72 |
 | paste | 1.0.15 | crate | MIT OR Apache-2.0 | T6, T2 |
 | pdf-writer | 0.15.0 | crate | MIT OR Apache-2.0 | T6, T25 |
-| peniko | 0.6.1 | crate | Apache-2.0 OR MIT | T668, T56 |
+| peniko | 0.6.1 | crate | Apache-2.0 OR MIT | T667, T56 |
 | percent-encoding | 2.3.2 | crate | MIT OR Apache-2.0 | T1, T69 |
 | phf | 0.13.1 | crate | MIT | T44 |
 | phf_codegen | 0.13.1 | crate | MIT | T44 |
@@ -400,7 +400,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | phf_macros | 0.13.1 | crate | MIT | T44 |
 | phf_shared | 0.13.1 | crate | MIT | T44 |
 | pic-scale | 0.7.12 | crate | BSD-3-Clause OR Apache-2.0 | T94, T77 |
-| pico-args | 0.5.0 | crate | MIT | T660 |
+| pico-args | 0.5.0 | crate | MIT | T659 |
 | pin-project-lite | 0.2.17 | crate | Apache-2.0 OR MIT | T10, T2 |
 | piper | 0.2.5 | crate | MIT OR Apache-2.0 | T1, T2 |
 | pkg-config | 0.3.34 | crate | MIT OR Apache-2.0 | T1, T17 |
@@ -421,27 +421,27 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | proc-macro-crate | 3.5.0 | crate | MIT OR Apache-2.0 | T52, T2 |
 | proc-macro-error | 1.0.4 | crate | MIT OR Apache-2.0 | T345, T135 |
 | proc-macro-error-attr | 1.0.4 | crate | MIT OR Apache-2.0 | T417, T135 |
-| proc-macro-hack | 0.5.20+deprecated | crate | MIT OR Apache-2.0 | T1, T598 |
+| proc-macro-hack | 0.5.20+deprecated | crate | MIT OR Apache-2.0 | T1, T597 |
 | proc-macro2 | 1.0.107 | crate | MIT OR Apache-2.0 | T6, T2 |
 | psm | 0.1.32 | crate | MIT OR Apache-2.0 | T494, T322 |
 | pxfm | 0.1.30 | crate | BSD-3-Clause OR Apache-2.0 | T94, T77 |
 | quick-error | 2.0.1 | crate | MIT/Apache-2.0 | T11, T215 |
 | quick-xml | 0.38.4 | crate | MIT | T375 |
-| quick-xml | 0.42.0 | crate | MIT | T649 |
+| quick-xml | 0.42.0 | crate | MIT | T648 |
 | quote | 1.0.47 | crate | MIT OR Apache-2.0 | T6, T2 |
-| r-efi | 5.3.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T680 |
-| r-efi | 6.0.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T591 |
+| r-efi | 5.3.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T679 |
+| r-efi | 6.0.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T590 |
 | rand | 0.8.8 | crate | MIT OR Apache-2.0 | T64, T129, T55 |
 | rand | 0.10.3 | crate | MIT OR Apache-2.0 | T64, T129, T55 |
 | rand_chacha | 0.3.1 | crate | MIT OR Apache-2.0 | T64, T68, T55 |
 | rand_core | 0.6.4 | crate | MIT OR Apache-2.0 | T64, T145, T55 |
 | rand_core | 0.10.1 | crate | MIT OR Apache-2.0 | T482, T145, T469 |
 | rangemap | 1.8.0 | crate | MIT/Apache-2.0 | T247, T283 |
-| raw-window-handle | 0.6.2 | crate | MIT OR Apache-2.0 OR Zlib | T10, T503, T539 |
+| raw-window-handle | 0.6.2 | crate | MIT OR Apache-2.0 OR Zlib | T10, T503, T538 |
 | rayon | 1.12.0 | crate | MIT OR Apache-2.0 | T1, T107 |
 | rayon-core | 1.13.0 | crate | MIT OR Apache-2.0 | T1, T107 |
 | read-fonts | 0.39.2 | crate | MIT OR Apache-2.0 | T65, T61 |
-| redox_syscall | 0.5.18 | crate | MIT | T647 |
+| redox_syscall | 0.5.18 | crate | MIT | T646 |
 | redox_users | 0.4.6 | crate | MIT | T190 |
 | redox_users | 0.5.2 | crate | MIT | T190 |
 | ref-cast | 1.0.27 | crate | MIT OR Apache-2.0 | T6, T2 |
@@ -449,15 +449,15 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | regex | 1.13.1 | crate | MIT OR Apache-2.0 | T1, T29 |
 | regex-automata | 0.4.18 | crate | MIT OR Apache-2.0 | T1, T29 |
 | regex-syntax | 0.8.11 | crate | MIT OR Apache-2.0 | T1, T29 |
-| reqwest | 0.13.4 | crate | MIT OR Apache-2.0 | T426, T613 |
+| reqwest | 0.13.4 | crate | MIT OR Apache-2.0 | T426, T612 |
 | resvg | 0.47.0 | crate | Apache-2.0 OR MIT | T26, T199 |
 | rfd | 0.16.0 | crate | MIT | T398 |
 | rgb | 0.8.53 | crate | MIT | T340 |
-| ring | 0.17.14 | crate | Apache-2.0 AND ISC | T549, T205, T648 |
+| ring | 0.17.14 | crate | Apache-2.0 AND ISC | T548, T205, T647 |
 | roman-numerals-rs | 3.1.0 | crate | 0BSD OR CC0-1.0 | requires review |
 | roxmltree | 0.20.0 | crate | MIT OR Apache-2.0 | T1, T203 |
 | roxmltree | 0.21.1 | crate | MIT OR Apache-2.0 | T1, T203 |
-| rust_decimal | 1.43.0 | crate | MIT | T666 |
+| rust_decimal | 1.43.0 | crate | MIT | T665 |
 | rustc-hash | 2.1.3 | crate | Apache-2.0 OR MIT | T491, T128 |
 | rustc_version | 0.4.1 | crate | MIT OR Apache-2.0 | T1, T72 |
 | rustix | 1.1.5 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | T312, T1, T37, T2 |
@@ -466,13 +466,13 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | rustls-webpki | 0.103.15 | crate | ISC | T377 |
 | rustversion | 1.0.23 | crate | MIT OR Apache-2.0 | T6, T2 |
 | rustybuzz | 0.20.1 | crate | MIT | T317 |
-| ryu | 1.0.23 | crate | Apache-2.0 OR BSL-1.0 | T6, T581 |
+| ryu | 1.0.23 | crate | Apache-2.0 OR BSL-1.0 | T6, T580 |
 | same-file | 1.0.6 | crate | Unlicense/MIT | T21, T173, T18 |
 | schemars | 0.8.22 | crate | MIT | T54 |
 | schemars | 0.9.0 | crate | MIT | T54 |
 | schemars | 1.2.2 | crate | MIT | T54 |
 | schemars_derive | 0.8.22 | crate | MIT | T54 |
-| scopeguard | 1.2.0 | crate | MIT OR Apache-2.0 | T1, T671 |
+| scopeguard | 1.2.0 | crate | MIT OR Apache-2.0 | T1, T670 |
 | selectors | 0.36.1 | crate | MPL-2.0 | requires review |
 | semver | 1.0.28 | crate | MIT OR Apache-2.0 | T6, T2 |
 | serde | 1.0.229 | crate | MIT OR Apache-2.0 | T6, T2 |
@@ -485,14 +485,14 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | serde_repr | 0.1.21 | crate | MIT OR Apache-2.0 | T6, T2 |
 | serde_spanned | 0.6.9 | crate | MIT OR Apache-2.0 | T11, T22 |
 | serde_spanned | 1.1.1 | crate | MIT OR Apache-2.0 | T11, T22 |
-| serde_urlencoded | 0.7.1 | crate | MIT/Apache-2.0 | T6, T560 |
+| serde_urlencoded | 0.7.1 | crate | MIT/Apache-2.0 | T6, T559 |
 | serde_with | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T86 |
 | serde_with_macros | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T86 |
 | serde_yaml | 0.9.34+deprecated | crate | MIT OR Apache-2.0 | T6, T2 |
 | serialize-to-javascript | 0.1.2 | crate | MIT OR Apache-2.0 | T9, T189 |
 | serialize-to-javascript-impl | 0.1.2 | crate | MIT OR Apache-2.0 | T9, T189 |
 | servo_arc | 0.4.3 | crate | MIT OR Apache-2.0 | T1, T2 |
-| sha2 | 0.10.9 | crate | MIT OR Apache-2.0 | T13, T552 |
+| sha2 | 0.10.9 | crate | MIT OR Apache-2.0 | T13, T551 |
 | sha2 | 0.11.0 | crate | MIT OR Apache-2.0 | T13, T151 |
 | shlex | 2.0.1 | crate | MIT OR Apache-2.0 | T367, T336 |
 | signal-hook-registry | 1.4.8 | crate | MIT OR Apache-2.0 | T1, T357 |
@@ -500,13 +500,13 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | simdutf8 | 0.1.5 | crate | MIT OR Apache-2.0 | T16, T240 |
 | similar | 2.7.0 | crate | Apache-2.0 | T1 |
 | simplecss | 0.2.2 | crate | Apache-2.0 OR MIT | T284, T1, T110 |
-| siphasher | 1.0.4 | crate | MIT OR Apache-2.0 | T579, T20, T669 |
+| siphasher | 1.0.4 | crate | MIT OR Apache-2.0 | T578, T20, T668 |
 | skrifa | 0.42.1 | crate | MIT OR Apache-2.0 | T65, T61 |
 | slab | 0.4.12 | crate | MIT | T473 |
 | slotmap | 1.1.1 | crate | Zlib | T412 |
 | smallvec | 1.16.2 | crate | MIT OR Apache-2.0 | T1, T223 |
 | socket2 | 0.6.5 | crate | MIT OR Apache-2.0 | T1, T17 |
-| softbuffer | 0.4.8 | crate | MIT OR Apache-2.0 | T521, T212 |
+| softbuffer | 0.4.8 | crate | MIT OR Apache-2.0 | T520, T212 |
 | soup3 | 0.5.0 | crate | MIT | T88 |
 | soup3-sys | 0.5.0 | crate | MIT | T88 |
 | specta | 2.0.0-rc.25 | crate | MIT | requires review |
@@ -520,24 +520,24 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | strict-num | 0.1.1 | crate | MIT | T298 |
 | string_cache | 0.9.0 | crate | MIT OR Apache-2.0 | T1, T38 |
 | string_cache_codegen | 0.6.1 | crate | MIT OR Apache-2.0 | T1, T38 |
-| stringprep | 0.1.5 | crate | MIT/Apache-2.0 | T11, T517 |
+| stringprep | 0.1.5 | crate | MIT/Apache-2.0 | T11, T516 |
 | strsim | 0.11.1 | crate | MIT | T249 |
 | strum | 0.27.2 | crate | MIT | T154 |
 | strum_macros | 0.27.2 | crate | MIT | T154 |
 | subsetter | 0.2.6 | crate | MIT OR Apache-2.0 | T6, T25, T429 |
-| subtle | 2.6.1 | crate | BSD-3-Clause | T593 |
-| svgtypes | 0.16.1 | crate | Apache-2.0 OR MIT | T656, T1, T196 |
-| swift-rs | 1.0.8 | crate | MIT OR Apache-2.0 | T479, T654 |
+| subtle | 2.6.1 | crate | BSD-3-Clause | T592 |
+| svgtypes | 0.16.1 | crate | Apache-2.0 OR MIT | T655, T1, T196 |
+| swift-rs | 1.0.8 | crate | MIT OR Apache-2.0 | T479, T653 |
 | syn | 1.0.109 | crate | MIT OR Apache-2.0 | T1, T2 |
 | syn | 2.0.119 | crate | MIT OR Apache-2.0 | T6, T2 |
 | syn | 3.0.6 | crate | MIT OR Apache-2.0 | T6, T2 |
 | sync_wrapper | 1.0.2 | crate | Apache-2.0 | T10 |
 | synstructure | 0.14.0 | crate | MIT | T261 |
-| syntect | 5.3.0 | crate | MIT | T574 |
+| syntect | 5.3.0 | crate | MIT | T573 |
 | system-deps | 6.2.2 | crate | MIT OR Apache-2.0 | T1, T2 |
 | system-deps | 7.0.8 | crate | MIT OR Apache-2.0 | T1, T2 |
 | tao | 0.35.3 | crate | Apache-2.0 | T144, T211 |
-| tao-macros | 0.1.4 | crate | MIT OR Apache-2.0 | T1, T584, T477 |
+| tao-macros | 0.1.4 | crate | MIT OR Apache-2.0 | T1, T583, T477 |
 | target-lexicon | 0.12.16 | crate | Apache-2.0 WITH LLVM-exception | T37 |
 | target-lexicon | 0.13.5 | crate | Apache-2.0 WITH LLVM-exception | T37 |
 | tauri | 2.11.6 | crate | Apache-2.0 OR MIT | T10, T30 |
@@ -557,7 +557,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | tauri-specta | 2.0.0-rc.25 | crate | MIT | requires review |
 | tauri-specta-macros | 2.0.0-rc.25 | crate | MIT | requires review |
 | tauri-utils | 2.9.3 | crate | Apache-2.0 OR MIT | T10, T30 |
-| tauri-winres | 0.3.6 | crate | MIT | T603 |
+| tauri-winres | 0.3.6 | crate | MIT | T602 |
 | tempfile | 3.27.0 | crate | MIT OR Apache-2.0 | T1, T467 |
 | tendril | 0.5.1 | crate | MIT OR Apache-2.0 | T1, T386 |
 | thin-vec | 0.2.20 | crate | MIT OR Apache-2.0 | T6, T2 |
@@ -571,7 +571,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | tiny-skia | 0.12.0 | crate | BSD-3-Clause | T143 |
 | tiny-skia-path | 0.12.0 | crate | BSD-3-Clause | T143 |
 | tinystr | 0.8.4 | crate | Unicode-3.0 | T8 |
-| tinyvec | 1.13.3 | crate | Zlib OR Apache-2.0 OR MIT | T20, T677, T90 |
+| tinyvec | 1.13.3 | crate | Zlib OR Apache-2.0 OR MIT | T20, T676, T90 |
 | tokio | 1.53.2 | crate | MIT | T122 |
 | tokio-macros | 2.7.2 | crate | MIT | T225 |
 | tokio-util | 0.7.19 | crate | MIT | T122 |
@@ -594,13 +594,13 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | tracing-attributes | 0.1.31 | crate | MIT | T92 |
 | tracing-core | 0.1.36 | crate | MIT | T92 |
 | tray-icon | 0.24.2 | crate | MIT OR Apache-2.0 | T1, T125, T410 |
-| try-lock | 0.2.5 | crate | MIT | T577 |
+| try-lock | 0.2.5 | crate | MIT | T576 |
 | ttf-parser | 0.25.1 | crate | MIT OR Apache-2.0 | T1, T196 |
-| two-face | 0.4.5 | crate | MIT OR Apache-2.0 | T1, T533 |
-| typed-arena | 2.0.2 | crate | MIT | T512 |
+| two-face | 0.4.5 | crate | MIT OR Apache-2.0 | T1, T532 |
+| typed-arena | 2.0.2 | crate | MIT | T511 |
 | typed-path | 0.12.3 | crate | MIT OR Apache-2.0 | T6, T2 |
 | typeid | 1.0.3 | crate | MIT OR Apache-2.0 | T6, T2 |
-| typenum | 1.20.1 | crate | MIT OR Apache-2.0 | T608, T360, T528 |
+| typenum | 1.20.1 | crate | MIT OR Apache-2.0 | T607, T360, T527 |
 | typst | 0.15.1 | crate | Apache-2.0 | requires review |
 | typst-assets | 0.15.1 | crate | Apache-2.0 | T6, T452 |
 | typst-eval | 0.15.1 | crate | Apache-2.0 | requires review |
@@ -624,10 +624,10 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | unic-langid-macros-impl | 0.9.6 | crate | MIT OR Apache-2.0 | T1, T2 |
 | unic-ucd-ident | 0.9.0 | crate | MIT/Apache-2.0 | requires review |
 | unic-ucd-version | 0.9.0 | crate | MIT/Apache-2.0 | requires review |
-| unicode-bidi | 0.3.18 | crate | MIT OR Apache-2.0 | T253, T641, T1, T39 |
+| unicode-bidi | 0.3.18 | crate | MIT OR Apache-2.0 | T253, T640, T1, T39 |
 | unicode-bidi-mirroring | 0.4.0 | crate | MIT/Apache-2.0 | T1, T85 |
 | unicode-ccc | 0.4.0 | crate | MIT/Apache-2.0 | T1, T85 |
-| unicode-ident | 1.0.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T6, T2, T665 |
+| unicode-ident | 1.0.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T6, T2, T664 |
 | unicode-math-class | 0.1.0 | crate | MIT OR Apache-2.0 | T6, T25 |
 | unicode-normalization | 0.1.25 | crate | MIT OR Apache-2.0 | T75, T1, T39 |
 | unicode-properties | 0.1.4 | crate | MIT/Apache-2.0 | T75, T1, T39 |
@@ -641,18 +641,18 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | url | 2.5.8 | crate | MIT OR Apache-2.0 | T1, T69 |
 | urlpattern | 0.3.0 | crate | MIT | T381 |
 | usvg | 0.47.0 | crate | Apache-2.0 OR MIT | T26, T199 |
-| utf16_iter | 1.0.5 | crate | Apache-2.0 OR MIT | T556, T20, T47 |
-| utf8_iter | 1.0.4 | crate | Apache-2.0 OR MIT | T569, T20, T47 |
+| utf16_iter | 1.0.5 | crate | Apache-2.0 OR MIT | T555, T20, T47 |
+| utf8_iter | 1.0.4 | crate | Apache-2.0 OR MIT | T568, T20, T47 |
 | uuid | 1.27.0 | crate | Apache-2.0 OR MIT | T1, T335 |
 | vello_common | 0.0.8 | crate | Apache-2.0 OR MIT | T26, T95 |
 | vello_common | 0.0.9 | crate | Apache-2.0 OR MIT | T26, T95 |
 | vello_cpu | 0.0.8 | crate | Apache-2.0 OR MIT | T26, T95 |
-| version-compare | 0.2.1 | crate | MIT | T589 |
-| version_check | 0.9.5 | crate | MIT/Apache-2.0 | T1, T555 |
+| version-compare | 0.2.1 | crate | MIT | T588 |
+| version_check | 0.9.5 | crate | MIT/Apache-2.0 | T1, T554 |
 | vswhom | 0.1.0 | crate | MIT | T167 |
 | vswhom-sys | 0.1.3 | crate | MIT | T167 |
 | walkdir | 2.5.0 | crate | Unlicense/MIT | T21, T24, T18 |
-| want | 0.3.1 | crate | MIT | T525 |
+| want | 0.3.1 | crate | MIT | T524 |
 | wasi | 0.11.1+wasi-snapshot-preview1 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | T1, T37, T2 |
 | wasip2 | 1.0.4+wasi-0.2.12 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | T1, T37, T2 |
 | wasm-bindgen | 0.2.127 | crate | MIT OR Apache-2.0 | T1, T17 |
@@ -677,7 +677,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | webview2-com-sys | 0.38.2 | crate | MIT | requires review |
 | weezl | 0.1.12 | crate | MIT OR Apache-2.0 | T43, T136 |
 | weezl | 0.2.1 | crate | MIT OR Apache-2.0 | T43, T136 |
-| winapi | 0.3.9 | crate | MIT/Apache-2.0 | T96, T588 |
+| winapi | 0.3.9 | crate | MIT/Apache-2.0 | T96, T587 |
 | winapi-i686-pc-windows-gnu | 0.4.0 | crate | MIT/Apache-2.0 | requires review |
 | winapi-util | 0.1.11 | crate | Unlicense OR MIT | T21, T173, T18 |
 | winapi-x86_64-pc-windows-gnu | 0.4.0 | crate | MIT/Apache-2.0 | requires review |
@@ -741,12 +741,12 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | winnow | 0.5.40 | crate | MIT | T101 |
 | winnow | 0.7.15 | crate | MIT | T101 |
 | winnow | 1.0.4 | crate | MIT | T101 |
-| winreg | 0.55.0 | crate | MIT | T635 |
+| winreg | 0.55.0 | crate | MIT | T634 |
 | wit-bindgen | 0.57.1 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | T1, T37, T2 |
 | write-fonts | 0.48.1 | crate | MIT OR Apache-2.0 | T65, T61 |
 | write16 | 1.0.0 | crate | Apache-2.0 OR MIT | T303, T20, T47 |
 | writeable | 0.6.4 | crate | Unicode-3.0 | T8 |
-| wry | 0.55.1 | crate | Apache-2.0 OR MIT | T1, T646, T273 |
+| wry | 0.55.1 | crate | Apache-2.0 OR MIT | T1, T645, T273 |
 | x11 | 2.21.0 | crate | MIT | T2 |
 | x11-dl | 2.21.0 | crate | MIT | T2 |
 | xmlwriter | 0.1.0 | crate | MIT | T291 |
@@ -767,7 +767,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | zerovec | 0.11.8 | crate | Unicode-3.0 | T8 |
 | zerovec-derive | 0.11.6 | crate | Unicode-3.0 | T8 |
 | zip | 8.6.0 | crate | MIT | T369 |
-| zlib-rs | 0.6.8 | crate | Zlib | T631 |
+| zlib-rs | 0.6.8 | crate | Zlib | T630 |
 | zmij | 1.0.23 | crate | MIT | T2 |
 | zune-core | 0.5.3 | crate | MIT OR Apache-2.0 OR Zlib | T9, T177, T176 |
 | zune-jpeg | 0.5.15 | crate | MIT OR Apache-2.0 OR Zlib | T9, T177, T176 |
@@ -775,8 +775,8 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | zvariant_derive | 5.15.0 | crate | MIT | T46 |
 | zvariant_utils | 4.2.0 | crate | MIT | T2 |
 | @adobe/css-tools | 4.5.0 | npm | MIT | T306 |
-| @asamuzakjp/css-color | 6.0.7 | npm | MIT | T564 |
-| @asamuzakjp/dom-selector | 8.3.2 | npm | MIT | T444 |
+| @asamuzakjp/css-color | 7.1.4 | npm | MIT | T563 |
+| @asamuzakjp/dom-selector | 9.2.4 | npm | MIT | T444 |
 | @babel/code-frame | 7.29.7 | npm | MIT | T45 |
 | @babel/helper-string-parser | 7.29.7 | npm | MIT | T45 |
 | @babel/helper-validator-identifier | 7.29.7 | npm | MIT | T45 |
@@ -784,15 +784,15 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | @babel/runtime | 7.29.7 | npm | MIT | T45 |
 | @babel/types | 7.29.8 | npm | MIT | T45 |
 | @bcoe/v8-coverage | 1.0.2 | npm | MIT | T497, T243 |
-| @bramus/specificity | 2.4.2 | npm | MIT | T538 |
+| @bramus/specificity | 2.4.2 | npm | MIT | T537 |
 | @cacheable/memory | 2.2.0 | npm | MIT | T48 |
 | @cacheable/utils | 2.5.0 | npm | MIT | T48 |
-| @csstools/color-helpers | 6.1.1 | npm | MIT-0 | T157 |
-| @csstools/css-calc | 3.3.0 | npm | MIT | T73 |
-| @csstools/css-color-parser | 4.2.0 | npm | MIT | T73 |
-| @csstools/css-parser-algorithms | 4.0.0 | npm | MIT | T73 |
-| @csstools/css-syntax-patches-for-csstree | 1.1.8 | npm | MIT-0 | T157 |
-| @csstools/css-tokenizer | 4.0.0 | npm | MIT | T73 |
+| @csstools/color-helpers | 6.1.2 | npm | MIT-0 | T157 |
+| @csstools/css-calc | 3.4.3 | npm | MIT | T73 |
+| @csstools/css-color-parser | 4.2.6 | npm | MIT | T73 |
+| @csstools/css-parser-algorithms | 4.0.2 | npm | MIT | T73 |
+| @csstools/css-syntax-patches-for-csstree | 1.1.15 | npm | MIT-0 | T157 |
+| @csstools/css-tokenizer | 4.0.2 | npm | MIT | T73 |
 | @esbuild/aix-ppc64 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/android-arm64 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/android-arm | 0.28.2 | npm | not declared | requires review |
@@ -827,7 +827,8 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | @eslint/js | 10.0.1 | npm | MIT | T130 |
 | @eslint/object-schema | 3.0.5 | npm | Apache-2.0 | T9 |
 | @eslint/plugin-kit | 0.7.3 | npm | Apache-2.0 | T9 |
-| @exodus/bytes | 1.15.1 | npm | MIT | T611 |
+| @exodus/bytes | 1.15.1 | npm | MIT | T182 |
+| @exodus/bytes | 1.16.0 | npm | MIT | T182 |
 | @humanfs/core | 0.19.2 | npm | Apache-2.0 | T9 |
 | @humanfs/node | 0.16.8 | npm | Apache-2.0 | T9 |
 | @humanfs/types | 0.15.0 | npm | Apache-2.0 | requires review |
@@ -858,11 +859,11 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | @jest/types | 30.4.1 | npm | MIT | T19 |
 | @jridgewell/gen-mapping | 0.3.13 | npm | MIT | T50 |
 | @jridgewell/remapping | 2.3.5 | npm | MIT | T50 |
-| @jridgewell/resolve-uri | 3.1.2 | npm | MIT | T557 |
+| @jridgewell/resolve-uri | 3.1.2 | npm | MIT | T556 |
 | @jridgewell/sourcemap-codec | 1.5.5 | npm | MIT | T50 |
 | @jridgewell/sourcemap-codec | 1.6.0 | npm | MIT | T50 |
 | @jridgewell/trace-mapping | 0.3.31 | npm | MIT | T50 |
-| @keyv/bigmap | 1.3.1 | npm | MIT | T650 |
+| @keyv/bigmap | 1.3.1 | npm | MIT | T649 |
 | @keyv/serialize | 1.1.1 | npm | MIT | T120 |
 | @nodable/entities | 3.0.0 | npm | MIT | requires review |
 | @oxc-project/types | 0.153.0 | npm | MIT | T492 |
@@ -884,9 +885,9 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | @rolldown/binding-openharmony-arm64 | 1.2.13 | npm | not declared | requires review |
 | @rolldown/binding-win32-arm64-msvc | 1.2.13 | npm | not declared | requires review |
 | @rolldown/binding-win32-x64-msvc | 1.2.13 | npm | not declared | requires review |
-| @rolldown/pluginutils | 1.0.1 | npm | MIT | T622 |
+| @rolldown/pluginutils | 1.0.1 | npm | MIT | T621 |
 | @sec-ant/readable-stream | 0.4.1 | npm | MIT | T446 |
-| @sinclair/typebox | 0.34.52 | npm | MIT | T524 |
+| @sinclair/typebox | 0.34.52 | npm | MIT | T523 |
 | @sindresorhus/merge-streams | 4.0.0 | npm | MIT | T5 |
 | @sveltejs/acorn-typescript | 1.0.13 | npm | MIT | T366 |
 | @sveltejs/load-config | 0.2.3 | npm | MIT | T166 |
@@ -910,7 +911,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | @testing-library/jest-dom | 7.0.1 | npm | MIT | T168 |
 | @testing-library/svelte-core | 1.1.3 | npm | MIT | T116 |
 | @testing-library/svelte | 5.4.2 | npm | MIT | T116 |
-| @testing-library/user-event | 14.6.7 | npm | MIT | T553 |
+| @testing-library/user-event | 14.6.7 | npm | MIT | T552 |
 | @tsconfig/svelte | 5.0.8 | npm | MIT | T395 |
 | @types/aria-query | 5.0.4 | npm | MIT | T3 |
 | @types/chai | 5.2.3 | npm | MIT | T3 |
@@ -936,7 +937,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | @typescript-eslint/project-service | 8.70.1 | npm | MIT | T106 |
 | @typescript-eslint/scope-manager | 8.70.1 | npm | MIT | T33 |
 | @typescript-eslint/tsconfig-utils | 8.70.1 | npm | MIT | T106 |
-| @typescript-eslint/type-utils | 8.70.1 | npm | MIT | T655 |
+| @typescript-eslint/type-utils | 8.70.1 | npm | MIT | T654 |
 | @typescript-eslint/types | 8.70.1 | npm | MIT | T33 |
 | @typescript-eslint/typescript-estree | 8.70.1 | npm | MIT | T33 |
 | @typescript-eslint/utils | 8.70.1 | npm | MIT | T33 |
@@ -981,10 +982,10 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | @wdio/xvfb | 9.31.2 | npm | MIT | T409 |
 | @zip.js/zip.js | 2.8.55 | npm | BSD-3-Clause | T245 |
 | abort-controller | 3.0.0 | npm | MIT | T610 |
-| acorn-jsx | 5.3.2 | npm | MIT | T590 |
+| acorn-jsx | 5.3.2 | npm | MIT | T589 |
 | acorn | 8.18.0 | npm | MIT | T430 |
 | agent-base | 7.1.4 | npm | MIT | T155 |
-| ajv | 6.15.0 | npm | MIT | T634 |
+| ajv | 6.15.0 | npm | MIT | T633 |
 | ansi-colors | 4.1.3 | npm | MIT | T488 |
 | ansi-regex | 5.0.1 | npm | MIT | T14 |
 | ansi-regex | 6.3.0 | npm | MIT | T5 |
@@ -993,47 +994,47 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | ansi-styles | 6.2.3 | npm | MIT | T5 |
 | anymatch | 3.1.3 | npm | ISC | T373 |
 | anynum | 1.0.1 | npm | MIT | T63 |
-| archiver-utils | 5.0.2 | npm | MIT | T515 |
+| archiver-utils | 5.0.2 | npm | MIT | T514 |
 | archiver | 7.0.1 | npm | MIT | T509 |
-| argparse | 2.0.1 | npm | Python-2.0 | T615 |
+| argparse | 2.0.1 | npm | Python-2.0 | T614 |
 | aria-query | 5.3.0 | npm | Apache-2.0 | T100 |
 | aria-query | 5.3.1 | npm | Apache-2.0 | T100 |
 | assertion-error | 2.0.1 | npm | MIT | T258 |
 | ast-v8-to-istanbul | 1.0.5 | npm | MIT | T433 |
 | async-exit-hook | 2.0.1 | npm | MIT | T416 |
-| async | 3.2.6 | npm | MIT | T604 |
+| async | 3.2.6 | npm | MIT | T603 |
 | axobject-query | 4.1.0 | npm | Apache-2.0 | T100 |
 | b4a | 1.8.1 | npm | Apache-2.0 | T9 |
-| balanced-match | 1.0.2 | npm | MIT | T520 |
-| balanced-match | 4.0.4 | npm | MIT | T597 |
+| balanced-match | 1.0.2 | npm | MIT | T519 |
+| balanced-match | 4.0.4 | npm | MIT | T596 |
 | bare-events | 2.9.1 | npm | Apache-2.0 | T9 |
 | bare-fs | 4.8.0 | npm | Apache-2.0 | T9 |
-| bare-path | 3.1.1 | npm | Apache-2.0 | T9, T675 |
+| bare-path | 3.1.1 | npm | Apache-2.0 | T9, T674 |
 | bare-stream | 2.13.3 | npm | Apache-2.0 | T9 |
 | bare-url | 2.5.2 | npm | Apache-2.0 | T9 |
 | base64-js | 1.5.1 | npm | MIT | T376 |
-| bidi-js | 1.0.3 | npm | MIT | T348 |
+| bidi-js | 1.1.0 | npm | MIT | T348 |
 | binary-extensions | 2.3.0 | npm | MIT | T495 |
 | boolbase | 1.0.0 | npm | ISC | requires review |
 | brace-expansion | 1.1.21 | npm | MIT | T141 |
 | brace-expansion | 2.1.7 | npm | MIT | T141 |
 | brace-expansion | 5.0.12 | npm | MIT | T504 |
 | braces | 3.0.3 | npm | MIT | T80 |
-| browser-stdout | 1.3.1 | npm | ISC | T676 |
+| browser-stdout | 1.3.1 | npm | ISC | T675 |
 | buffer-crc32 | 0.2.13 | npm | MIT | T232 |
-| buffer-crc32 | 1.0.0 | npm | MIT | T614 |
-| buffer | 6.0.3 | npm | MIT | T583, T218 |
+| buffer-crc32 | 1.0.0 | npm | MIT | T613 |
+| buffer | 6.0.3 | npm | MIT | T582, T218 |
 | cacheable | 2.5.0 | npm | MIT | T48 |
 | camelcase | 6.3.0 | npm | MIT | T5 |
-| chai | 6.2.2 | npm | MIT | T546 |
+| chai | 6.2.2 | npm | MIT | T545 |
 | chalk | 4.1.2 | npm | MIT | T14 |
 | chalk | 5.6.2 | npm | MIT | T5 |
 | chardet | 2.2.0 | npm | MIT | T213 |
 | cheerio-select | 2.1.0 | npm | BSD-2-Clause | T27 |
 | cheerio | 1.2.0 | npm | MIT | T389 |
 | chokidar | 3.6.0 | npm | MIT | T609 |
-| chokidar | 4.0.3 | npm | MIT | T565 |
-| ci-info | 4.4.0 | npm | MIT | T658 |
+| chokidar | 4.0.3 | npm | MIT | T564 |
+| ci-info | 4.4.0 | npm | MIT | T657 |
 | cli-width | 4.1.0 | npm | ISC | T301 |
 | cliui | 7.0.4 | npm | ISC | T57 |
 | cliui | 8.0.1 | npm | ISC | T57 |
@@ -1041,17 +1042,17 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | clone | 1.0.4 | npm | MIT | T325 |
 | clsx | 2.1.1 | npm | MIT | T159 |
 | color-convert | 2.0.1 | npm | MIT | T402 |
-| color-name | 1.1.4 | npm | MIT | T567 |
+| color-name | 1.1.4 | npm | MIT | T566 |
 | commander | 14.0.3 | npm | MIT | T105 |
 | commander | 9.5.0 | npm | MIT | T105 |
 | compress-commons | 6.0.2 | npm | MIT | T87 |
 | concat-map | 0.0.1 | npm | MIT | T133 |
 | convert-source-map | 2.0.0 | npm | MIT | T252 |
 | core-util-is | 1.0.3 | npm | MIT | T308 |
-| crc-32 | 1.2.2 | npm | Apache-2.0 | T572 |
+| crc-32 | 1.2.2 | npm | Apache-2.0 | T571 |
 | crc32-stream | 6.0.0 | npm | MIT | T87 |
 | create-wdio | 9.31.2 | npm | MIT | T12 |
-| cross-spawn | 7.0.6 | npm | MIT | T534 |
+| cross-spawn | 7.0.6 | npm | MIT | T533 |
 | css-select | 5.2.2 | npm | BSD-2-Clause | T27 |
 | css-shorthand-properties | 1.1.2 | npm | MIT | T277 |
 | css-tree | 3.2.1 | npm | MIT | T422 |
@@ -1059,19 +1060,19 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | css-what | 6.2.2 | npm | BSD-2-Clause | T27 |
 | css.escape | 1.5.1 | npm | MIT | T34 |
 | cssesc | 3.0.0 | npm | MIT | T34 |
-| data-urls | 7.0.0 | npm | MIT | T49 |
+| data-urls | 8.0.0 | npm | MIT | T49 |
 | debug | 4.4.3 | npm | MIT | T316 |
 | decamelize | 4.0.0 | npm | MIT | T14 |
 | decamelize | 6.0.1 | npm | MIT | T5 |
 | decimal.js | 10.6.0 | npm | MIT | T300 |
-| deep-eql | 5.0.2 | npm | MIT | T627 |
-| deep-is | 0.1.4 | npm | MIT | T651 |
+| deep-eql | 5.0.2 | npm | MIT | T626 |
+| deep-is | 0.1.4 | npm | MIT | T650 |
 | deepmerge-ts | 8.0.2 | npm | BSD-3-Clause | T423 |
 | deepmerge | 4.3.1 | npm | MIT | T413 |
-| defaults | 1.0.4 | npm | MIT | T678 |
+| defaults | 1.0.4 | npm | MIT | T677 |
 | dequal | 2.0.3 | npm | MIT | T127 |
 | detect-libc | 2.1.2 | npm | Apache-2.0 | T96 |
-| devalue | 5.9.4 | npm | MIT | T625 |
+| devalue | 5.9.4 | npm | MIT | T624 |
 | diff | 5.2.2 | npm | BSD-3-Clause | T195 |
 | diff | 8.0.4 | npm | BSD-3-Clause | T195 |
 | dom-accessibility-api | 0.5.16 | npm | MIT | T114 |
@@ -1083,7 +1084,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | dotenv | 17.4.2 | npm | BSD-2-Clause | T425 |
 | eastasianwidth | 0.2.0 | npm | MIT | requires review |
 | easy-table | 1.2.0 | npm | MIT | requires review |
-| edge-paths | 3.0.5 | npm | MIT | T637 |
+| edge-paths | 3.0.5 | npm | MIT | T636 |
 | edgedriver | 6.3.0 | npm | MIT | T197 |
 | ejs | 3.1.10 | npm | Apache-2.0 | T20 |
 | emoji-regex | 10.6.0 | npm | MIT | T34 |
@@ -1096,7 +1097,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | entities | 8.0.0 | npm | BSD-2-Clause | T27 |
 | error-ex | 1.3.4 | npm | MIT | T156 |
 | es-module-lexer | 2.3.2 | npm | MIT | T465 |
-| esbuild | 0.28.2 | npm | MIT | T550 |
+| esbuild | 0.28.2 | npm | MIT | T549 |
 | escalade | 3.2.0 | npm | MIT | T159 |
 | escape-string-regexp | 2.0.0 | npm | MIT | T14 |
 | escape-string-regexp | 4.0.0 | npm | MIT | T5 |
@@ -1111,7 +1112,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | esm-env | 1.2.2 | npm | MIT | T414 |
 | espree | 10.4.0 | npm | BSD-2-Clause | T123 |
 | espree | 11.2.0 | npm | BSD-2-Clause | T123 |
-| esquery | 1.7.0 | npm | BSD-3-Clause | T537 |
+| esquery | 1.7.0 | npm | BSD-3-Clause | T536 |
 | esrap | 2.3.6 | npm | MIT | T476 |
 | esrecurse | 4.3.0 | npm | BSD-2-Clause | requires review |
 | estraverse | 5.3.0 | npm | BSD-2-Clause | T113 |
@@ -1123,12 +1124,12 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | execa | 9.6.1 | npm | MIT | T5 |
 | exit-hook | 4.0.0 | npm | MIT | T5 |
 | expect-type | 1.4.0 | npm | Apache-2.0 | T440 |
-| expect-webdriverio | 6.0.7 | npm | MIT | T532 |
+| expect-webdriverio | 6.0.7 | npm | MIT | T531 |
 | expect | 30.4.1 | npm | MIT | T19 |
 | fast-deep-equal | 2.0.1 | npm | MIT | T89 |
 | fast-deep-equal | 3.1.3 | npm | MIT | T89 |
 | fast-fifo | 1.3.2 | npm | MIT | T132 |
-| fast-json-stable-stringify | 2.1.0 | npm | MIT | T529 |
+| fast-json-stable-stringify | 2.1.0 | npm | MIT | T528 |
 | fast-levenshtein | 2.0.6 | npm | MIT | T485 |
 | fast-xml-builder | 1.3.1 | npm | MIT | T63 |
 | fast-xml-parser | 5.11.0 | npm | MIT | T434 |
@@ -1147,17 +1148,17 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | foreground-child | 3.3.1 | npm | ISC | T484 |
 | fs.realpath | 1.0.0 | npm | ISC | T457 |
 | fsevents | 2.3.3 | npm | MIT | T286 |
-| geckodriver | 6.1.1 | npm | MIT | T264, T623 |
+| geckodriver | 6.1.1 | npm | MIT | T264, T622 |
 | get-caller-file | 2.0.5 | npm | ISC | T478 |
 | get-east-asian-width | 1.6.0 | npm | MIT | T5 |
 | get-port | 7.2.0 | npm | MIT | T5 |
 | get-stream | 9.0.1 | npm | MIT | T5 |
 | glob-parent | 5.1.2 | npm | ISC | T290 |
-| glob-parent | 6.0.2 | npm | ISC | T673 |
-| glob | 10.5.0 | npm | ISC | T587 |
-| glob | 8.1.0 | npm | ISC | T617 |
+| glob-parent | 6.0.2 | npm | ISC | T672 |
+| glob | 10.5.0 | npm | ISC | T586 |
+| glob | 8.1.0 | npm | ISC | T616 |
 | globals | 16.5.0 | npm | MIT | T5 |
-| graceful-fs | 4.2.11 | npm | ISC | T659 |
+| graceful-fs | 4.2.11 | npm | ISC | T658 |
 | grapheme-splitter | 1.0.4 | npm | MIT | T450 |
 | has-flag | 4.0.0 | npm | MIT | T14 |
 | hashery | 1.5.1 | npm | MIT | T296 |
@@ -1166,12 +1167,12 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | hookified | 2.2.0 | npm | MIT | T82 |
 | hosted-git-info | 7.0.2 | npm | ISC | T169 |
 | hosted-git-info | 8.1.0 | npm | ISC | T169 |
-| html-encoding-sniffer | 6.0.0 | npm | MIT | T49 |
-| htmlfy | 0.8.1 | npm | MIT | T602 |
+| html-encoding-sniffer | 7.0.0 | npm | MIT | T49 |
+| htmlfy | 0.8.1 | npm | MIT | T601 |
 | htmlparser2 | 10.1.0 | npm | MIT | T255 |
 | http-proxy-agent | 7.0.2 | npm | MIT | T421 |
 | https-proxy-agent | 7.0.6 | npm | MIT | T155 |
-| human-signals | 8.0.1 | npm | Apache-2.0 | T657 |
+| human-signals | 8.0.1 | npm | Apache-2.0 | T656 |
 | iconv-lite | 0.6.3 | npm | MIT | T165 |
 | iconv-lite | 0.7.3 | npm | MIT | T165 |
 | ieee754 | 1.2.1 | npm | BSD-3-Clause | T241 |
@@ -1213,8 +1214,8 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | jiti | 2.7.0 | npm | MIT | T344 |
 | js-tokens | 10.0.0 | npm | MIT | T318 |
 | js-tokens | 4.0.0 | npm | MIT | T263 |
-| js-yaml | 4.3.2 | npm | MIT | T518 |
-| jsdom | 30.0.1 | npm | MIT | T270 |
+| js-yaml | 4.3.2 | npm | MIT | T517 |
+| jsdom | 30.1.2 | npm | MIT | T270 |
 | json-parse-even-better-errors | 3.0.2 | npm | MIT | T359 |
 | json-schema-traverse | 0.4.1 | npm | MIT | T89 |
 | json-stable-stringify-without-jsonify | 1.0.1 | npm | MIT | T133 |
@@ -1222,7 +1223,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | jszip | 3.10.1 | npm | (MIT OR GPL-3.0-or-later) | T368 |
 | keyv | 5.6.0 | npm | MIT | T120 |
 | known-css-properties | 0.37.0 | npm | MIT | T454 |
-| lazystream | 1.0.1 | npm | MIT | T633 |
+| lazystream | 1.0.1 | npm | MIT | T632 |
 | levn | 0.4.1 | npm | MIT | T70 |
 | lie | 3.3.0 | npm | MIT | T379 |
 | lightningcss-android-arm64 | 1.33.0 | npm | not declared | requires review |
@@ -1237,9 +1238,9 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | lightningcss-win32-arm64-msvc | 1.33.0 | npm | not declared | requires review |
 | lightningcss-win32-x64-msvc | 1.33.0 | npm | not declared | requires review |
 | lightningcss | 1.33.0 | npm | MPL-2.0 | T138 |
-| lilconfig | 2.1.0 | npm | MIT | T601 |
+| lilconfig | 2.1.0 | npm | MIT | T600 |
 | lines-and-columns | 2.0.4 | npm | MIT | T339 |
-| locate-app | 2.5.0 | npm | Apache-2.0 | T619 |
+| locate-app | 2.5.0 | npm | Apache-2.0 | T618 |
 | locate-character | 3.0.0 | npm | MIT | requires review |
 | locate-path | 6.0.0 | npm | MIT | T5 |
 | locate-path | 7.2.0 | npm | MIT | T5 |
@@ -1248,12 +1249,12 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | lodash.pickby | 4.6.0 | npm | MIT | T53 |
 | lodash.union | 4.6.0 | npm | MIT | T53 |
 | lodash.zip | 4.2.0 | npm | MIT | T53 |
-| lodash | 4.18.1 | npm | MIT | T661 |
+| lodash | 4.18.1 | npm | MIT | T660 |
 | log-symbols | 4.1.0 | npm | MIT | T5 |
-| loglevel-plugin-prefix | 0.8.4 | npm | MIT | T645 |
+| loglevel-plugin-prefix | 0.8.4 | npm | MIT | T644 |
 | loglevel | 1.9.2 | npm | MIT | T242 |
 | lru-cache | 10.4.3 | npm | ISC | T338 |
-| lru-cache | 11.5.2 | npm | BlueOak-1.0.0 | T60 |
+| lru-cache | 11.5.3 | npm | BlueOak-1.0.0 | T60 |
 | lz-string | 1.5.0 | npm | MIT | T333 |
 | magic-string | 0.30.21 | npm | MIT | T118 |
 | magic-string | 1.4.3 | npm | MIT | T118 |
@@ -1266,9 +1267,9 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | minimatch | 9.0.9 | npm | ISC | T175 |
 | minipass | 7.1.3 | npm | BlueOak-1.0.0 | T60 |
 | mitt | 3.0.1 | npm | MIT | T248 |
-| mocha | 10.8.2 | npm | MIT | T554 |
-| modern-tar | 0.7.7 | npm | MIT | T182 |
-| modern-tar | 0.8.4 | npm | MIT | T182 |
+| mocha | 10.8.2 | npm | MIT | T553 |
+| modern-tar | 0.7.7 | npm | MIT | T181 |
+| modern-tar | 0.8.4 | npm | MIT | T181 |
 | mri | 1.2.0 | npm | MIT | T127 |
 | ms | 2.1.3 | npm | MIT | T236 |
 | mute-stream | 2.0.0 | npm | ISC | T35 |
@@ -1277,19 +1278,19 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | natural-compare | 1.4.0 | npm | MIT | requires review |
 | normalize-package-data | 6.0.2 | npm | BSD-2-Clause | T164 |
 | normalize-package-data | 7.0.1 | npm | BSD-2-Clause | T164 |
-| normalize-path | 3.0.0 | npm | MIT | T630 |
+| normalize-path | 3.0.0 | npm | MIT | T629 |
 | npm-run-path | 6.0.0 | npm | MIT | T5 |
 | nth-check | 2.1.1 | npm | BSD-2-Clause | T27 |
-| object-inspect | 1.13.4 | npm | MIT | T563 |
-| obug | 2.1.4 | npm | MIT | T643 |
+| object-inspect | 1.13.4 | npm | MIT | T562 |
+| obug | 2.1.4 | npm | MIT | T642 |
 | once | 1.4.0 | npm | ISC | T35 |
 | optionator | 0.9.4 | npm | MIT | T70 |
 | p-limit | 3.1.0 | npm | MIT | T5 |
 | p-limit | 4.0.0 | npm | MIT | T5 |
 | p-locate | 5.0.0 | npm | MIT | T5 |
 | p-locate | 6.0.0 | npm | MIT | T5 |
-| package-json-from-dist | 1.0.1 | npm | BlueOak-1.0.0 | T523 |
-| pako | 1.0.11 | npm | (MIT AND Zlib) | T516 |
+| package-json-from-dist | 1.0.1 | npm | BlueOak-1.0.0 | T522 |
+| pako | 1.0.11 | npm | (MIT AND Zlib) | T515 |
 | parse-json | 7.1.1 | npm | MIT | T5 |
 | parse-ms | 4.0.0 | npm | MIT | T5 |
 | parse5-htmlparser2-tree-adapter | 7.1.0 | npm | MIT | T62 |
@@ -1302,7 +1303,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | path-key | 3.1.1 | npm | MIT | T14 |
 | path-key | 4.0.0 | npm | MIT | T5 |
 | path-scurry | 1.11.1 | npm | BlueOak-1.0.0 | T60 |
-| pathe | 1.1.2 | npm | MIT | T586 |
+| pathe | 1.1.2 | npm | MIT | T585 |
 | pathe | 2.0.3 | npm | MIT | T362 |
 | pend | 1.2.0 | npm | MIT | T448 |
 | picocolors | 1.1.1 | npm | ISC | T396 |
@@ -1316,18 +1317,18 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | postcss | 8.5.29 | npm | MIT | T137 |
 | prelude-ls | 1.2.1 | npm | MIT | T70 |
 | prettier-plugin-svelte | 4.1.1 | npm | MIT | T436 |
-| prettier | 3.9.9 | npm | MIT | T542 |
+| prettier | 3.9.9 | npm | MIT | T541 |
 | pretty-format | 27.5.1 | npm | MIT | T84 |
 | pretty-format | 30.4.1 | npm | MIT | T19 |
 | pretty-ms | 9.3.0 | npm | MIT | T5 |
-| process-nextick-args | 2.0.1 | npm | MIT | T639 |
+| process-nextick-args | 2.0.1 | npm | MIT | T638 |
 | process | 0.11.10 | npm | MIT | T372 |
 | punycode | 2.3.1 | npm | MIT | T34 |
 | qified | 0.10.1 | npm | MIT | T82 |
-| query-selector-shadow-dom | 1.0.1 | npm | MIT | T580 |
+| query-selector-shadow-dom | 1.0.1 | npm | MIT | T579 |
 | react-is | 17.0.2 | npm | MIT | T84 |
 | react-is | 18.3.1 | npm | MIT | T84 |
-| react-is | 19.2.8 | npm | MIT | T605 |
+| react-is | 19.2.8 | npm | MIT | T604 |
 | read-pkg-up | 10.1.0 | npm | MIT | T5 |
 | read-pkg | 8.1.0 | npm | MIT | T5 |
 | readable-stream | 2.3.8 | npm | MIT | T192 |
@@ -1337,15 +1338,15 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | readdirp | 4.1.2 | npm | MIT | T186 |
 | recursive-readdir | 2.2.3 | npm | MIT | T259 |
 | redent | 3.0.0 | npm | MIT | T14 |
-| require-directory | 2.1.1 | npm | MIT | T531 |
+| require-directory | 2.1.1 | npm | MIT | T530 |
 | require-from-string | 2.0.2 | npm | MIT | T415 |
 | resq | 1.11.0 | npm | MIT | T220 |
-| ret | 0.5.0 | npm | MIT | T566 |
+| ret | 0.5.0 | npm | MIT | T565 |
 | rgb2hex | 0.2.5 | npm | MIT | T363 |
 | rolldown | 1.2.13 | npm | MIT | T269 |
-| run-async | 4.0.6 | npm | MIT | T628 |
+| run-async | 4.0.6 | npm | MIT | T627 |
 | rxjs | 7.8.2 | npm | Apache-2.0 | T455 |
-| sade | 1.8.1 | npm | MIT | T561 |
+| sade | 1.8.1 | npm | MIT | T560 |
 | safaridriver | 1.0.1 | npm | MIT | T197 |
 | safe-buffer | 5.1.2 | npm | MIT | T172 |
 | safe-buffer | 5.2.1 | npm | MIT | T172 |
@@ -1354,23 +1355,23 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | saxes | 6.0.0 | npm | ISC | requires review |
 | semver | 7.8.5 | npm | ISC | T35 |
 | serialize-error | 12.0.0 | npm | MIT | T5 |
-| serialize-javascript | 7.0.5 | npm | BSD-3-Clause | T596 |
-| setimmediate | 1.0.5 | npm | MIT | T571 |
+| serialize-javascript | 7.0.5 | npm | BSD-3-Clause | T595 |
+| setimmediate | 1.0.5 | npm | MIT | T570 |
 | shebang-command | 2.0.0 | npm | MIT | T405 |
 | shebang-regex | 3.0.0 | npm | MIT | T14 |
-| signal-exit | 4.1.0 | npm | ISC | T545 |
+| signal-exit | 4.1.0 | npm | ISC | T544 |
 | slash | 3.0.0 | npm | MIT | T14 |
-| smol-toml | 1.9.0 | npm | BSD-3-Clause | T670 |
+| smol-toml | 1.9.0 | npm | BSD-3-Clause | T669 |
 | source-map-js | 1.2.2 | npm | BSD-3-Clause | T411 |
-| spacetrim | 0.11.59 | npm | Apache-2.0 | T514 |
+| spacetrim | 0.11.59 | npm | Apache-2.0 | T513 |
 | spdx-correct | 3.2.0 | npm | Apache-2.0 | T20 |
 | spdx-exceptions | 2.5.0 | npm | CC-BY-3.0 | requires review |
 | spdx-expression-parse | 3.0.1 | npm | MIT | T337, T449 |
 | spdx-license-ids | 3.0.23 | npm | CC0-1.0 | requires review |
-| split2 | 4.2.0 | npm | ISC | T570 |
+| split2 | 4.2.0 | npm | ISC | T569 |
 | stack-utils | 2.0.6 | npm | MIT | T502 |
-| std-env | 4.2.0 | npm | MIT | T526 |
-| stream-buffers | 3.0.3 | npm | Unlicense | T582 |
+| std-env | 4.2.0 | npm | MIT | T525 |
+| stream-buffers | 3.0.3 | npm | Unlicense | T581 |
 | streamx | 2.28.0 | npm | MIT | T132 |
 | string-width | 4.2.3 | npm | MIT | T14 |
 | string-width | 5.1.2 | npm | MIT | T5 |
@@ -1390,20 +1391,19 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | svelte-eslint-parser | 1.8.1 | npm | MIT | T104 |
 | svelte-eslint-parser | 1.9.0 | npm | MIT | T104 |
 | svelte | 5.57.2 | npm | MIT | T217 |
-| symbol-tree | 3.2.4 | npm | MIT | T510 |
 | tar-stream | 3.2.0 | npm | MIT | T326 |
 | teex | 1.0.1 | npm | MIT | T404 |
 | text-decoder | 1.2.7 | npm | Apache-2.0 | T9 |
 | tinybench | 6.2.1 | npm | MIT | T102 |
-| tinyexec | 1.3.0 | npm | MIT | T667 |
+| tinyexec | 1.3.0 | npm | MIT | T666 |
 | tinyglobby | 0.2.17 | npm | MIT | T265 |
 | tinyrainbow | 1.2.0 | npm | MIT | T102 |
 | tinyrainbow | 3.1.1 | npm | MIT | T102 |
 | tldts-core | 7.4.10 | npm | MIT | T171 |
 | tldts | 7.4.10 | npm | MIT | T171 |
-| to-regex-range | 5.0.1 | npm | MIT | T632 |
+| to-regex-range | 5.0.1 | npm | MIT | T631 |
 | tough-cookie | 6.0.2 | npm | BSD-3-Clause | T266 |
-| tr46 | 6.0.0 | npm | MIT | T347 |
+| tr46 | 7.0.0 | npm | MIT | T347 |
 | ts-api-utils | 2.5.0 | npm | MIT | T431 |
 | tslib | 2.8.1 | npm | 0BSD | T257 |
 | tsx | 4.23.12 | npm | MIT | T475 |
@@ -1412,36 +1412,35 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | type-fest | 4.26.0 | npm | (MIT OR CC0-1.0) | requires review |
 | type-fest | 4.41.0 | npm | (MIT OR CC0-1.0) | T163, T5 |
 | typescript-eslint | 8.70.1 | npm | MIT | T33 |
-| typescript | 6.0.3 | npm | Apache-2.0 | T527 |
+| typescript | 6.0.3 | npm | Apache-2.0 | T526 |
 | undici-types | 6.21.0 | npm | MIT | T66 |
 | undici | 6.28.1 | npm | MIT | T66 |
 | undici | 7.29.1 | npm | MIT | T66 |
-| undici | 8.11.0 | npm | MIT | T66 |
+| undici | 8.11.2 | npm | MIT | T66 |
 | unicorn-magic | 0.3.0 | npm | MIT | T5 |
 | uri-js | 4.4.1 | npm | BSD-2-Clause | T222 |
-| urlpattern-polyfill | 10.1.0 | npm | MIT | T576 |
+| urlpattern-polyfill | 10.1.0 | npm | MIT | T575 |
 | userhome | 1.0.1 | npm | MIT | T505 |
 | util-deprecate | 1.0.2 | npm | MIT | T207 |
 | validate-npm-package-license | 3.0.4 | npm | Apache-2.0 | T20 |
-| vite | 8.3.4 | npm | MIT | T522 |
-| vitefu | 1.1.3 | npm | MIT | T640 |
-| vitest | 5.0.3 | npm | MIT | T578 |
-| w3c-xmlserializer | 5.0.0 | npm | MIT | T536 |
+| vite | 8.3.4 | npm | MIT | T521 |
+| vitefu | 1.1.3 | npm | MIT | T639 |
+| vitest | 5.0.3 | npm | MIT | T577 |
+| w3c-xmlserializer | 6.0.0 | npm | MIT | T535 |
 | wait-port | 1.1.0 | npm | MIT | T274 |
 | wcwidth | 1.0.1 | npm | MIT | T391 |
 | webdriver | 9.31.2 | npm | MIT | T12 |
 | webdriverio | 9.31.2 | npm | MIT | T12 |
-| webidl-conversions | 8.0.1 | npm | BSD-2-Clause | T530 |
+| webidl-conversions | 8.0.1 | npm | BSD-2-Clause | T529 |
 | whatwg-encoding | 3.1.1 | npm | MIT | T49 |
 | whatwg-mimetype | 4.0.0 | npm | MIT | T49 |
 | whatwg-mimetype | 5.0.0 | npm | MIT | T49 |
-| whatwg-url | 16.0.1 | npm | MIT | T181 |
-| whatwg-url | 17.1.0 | npm | MIT | T181 |
+| whatwg-url | 17.2.0 | npm | MIT | T608 |
 | which | 2.0.2 | npm | ISC | T35 |
 | which | 6.0.1 | npm | ISC | T35 |
 | why-is-node-running | 3.2.1 | npm | MIT | T406 |
 | word-wrap | 1.2.5 | npm | MIT | T147 |
-| workerpool | 6.5.1 | npm | Apache-2.0 | T672 |
+| workerpool | 6.5.1 | npm | Apache-2.0 | T671 |
 | wrap-ansi | 6.2.0 | npm | MIT | T14 |
 | wrap-ansi | 7.0.0 | npm | MIT | T5 |
 | wrap-ansi | 8.1.0 | npm | MIT | T5 |
@@ -1461,7 +1460,7 @@ Packages: 1458 – crates 752, npm 706. Distinct licence texts: 680. Requires re
 | yargs | 16.2.2 | npm | MIT | T78 |
 | yargs | 17.7.3 | npm | MIT | T78 |
 | yargs | 18.1.0 | npm | MIT | T78 |
-| yauzl | 2.10.0 | npm | MIT | T548 |
+| yauzl | 2.10.0 | npm | MIT | T547 |
 | yocto-queue | 0.1.0 | npm | MIT | T5 |
 | yocto-queue | 1.2.2 | npm | MIT | T5 |
 | yoctocolors-cjs | 2.1.3 | npm | MIT | T5 |
@@ -5417,7 +5416,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T49
 
-SHA-256 `528eec83cb836a0adda9f8fc3d6a2a70a710d6cc0be9a155f92212c8df28acfa`. Used by: data-urls 7.0.0 (LICENSE.txt), html-encoding-sniffer 6.0.0 (LICENSE.txt), whatwg-encoding 3.1.1 (LICENSE.txt), whatwg-mimetype 4.0.0 (LICENSE.txt), whatwg-mimetype 5.0.0 (LICENSE.txt).
+SHA-256 `528eec83cb836a0adda9f8fc3d6a2a70a710d6cc0be9a155f92212c8df28acfa`. Used by: data-urls 8.0.0 (LICENSE.txt), html-encoding-sniffer 7.0.0 (LICENSE.txt), whatwg-encoding 3.1.1 (LICENSE.txt), whatwg-mimetype 4.0.0 (LICENSE.txt), whatwg-mimetype 5.0.0 (LICENSE.txt).
 
 ```text
 Copyright © Domenic Denicola <d@domenic.me>
@@ -5921,7 +5920,7 @@ SOFTWARE.
 
 ### T60
 
-SHA-256 `8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004`. Used by: isexe 4.0.0 (LICENSE.md), lru-cache 11.5.2 (LICENSE.md), minipass 7.1.3 (LICENSE.md), path-scurry 1.11.1 (LICENSE.md).
+SHA-256 `8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004`. Used by: isexe 4.0.0 (LICENSE.md), lru-cache 11.5.3 (LICENSE.md), minipass 7.1.3 (LICENSE.md), path-scurry 1.11.1 (LICENSE.md).
 
 ```text
 # Blue Oak Model License
@@ -6162,7 +6161,7 @@ limitations under the License.
 
 ### T66
 
-SHA-256 `a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27`. Used by: undici-types 6.21.0 (LICENSE), undici 6.28.1 (LICENSE), undici 7.29.1 (LICENSE), undici 8.11.0 (LICENSE).
+SHA-256 `a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27`. Used by: undici-types 6.21.0 (LICENSE), undici 6.28.1 (LICENSE), undici 7.29.1 (LICENSE), undici 8.11.2 (LICENSE).
 
 ```text
 MIT License
@@ -6711,7 +6710,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T73
 
-SHA-256 `d00d032f517721b45c56c70c46bf904ebb71ad313df4d4db7722266b38069665`. Used by: @csstools/css-calc 3.3.0 (LICENSE.md), @csstools/css-color-parser 4.2.0 (LICENSE.md), @csstools/css-parser-algorithms 4.0.0 (LICENSE.md), @csstools/css-tokenizer 4.0.0 (LICENSE.md).
+SHA-256 `d00d032f517721b45c56c70c46bf904ebb71ad313df4d4db7722266b38069665`. Used by: @csstools/css-calc 3.4.3 (LICENSE.md), @csstools/css-color-parser 4.2.6 (LICENSE.md), @csstools/css-parser-algorithms 4.0.2 (LICENSE.md), @csstools/css-tokenizer 4.0.2 (LICENSE.md).
 
 ```text
 The MIT License (MIT)
@@ -11278,7 +11277,7 @@ THE SOFTWARE.
 
 ### T157
 
-SHA-256 `947e32047a166cd05f04e45938d172b412c07cbee0b9735afd14bae30e02c2f6`. Used by: @csstools/color-helpers 6.1.1 (LICENSE.md), @csstools/css-syntax-patches-for-csstree 1.1.8 (LICENSE.md).
+SHA-256 `947e32047a166cd05f04e45938d172b412c07cbee0b9735afd14bae30e02c2f6`. Used by: @csstools/color-helpers 6.1.2 (LICENSE.md), @csstools/css-syntax-patches-for-csstree 1.1.15 (LICENSE.md).
 
 ```text
 MIT No Attribution (MIT-0)
@@ -12167,12 +12166,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T181
 
-SHA-256 `db480f236292a093e77a83c35431a8496624e1e664a3547768a9ce2bdde39877`. Used by: whatwg-url 16.0.1 (LICENSE.txt), whatwg-url 17.1.0 (LICENSE.txt).
+SHA-256 `dbcbef54fa7e111b69b12a9787051f31f5378b40711b6c57c5a82d99dc8a9e0d`. Used by: modern-tar 0.7.7 (LICENSE), modern-tar 0.8.4 (LICENSE).
 
 ```text
-The MIT License (MIT)
+MIT License
 
-Copyright (c) Sebastian Mayr
+Copyright (c) 2025 Ayuhito
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -12181,26 +12180,26 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### T182
 
-SHA-256 `dbcbef54fa7e111b69b12a9787051f31f5378b40711b6c57c5a82d99dc8a9e0d`. Used by: modern-tar 0.7.7 (LICENSE), modern-tar 0.8.4 (LICENSE).
+SHA-256 `dbffd380d59504ba19fcf87ff5a1a33c37edf66d5b09966b0ad5368ab87bc2af`. Used by: @exodus/bytes 1.15.1 (LICENSE), @exodus/bytes 1.16.0 (LICENSE).
 
 ```text
 MIT License
 
-Copyright (c) 2025 Ayuhito
+Copyright (c) 2024-2025 Exodus Movement
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -16368,7 +16367,7 @@ The licenses of externally maintained libraries from which parts of the Software
 
 ### T270
 
-SHA-256 `242d37e7cab25cbafc36cc973ee88f9345fddf066afe4f72b7ac3d9ad4e24cce`. Used by: jsdom 30.0.1 (LICENSE.txt).
+SHA-256 `242d37e7cab25cbafc36cc973ee88f9345fddf066afe4f72b7ac3d9ad4e24cce`. Used by: jsdom 30.1.2 (LICENSE.txt).
 
 ```text
 Copyright (c) 2010 Elijah Insua
@@ -19737,7 +19736,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### T347
 
-SHA-256 `499d6d466d064e0460427967a344e2a32fcb86ea8c6cd1a285ec4f1fa03fba67`. Used by: tr46 6.0.0 (LICENSE.md).
+SHA-256 `499d6d466d064e0460427967a344e2a32fcb86ea8c6cd1a285ec4f1fa03fba67`. Used by: tr46 7.0.0 (LICENSE.md).
 
 ```text
 The MIT License (MIT)
@@ -19765,7 +19764,7 @@ SOFTWARE.
 
 ### T348
 
-SHA-256 `49d4d143fed599deb502a0fe6e02f49832f87e9a3a4cd0502e469596d50faa6d`. Used by: bidi-js 1.0.3 (LICENSE.txt).
+SHA-256 `49d4d143fed599deb502a0fe6e02f49832f87e9a3a4cd0502e469596d50faa6d`. Used by: bidi-js 1.1.0 (LICENSE.txt).
 
 ```text
 Copyright (c) 2021 Jason Johnston
@@ -26055,7 +26054,7 @@ Creator: Person: Daniel Thompson-Yvetot
 
 ### T444
 
-SHA-256 `7cdf9db3b91cc77b9ec947ad0c7126140f00e34528b67c3a58e9fc1a98055e14`. Used by: @asamuzakjp/dom-selector 8.3.2 (LICENSE).
+SHA-256 `7cdf9db3b91cc77b9ec947ad0c7126140f00e34528b67c3a58e9fc1a98055e14`. Used by: @asamuzakjp/dom-selector 9.2.4 (LICENSE).
 
 ```text
 MIT License
@@ -31029,34 +31028,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ### T510
 
-SHA-256 `9ea1eccdabe469767a9edb9249a840b2461cf91b2434bf8a3e2fc1f414311cb1`. Used by: symbol-tree 3.2.4 (LICENSE).
-
-```text
-The MIT License (MIT)
-
-Copyright (c) 2015 Joris van der Wel
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
-### T511
-
 SHA-256 `9ebf8c4cc0b735ca13a766451f7b8097db3185975ceb2ba94b5abf439156a91f`. Used by: core_maths 0.1.1 (LICENSE).
 
 ```text
@@ -31083,7 +31054,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T512
+### T511
 
 SHA-256 `9ed5e982274d54d0cf94f0e9f9fd889182b6f1f50a012f0be41ce7c884347ab6`. Used by: typed-arena 2.0.2 (LICENSE).
 
@@ -31111,7 +31082,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T513
+### T512
 
 SHA-256 `9eff396a99bafd208e7126602420d6864f6066c08b84485a5b032320a9c01997`. Used by: dpi 0.1.2 (LICENSE-LIBM-MIT).
 
@@ -31169,7 +31140,7 @@ have been licensed under extremely permissive terms.
 ------------------------------------------------------------------------------
 ```
 
-### T514
+### T513
 
 SHA-256 `9f6098379601ad8e9c83aac59600726fdaefc899778af83527fcfd5ef875cbcf`. Used by: spacetrim 0.11.59 (LICENSE.md).
 
@@ -31391,7 +31362,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### T515
+### T514
 
 SHA-256 `9fe335fb097fbff0b7f709ee14a77b1d1cf739d3400cd0b0e19118946772ea56`. Used by: archiver-utils 5.0.2 (LICENSE).
 
@@ -31420,7 +31391,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T516
+### T515
 
 SHA-256 `a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539`. Used by: pako 1.0.11 (LICENSE).
 
@@ -31448,7 +31419,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T517
+### T516
 
 SHA-256 `a07450fd4496cb8b58466e6d529f1f502444eee4a235659337e9194d694739d6`. Used by: stringprep 0.1.5 (LICENSE-MIT).
 
@@ -31474,7 +31445,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T518
+### T517
 
 SHA-256 `a07bc24468b9654ce76a547d47a2db282d07733b715db4c73a98bd63961f9550`. Used by: js-yaml 4.3.2 (LICENSE).
 
@@ -31502,7 +31473,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T519
+### T518
 
 SHA-256 `a07fcacc3c60de4dc0fab10ac9d6aaba7379974e28451c99da7f7df09c25b28c`. Used by: inout 0.2.2 (LICENSE-MIT).
 
@@ -31535,7 +31506,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T520
+### T519
 
 SHA-256 `a1bd5deadb6a06dd74efa852c1b8b23f63b67f2214fbe9c8bd591da51da69268`. Used by: balanced-match 1.0.2 (LICENSE.md).
 
@@ -31563,7 +31534,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T521
+### T520
 
 SHA-256 `a4445427440043e8ce6fadf7a43fb906cb0d7f6c573a560a9f142cf9f9bf8ff4`. Used by: softbuffer 0.4.8 (LICENSE-APACHE).
 
@@ -31771,7 +31742,7 @@ Apache License
    limitations under the License.
 ```
 
-### T522
+### T521
 
 SHA-256 `a47172e44a86a7e2cd1c16282341f7726ec60caafe3a6166fe3e0602005b6fa6`. Used by: vite 8.3.4 (LICENSE.md).
 
@@ -34043,7 +34014,7 @@ Repository: https://github.com/sveltejs/zimmerframe
 > SOFTWARE.
 ```
 
-### T523
+### T522
 
 SHA-256 `a49c9ba464796f65b59fca3f1e6ca40912df1e859f575383223f7ec6c5baae09`. Used by: package-json-from-dist 1.0.1 (LICENSE.md).
 
@@ -34113,7 +34084,7 @@ will be liable to anyone for any damages related to this
 software or this license, under any kind of legal claim.***
 ```
 
-### T524
+### T523
 
 SHA-256 `a62f9f2edd97ed0d92f0ef93584dd109a7d34299795abc7780b8b5a85ff00671`. Used by: @sinclair/typebox 0.34.52 (license).
 
@@ -34145,7 +34116,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T525
+### T524
 
 SHA-256 `a65f5d0a945d267751344c95665945b90c030ea107faf5c85d518929886187da`. Used by: want 0.3.1 (LICENSE).
 
@@ -34172,7 +34143,7 @@ THE SOFTWARE.
 
 ```
 
-### T526
+### T525
 
 SHA-256 `a6f36438e46fb911859f3b9c4cad045ba64e1af3d8f4512c60258fa2d7552d28`. Used by: std-env 4.2.0 (LICENCE).
 
@@ -34201,7 +34172,7 @@ SOFTWARE.
 
 ```
 
-### T527
+### T526
 
 SHA-256 `a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47`. Used by: typescript 6.0.3 (LICENSE.txt).
 
@@ -34263,7 +34234,7 @@ If the Work includes a "NOTICE" text file as part of its distribution, then any 
 END OF TERMS AND CONDITIONS
 ```
 
-### T528
+### T527
 
 SHA-256 `a825bd853ab71619a4923d7b4311221427848070ff44d990da39b0b274c1683f`. Used by: typenum 1.20.1 (LICENSE-MIT).
 
@@ -34291,7 +34262,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T529
+### T528
 
 SHA-256 `a833d366242c298cf1b10263516572fb8dcbe68eb5072cdcac2b4546e2b4eb36`. Used by: fast-json-stable-stringify 2.1.0 (LICENSE).
 
@@ -34319,7 +34290,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T530
+### T529
 
 SHA-256 `a889cc4dbee2ae172c179856b25d75b0b7a5a136e1b97109b9b590b2ff1a879c`. Used by: webidl-conversions 8.0.1 (LICENSE.md).
 
@@ -34338,7 +34309,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### T531
+### T530
 
 SHA-256 `a92e52eb1fa7cd746e3827bf01d3a3589bbc8e1e51348b1da042aad165525ad1`. Used by: require-directory 2.1.1 (LICENSE).
 
@@ -34367,7 +34338,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T532
+### T531
 
 SHA-256 `aa0371b43def81d7a45856d7bf2b25369b6b7acf331c8251cc5e107099d50a00`. Used by: expect-webdriverio 6.0.7 (LICENSE).
 
@@ -34395,7 +34366,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T533
+### T532
 
 SHA-256 `aa1a8099209547c3bfa01e9976e2075e45dcc71b9b677bde86b356cb89a05069`. Used by: two-face 0.4.5 (LICENSE-MIT).
 
@@ -34423,7 +34394,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T534
+### T533
 
 SHA-256 `aaa78451b6fecd1b9c4594c796c133c0e90cad100372ff8bc6de615e9ef9adf1`. Used by: cross-spawn 7.0.6 (LICENSE).
 
@@ -34451,7 +34422,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T535
+### T534
 
 SHA-256 `ab499c75a0f0da8e0fe83bf9ba3a27e5c39705310f07107c6c66b69958d2401c`. Used by: base64 0.23.1 (LICENSE-MIT).
 
@@ -34479,9 +34450,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T536
+### T535
 
-SHA-256 `ab654de803cdaa9e2819ab2e934bdf7f757e308649ec231d78e80e92425cdc34`. Used by: w3c-xmlserializer 5.0.0 (LICENSE.md).
+SHA-256 `ab654de803cdaa9e2819ab2e934bdf7f757e308649ec231d78e80e92425cdc34`. Used by: w3c-xmlserializer 6.0.0 (LICENSE.md).
 
 ```text
 The MIT License (MIT)
@@ -34511,7 +34482,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T537
+### T536
 
 SHA-256 `ac68116ae73740de4190892f334992e449a124600924ec761e64319d3aac9e6e`. Used by: esquery 1.7.0 (license.txt).
 
@@ -34542,7 +34513,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### T538
+### T537
 
 SHA-256 `ae842a63dd9bc829c95a2ec22dda25a08e422a368b71dbca67a45cde7c4a4b81`. Used by: @bramus/specificity 2.4.2 (LICENSE).
 
@@ -34568,7 +34539,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T539
+### T538
 
 SHA-256 `ae895c8576e682f310fb70d93d9f99b1dd82872094c54a8f6cdfe2ca5c2d6ecb`. Used by: raw-window-handle 0.6.2 (LICENSE-ZLIB.md).
 
@@ -34586,7 +34557,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 ```
 
-### T540
+### T539
 
 SHA-256 `ae9baa7beea910273c2f384c2a6b721fb7bd02bda3436074a1072e4ee689f985`. Used by: cpufeatures 0.2.17 (LICENSE-MIT).
 
@@ -34618,7 +34589,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T541
+### T540
 
 SHA-256 `af59cea35d7f5e2777a713b8d155d65efa2c339eb43f3c14e868c6ac8506edad`. Used by: digest 0.11.3 (LICENSE-MIT).
 
@@ -34651,7 +34622,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T542
+### T541
 
 SHA-256 `b0f2417199889f1c0d28ec4e0244eacf1a15de5819d61f641dd7d8f45153ac9c`. Used by: prettier 3.9.9 (LICENSE).
 
@@ -34665,7 +34636,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T543
+### T542
 
 SHA-256 `b1181a40b2a7b25cf66fd01481713bc1005df082c53ef73e851e55071b102744`. Used by: foldhash 0.2.0 (LICENSE).
 
@@ -34691,7 +34662,7 @@ the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 ```
 
-### T544
+### T543
 
 SHA-256 `b16db96b93b1d7cf7bea533f572091ec6bca3234fbe0a83038be772ff391a44c`. Used by: crossbeam-channel 0.5.17 (LICENSE-THIRD-PARTY).
 
@@ -35291,7 +35262,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### T545
+### T544
 
 SHA-256 `b173e19b9a78df305577ace0e52ef45a4bcc915ea28b47b256dc3b68dcb1f7e7`. Used by: signal-exit 4.1.0 (LICENSE.txt).
 
@@ -35314,7 +35285,7 @@ WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
 ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T546
+### T545
 
 SHA-256 `b181da80336ff9dd1043fc8be1a764d7382363433319aa872e4d2cb5ce2a3066`. Used by: chai 6.2.2 (LICENSE).
 
@@ -35342,7 +35313,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T547
+### T546
 
 SHA-256 `b29f8b01452350c20dd1af16ef83b598fea3053578ccc1c7a0ef40e57be2620f`. Used by: libloading 0.7.4 (LICENSE).
 
@@ -35361,7 +35332,7 @@ NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE US
 THIS SOFTWARE.
 ```
 
-### T548
+### T547
 
 SHA-256 `b303783d5eb7ca50b853ffa5f145e4e7998fab339831d848f507ca6cd970577a`. Used by: yauzl 2.10.0 (LICENSE).
 
@@ -35389,7 +35360,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T549
+### T548
 
 SHA-256 `b3d734001a94efff3579978d953391aa7115f877657d25eb54037a43875d078a`. Used by: ring 0.17.14 (LICENSE).
 
@@ -35405,7 +35376,7 @@ See src/polyfill/once_cell/LICENSE-APACHE and src/polyfill/once_cell/LICENSE-MIT
 for the license to code that was sourced from the once_cell project.
 ```
 
-### T550
+### T549
 
 SHA-256 `b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681`. Used by: esbuild 0.28.2 (LICENSE.md).
 
@@ -35433,7 +35404,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T551
+### T550
 
 SHA-256 `b4bf94a9fceb8846320fda938ee53fc16b506572609da5cf1d2d289a5597a8f8`. Used by: num_threads 0.1.7 (LICENSE-MIT).
 
@@ -35459,7 +35430,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T552
+### T551
 
 SHA-256 `b4eb00df6e2a4d22518fcaa6a2b4646f249b3a3c9814509b22bd2091f1392ff1`. Used by: sha2 0.10.9 (LICENSE-MIT).
 
@@ -35493,7 +35464,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T553
+### T552
 
 SHA-256 `b5a4028c49c48f820831421de69c8ea83d621a062914bf16739fd0703c7c9fba`. Used by: @testing-library/user-event 14.6.7 (LICENSE).
 
@@ -35520,7 +35491,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T554
+### T553
 
 SHA-256 `b5c6fed2ba4526a1df13b07ce0d9047596bef8835eb55222c754a7e2a741d156`. Used by: mocha 10.8.2 (LICENSE).
 
@@ -35549,7 +35520,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T555
+### T554
 
 SHA-256 `b7e650f3fce5c53249d1cdc608b54df156a97edd636cf9d23498d0cfe7aec63e`. Used by: version_check 0.9.5 (LICENSE-MIT).
 
@@ -35575,7 +35546,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T556
+### T555
 
 SHA-256 `b84efe109a420fa3ca98be33f4227327af7ffa426195812c270feb1268bc2426`. Used by: utf16_iter 1.0.5 (COPYRIGHT).
 
@@ -35624,7 +35595,7 @@ licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 <LICENSE-MIT> or <http://opensource.org/licenses/MIT>, at your option.
 ```
 
-### T557
+### T556
 
 SHA-256 `b8778b155bfde5a28b023a558753c0fa058a52bb9de35c343c250be1bbcdedab`. Used by: @jridgewell/resolve-uri 3.1.2 (LICENSE).
 
@@ -35650,7 +35621,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T558
+### T557
 
 SHA-256 `b8c6939380a400f53e11923d50fcc4dd2fa1ba8339fd9d04cda38a0251b6c9b0`. Used by: chacha20 0.10.2 (LICENSE-MIT).
 
@@ -35682,7 +35653,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T559
+### T558
 
 SHA-256 `b99f9d43803f2ac979c50949df630bd8eeaf2fcd1b9fdb9093710d70f5dfb63d`. Used by: muda 0.19.3 (LICENSE.spdx).
 
@@ -35708,7 +35679,7 @@ PackageDownloadLocation: git+ssh://github.com/tauri-apps/muda.git
 Creator: Person: Daniel Thompson-Yvetot
 ```
 
-### T560
+### T559
 
 SHA-256 `b9eb266294324f672cbe945fe8f2e32f85024f0d61a1a7d14382cdde0ac44769`. Used by: serde_urlencoded 0.7.1 (LICENSE-MIT).
 
@@ -35740,7 +35711,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T561
+### T560
 
 SHA-256 `ba573393f24555ac0528612ad39665fab5bdcc80330a61096024bbf5f736526d`. Used by: sade 1.8.1 (license).
 
@@ -35768,7 +35739,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T562
+### T561
 
 SHA-256 `bb3c0c388d2e5efc777ee1a7bc4671188447d5fbbad130aecac9fd52e0010b76`. Used by: android_log-sys 0.3.2 (LICENSE-MIT).
 
@@ -35794,7 +35765,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T563
+### T562
 
 SHA-256 `bd40cc437e28a3ad7bef2ad34e6b72e757b182e67bda1acadbab4ef0476f8232`. Used by: object-inspect 1.13.4 (LICENSE).
 
@@ -35822,9 +35793,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T564
+### T563
 
-SHA-256 `bd4539377980dd797fc6a51d90e664e52b2b2625b2158f01d4c68b5fe107eacb`. Used by: @asamuzakjp/css-color 6.0.7 (LICENSE).
+SHA-256 `bd4539377980dd797fc6a51d90e664e52b2b2625b2158f01d4c68b5fe107eacb`. Used by: @asamuzakjp/css-color 7.1.4 (LICENSE).
 
 ```text
 MIT License
@@ -35850,7 +35821,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T565
+### T564
 
 SHA-256 `bdfd5e0edb6089e6586c8f15e6a86fab83ffbeeda3b3b7b33734ccb8c5906965`. Used by: chokidar 4.0.3 (LICENSE).
 
@@ -35878,7 +35849,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T566
+### T565
 
 SHA-256 `bfc2c678db20d806b3787956f607a1509da5fca45b4d40a97c671cbee737159d`. Used by: ret 0.5.0 (LICENSE).
 
@@ -35906,7 +35877,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE. 
 ```
 
-### T567
+### T566
 
 SHA-256 `c064f7a3e353bc1bc977f3c897941c75ef763f44f41677e0a15370ca0853d6e2`. Used by: color-name 1.1.4 (LICENSE).
 
@@ -35921,7 +35892,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T568
+### T567
 
 SHA-256 `c09aae9d3c77b531f56351a9947bc7446511d6b025b3255312d3e3442a9a7583`. Used by: generic-array 0.14.7 (LICENSE).
 
@@ -35949,7 +35920,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T569
+### T568
 
 SHA-256 `c30152c94a6d75e021adbc52b3a52470366a46edb917e17deae3259251af244c`. Used by: utf8_iter 1.0.4 (COPYRIGHT).
 
@@ -35998,7 +35969,7 @@ licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 <LICENSE-MIT> or <http://opensource.org/licenses/MIT>, at your option.
 ```
 
-### T570
+### T569
 
 SHA-256 `c372ef2fa1dfcb124ed807609751e75e3a009f108c5724916b489288fcb88a0c`. Used by: split2 4.2.0 (LICENSE).
 
@@ -36018,7 +35989,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T571
+### T570
 
 SHA-256 `c4b4ad3a5746f1f5249a6dd90396ec519264e1bb02e01e48a6522c48a3a97cb4`. Used by: setimmediate 1.0.5 (LICENSE.txt).
 
@@ -36045,7 +36016,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T572
+### T571
 
 SHA-256 `c542ba7851b5d39a5face477e47a27cb7c00a9759e321b66824e79718bffe1ac`. Used by: crc-32 1.2.2 (LICENSE).
 
@@ -36253,7 +36224,7 @@ SHA-256 `c542ba7851b5d39a5face477e47a27cb7c00a9759e321b66824e79718bffe1ac`. Used
    limitations under the License.
 ```
 
-### T573
+### T572
 
 SHA-256 `c55d71b6d0b06bd6df5c0be804707430b8317550a6ec8ad8b140f2a0d0d798bc`. Used by: hayagriva 0.10.1 (NOTICE).
 
@@ -36268,7 +36239,7 @@ The Creative Commons BY-SA 3.0 DEED License applies to:
 https://creativecommons.org/licenses/by-sa/3.0/
 ```
 
-### T574
+### T573
 
 SHA-256 `c695a20d7feb2463ecc9f0a966c88ed1581e364e1e22796e0ded020b571fa43b`. Used by: syntect 5.3.0 (LICENSE.txt).
 
@@ -36296,7 +36267,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T575
+### T574
 
 SHA-256 `c69b72788ec261765e460532016b4bb78372f238e449b5e70e3268ec1e18fd15`. Used by: num_threads 0.1.7 (LICENSE-Apache).
 
@@ -36505,7 +36476,7 @@ SHA-256 `c69b72788ec261765e460532016b4bb78372f238e449b5e70e3268ec1e18fd15`. Used
    limitations under the License.
 ```
 
-### T576
+### T575
 
 SHA-256 `c7b9df332d06b323d491f98324dba24ed5b325161b081fab46e538dcb89bde81`. Used by: urlpattern-polyfill 10.1.0 (LICENSE).
 
@@ -36531,7 +36502,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T577
+### T576
 
 SHA-256 `c816a0749cdc6bf062a5111c159723de51b2bfac66a1dac2655abd9e6b1583eb`. Used by: try-lock 0.2.5 (LICENSE).
 
@@ -36559,7 +36530,7 @@ THE SOFTWARE.
 
 ```
 
-### T578
+### T577
 
 SHA-256 `c8f14eea9df88b94c4710b4c476d8642e080832d7de0d861eba1337746494b4d`. Used by: vitest 5.0.3 (LICENSE.md).
 
@@ -37559,7 +37530,7 @@ Repository: git+https://github.com/websockets/ws.git
 > CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T579
+### T578
 
 SHA-256 `c962ee4d1d05ddc138b202b2540219ebc57893fcf97b364852094a9a94ce1365`. Used by: siphasher 1.0.4 (COPYING).
 
@@ -37573,7 +37544,7 @@ http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 option.
 ```
 
-### T580
+### T579
 
 SHA-256 `c979fed41a7fb18df3e178e1acd9f83ce11f5129d8e42a532b1a801a17856154`. Used by: query-selector-shadow-dom 1.0.1 (LICENSE).
 
@@ -37601,7 +37572,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T581
+### T580
 
 SHA-256 `c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566`. Used by: ryu 1.0.23 (LICENSE-BOOST).
 
@@ -37631,7 +37602,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T582
+### T581
 
 SHA-256 `ca2abdf695884c77ea4b4a5b64ca7b732d9d9dbade4eebc1c2e76c53e9e3bc83`. Used by: stream-buffers 3.0.3 (UNLICENSE).
 
@@ -37662,7 +37633,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 ```
 
-### T583
+### T582
 
 SHA-256 `ca3d96437f69ceb38df1972db017fcd6303b02f57ea1f838ab9f9c3db3e789e0`. Used by: buffer 6.0.3 (AUTHORS.md).
 
@@ -37742,7 +37713,7 @@ SHA-256 `ca3d96437f69ceb38df1972db017fcd6303b02f57ea1f838ab9f9c3db3e789e0`. Used
 #### Generated by bin/update-authors.sh.
 ```
 
-### T584
+### T583
 
 SHA-256 `ca52f53b2ee0b6a96d77d8ae0cb1b4624080dd0274c97f1cece24efaf4e145f2`. Used by: tao-macros 0.1.4 (LICENSE-MIT).
 
@@ -37770,7 +37741,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T585
+### T584
 
 SHA-256 `cab31b979edfb1d6ff72a9a84e1092a9b68954022fc3f253338e64879961b8d2`. Used by: guillotiere 0.7.0 (LICENSE-MIT).
 
@@ -37797,7 +37768,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T586
+### T585
 
 SHA-256 `cb00dc7c358014d300dba2462e57d3f477299c169c7ab14d8fe5e347eca44f48`. Used by: pathe 1.1.2 (LICENSE).
 
@@ -37848,7 +37819,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T587
+### T586
 
 SHA-256 `cdbc258d13806538e727964c2436a8806e6e2496ccd616224aace6f7bf98dbc1`. Used by: glob 10.5.0 (LICENSE).
 
@@ -37870,7 +37841,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T588
+### T587
 
 SHA-256 `ce7bc3499fee93d5022ef430d5e4201e79a6d9154f3974e42f41349f0569e09b`. Used by: winapi 0.3.9 (LICENSE-MIT).
 
@@ -37896,7 +37867,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T589
+### T588
 
 SHA-256 `cedfcc7ace1639adb054bd4a19b6f8585ccb2429a60b4bf51bfeb0601058c22c`. Used by: version-compare 0.2.1 (LICENSE).
 
@@ -37923,7 +37894,7 @@ SOFTWARE.
 
 ```
 
-### T590
+### T589
 
 SHA-256 `cfa72b62b9ae173078823a3796b25c027a9071046a263beddf966df67018ce06`. Used by: acorn-jsx 5.3.2 (LICENSE).
 
@@ -37949,7 +37920,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T591
+### T590
 
 SHA-256 `d027e91dbc9cdbb2f1190068e498bd6b61cff022b6a032b191021ba658d96111`. Used by: r-efi 6.0.0 (AUTHORS).
 
@@ -38031,7 +38002,7 @@ AUTHORS: (ordered alphabetically)
         Trevor Gross <tmgross@umich.edu>
 ```
 
-### T592
+### T591
 
 SHA-256 `d13669f0eaff9b7015bff0d8637297213b53d9f239826636c07a15633acf7052`. Used by: enumflags2_derive 0.7.12 (LICENSE-MIT).
 
@@ -38063,7 +38034,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T593
+### T592
 
 SHA-256 `d1fc1bc0d155df60b2e7705b6b2ae02a05c96f948e1cec6e2fb86360b09f346b`. Used by: subtle 2.6.1 (LICENSE).
 
@@ -38099,7 +38070,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 ```
 
-### T594
+### T593
 
 SHA-256 `d2a809eafabba137f508bea16a1b93d8ff24df7da6f38129d830db9bc118bdfe`. Used by: multiversion_no_op 1.0.0 (COPYRIGHT).
 
@@ -38121,7 +38092,7 @@ See the Licenses for the specific language governing permissions and
 limitations under the Licenses.
 ```
 
-### T595
+### T594
 
 SHA-256 `d2e7ec5355c96eeade56b09187ceb48a6a30299da3ce7531a66d3d11405ab963`. Used by: crypto-common 0.2.2 (LICENSE-MIT).
 
@@ -38153,7 +38124,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T596
+### T595
 
 SHA-256 `d3dfa68a3c80e64eb10e46cef10e4208502da5ffb1387b11db00e42a507ab8f7`. Used by: serialize-javascript 7.0.5 (LICENSE).
 
@@ -38187,7 +38158,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### T597
+### T596
 
 SHA-256 `d408f38ffa3355c5faec517153295338892eb0f1ea43f57874bb23c6075979b5`. Used by: balanced-match 4.0.4 (LICENSE.md).
 
@@ -38217,7 +38188,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T598
+### T597
 
 SHA-256 `d59d2723bbc1627b629429a9c779d5dcfde579c9723e6ded1052931c4e8efa0a`. Used by: proc-macro-hack 0.5.20+deprecated (LICENSE-MIT).
 
@@ -38249,7 +38220,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T599
+### T598
 
 SHA-256 `d5c22aa3118d240e877ad41c5d9fa232f9c77d757d4aac0c2f943afc0a95e0ef`. Used by: block-buffer 0.10.4 (LICENSE-MIT).
 
@@ -38281,7 +38252,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T600
+### T599
 
 SHA-256 `d5fca2653c88ad02d197faead77e22b80c70636b5bec6e02f2805f389a21b86d`. Used by: fancy-regex 0.16.2 (AUTHORS).
 
@@ -38298,7 +38269,7 @@ Keith Hall
 Jon Perry
 ```
 
-### T601
+### T600
 
 SHA-256 `d70f9e316930b4333b6f51af5f0d0cb7ded6a4a2641549aa088027aaff91e950`. Used by: lilconfig 2.1.0 (LICENSE).
 
@@ -38326,7 +38297,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T602
+### T601
 
 SHA-256 `d72768d98ecd23ad9bc3dab5cd10b174db3bb20336c1b7daf298988facea3807`. Used by: htmlfy 0.8.1 (LICENSE).
 
@@ -38355,7 +38326,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T603
+### T602
 
 SHA-256 `d9fa6b0e6fed50d4961b9c931587af6bd127df13e9473418d3e324f427db4f06`. Used by: tauri-winres 0.3.6 (LICENSE).
 
@@ -38390,7 +38361,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T604
+### T603
 
 SHA-256 `d9fed24f132985934fca621c4dc1dfb53e03377a24d0568d424383d7eaa9c0ac`. Used by: async 3.2.6 (LICENSE).
 
@@ -38416,7 +38387,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T605
+### T604
 
 SHA-256 `da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93`. Used by: react-is 19.2.8 (LICENSE).
 
@@ -38444,7 +38415,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T606
+### T605
 
 SHA-256 `daa94322de7eab889e055932396160395bd8e3af82f56ae8c419d3049111da72`. Used by: by_address 1.2.1 (LICENSE-MIT).
 
@@ -38476,7 +38447,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T607
+### T606
 
 SHA-256 `daacc37f680c7dd0a758ac99a109f2f57d9f21d3683df9e9245055922842a695`. Used by: embed_plist 1.2.2 (LICENSE-MIT).
 
@@ -38504,12 +38475,40 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T608
+### T607
 
 SHA-256 `db11fec9946737df39ca3898d9cd8c10ec6f6c3a884a6802b0ad0b81b4e8f23a`. Used by: typenum 1.20.1 (LICENSE).
 
 ```text
 MIT OR Apache-2.0
+```
+
+### T608
+
+SHA-256 `db480f236292a093e77a83c35431a8496624e1e664a3547768a9ce2bdde39877`. Used by: whatwg-url 17.2.0 (LICENSE.txt).
+
+```text
+The MIT License (MIT)
+
+Copyright (c) Sebastian Mayr
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### T609
@@ -38570,34 +38569,6 @@ SOFTWARE.
 
 ### T611
 
-SHA-256 `dbffd380d59504ba19fcf87ff5a1a33c37edf66d5b09966b0ad5368ab87bc2af`. Used by: @exodus/bytes 1.15.1 (LICENSE).
-
-```text
-MIT License
-
-Copyright (c) 2024-2025 Exodus Movement
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-### T612
-
 SHA-256 `dc91f8200e4b2a1f9261035d4c18c33c246911a6c0f7b543d75347e61b249cff`. Used by: http 1.5.0 (LICENSE-MIT).
 
 ```text
@@ -38628,7 +38599,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T613
+### T612
 
 SHA-256 `dd87e27dfbaa888cb77ea34592648a7743636b8dce07e49543bddda0fcfc73bc`. Used by: reqwest 0.13.4 (LICENSE-MIT).
 
@@ -38655,7 +38626,7 @@ THE SOFTWARE.
 
 ```
 
-### T614
+### T613
 
 SHA-256 `ddc9158fa20e427bc12fa8e1e6d07c642ed4d2c618607df768b30ae2986b3b7c`. Used by: buffer-crc32 1.0.0 (LICENSE).
 
@@ -38681,7 +38652,7 @@ FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TOR
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T615
+### T614
 
 SHA-256 `de4d1f2d2ad5ad0cfd1657a106476b31cb5db5ef9d1ff842b237c0c81f0c8a23`. Used by: argparse 2.0.1 (LICENSE).
 
@@ -38942,7 +38913,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T616
+### T615
 
 SHA-256 `de701d0618d694feb1af90f02181a1763d9b0bdeb70a3a592781e529077dba65`. Used by: matchit 0.8.4 (LICENSE).
 
@@ -38970,7 +38941,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T617
+### T616
 
 SHA-256 `dedc5ba48845093da9bbe6f2bb0b3cc87d9829c7d49d55c2dfe661671364d821`. Used by: glob 8.1.0 (LICENSE).
 
@@ -38992,7 +38963,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T618
+### T617
 
 SHA-256 `df9cfd06d8a44d9a671eadd39ffd97f166481da015a30f45dfd27886209c5922`. Used by: mime 0.3.17 (LICENSE-MIT).
 
@@ -39019,7 +38990,7 @@ THE SOFTWARE.
 
 ```
 
-### T619
+### T618
 
 SHA-256 `e0c22cfe00a9a0a5fa1b3071863c4658a68a84b8279b3e64df60b50db0c38780`. Used by: locate-app 2.5.0 (LICENSE).
 
@@ -39228,7 +39199,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### T620
+### T619
 
 SHA-256 `e0cfa1006a64520633de6bfbf563f5b1bea04ef0c5b73f049681931fa297dda3`. Used by: cobs 0.3.0 (LICENSE-MIT).
 
@@ -39254,7 +39225,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T621
+### T620
 
 SHA-256 `e1305318de03582a116ff7fda2925e4c4d18af2bc88b070bccf819c4a5412d10`. Used by: citationberg 0.7.0 (NOTICE).
 
@@ -39270,7 +39241,7 @@ The Creative Commons BY-SA 3.0 DEED License applies to:
 https://creativecommons.org/licenses/by-sa/3.0/
 ```
 
-### T622
+### T621
 
 SHA-256 `e1919b3b98b8bf6c1b99fcc60a0ed46027c97ac947432e1278446c9606f50161`. Used by: @rolldown/pluginutils 1.0.1 (LICENSE).
 
@@ -39298,7 +39269,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T623
+### T622
 
 SHA-256 `e24c254362b30841cd770cb4ee6adb081250306de4aa699fbd9684e0bc9f7d06`. Used by: geckodriver 6.1.1 (LICENSE).
 
@@ -39327,7 +39298,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T624
+### T623
 
 SHA-256 `e2e245f2b566d0bfafb0f6a04c16b82d710c4e6e7d799e39bb4ef6e541b85b98`. Used by: num-conv 0.2.2 (LICENSE-MIT).
 
@@ -39353,7 +39324,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T625
+### T624
 
 SHA-256 `e399db7e952e45cae84f1b53d72ba8dbad2daaa7ab8cd1f0ab72fea5ab73b225`. Used by: devalue 5.9.4 (LICENSE).
 
@@ -39367,7 +39338,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T626
+### T625
 
 SHA-256 `e4705ddab847449a2cdcb3c88b005ea10330aa249d9148ca2eef9c84c5d29895`. Used by: async-broadcast 0.7.2 (LICENSE-APACHE).
 
@@ -39564,7 +39535,7 @@ SHA-256 `e4705ddab847449a2cdcb3c88b005ea10330aa249d9148ca2eef9c84c5d29895`. Used
    limitations under the License.
 ```
 
-### T627
+### T626
 
 SHA-256 `e5aee0714b6ecc416454b968d1017570ef609f20d8722ab84b07acd550b78198`. Used by: deep-eql 5.0.2 (LICENSE).
 
@@ -39590,7 +39561,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T628
+### T627
 
 SHA-256 `e5c1364118b39fa98b959138ce4aa4d0e68cfbee12d115e69730579fecb1dc1b`. Used by: run-async 4.0.6 (LICENSE).
 
@@ -39618,7 +39589,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T629
+### T628
 
 SHA-256 `e63690624d604aa626c3c62b6ead1a9f4a916d2260ac8132022acbafe2556045`. Used by: open 5.4.2 (LICENSE.md).
 
@@ -39650,7 +39621,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T630
+### T629
 
 SHA-256 `e70ff771504ba41f2be55de812a017ff46433d7a250c862e38fc419159e44500`. Used by: normalize-path 3.0.0 (LICENSE).
 
@@ -39678,7 +39649,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T631
+### T630
 
 SHA-256 `e72111c52b7d96ebe25348dee19f0744f444d3c95ae6b1ecb6ccaecc5bce05ba`. Used by: zlib-rs 0.6.8 (LICENSE).
 
@@ -39704,7 +39675,7 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 ```
 
-### T632
+### T631
 
 SHA-256 `e7d1fee7347ffddccc5fd03327ffdb50f8c112be0d5016d62388a92c4ae6e7a9`. Used by: to-regex-range 5.0.1 (LICENSE).
 
@@ -39732,7 +39703,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T633
+### T632
 
 SHA-256 `e7f5d28405c9fe6580db684634bace66953055b436d7fbb6f860d0c800c44a9f`. Used by: lazystream 1.0.1 (LICENSE).
 
@@ -39762,7 +39733,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ```
 
-### T634
+### T633
 
 SHA-256 `e85e131fa4ed25538ff1f4962ced1fb6f68b079bd9164a790597a0f30b8fd030`. Used by: ajv 6.15.0 (LICENSE).
 
@@ -39791,7 +39762,7 @@ SOFTWARE.
 
 ```
 
-### T635
+### T634
 
 SHA-256 `ea021d8c6383c84d19c15ce90d3b1602cf448fdcc0bf3772c98e43c7bf1bf1d1`. Used by: winreg 0.55.0 (LICENSE).
 
@@ -39817,7 +39788,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T636
+### T635
 
 SHA-256 `eb227437252b2a7a9c1fc342c93ade1f3d7ce38cc6dd754f613db07d53ceff0b`. Used by: libappindicator 0.9.0 (LICENSE-MIT).
 
@@ -39846,7 +39817,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T637
+### T636
 
 SHA-256 `eb43bf7ab35c34fbfd52f1aff29e0ee8cad8d27f89cdd5a35bc20b415eef7146`. Used by: edge-paths 3.0.5 (LICENSE).
 
@@ -39874,7 +39845,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T638
+### T637
 
 SHA-256 `ebaac853b53fec0ed475796f533ce676912a4df9ad9d8a621fa76d5060591e10`. Used by: cfb 0.7.3 (LICENSE).
 
@@ -39902,7 +39873,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T639
+### T638
 
 SHA-256 `ecdccbcf39024f624ded480c01c0b25458e1eca8f26ecf040933865ce56d9a4f`. Used by: process-nextick-args 2.0.1 (license.md).
 
@@ -39928,7 +39899,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.**
 ```
 
-### T640
+### T639
 
 SHA-256 `ed0b4f44d335645e243ff856c66b5ca7b353ed58d10307e6d4dbfb35658a7814`. Used by: vitefu 1.1.3 (LICENSE).
 
@@ -39956,7 +39927,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T641
+### T640
 
 SHA-256 `edb20b474f6cbd4f4db066b54a9e0f687d0009d309412a63431189b59b8e2a07`. Used by: unicode-bidi 0.3.18 (COPYRIGHT).
 
@@ -39971,7 +39942,7 @@ carrying such notice may not be copied, modified, or distributed except
 according to those terms.
 ```
 
-### T642
+### T641
 
 SHA-256 `edd65bdd88957a205c47d53fa499eed8865a70320f0f03f6391668cb304ea376`. Used by: deranged 0.5.8 (LICENSE-Apache).
 
@@ -40180,7 +40151,7 @@ SHA-256 `edd65bdd88957a205c47d53fa499eed8865a70320f0f03f6391668cb304ea376`. Used
    limitations under the License.
 ```
 
-### T643
+### T642
 
 SHA-256 `ee48679d379ca6b4493d5e231094d85f818dd9be40b1a4f234fb7ff657ee35d9`. Used by: obug 2.1.4 (LICENSE).
 
@@ -40210,7 +40181,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T644
+### T643
 
 SHA-256 `ee874098519e956c23a3c5c7e20581f8e9b1d70aa05eb178f983be9775090a2f`. Used by: cargo_toml 0.22.3 (LICENSE).
 
@@ -40420,7 +40391,7 @@ DEALINGS IN THE SOFTWARE.
 
 ```
 
-### T645
+### T644
 
 SHA-256 `ef85e793535938cd0c18792c194d32692a06bb1bce41ab3227fdfe9ef7d192f1`. Used by: loglevel-plugin-prefix 0.8.4 (LICENSE).
 
@@ -40448,7 +40419,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T646
+### T645
 
 SHA-256 `ef88893533af22ffbb68ceef0724ba1389518df26165a34f3c99ad30b884df4f`. Used by: wry 0.55.1 (LICENSE-MIT).
 
@@ -40476,7 +40447,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T647
+### T646
 
 SHA-256 `efcfee7981ff72431fffb06925cad00a23dce079ed4354f61030ad5abdb78829`. Used by: redox_syscall 0.5.18 (LICENSE).
 
@@ -40505,7 +40476,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T648
+### T647
 
 SHA-256 `f025ccfb7dfb6bdfedc75ca0f67acc69e6fb4998143d834f7c2f38a29989680f`. Used by: ring 0.17.14 (LICENSE-other-bits).
 
@@ -40525,7 +40496,7 @@ OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T649
+### T648
 
 SHA-256 `f0cf9b1c62bbe3bd3a69f5f79c7158f513f612b4940a0a812d1db39d605318bc`. Used by: quick-xml 0.42.0 (LICENSE-MIT.md).
 
@@ -40555,7 +40526,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T650
+### T649
 
 SHA-256 `f18cad8d98d4454ad42c33f1950d642cd3b939f2ccd3c36710fa8f50842cacc0`. Used by: @keyv/bigmap 1.3.1 (LICENSE).
 
@@ -40583,7 +40554,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T651
+### T650
 
 SHA-256 `f2042f3634c4136d06b5139c9c6aefb81a3a462b514548bc1845953233dfba98`. Used by: deep-is 0.1.4 (LICENSE).
 
@@ -40612,7 +40583,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T652
+### T651
 
 SHA-256 `f28420c1906af38be726cd7842798f0194b27c41d6051c0d1e9ee348b8a4a0ea`. Used by: cookie 0.18.2 (LICENSE-MIT).
 
@@ -40645,7 +40616,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T653
+### T652
 
 SHA-256 `f2e4fad8a368f5bb6610e9843f142a0098c80c3718d1ce75c7133ee0acddd786`. Used by: ecb 0.2.1 (LICENSE-MIT).
 
@@ -40677,7 +40648,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T654
+### T653
 
 SHA-256 `f3c3e9f4febe81ff14ccc233c344e6e60051290d1c1e5a2c670d63cc3608a5bb`. Used by: swift-rs 1.0.8 (LICENSE-MIT).
 
@@ -40703,7 +40674,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T655
+### T654
 
 SHA-256 `f3c51ace7f159b21566d72535e84ff354505ae7ffdca835dac81fcdafbf9e879`. Used by: @typescript-eslint/type-utils 8.70.1 (LICENSE).
 
@@ -40731,7 +40702,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T656
+### T655
 
 SHA-256 `f49d7e15695022ed1dcd72eb88adf16c9e3fa7f2de63cd71963ba233d3d51264`. Used by: svgtypes 0.16.1 (AUTHORS).
 
@@ -40745,7 +40716,7 @@ SHA-256 `f49d7e15695022ed1dcd72eb88adf16c9e3fa7f2de63cd71963ba233d3d51264`. Used
 Yevhenii Reizner
 ```
 
-### T657
+### T656
 
 SHA-256 `f4ff0f211345d2496a6e9dc56d6f13f4ee52c0223ab718bfe7ebc77945af3942`. Used by: human-signals 8.0.1 (LICENSE).
 
@@ -40953,7 +40924,7 @@ SHA-256 `f4ff0f211345d2496a6e9dc56d6f13f4ee52c0223ab718bfe7ebc77945af3942`. Used
    limitations under the License.
 ```
 
-### T658
+### T657
 
 SHA-256 `f58943cb354fb2707fea2f7b26b04e6014ddb56835cdfd414c9d2c6c59165b64`. Used by: ci-info 4.4.0 (LICENSE).
 
@@ -40981,7 +40952,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T659
+### T658
 
 SHA-256 `f65c5d9f22a317b2a10803bd1868461ce6499c2ed7217bc80c0cc772a748789c`. Used by: graceful-fs 4.2.11 (LICENSE).
 
@@ -41003,7 +40974,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T660
+### T659
 
 SHA-256 `f71452d91682fdae0ca948b18cfed53a953d1237740dd80371c76a5c1c7bbe91`. Used by: pico-args 0.5.0 (LICENSE).
 
@@ -41030,7 +41001,7 @@ THE SOFTWARE.
 
 ```
 
-### T661
+### T660
 
 SHA-256 `f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc`. Used by: lodash 4.18.1 (LICENSE).
 
@@ -41084,7 +41055,7 @@ licenses; we recommend you read them, as their terms may differ from the
 terms above.
 ```
 
-### T662
+### T661
 
 SHA-256 `f72b120d1385408e9e380acc020756eb6ba1b461d66c328ea67327ba08d7dcfd`. Used by: ar_archive_writer 0.5.3 (LICENSE.txt).
 
@@ -41310,7 +41281,7 @@ Software.
 
 ```
 
-### T663
+### T662
 
 SHA-256 `f7715d38a3fa1b4ac97c5729740752505a39cb92ee83ab5b102aeb5eaa7cdea4`. Used by: new_debug_unreachable 1.0.6 (LICENSE-MIT).
 
@@ -41342,7 +41313,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T664
+### T663
 
 SHA-256 `f7bdb3426d045cd50efd4953026e3eb5a83d0199f458a075602611b9344da5b9`. Used by: hex 0.4.3 (LICENSE-MIT).
 
@@ -41369,7 +41340,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T665
+### T664
 
 SHA-256 `f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1`. Used by: unicode-ident 1.0.26 (LICENSE-UNICODE).
 
@@ -41415,7 +41386,7 @@ dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 ```
 
-### T666
+### T665
 
 SHA-256 `f8218253704e32441cafea1b9b3bcb2c6a3c51c5553cd8513d179290202bccb2`. Used by: rust_decimal 1.43.0 (LICENSE).
 
@@ -41443,7 +41414,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T667
+### T666
 
 SHA-256 `f95f668fe64081ddb4153b322e34fdd719b991285ed08177d5ad7133b7988d92`. Used by: tinyexec 1.3.0 (LICENSE).
 
@@ -41471,7 +41442,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T668
+### T667
 
 SHA-256 `f9946796a8a5bd5981565142fa42e3b0cc36aef6f80e86beaf5905b3c0fef1b5`. Used by: peniko 0.6.1 (LICENSE-APACHE).
 
@@ -41681,7 +41652,7 @@ SHA-256 `f9946796a8a5bd5981565142fa42e3b0cc36aef6f80e86beaf5905b3c0fef1b5`. Used
    
 ```
 
-### T669
+### T668
 
 SHA-256 `f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d`. Used by: siphasher 1.0.4 (LICENSE-MIT).
 
@@ -41705,7 +41676,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T670
+### T669
 
 SHA-256 `fa5659948374d4f555594f47f6da073b40dc503e921aeeece30df4362b3051a5`. Used by: smol-toml 1.9.0 (LICENSE).
 
@@ -41736,7 +41707,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### T671
+### T670
 
 SHA-256 `fb77f0a9c53e473abe5103c8632ef9f0f2874d4fb3f17cb2d8c661aab9cee9d7`. Used by: scopeguard 1.2.0 (LICENSE-MIT).
 
@@ -41768,7 +41739,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T672
+### T671
 
 SHA-256 `fbeb498edc5acbc8a4c3f24b93465759b2e8e495d503dcd0d21c46498ca39028`. Used by: workerpool 6.5.1 (LICENSE).
 
@@ -41976,7 +41947,7 @@ Apache License
    limitations under the License.
 ```
 
-### T673
+### T672
 
 SHA-256 `fc68eb8f1c8e1d6b8be50f3c177927e24791cae7dc251e6253a012f37926a30c`. Used by: glob-parent 6.0.2 (LICENSE).
 
@@ -41998,7 +41969,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T674
+### T673
 
 SHA-256 `fcc0fd346134b067799cb658081acec83b01b55a812c4166e98059da982e43cc`. Used by: hayagriva 0.10.1 (LICENSE-APACHE).
 
@@ -42206,7 +42177,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### T675
+### T674
 
 SHA-256 `fd4098360de4b9fb2e003ac7c852e8c86f264a1d6e27c47128e8c8075c81249b`. Used by: bare-path 3.1.1 (NOTICE).
 
@@ -42241,7 +42212,7 @@ The above copyright notice and this permission notice shall be included
 in all copies or substantial portions of the Software.
 ```
 
-### T676
+### T675
 
 SHA-256 `fd595a25dd3c90492a8cc3b888aa9ae47630173181efed17f71b4c689d99d0ec`. Used by: browser-stdout 1.3.1 (LICENSE).
 
@@ -42253,7 +42224,7 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T677
+### T676
 
 SHA-256 `fd80a26fbb3f644af1fa994134446702932968519797227e07a1368dea80f0bc`. Used by: tinyvec 1.13.3 (LICENSE-MIT.md).
 
@@ -42265,7 +42236,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T678
+### T677
 
 SHA-256 `fe99d9a94ec7edc64a9767701f830f66e08239b000d653a359d66e640289ed0c`. Used by: defaults 1.0.4 (LICENSE).
 
@@ -42294,7 +42265,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T679
+### T678
 
 SHA-256 `fea1d5bf3dd71605ce5d7d2ff695c1837e914c77195e523a86b5391716477960`. Used by: jni 0.21.1 (LICENSE-MIT).
 
@@ -42322,7 +42293,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T680
+### T679
 
 SHA-256 `ff92bed461f50338dd703a9ba9aee496a425957873df1d91192776e4bdf5dda7`. Used by: r-efi 5.3.0 (AUTHORS).
 
