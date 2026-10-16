@@ -184,7 +184,12 @@ jobs:
       # against nextest's own release on 26.09.2026. The pin is v2.87.19, the
       # release whose notes name cargo-nextest 0.9.146 (it moves `latest` to it;
       # the 0.9.146 entry is v2.87.18's, unchanged) – raised the same day, short
-      # of the seven days of the spec's 5.1, and recorded there.
+      # of the seven days of the spec's 5.1, and recorded there. On 2026-10-16
+      # nextest went to 0.9.148 and the pin to v2.87.27 (2026-10-09 21:04 UTC),
+      # the first release whose manifest lists it; against v2.87.19 it changes
+      # manifests, the changelog, its own workflows and its manifest generator,
+      # and its 0.9.148 checksums for `universal-apple-darwin` and
+      # `x86_64-unknown-linux-gnu` match nextest's release files.
       #
       # `fallback: none` on every step of this action: a tool or version the
       # pinned manifest does not list fails the job instead of being fetched
@@ -192,9 +197,9 @@ jobs:
       # first run rather than warned about. It also keeps the GitHub token out
       # of the action's environment, which its README calls the best practice.
       - name: Install nextest
-        uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
-          tool: cargo-nextest@0.9.146
+          tool: cargo-nextest@0.9.148
           fallback: none
 
       - name: Test (CLI)
@@ -212,7 +217,7 @@ jobs:
       # policies over one graph started disagreeing with each other about a
       # licence the tree had carried all along.
       - name: Install cargo-deny
-        uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-deny
           fallback: none
@@ -295,9 +300,9 @@ jobs:
         run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: Install nextest
-        uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
-          tool: cargo-nextest@0.9.146
+          tool: cargo-nextest@0.9.148
           fallback: none
 
       # Without `--all-features`, and that is the condition of the test running
@@ -412,9 +417,9 @@ jobs:
       # ARUNA_REQUIRE_FIXTURE exists to prevent, and it was set on a command
       # that never reached that file.
       - name: Install nextest
-        uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
-          tool: cargo-nextest@0.9.146
+          tool: cargo-nextest@0.9.148
           fallback: none
 
       # nextest rather than `cargo test`, for the reason the `check` job gives
