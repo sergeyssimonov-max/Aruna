@@ -531,7 +531,7 @@ How many tests it turns red is not a constant, and is recorded as measured:
 | 2026-10-15, `534e095` and the tree of the first group of updates for 3.0.0 that became `7f0ae50` | ordinary set, once on each | none on `534e095`; FAIL `download::tests::asking_a_question_fails_as_an_error_rather_than_a_surprise` – `Operation not permitted (os error 1)` – on the updated tree |
 | 2026-10-15, `7f0ae50` | ordinary set, first of two in a row; host 80 % idle, 221 s | 6 FAIL, 2 TIMEOUT – below |
 | 2026-10-15, `7f0ae50` | ordinary set, second of the two; host 88 % idle, 76 s | none: 727 of 727 |
-| 2026-10-16, `f0da0f6` | ordinary set, one run | 726 of 727: FAIL `download::tests::an_answer_that_is_not_text_is_refused` – `Operation not permitted (os error 1)` on 127.0.0.1 |
+| 2026-10-15, `f0da0f6` | ordinary set, one run | 726 of 727: FAIL `download::tests::an_answer_that_is_not_text_is_refused` – `Operation not permitted (os error 1)` on 127.0.0.1 |
 
 The first of the two runs of 2026-10-15, test by test:
 
