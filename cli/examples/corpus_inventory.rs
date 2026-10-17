@@ -366,7 +366,7 @@ fn main() {
 
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).expect("entry");
-        let name = entry.name().to_string();
+        let name = entry.name().expect("name").to_string();
         if !aruna::parse::is_manuscript_xml(&name) {
             if name.to_ascii_lowercase().ends_with(".xml") {
                 skipped += 1;

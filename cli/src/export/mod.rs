@@ -765,7 +765,7 @@ fn collect_fragments_from(
         job.check(Phase::Exporting)?;
         let mut entry = archive.by_index(i)?;
         path.clear();
-        path.push_str(entry_name(entry.name_raw(), entry.name()));
+        path.push_str(&entry_name(entry.name_raw(), || entry.name())?);
         if !is_manuscript_xml(&path) {
             continue;
         }
@@ -856,15 +856,12 @@ fn write_documents(
         job.check(Phase::Exporting)?;
 
         let mut entry = archive.by_index(i)?;
-        let Some(index) = wanted
-            .get(entry_name(entry.name_raw(), entry.name()))
-            .copied()
-        else {
+        let name = entry_name(entry.name_raw(), || entry.name())?.into_owned();
+        let Some(index) = wanted.get(name.as_str()).copied() else {
             continue;
         };
         let relative = placed[index].relative.as_path();
 
-        let name = entry_name(entry.name_raw(), entry.name()).to_string();
         read_document(&mut entry, relative, &name, &mut bytes)?;
         normalised.clear();
         normalize::normalize_into(&bytes, &mut normalised);

@@ -256,7 +256,7 @@ fn collect(zip: &std::path::Path) -> std::io::Result<Vec<Document>> {
     let mut window = Vec::with_capacity(HEADER_READ_LIMIT);
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(std::io::Error::other)?;
-        let path = entry.name().to_string();
+        let path = entry.name().map_err(std::io::Error::other)?.to_string();
         if !is_manuscript_xml(&path) {
             continue;
         }

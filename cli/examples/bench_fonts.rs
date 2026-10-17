@@ -25,7 +25,7 @@ fn main() {
     let mut bytes = Vec::new();
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).expect("entry");
-        if !is_manuscript_xml(entry.name()) {
+        if !is_manuscript_xml(&entry.name().expect("name")) {
             continue;
         }
         bytes.clear();

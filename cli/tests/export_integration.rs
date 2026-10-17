@@ -540,13 +540,15 @@ fn each_document_names_its_archive_entry_byte_for_byte() {
             entry.read_to_end(&mut bytes).expect("read");
             catalogue.push((
                 entry.name_raw().to_vec(),
-                entry.name().to_string(),
+                entry.name().expect("name").to_string(),
                 sha256_hex(&bytes),
             ));
         }
         assert_eq!(catalogue[0].0, nfd.as_bytes());
-        // Without the flag `zip` reads the name as CP437: not what the bytes say.
-        assert_eq!(catalogue[0].1 == nfd, flagged, "{}", catalogue[0].1);
+        // Since `zip` 9 (#807, #789) the crate reads a name as UTF-8 first,
+        // whatever the flag says: both archives give `nfd`. Until 8.6 an
+        // unflagged name came back as CP437, not what the bytes say.
+        assert_eq!(catalogue[0].1, nfd, "flagged: {flagged}");
 
         export::build(
             &zip,

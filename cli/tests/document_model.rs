@@ -68,13 +68,14 @@ fn each_document(path: &Path, mut visit: impl FnMut(&str, &[u8])) -> usize {
     let mut admitted = 0;
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).expect("entry");
-        if !is_manuscript_xml(entry.name()) {
+        if !is_manuscript_xml(&entry.name().expect("name")) {
             continue;
         }
         let name = entry
             .name()
+            .expect("name")
             .split_once('/')
-            .map_or(entry.name(), |(_, rest)| rest)
+            .map_or(&*entry.name().expect("name"), |(_, rest)| rest)
             .to_string();
         bytes.clear();
         entry.read_to_end(&mut bytes).expect("read the document");

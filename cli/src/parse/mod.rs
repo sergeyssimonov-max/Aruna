@@ -32,6 +32,10 @@ use fields::{
     extract_year_fallback,
 };
 
+use std::borrow::Cow;
+
+use zip::result::ZipResult;
+
 use crate::xml_scan::{find_close_tag, find_open_tag};
 
 /// Placeholder for missing fields (en-dash per specification).
@@ -88,11 +92,24 @@ pub fn truncate_on_char_boundary(s: &str, max: usize) -> &str {
 /// whose own `docID` cannot be read gets its package file named from — so
 /// reading the name wrong is reading it wrong exactly where it is needed.
 ///
-/// CP437 stays for an archive that really is CP437: `fallback` is the name the
-/// crate already decoded, and it is asked for only when the bytes are not UTF-8.
-/// Measured 2026-09-16: no entry name in this corpus is anything but UTF-8.
-pub fn entry_name<'a>(raw: &'a [u8], fallback: &'a str) -> &'a str {
-    std::str::from_utf8(raw).unwrap_or(fallback)
+/// CP437 stays for an archive that really is CP437: `fallback` is the crate's
+/// own decoding, and it is called only when the bytes are not UTF-8.
+/// Measured 2026-09-16: no entry name in this corpus is anything but UTF-8, so
+/// on the corpus `fallback` is never called.
+///
+/// Since `zip` 9 (#807, #789) the crate itself reads a name as UTF-8 first,
+/// whatever the flag says, and decodes it on demand – `ZipFile::name` returns a
+/// `ZipResult<Cow<str>>`. The paragraph above is the history of 2026-09-16;
+/// Aruna keeps its own rule all the same, so the package does not depend on
+/// which rule the library happens to follow (owner's decision of 2026-10-17).
+pub fn entry_name<'a>(
+    raw: &'a [u8],
+    fallback: impl FnOnce() -> ZipResult<Cow<'a, str>>,
+) -> ZipResult<Cow<'a, str>> {
+    match std::str::from_utf8(raw) {
+        Ok(name) => Ok(Cow::Borrowed(name)),
+        Err(_) => fallback(),
+    }
 }
 
 /// Parse a single XML document given its archive-relative path and raw text.
@@ -287,15 +304,36 @@ mod tests {
         // `München 5.xml`, как его пишет macOS: `u` и знак умлаута отдельно.
         let raw = "CTH 570_XML_HDivT/Mu\u{308}nchen 5.xml".as_bytes();
         assert_eq!(
-            entry_name(raw, "CTH 570_XML_HDivT/Mu╠ênchen 5.xml"),
+            entry_name(raw, || Ok("CTH 570_XML_HDivT/Mu╠ênchen 5.xml".into())).expect("name"),
             "CTH 570_XML_HDivT/Mu\u{308}nchen 5.xml"
         );
 
         let cp437 = b"CTH 570/M\x9aNCHEN.XML";
         assert_eq!(
-            entry_name(cp437, "CTH 570/MÜNCHEN.XML"),
+            entry_name(cp437, || Ok("CTH 570/MÜNCHEN.XML".into())).expect("name"),
             "CTH 570/MÜNCHEN.XML",
             "байты не UTF-8 – запасное чтение крейта"
+        );
+    }
+
+    /// **Расшифровка крейта зовется только для байтов, которые не UTF-8.**
+    ///
+    /// С `zip` 9 (#807, #789) имя записи расшифровывается по требованию, и
+    /// `entry_name` получает эту расшифровку как замыкание. Байты UTF-8 его не
+    /// вызывают вовсе – здесь оно паникует, – а байты не UTF-8 получают ровно
+    /// то, что оно вернуло.
+    #[test]
+    fn the_crate_decoding_is_called_only_for_bytes_that_are_not_utf8() {
+        let utf8 = "CTH 570_XML_HDivT/Mu\u{308}nchen 5.xml".as_bytes();
+        assert_eq!(
+            entry_name(utf8, || panic!("байты UTF-8 вызвали запасное чтение")).expect("name"),
+            "CTH 570_XML_HDivT/Mu\u{308}nchen 5.xml"
+        );
+
+        let not_utf8 = b"M\x81nchen.xml";
+        assert_eq!(
+            entry_name(not_utf8, || Ok("München.xml".into())).expect("name"),
+            "München.xml"
         );
     }
 

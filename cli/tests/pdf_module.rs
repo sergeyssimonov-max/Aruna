@@ -263,10 +263,10 @@ fn corpus_document(rel_in_zip_suffix: &str) -> Option<(String, Vec<u8>)> {
     let mut archive = zip::ZipArchive::new(file).ok()?;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).ok()?;
-        if entry.name().ends_with(rel_in_zip_suffix) {
+        if entry.name().ok()?.ends_with(rel_in_zip_suffix) {
             let mut bytes = Vec::new();
             std::io::Read::read_to_end(&mut entry, &mut bytes).ok()?;
-            return Some((entry.name().to_string(), bytes));
+            return Some((entry.name().ok()?.to_string(), bytes));
         }
     }
     None

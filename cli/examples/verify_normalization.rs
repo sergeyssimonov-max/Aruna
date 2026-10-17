@@ -76,7 +76,13 @@ fn main() -> ExitCode {
                 continue;
             }
         };
-        let name = entry.name().to_string();
+        let name = match entry.name() {
+            Ok(name) => name.to_string(),
+            Err(err) => {
+                violations.push(format!("entry {i} has no readable name: {err}"));
+                continue;
+            }
+        };
         if !is_manuscript_xml(&name) {
             continue;
         }

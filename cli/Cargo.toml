@@ -25,7 +25,7 @@ ureq = { version = "2.12", default-features = true, features = ["tls"] }
 # entries: the flate2 decoder on zlib-rs, which typst-library already enabled
 # and flate2 prefers over miniz_oxide. `deflate` would bring back zopfli, an
 # encoder nothing calls.
-zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "=9.0.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # The PDF of every document (specification 4.10; owner's decisions of
 # 2026-09-30, questions 2, 9 and 16 of the design note): the typesetting
 # engine, pinned exactly, in the core without a Cargo feature – one

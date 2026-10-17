@@ -130,7 +130,7 @@ fn expected_from_archive(archive: &Path) -> (Bodies, usize) {
 
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).expect("entry");
-        let name = entry.name().to_string();
+        let name = entry.name().expect("name").to_string();
         if !is_manuscript_xml(&name) {
             continue;
         }

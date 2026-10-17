@@ -165,7 +165,7 @@ fn read_archive<P: Probe>(
         scratch.path.clear();
         scratch
             .path
-            .push_str(entry_name(entry.name_raw(), entry.name()));
+            .push_str(&entry_name(entry.name_raw(), || entry.name())?);
 
         // The path gate, which costs nothing: an entry rejected here is never
         // inflated.

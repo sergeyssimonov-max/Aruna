@@ -66,7 +66,7 @@ fn the_whole_corpus_normalises_without_distortion_and_the_archive_is_not_written
 
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).expect("entry");
-        let name = entry.name().to_string();
+        let name = entry.name().expect("name").to_string();
         if !is_manuscript_xml(&name) {
             continue;
         }
@@ -160,7 +160,7 @@ fn the_documents_whose_tags_do_not_balance_are_the_ones_already_known() {
     let mut source = Vec::new();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).expect("entry");
-        let name = entry.name().to_string();
+        let name = entry.name().expect("name").to_string();
         if !is_manuscript_xml(&name) {
             continue;
         }
@@ -279,7 +279,7 @@ fn every_document_the_gates_admit_survives_decoding_intact() {
 
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).expect("entry");
-        if !is_manuscript_xml(entry.name()) {
+        if !is_manuscript_xml(&entry.name().expect("name")) {
             continue;
         }
         let mut bytes = Vec::new();
@@ -378,7 +378,7 @@ fn the_documents_beyond_this_parser_are_the_seventeen_xmllint_names() {
     let mut out = Vec::new();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).expect("entry");
-        let name = entry.name().to_string();
+        let name = entry.name().expect("name").to_string();
         if !is_manuscript_xml(&name) {
             continue;
         }
@@ -482,7 +482,7 @@ fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
     let mut out = Vec::new();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).expect("entry");
-        let name = entry.name().to_string();
+        let name = entry.name().expect("name").to_string();
         if !is_manuscript_xml(&name) {
             continue;
         }
@@ -533,8 +533,11 @@ fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
 /// `docID` документа прочитать нельзя.
 ///
 /// Отрицательный контроль здесь обязателен: без него тест прошел бы и на
-/// прежнем коде. Шестнадцать имен обязаны отличаться от того, что крейт
-/// говорит сам, – иначе проверять нечего.
+/// прежнем коде. До 17.10.2026 им было «шестнадцать имен обязаны отличаться
+/// от того, что крейт говорит сам». С `zip` 9 (#807, #789) крейт сам читает
+/// имя сначала как UTF-8 при любом флаге, и прежний контроль стал бы проверять
+/// библиотеку, а не Aruna. Теперь контроль – что расшифровка крейта на корпусе
+/// не вызывается ни разу: все 26 910 имен прочитаны по своим байтам.
 #[test]
 fn no_entry_name_is_read_through_a_foreign_code_page() {
     let Some(path) = required() else { return };
@@ -543,11 +546,15 @@ fn no_entry_name_is_read_through_a_foreign_code_page() {
     let mut archive =
         zip::ZipArchive::new(std::io::BufReader::new(file)).expect("read the archive");
 
-    let (mut entries, mut non_ascii, mut repaired) = (0usize, 0usize, 0usize);
+    let (mut entries, mut non_ascii, mut fallbacks) = (0usize, 0usize, 0usize);
     let mut seen: Vec<String> = Vec::new();
     for i in 0..archive.len() {
         let entry = archive.by_index(i).expect("entry");
-        let name = entry_name(entry.name_raw(), entry.name());
+        let name = entry_name(entry.name_raw(), || {
+            fallbacks += 1;
+            entry.name()
+        })
+        .expect("name");
         assert!(
             !name.contains('\u{FFFD}'),
             "имя записи со знаком замены: {name:?}"
@@ -555,7 +562,6 @@ fn no_entry_name_is_read_through_a_foreign_code_page() {
         entries += 1;
         if !name.is_ascii() {
             non_ascii += 1;
-            repaired += usize::from(name != entry.name());
             seen.push(name.to_string());
         }
     }
@@ -563,8 +569,8 @@ fn no_entry_name_is_read_through_a_foreign_code_page() {
     assert_eq!(entries, 26_910, "архив сменил состав");
     assert_eq!(non_ascii, 16, "имен с не-ASCII байтами стало другое число");
     assert_eq!(
-        repaired, non_ascii,
-        "имена читаются так же, как их отдает крейт, – проверять нечего"
+        fallbacks, 0,
+        "расшифровка крейта вызвана – имя на корпусе не UTF-8"
     );
     assert!(
         seen.iter()

@@ -210,7 +210,7 @@ fn sample_documents(zip: &std::path::Path, fragments: &[Fragment], limit: usize)
         let Ok(mut entry) = archive.by_index(i) else {
             continue;
         };
-        if !wanted.contains(entry.name()) {
+        if !entry.name().is_ok_and(|name| wanted.contains(&*name)) {
             continue;
         }
         let mut bytes = Vec::new();

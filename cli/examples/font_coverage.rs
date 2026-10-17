@@ -197,7 +197,7 @@ fn code_points(zip: &Path) -> BTreeSet<u32> {
         let Ok(mut entry) = archive.by_index(i) else {
             continue;
         };
-        if !is_manuscript_xml(entry.name()) {
+        if !entry.name().is_ok_and(|name| is_manuscript_xml(&name)) {
             continue;
         }
         bytes.clear();
