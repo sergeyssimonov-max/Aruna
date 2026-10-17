@@ -1297,7 +1297,7 @@ Packages: 1435 – crates 745, npm 690. Distinct licence texts: 679. Requires re
 | postcss | 8.5.29 | npm | MIT | T134 |
 | prelude-ls | 1.2.1 | npm | MIT | T69 |
 | prettier-plugin-svelte | 4.1.1 | npm | MIT | T434 |
-| prettier | 3.9.9 | npm | MIT | T540 |
+| prettier | 3.9.10 | npm | MIT | T540 |
 | pretty-format | 27.5.1 | npm | MIT | T82 |
 | pretty-format | 30.4.1 | npm | MIT | T19 |
 | pretty-ms | 9.3.0 | npm | MIT | T4 |
@@ -34753,7 +34753,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T540
 
-SHA-256 `b0f2417199889f1c0d28ec4e0244eacf1a15de5819d61f641dd7d8f45153ac9c`. Used by: prettier 3.9.9 (LICENSE).
+SHA-256 `b0f2417199889f1c0d28ec4e0244eacf1a15de5819d61f641dd7d8f45153ac9c`. Used by: prettier 3.9.10 (LICENSE).
 
 ```text
 Copyright © James Long and contributors
