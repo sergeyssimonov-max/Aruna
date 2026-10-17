@@ -128,7 +128,7 @@ dependencies = [
  "typst-pdf",
  "unicode-normalization",
  "ureq",
- "zip 9.0.1",
+ "zip",
 ]
 
 [[package]]
@@ -152,7 +152,7 @@ dependencies = [
  "tauri-specta",
  "tempfile",
  "thiserror 2.0.20",
- "zip 8.6.0",
+ "zip",
 ]
 
 [[package]]
@@ -8068,18 +8068,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
-]
-
-[[package]]
-name = "zip"
-version = "8.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b"
-dependencies = [
- "crc32fast",
- "indexmap 2.14.2",
- "memchr",
- "typed-path",
 ]
 
 [[package]]

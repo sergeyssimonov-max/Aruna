@@ -62,4 +62,4 @@ tempfile = "3"
 # не только с архивом корпуса. Та же версия, что у ядра, – крейт в lock-файле
 # уже есть. Без признаков: тесты оболочки пишут только Stored, распаковка –
 # признак ядра.
-zip = { version = "8.6", default-features = false }
+zip = { version = "=9.0.1", default-features = false }
