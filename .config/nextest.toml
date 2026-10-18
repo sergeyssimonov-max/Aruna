@@ -59,13 +59,16 @@ priority = 100
 filter = "(package(aruna) & kind(lib) & test(/^download::tests::/)) | binary(cli_process) | binary(cache_concurrency) | binary(cache_lifecycle)"
 priority = 50
 
-# The heavy tests that build the whole package with PDFs (`#[ignore]`): each
-# is a whole-corpus build in the dev profile, about 170–180 s. Named exactly,
+# The five heavy tests that build the whole package with PDFs (`#[ignore]`):
+# each is a whole-corpus build in the dev profile, about 170–180 s, and up to
+# about 210 s when all five run side by side. Named exactly,
 # not by a substring or a pattern, so no other test inherits the limit. The
 # reason is in the comment over `slow-timeout` above.
 [[profile.default.overrides]]
 filter = '''
 (package(aruna-desktop) & test(=cancelling::the_window_builds_the_corpus_with_pdfs))
+| (package(aruna-desktop) & test(=cancelling::the_same_run_without_a_press_builds_the_whole_package))
+| (package(aruna-desktop) & test(=markup::every_name_of_a_real_package_reaches_the_window_byte_for_byte))
 | (package(aruna) & binary(authenticity) & test(=the_whole_corpus_reaches_the_package_once_and_unchanged))
 | (package(aruna) & binary(authenticity) & test(=every_document_names_the_entry_its_source_digest_was_taken_of))
 '''

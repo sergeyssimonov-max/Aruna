@@ -119,7 +119,7 @@ function report(over: Partial<BuildReport> = {}): BuildReport {
     groups: 663,
     disambiguated: 0,
     stylesheet_dropped: 0,
-    pdfs: null,
+    pdfs: { built: 23936, refused: 0 },
     ...over,
   }
 }
@@ -247,6 +247,11 @@ async function overNothing(): Promise<HTMLElement> {
   const { container } = render(App)
   await screen.findByRole('button', { name: 'Собрать по умолчанию' })
   return container
+}
+
+/** Подписи всех кнопок окна, в порядке разметки. */
+function buttons(): string[] {
+  return screen.getAllByRole('button').map((button) => button.textContent?.trim() ?? '')
 }
 
 /** Нажать главную кнопку – ту, на которой держится сценарий E2E. */
@@ -572,7 +577,7 @@ describe('пакет есть', () => {
     // И кнопка не для вида: она и есть единственный способ вернуть опись.
     buildCorpus.mockResolvedValue(ok(report()))
     await fireEvent.click(await primary())
-    expect(buildCorpus).toHaveBeenCalledWith(null, true)
+    expect(buildCorpus).toHaveBeenCalledWith(null)
   })
 
   it('открывает опись командой ядра', async () => {
@@ -601,45 +606,13 @@ describe('ничего не собрано', () => {
     expect(screen.getByRole('button', { name: 'Собрать в папку…' })).toBeInTheDocument()
   })
 
-  /**
-   * **Время сборки названо для обоих режимов** (решение владельца
-   * 18.10.2026, 4.1): с PDF и без.
-   */
-  it('говорит, сколько занимает сборка с PDF и без', async () => {
+  /** **Время сборки названо одно** – сборка всегда с PDF. */
+  it('говорит, сколько занимает сборка', async () => {
     const container = await overNothing()
 
     const about = container.querySelector('.about')?.textContent?.replace(/\s+/g, ' ')
-    expect(about).toContain('С PDF это занимает около двух минут, без PDF – до минуты с небольшим.')
-    expect(about).not.toContain('от нескольких секунд')
-  })
-
-  /**
-   * **Флажок «Строить PDF» при открытии окна включен** (решение владельца
-   * 18.10.2026, 4.2) – и его значение уходит в `build_corpus`.
-   */
-  it('открывается с включенным флажком «Строить PDF»', async () => {
-    await overNothing()
-
-    const box = screen.getByRole('checkbox', { name: 'Строить PDF' })
-    expect(box).toBeChecked()
-    expect(box).toBeEnabled()
-  })
-
-  it('отдает выключенный флажок в build_corpus', async () => {
-    buildCorpus.mockReturnValue(deferred<unknown>().promise)
-    await overNothing()
-
-    await fireEvent.click(screen.getByRole('checkbox', { name: 'Строить PDF' }))
-    await fireEvent.click(await primary())
-
-    expect(buildCorpus).toHaveBeenCalledWith(null, false)
-  })
-
-  /** Флажок стоит на всех экранах с кнопкой сборки, и на собранном пакете тоже. */
-  it('показывает флажок над пакетом', async () => {
-    await overPackage()
-
-    expect(screen.getByRole('checkbox', { name: 'Строить PDF' })).toBeChecked()
+    expect(about).toContain('Сборка занимает около двух минут.')
+    expect(about).not.toContain('с небольшим')
   })
 
   /**
@@ -671,7 +644,7 @@ describe('ничего не собрано', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
 
     expect(open).toHaveBeenCalledWith({ multiple: false, directory: true })
-    await vi.waitFor(() => expect(buildCorpus).toHaveBeenCalledWith(FOLDER, true))
+    await vi.waitFor(() => expect(buildCorpus).toHaveBeenCalledWith(FOLDER))
   })
 
   /** **Закрытый без выбора диалог – не событие: окно остается как было.** */
@@ -700,17 +673,12 @@ describe('ничего не собрано', () => {
     buildCorpus.mockReturnValue(deferred<unknown>().promise)
     await overNothing()
 
-    // С 18.10.2026 первым в подвале стоит флажок «Строить PDF» (над рядом
-    // кнопок), и первая табуляция приходит к нему. Главное действие по-прежнему
-    // первое в ряду кнопок и следующее после флажка.
-    await user.tab()
-    expect(screen.getByRole('checkbox', { name: 'Строить PDF' })).toHaveFocus()
     await user.tab()
     expect(await primary()).toHaveFocus()
 
     await user.keyboard('{Enter}')
 
-    expect(buildCorpus).toHaveBeenCalledWith(null, true)
+    expect(buildCorpus).toHaveBeenCalledWith(null)
   })
 })
 
@@ -772,34 +740,20 @@ describe('идет сборка', () => {
   })
 
   /**
-   * **Во время сборки флажок виден и недоступен** (решение владельца
-   * 18.10.2026, 4.2): выбор относится к следующему прогону, а не к идущему.
-   */
-  it('не дает переключить PDF во время сборки', async () => {
-    const { finish } = await building()
-
-    expect(screen.getByRole('checkbox', { name: 'Строить PDF' })).toBeDisabled()
-
-    finish(ok(report()))
-    await screen.findByText(/Документов/)
-    expect(screen.getByRole('checkbox', { name: 'Строить PDF' })).toBeEnabled()
-  })
-
-  /**
    * **Фаза PDF названа своей стадией, а ее ход – строкой под полосой**
    * (решение владельца 18.10.2026, 4.1).
    *
-   * Объявление стадии несет `built: null`, и строки при нем нет: сколько
-   * построено, говорят только тики. Числа – разрядкой, как всюду в окне.
+   * Объявление стадии несет `built: 0`, и строка стоит уже на нем; тики
+   * несут числа ядра. Числа – разрядкой, как всюду в окне.
    */
   it('называет фазу PDF и ее ход с построенными', async () => {
     const { container } = await building()
     const line = () => container.querySelector('.metrics')?.textContent?.replace(/\s+/g, ' ').trim()
 
-    emit(tock({ stage: 'writing-pdfs', done: 0, total: 23936 }))
+    emit(tock({ stage: 'writing-pdfs', done: 0, built: 0, total: 23936 }))
     await tick()
     expect(screen.getByText('Перевожу документы в PDF')).toBeInTheDocument()
-    expect(screen.queryByText(/Обработано/)).toBeNull()
+    expect(line()).toBe('Обработано – 0 из 23 936, PDF построено – 0')
 
     emit(tock({ stage: 'writing-pdfs', done: 5984, built: 5980, total: 23936 }))
     await tick()
@@ -809,13 +763,12 @@ describe('идет сборка', () => {
 
   /** Строка хода PDF – только в фазе PDF: у записи документов ее нет. */
   it('не говорит о PDF на записи документов', async () => {
-    const { container } = await building()
+    await building()
 
     emit(tock({ stage: 'writing', done: 5984, total: 23936 }))
     await tick()
     expect(screen.getByText('Записываю документы')).toBeInTheDocument()
-    // Тело экрана, а не подвал: там стоит флажок «Строить PDF».
-    expect(container.querySelector('.ready')?.textContent).not.toMatch(/PDF/)
+    expect(screen.queryByText(/PDF/)).toBeNull()
   })
 
   /**
@@ -980,7 +933,7 @@ describe('кончилось', () => {
 
     await screen.findByText(/Документов/)
     const counts = Array.from(container.querySelectorAll('.count')).map((node) => node.textContent)
-    expect(counts).toEqual(['24 001', '664'])
+    expect(counts).toEqual(['24 001', '664', '23 936'])
     expect(screen.queryByText(/Рукописей/)).toBeNull()
     // Один раз, при открытии окна: после сборки числа берутся у отчета.
     expect(corpusStats).toHaveBeenCalledTimes(1)
@@ -1005,7 +958,7 @@ describe('кончилось', () => {
     expect(screen.queryByText(/Переименовано из-за совпадения/)).toBeNull()
     expect(screen.queryByText(/С лишней ссылкой на оформление/)).toBeNull()
     const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
-    expect(counts).toEqual(['23 936', '663'])
+    expect(counts).toEqual(['23 936', '663', '23 936'])
   })
 
   /**
@@ -1051,21 +1004,6 @@ describe('кончилось', () => {
     expect(await screen.findByText(/Без PDF/)).toBeInTheDocument()
   })
 
-  /**
-   * **Сборка без PDF чисел PDF не показывает вовсе** (ни нуля, ни строки)
-   * и сведений о разметке второй раз не спрашивает.
-   */
-  it('без PDF не говорит о PDF', async () => {
-    const container = await ran(ok(report()))
-
-    await screen.findByText(/Документов/)
-    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
-    expect(counts).toEqual(['23 936', '663'])
-    // Тело экрана, а не подвал: там стоит флажок «Строить PDF».
-    expect(container.querySelector('.ready')?.textContent).not.toMatch(/PDF/)
-    expect(corpusXml).toHaveBeenCalledTimes(1)
-  })
-
   /** PDF построены все: спрашивать о разметке незачем, строки нет. */
   it('без отказов PDF не спрашивает о разметке', async () => {
     await ran(ok(report({ pdfs: { built: 23936, refused: 0 } })))
@@ -1076,38 +1014,27 @@ describe('кончилось', () => {
   })
 
   /**
-   * **Отказ шрифтов предлагает собрать без PDF** (решение владельца
-   * 18.10.2026, 4.3): в ту же папку, что у неудачной попытки, без нового
-   * выбора, и флажок выключается – экран не говорит о PDF, которых не строят.
+   * **Отказ шрифтов – своя фраза и обычные действия отказа**, как у прочих
+   * неповторимых кодов: собрать по умолчанию или в папку.
    */
-  it.each(['font_missing', 'font_altered'])(
-    'на %s предлагает «Собрать без PDF» в ту же папку',
-    async (code) => {
-      open.mockResolvedValue(FOLDER)
-      buildCorpus.mockResolvedValue(
-        bad(failure({ code, phase: null, retryable: false, message: 'a font file' })),
-      )
-      await overNothing()
-      await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
-      expect(await primary()).toHaveTextContent('Собрать без PDF')
-      expect(screen.getByText(/Переустановите Aruna|не совпадает с записанным/)).toBeInTheDocument()
+  it.each([
+    ['font_missing', /Переустановите Aruna/],
+    ['font_altered', /не совпадает с записанным/],
+  ] as const)('на %s говорит свою фразу и предлагает обычные действия', async (code, phrase) => {
+    await ran(bad(failure({ code, phase: null, retryable: false, message: 'a font file' })))
 
-      buildCorpus.mockClear()
-      buildCorpus.mockReturnValue(deferred<unknown>().promise)
-      await fireEvent.click(await primary())
-
-      expect(buildCorpus).toHaveBeenCalledWith(FOLDER, false)
-      expect(open).toHaveBeenCalledTimes(1)
-      expect(screen.getByRole('checkbox', { name: 'Строить PDF' })).not.toBeChecked()
-    },
-  )
-
-  /** Прочим неповторимым отказам собирать без PDF незачем. */
-  it('на прочем неповторимом отказе не предлагает собрать без PDF', async () => {
-    await ran(bad(failure({ code: 'distorted', phase: 'exporting', retryable: false })))
-
+    expect(await screen.findByText(phrase)).toBeInTheDocument()
     expect(await primary()).toHaveTextContent('Собрать по умолчанию')
-    expect(screen.queryByRole('button', { name: 'Собрать без PDF' })).toBeNull()
+    expect(buttons()).toEqual(['Собрать по умолчанию', 'Собрать в папку…'])
+  })
+
+  /** **Итог всегда называет число PDF**, и при отказах нет тоже. */
+  it('всегда называет число PDF', async () => {
+    const container = await ran(ok(report()))
+
+    expect(await screen.findByText(/^PDF –/)).toBeInTheDocument()
+    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    expect(counts).toEqual(['23\u00a0936', '663', '23\u00a0936'])
   })
 
   /**
@@ -1175,7 +1102,7 @@ describe('кончилось', () => {
     buildCorpus.mockClear()
     await fireEvent.click(await primary())
 
-    expect(buildCorpus).toHaveBeenCalledWith(null, true)
+    expect(buildCorpus).toHaveBeenCalledWith(null)
   })
 
   /**
@@ -1366,7 +1293,7 @@ describe('кончилось', () => {
     await overNothing()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
-    await vi.waitFor(() => expect(buildCorpus).toHaveBeenCalledWith(FOLDER, true))
+    await vi.waitFor(() => expect(buildCorpus).toHaveBeenCalledWith(FOLDER))
     await screen.findByRole('button', { name: 'Отменить' })
 
     await fireEvent.click(await primary())
@@ -1381,7 +1308,7 @@ describe('кончилось', () => {
     buildCorpus.mockReturnValue(deferred<unknown>().promise)
     await fireEvent.click(await primary())
 
-    expect(buildCorpus).toHaveBeenCalledWith(FOLDER, true)
+    expect(buildCorpus).toHaveBeenCalledWith(FOLDER)
     // Подпись – следствие: обещать умолчание кнопка не вправе.
     expect(label).toBe('Собрать')
   })
@@ -1393,6 +1320,46 @@ describe('кончилось', () => {
  * `listen` возвращает отписку, и §4 контракта числит утекшие слушатели Tauri
  * среди того, что фронтенд обязан проверять.
  */
+/**
+ * **Сборка всегда с PDF, и выбирать окну нечего.** Ни в одном состоянии нет
+ * поля ввода, у каждого состояния – ровно свой набор кнопок, и каждая сборка
+ * и пересборка зовет `build_corpus` с одним аргументом – папкой.
+ */
+it('ни в одном состоянии не дает выбора сверх папки', async () => {
+  const run = deferred<unknown>()
+  buildCorpus.mockReturnValueOnce(run.promise)
+  const noInput = () => expect(document.querySelectorAll('input')).toHaveLength(0)
+
+  await overPackage()
+  noInput()
+  expect(buttons()).toEqual(['Открыть опись', 'Пересобрать', 'Собрать в папку…'])
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
+  await screen.findByRole('button', { name: 'Отменить' })
+  noInput()
+  expect(buttons()).toEqual(['Отменить'])
+
+  run.settle(ok(report()))
+  await screen.findByText(/Документов/)
+  noInput()
+  expect(buttons()).toEqual(['Открыть опись', 'Пересобрать', 'Собрать в папку…'])
+
+  buildCorpus.mockResolvedValueOnce(
+    bad(failure({ code: 'font_missing', phase: null, retryable: false })),
+  )
+  await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
+  expect(await primary()).toHaveTextContent('Собрать по умолчанию')
+  noInput()
+  expect(buttons()).toEqual(['Собрать по умолчанию', 'Собрать в папку…'])
+
+  open.mockResolvedValue(FOLDER)
+  buildCorpus.mockResolvedValueOnce(ok(report()))
+  await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
+  await screen.findByText(/Документов/)
+
+  expect(buildCorpus.mock.calls).toEqual([[null], [null], [FOLDER]])
+})
+
 it('снимает подписку на прогресс при размонтировании', async () => {
   corpusLocation.mockResolvedValue(location(false))
   const { unmount } = render(App)

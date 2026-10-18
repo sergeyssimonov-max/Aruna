@@ -235,17 +235,15 @@ pub(crate) struct BuildReport {
     /// 10.09.2026 число считалось по документам, а называлось инструкциями –
     /// на корпусе это ровно единица разницы, 8 424 против 8 423.
     pub stylesheet_dropped: u32,
-    /// PDF, когда сборка их строила: `PackageReport::pdfs` ядра. `None` у
-    /// сборки без PDF: ноль там значил бы «ни одного не вышло», а их не
-    /// строили. С 18.10.2026 (part3-1).
-    pub pdfs: Option<PdfReport>,
+    /// PDF сборки: `PackageReport::pdfs` ядра.
+    pub pdfs: PdfReport,
 }
 
 /// Сколько PDF построено и сколько отказано: `export::PdfCount` ядра.
 ///
-/// Одна пара под одним `Option`, а не два поля по отдельности: построенные без
-/// отказанных – это половина числа, которой провод не должен уметь сказать.
-/// Причины отказов записаны в манифесте пакета, сюда они не идут.
+/// Одна пара, а не два поля отчета по отдельности: построенные без отказанных
+/// – это половина числа. Причины отказов записаны в манифесте пакета, сюда
+/// они не идут.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub(crate) struct PdfReport {
     pub built: u32,
@@ -370,9 +368,11 @@ pub(crate) struct BuildProgress {
     /// знаменателя может не быть: сервер не обязан объявлять длину.
     pub done: Option<u32>,
     pub total: Option<u32>,
-    /// Сколько PDF построено, а не отказано. Только у тиков фазы PDF, у всех
-    /// прочих событий `None`. `done` и `total` этих тиков – числа ядра как
-    /// есть: обработано и всего размещенных документов.
+    /// Сколько PDF построено, а не отказано. `None` – фаза PDF еще не
+    /// началась. Объявление фазы несет ноль, тики – число ядра как есть, а все
+    /// события после фазы – последнее число тика (`WindowProgress` его
+    /// помнит). `done` и `total` тиков – тоже числа ядра: обработано и всего
+    /// размещенных документов.
     pub built: Option<u32>,
     /// Сколько нашлось, когда это уже известно, — окно говорит числа до того,
     /// как появится отчет.
@@ -467,6 +467,7 @@ impl BuildProgress {
             Core::WritingPdfs { documents } => {
                 progress.done = Some(0);
                 progress.total = Some(counted(*documents));
+                progress.built = Some(0);
                 Stage::WritingPdfs
             }
             Core::PdfsWritten { done, built, total } => {
@@ -483,6 +484,17 @@ impl BuildProgress {
         };
         progress
     }
+
+    /// Это событие с числом построенных PDF, начиная с объявления фазы: свое
+    /// число оно запоминает в `last`, а событие без числа получает оттуда
+    /// последнее. До фазы `last` пуст, и `built` остается `None`.
+    fn carrying(mut self, last: &mut Option<u32>) -> BuildProgress {
+        match self.built {
+            Some(built) => *last = Some(built),
+            None => self.built = *last,
+        }
+        self
+    }
 }
 
 /// Синк прогресса, который шлет события в окно.
@@ -494,12 +506,20 @@ impl BuildProgress {
 struct WindowProgress {
     app: tauri::AppHandle,
     job: u32,
+    /// Последнее число построенных PDF этого прогона ([`BuildProgress::carrying`]).
+    built: std::sync::Mutex<Option<u32>>,
 }
 
 impl aruna::progress::Progress for WindowProgress {
     fn report(&self, event: aruna::progress::Event<'_>) {
         use tauri_specta::Event as _;
-        let _ = BuildProgress::of(self.job, &event).emit(&self.app);
+        let mut last = self
+            .built
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _ = BuildProgress::of(self.job, &event)
+            .carrying(&mut last)
+            .emit(&self.app);
     }
 }
 
@@ -647,10 +667,10 @@ fn chosen_destination(
 /// дотягивалось. Путь приходит строкой и проверяется здесь: окно файловых ручек
 /// не получает (§3 контракта).
 ///
-/// Третья ось с 18.10.2026 (part3-2) – `pdf`, флажок «Строить PDF» окна.
-/// Каталог шрифтов берется у Tauri в момент сборки и проверяется один раз, в
-/// `PdfRequest::fonts` ядра (решение владельца 18.10.2026, 4.3). Каталога
-/// ресурсов нет – ядро откажет `font_missing`, как при отсутствующем файле.
+/// Каждый пакет несет PDF всех документов. Каталог шрифтов берется у Tauri в
+/// момент сборки и проверяется один раз, в `app::load_fonts` ядра (решение
+/// владельца 18.10.2026, 4.3). Каталога ресурсов нет – ядро откажет
+/// `font_missing`, как при отсутствующем файле.
 ///
 /// Работа идет не в главном потоке. Сборка – это от шести секунд до двух
 /// минут с PDF, а команда на главном потоке заморозила бы webview и заодно
@@ -661,12 +681,11 @@ async fn build_corpus(
     app: tauri::AppHandle,
     state: tauri::State<'_, Building>,
     destination: Option<String>,
-    pdf: bool,
 ) -> Result<BuildReport, BuildFailure> {
     use tauri::Manager as _;
 
     let chosen = chosen_destination(destination)?;
-    let request = window_request(pdf, app.path().resource_dir().ok());
+    let request = window_request(app.path().resource_dir().ok());
     let cancel = aruna::job::Cancel::new();
 
     let handle = app.clone();
@@ -679,41 +698,29 @@ async fn build_corpus(
         let sink = WindowProgress {
             app: handle,
             job: counted(id.get()),
+            built: std::sync::Mutex::new(None),
         };
         build_once(id, &request, chosen.as_deref(), &flag, &sink)
     })
     .await
 }
 
-/// Что окно просит у ядра: пакет из закрепленной записи Zenodo, с PDF или
-/// без – как скажет флажок «Строить PDF».
+/// Что окно просит у ядра: пакет из закрепленной записи Zenodo, с PDF каждого
+/// документа.
 ///
 /// Ядро умеет читать архив с диска, окно этой возможностью не пользуется:
 /// `None` – закрепленная запись Zenodo через кеш.
 ///
-/// **PDF.** С 18.10.2026 (part3-2) окно строит PDF по умолчанию: флажок при
-/// каждом запуске включен, и `pdf: true` дает `PdfRequest::On` с каталогом
-/// `resources/FONT_RESOURCES`. `resources` – каталог ресурсов приложения,
-/// который команда берет у Tauri в момент сборки. Нет его – `fonts: None`, и
-/// ядро откажет `font_missing` до начала работы: искать шрифты где-то еще
-/// окно не станет. Проверка шрифтов одна, в `PdfRequest::fonts` ядра
-/// (решение владельца 18.10.2026, 4.3): итог проверки при запуске
-/// (`FontResources`) в путь сборки не входит.
-///
-/// Прежнее звено: с 06.10.2026 по 18.10.2026 здесь стояло `PdfRequest::Off`
-/// без выбора (решения владельца 06.10.2026 и 11.10.2026: в 2.6.3 PDF выключен
-/// везде, с 11.10.2026 консоль снова строит его по умолчанию, окно – нет).
-/// До 06.10.2026 – `PdfRequest::On { fonts }` с каталогом ресурсов.
-fn window_request(pdf: bool, resources: Option<std::path::PathBuf>) -> aruna::app::CorpusRequest {
+/// Шрифты – каталог `resources/FONT_RESOURCES`. `resources` – каталог
+/// ресурсов приложения, который команда берет у Tauri в момент сборки. Нет его
+/// – `fonts: None`, и ядро откажет `font_missing` до начала работы: искать
+/// шрифты где-то еще окно не станет. Проверка шрифтов одна, в
+/// `app::load_fonts` ядра (решение владельца 18.10.2026, 4.3): итог проверки
+/// при запуске (`FontResources`) в путь сборки не входит.
+fn window_request(resources: Option<std::path::PathBuf>) -> aruna::app::CorpusRequest {
     aruna::app::CorpusRequest {
         local_archive: None,
-        pdf: if pdf {
-            aruna::app::PdfRequest::On {
-                fonts: resources.map(|dir| dir.join(FONT_RESOURCES)),
-            }
-        } else {
-            aruna::app::PdfRequest::Off
-        },
+        fonts: resources.map(|dir| dir.join(FONT_RESOURCES)),
     }
 }
 
@@ -751,10 +758,10 @@ fn build_once(
         groups: counted(report.package.groups),
         disambiguated: counted(report.package.disambiguated),
         stylesheet_dropped: counted(report.package.stylesheet_dropped),
-        pdfs: report.package.pdfs.map(|pdfs| PdfReport {
-            built: counted(pdfs.built),
-            refused: counted(pdfs.refused),
-        }),
+        pdfs: PdfReport {
+            built: counted(report.package.pdfs.built),
+            refused: counted(report.package.pdfs.refused),
+        },
     })
     .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
 }
@@ -808,9 +815,9 @@ pub(crate) const FONT_RESOURCES: &str = "fonts";
 ///
 /// Хранится, а не печатается и забывается – с расчетом на то, что контур PDF
 /// откажет со ссылкой на эту причину, а не будет искать шрифт заново. Контур
-/// пришел 30.09.2026 и этого итога не читает: с 18.10.2026 (part3-2) запрос
-/// окна (`window_request`) берет каталог ресурсов у Tauri в момент сборки, и
-/// файлы проверяет ядро, при сборке. Сборке на этот итог не переходить –
+/// пришел 30.09.2026 и этого итога не читает: запрос окна (`window_request`)
+/// берет каталог ресурсов у Tauri в момент сборки, и файлы проверяет ядро,
+/// при сборке. Сборке на этот итог не переходить –
 /// решение владельца 18.10.2026, 4.3: проверка одна. Метод чтения, которого
 /// никто не звал, снят 01.10.2026. Итог остается записью для журнала.
 #[derive(Default)]
@@ -890,11 +897,10 @@ pub fn run() {
 
             // Шрифты проверяются здесь при запуске – для журнала.
             //
-            // Путь сборки этот итог не читает: с 18.10.2026 (part3-2) сборка с
-            // PDF берет каталог ресурсов у Tauri заново, и файлы проверяет ядро
-            // (`PdfRequest::fonts`, решение владельца 18.10.2026, 4.3). Отказ
-            // здесь окно не меняет: флажок «Строить PDF» остается включенным, а
-            // сборка с ним откажет `font_missing` или `font_altered`.
+            // Путь сборки этот итог не читает: сборка берет каталог ресурсов у
+            // Tauri заново, и файлы проверяет ядро (`app::load_fonts`, решение
+            // владельца 18.10.2026, 4.3). Отказ здесь окно не меняет: сборка
+            // откажет `font_missing` или `font_altered` сама.
             //
             // **Почему при запуске, а не при сборке.** Сборочная проверка
             // держит дерево – это `fonts::tests` и `cli/tests/fonts.rs`, и они
@@ -1219,11 +1225,9 @@ mod wire {
     #[test]
     fn the_build_command_names_a_destination_and_never_an_archive() {
         let contract = exported();
-        // Второй аргумент – флажок «Строить PDF» (part3-2, 18.10.2026):
-        // выбор, а не источник.
         assert!(
-            contract.contains("buildCorpus: (destination: string | null, pdf: boolean)"),
-            "у buildCorpus нет аргумента назначения или флажка PDF"
+            contract.contains("buildCorpus: (destination: string | null)"),
+            "у buildCorpus нет аргумента назначения или есть еще один"
         );
         for gone in ["localArchive", "archive_missing"] {
             assert!(
@@ -1698,6 +1702,67 @@ mod markup {
             .collect()
     }
 
+    /// Ссылки описи на PDF – те же имена, что у манифеста, байт в байт.
+    ///
+    /// Для каждого документа манифеста с построенным PDF: ссылка на PDF есть в
+    /// описи ровно одна, раскодированная дает побайтно путь `pdf` манифеста, а
+    /// без «.pdf» совпадает побайтно со ссылкой того же документа на XML – то
+    /// же экранирование. Других ссылок на PDF нет. У имен из `refused` (их
+    /// модель не читает) PDF нет, и ссылки на него тоже.
+    fn pdf_links_carry_every_name(
+        package: &std::path::Path,
+        manifest: &serde_json::Value,
+        refused: &[String],
+    ) {
+        use std::os::unix::ffi::OsStrExt as _;
+        let html = fs::read_to_string(package.join(aruna::paths::OUTPUT_FILE_NAME)).unwrap();
+        let links = aruna::export::hrefs(&html);
+        let pdf_links: Vec<&str> = links
+            .iter()
+            .copied()
+            .filter(|h| h.ends_with(".pdf"))
+            .collect();
+        let mut named = 0usize;
+        for group in manifest["groups"].as_array().unwrap() {
+            for document in group["documents"].as_array().unwrap() {
+                let Some(pdf) = document["pdf"].as_str() else {
+                    continue;
+                };
+                named += 1;
+                let xml_href = document["href"].as_str().unwrap();
+                let stem = xml_href.strip_suffix(".xml").unwrap();
+                let wanted = format!("{stem}.pdf");
+                assert_eq!(
+                    pdf_links.iter().filter(|h| **h == wanted).count(),
+                    1,
+                    "опись не ссылается ровно один раз на {wanted:?}"
+                );
+                let target = aruna::export::resolve(&wanted).unwrap();
+                assert_eq!(
+                    target.as_os_str().as_bytes(),
+                    pdf.as_bytes(),
+                    "ссылка на PDF раскодируется не в путь манифеста"
+                );
+                assert!(package.join(&target).is_file(), "в пакете нет {pdf:?}");
+            }
+        }
+        assert_eq!(
+            pdf_links.len(),
+            named,
+            "в описи есть ссылки на PDF сверх манифеста"
+        );
+        for name in refused {
+            let pdf = std::path::Path::new(name).with_extension("pdf");
+            assert!(!package.join(&pdf).exists(), "у {name:?} есть PDF");
+            assert!(
+                !pdf_links
+                    .iter()
+                    .any(|h| aruna::export::resolve(h).as_deref() == Some(pdf.as_path())),
+                "опись ссылается на PDF {name:?}"
+            );
+        }
+    }
+
     /// Все проверки провода на пакете `package`, где `decomposed` – имя
     /// документа, записанное в NFD и названное манифестом.
     ///
@@ -1720,6 +1785,7 @@ mod markup {
         for name in &arrived {
             assert!(package.join(name).is_file(), "в пакете нет {name:?}");
         }
+        pdf_links_carry_every_name(package, &manifest, &arrived);
         assert!(
             arrived
                 .iter()
@@ -1796,6 +1862,10 @@ mod markup {
             &zip_path,
             out.path(),
             "test",
+            &aruna::app::load_fonts(Some(
+                &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../cli/resources/fonts"),
+            ))
+            .unwrap(),
             &aruna::job::Job::unattended(),
         )
         .unwrap();
@@ -1825,8 +1895,18 @@ mod markup {
                     return;
                 };
                 built = tempfile::tempdir().unwrap();
-                aruna::export::build(&zip, built.path(), "test", &aruna::job::Job::unattended())
-                    .unwrap();
+                aruna::export::build(
+                    &zip,
+                    built.path(),
+                    "test",
+                    &aruna::app::load_fonts(Some(
+                        &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                            .join("../cli/resources/fonts"),
+                    ))
+                    .unwrap(),
+                    &aruna::job::Job::unattended(),
+                )
+                .unwrap();
                 built.path().join(aruna::export::PACKAGE)
             }
         };
@@ -2241,7 +2321,7 @@ mod cancelling {
         };
         let request = aruna::app::CorpusRequest {
             local_archive: Some(zip),
-            pdf: aruna::app::PdfRequest::Off,
+            ..window_request(Some(resources()))
         };
         let outcome = build_once(
             aruna::job::JobId::next(),
@@ -2363,19 +2443,16 @@ mod cancelling {
     }
 
     /// Сборка запросом окна на `zip` в `into` – архив с диска вместо Zenodo,
-    /// все прочее, PDF в том числе, как просит окно с флажком `pdf`. Затем
-    /// проверка пакета: без флажка в нем нет ни одного PDF, а манифест и опись
-    /// не называют ни одного. С флажком PDF столько, сколько построено, и
-    /// манифест и опись их называют.
+    /// все прочее как просит окно. Затем проверка пакета: PDF в нем столько,
+    /// сколько построено, и манифест и опись их называют.
     fn the_window_builds(
         zip: std::path::PathBuf,
         into: &std::path::Path,
-        pdf: bool,
         progress: &dyn aruna::progress::Progress,
     ) -> BuildReport {
         let request = aruna::app::CorpusRequest {
             local_archive: Some(zip),
-            ..window_request(pdf, Some(resources()))
+            ..window_request(Some(resources()))
         };
         let report = build_once(
             aruna::job::JobId::next(),
@@ -2389,74 +2466,37 @@ mod cancelling {
         let manifest =
             std::fs::read_to_string(package.join(aruna::export::MANIFEST)).expect("манифест");
         let inventory = std::fs::read_to_string(&report.inventory).expect("опись");
-        if pdf {
-            let built = report.pdfs.expect("сборка с флажком несет числа PDF").built;
-            assert_eq!(pdfs_under(&package).len(), built as usize);
-            assert!(manifest.contains("\"pdf"), "манифест не называет PDF");
-            assert!(inventory.contains(".pdf"), "опись не ссылается на PDF");
-        } else {
-            assert_eq!(report.pdfs, None);
-            assert_eq!(pdfs_under(&package), Vec::<std::path::PathBuf>::new());
-            assert!(!manifest.contains("\"pdf"), "манифест называет PDF");
-            assert!(!inventory.contains(".pdf"), "опись ссылается на PDF");
-        }
+        assert_eq!(pdfs_under(&package).len(), report.pdfs.built as usize);
+        assert!(manifest.contains("\"pdf"), "манифест не называет PDF");
+        assert!(inventory.contains(".pdf"), "опись не ссылается на PDF");
         report
     }
 
-    /// **Без флажка окно PDF не строит**: запрос – `Off`, и пакет, собранный
-    /// им, не несет ни одного PDF, а манифест и опись не называют ни одного.
-    /// До 18.10.2026 это был единственный запрос окна (решение владельца
-    /// 06.10.2026).
+    /// **Окно строит PDF рядом с каждым документом**: запрос несет каталог
+    /// шрифтов внутри ресурсов, и у каждого XML малого архива рядом лежит PDF
+    /// под тем же именем.
     #[test]
-    fn the_window_without_the_flag_asks_for_no_pdf_and_its_package_has_none() {
-        let request = window_request(false, Some(resources()));
-        assert_eq!(request.pdf, aruna::app::PdfRequest::Off);
-        assert_eq!(request.local_archive, None);
-        let dir = tempfile::tempdir().expect("tempdir");
-        let out = tempfile::tempdir().expect("каталог назначения");
-        let report = the_window_builds(
-            small_archive(dir.path(), 5),
-            out.path(),
-            false,
-            &aruna::progress::Silent,
-        );
-        assert_eq!(report.documents, 5);
-    }
-
-    /// **С флажком окно строит PDF рядом с каждым документом** (part3-2,
-    /// 18.10.2026): запрос – `On` с каталогом шрифтов внутри ресурсов, и у
-    /// каждого XML малого архива рядом лежит PDF под тем же именем.
-    #[test]
-    fn the_window_with_the_flag_builds_a_pdf_beside_every_document() {
-        let request = window_request(true, Some(resources()));
-        assert_eq!(
-            request.pdf,
-            aruna::app::PdfRequest::On {
-                fonts: Some(resources().join(FONT_RESOURCES))
-            }
-        );
+    fn the_window_builds_a_pdf_beside_every_document() {
+        let request = window_request(Some(resources()));
+        assert_eq!(request.fonts, Some(resources().join(FONT_RESOURCES)));
         assert_eq!(request.local_archive, None);
         // Каталога ресурсов нет – шрифтов не ищут нигде: ядро откажет само.
-        assert_eq!(
-            window_request(true, None).pdf,
-            aruna::app::PdfRequest::On { fonts: None }
-        );
+        assert_eq!(window_request(None).fonts, None);
 
         let dir = tempfile::tempdir().expect("tempdir");
         let out = tempfile::tempdir().expect("каталог назначения");
         let report = the_window_builds(
             small_archive(dir.path(), 5),
             out.path(),
-            true,
             &aruna::progress::Silent,
         );
         assert_eq!(report.documents, 5);
         assert_eq!(
             report.pdfs,
-            Some(PdfReport {
+            PdfReport {
                 built: 5,
                 refused: 0
-            })
+            }
         );
         let package = out.path().join(aruna::export::PACKAGE);
         let mut xml = Vec::new();
@@ -2520,7 +2560,6 @@ mod cancelling {
         the_window_builds(
             small_archive(dir.path(), 5),
             destination.path(),
-            false,
             &aruna::progress::Silent,
         );
         let package = destination.path().join(aruna::export::PACKAGE);
@@ -2537,7 +2576,7 @@ mod cancelling {
         };
         let request = aruna::app::CorpusRequest {
             local_archive: Some(small_archive(dir.path(), 5)),
-            ..window_request(true, Some(resources()))
+            ..window_request(Some(resources()))
         };
         let outcome = build_once(
             aruna::job::JobId::next(),
@@ -2562,35 +2601,34 @@ mod cancelling {
 
     /// Окно, которое копит то, что дошло бы до него по проводу.
     ///
-    /// Перекладывает событие тем же `BuildProgress::of`, что и
-    /// `WindowProgress`, и ничего не отсеивает: отсева на пути к окну больше
-    /// нет, так что накопленное здесь и есть то, что окно получило бы.
+    /// Перекладывает событие тем же `BuildProgress::of` и `carrying`, что и
+    /// `WindowProgress`, и ничего не отсеивает, так что накопленное здесь и
+    /// есть то, что окно получило бы.
     #[derive(Default)]
-    struct WindowThatListens(Mutex<Vec<BuildProgress>>);
+    struct WindowThatListens(Mutex<(Vec<BuildProgress>, Option<u32>)>);
 
     impl aruna::progress::Progress for WindowThatListens {
         fn report(&self, event: aruna::progress::Event<'_>) {
-            self.0
-                .lock()
-                .expect("не отравлен")
-                .push(BuildProgress::of(1, &event));
+            let mut heard = self.0.lock().expect("не отравлен");
+            let (events, last) = &mut *heard;
+            events.push(BuildProgress::of(1, &event).carrying(last));
         }
     }
 
     /// **Фаза PDF доходит до окна** (part3-1, 18.10.2026; до того ее события
     /// отбрасывались до провода по решению владельца 30.09.2026, вопрос 8).
     ///
-    /// Сборка идет путем окна с флажком «Строить PDF» и шрифтами из
-    /// `cli/resources/fonts`. Видны своя стадия, объявление без `built`, тики с `built`,
-    /// последний тик на всем числе и числа PDF в отчете.
+    /// Сборка идет путем окна со шрифтами из `cli/resources/fonts`. Видны
+    /// своя стадия, `built` – `None` до фазы, ноль в объявлении, число ядра в
+    /// тиках и последнее число после фазы, последний тик на всем числе и
+    /// числа PDF в отчете.
     #[test]
     fn the_pdf_phase_reaches_the_window() {
         let dir = tempfile::tempdir().expect("tempdir");
         let out = tempfile::tempdir().expect("каталог назначения");
-        let fonts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../cli/resources/fonts");
         let request = aruna::app::CorpusRequest {
             local_archive: Some(small_archive(dir.path(), 5)),
-            pdf: aruna::app::PdfRequest::On { fonts: Some(fonts) },
+            ..window_request(Some(resources()))
         };
         let window = WindowThatListens::default();
         let report = build_once(
@@ -2602,7 +2640,7 @@ mod cancelling {
         )
         .expect("сборка с PDF доходит до конца");
 
-        let heard = window.0.into_inner().expect("не отравлен");
+        let (heard, _) = window.0.into_inner().expect("не отравлен");
         let phase: Vec<&BuildProgress> = heard
             .iter()
             .filter(|p| p.stage == Stage::WritingPdfs)
@@ -2610,7 +2648,7 @@ mod cancelling {
         let (announced, ticks) = phase.split_first().expect("стадия PDF дошла до окна");
         assert_eq!(
             (announced.done, announced.total, announced.built),
-            (Some(0), Some(5), None),
+            (Some(0), Some(5), Some(0)),
             "объявление стадии"
         );
         assert!(!ticks.is_empty(), "тиков фазы PDF нет");
@@ -2619,15 +2657,25 @@ mod cancelling {
             .all(|t| t.built.is_some() && t.total == Some(5)));
         let last = ticks.last().expect("тик есть");
         assert_eq!(last.done, last.total, "последний тик не на всем числе");
+        let start = heard
+            .iter()
+            .position(|p| p.stage == Stage::WritingPdfs)
+            .expect("фаза есть");
         assert!(
-            heard
-                .iter()
-                .filter(|p| p.stage != Stage::WritingPdfs)
-                .all(|p| p.built.is_none()),
-            "`built` вне фазы PDF"
+            heard[..start].iter().all(|p| p.built.is_none()),
+            "`built` до фазы PDF"
+        );
+        let end = heard
+            .iter()
+            .rposition(|p| p.stage == Stage::WritingPdfs)
+            .expect("фаза есть");
+        assert!(end + 1 < heard.len(), "после фазы событий нет");
+        assert!(
+            heard[end + 1..].iter().all(|p| p.built == last.built),
+            "после фазы `built` не равен последнему тику"
         );
 
-        let pdfs = report.pdfs.expect("отчет сборки с PDF несет числа PDF");
+        let pdfs = report.pdfs;
         assert_eq!(pdfs.built + pdfs.refused, 5);
         assert_eq!(Some(pdfs.built), last.built, "отчет разошелся с ходом");
         assert!(
@@ -2636,42 +2684,6 @@ mod cancelling {
         );
         let package = out.path().join(aruna::export::PACKAGE);
         assert_eq!(pdfs_under(&package).len(), pdfs.built as usize);
-
-        // Без PDF чисел PDF нет вовсе, а не нули.
-        let off = tempfile::tempdir().expect("каталог назначения");
-        let without = WindowThatListens::default();
-        let report = build_once(
-            aruna::job::JobId::next(),
-            &aruna::app::CorpusRequest {
-                pdf: aruna::app::PdfRequest::Off,
-                ..request
-            },
-            Some(off.path()),
-            &aruna::job::Cancel::new(),
-            &without,
-        )
-        .expect("сборка без PDF доходит до конца");
-        assert_eq!(report.pdfs, None);
-        let heard = without.0.into_inner().expect("не отравлен");
-        assert!(heard.iter().all(|p| p.stage != Stage::WritingPdfs));
-    }
-
-    /// **То же на архиве корпуса.** Пакет кладется в каталог `ARUNA_WINDOW_PACKAGE`,
-    /// если он назван, – чтобы его сумму можно было сверить с опорной суммой
-    /// пакета без PDF, – иначе во временный.
-    #[test]
-    #[ignore = "читает архив корпуса; запускать явно"]
-    fn the_window_builds_the_corpus_without_pdfs() {
-        let Some(zip) = corpus_fixture() else { return };
-        let temporary = tempfile::tempdir().expect("tempdir");
-        let into = std::env::var_os("ARUNA_WINDOW_PACKAGE").map(std::path::PathBuf::from);
-        let report = the_window_builds(
-            zip,
-            into.as_deref().unwrap_or(temporary.path()),
-            false,
-            &aruna::progress::Silent,
-        );
-        assert_eq!((report.documents, report.groups), (23936, 663));
     }
 
     /// Синк, который замечает время фазы PDF: от объявления до последнего
@@ -2694,9 +2706,9 @@ mod cancelling {
         }
     }
 
-    /// **То же с флажком «Строить PDF»** (part3-2, 18.10.2026). Пакет – в
-    /// `ARUNA_WINDOW_PACKAGE`, если он назван, чтобы сверить его с опорной
-    /// суммой пакета с PDF. Время фазы PDF от объявления до последнего тика
+    /// **То же на архиве корпуса.** Пакет – в `ARUNA_WINDOW_PACKAGE`, если он
+    /// назван, чтобы сверить его с опорной суммой пакета. Время фазы PDF от
+    /// объявления до последнего тика
     /// печатается одной строкой `window_pdf_phase_seconds` – это замер, а не
     /// порог: предел держит заслон (`pdf_gate`).
     #[test]
@@ -2706,14 +2718,9 @@ mod cancelling {
         let temporary = tempfile::tempdir().expect("tempdir");
         let into = std::env::var_os("ARUNA_WINDOW_PACKAGE").map(std::path::PathBuf::from);
         let watch = PdfStopwatch::default();
-        let report = the_window_builds(
-            zip,
-            into.as_deref().unwrap_or(temporary.path()),
-            true,
-            &watch,
-        );
+        let report = the_window_builds(zip, into.as_deref().unwrap_or(temporary.path()), &watch);
         assert_eq!((report.documents, report.groups), (23936, 663));
-        let pdfs = report.pdfs.expect("числа PDF");
+        let pdfs = report.pdfs;
         assert_eq!(pdfs.built + pdfs.refused, 23936);
         let (Some(start), Some(end)) = *watch.0.lock().expect("не отравлен") else {
             panic!("фаза PDF не объявлена или не дошла до тика");

@@ -49,42 +49,18 @@ describe('Aruna window', () => {
    * Отказ на несуществующей папке стоит ровно ту же проверку и не строит
    * ничего: 384 МиБ в чужой папке загрузок и десяток секунд здесь недопустимы.
    *
-   * С 18.10.2026 (part3-2) у команды второй аргумент – `pdf`, флажок «Строить
-   * PDF». Он передается включенным, как стоит флажок при открытии окна: папка
-   * проверяется раньше шрифтов, и отказ тот же.
+   * Папка проверяется раньше шрифтов, так что сборка PDF тут не начинается.
    */
   it('carries a typed refusal back from the core', async () => {
     type Refusal = { code: string; retryable: boolean }
     const refusal = await browser.tauri.execute(({ core }) =>
       core
-        .invoke('build_corpus', { destination: '/такой-папки-нет', pdf: true })
+        .invoke('build_corpus', { destination: '/такой-папки-нет' })
         .then(() => ({ code: 'resolved', retryable: false }))
         .catch((error: unknown) => error as { code: string; retryable: boolean }),
     )
     expect((refusal as Refusal).code).toBe('destination_missing')
     expect((refusal as Refusal).retryable).toBe(false)
-  })
-
-  /**
-   * **Флажок «Строить PDF» на экране и включен** (решение владельца
-   * 18.10.2026, 4.2): окно строит PDF по умолчанию и не помнит выбора между
-   * запусками, так что в только что открытом окне флажок стоит всегда.
-   *
-   * Заодно – что подвал целиком в окне: окно 800 × 600 не меняет размер и не
-   * прокручивается, и флажок над кнопками не должен столкнуть их под край.
-   */
-  it('shows the PDF switch, on', async () => {
-    const box = await $('[data-testid="pdf"]')
-    await expect(box).toExist()
-    expect(await box.isSelected()).toBe(true)
-    expect(await box.isEnabled()).toBe(true)
-    const bottoms = await browser.execute(() => ({
-      height: window.innerHeight,
-      foot: document.querySelector('.foot')?.getBoundingClientRect().bottom ?? Infinity,
-      page: document.documentElement.scrollHeight,
-    }))
-    expect(bottoms.foot).toBeLessThanOrEqual(bottoms.height)
-    expect(bottoms.page).toBeLessThanOrEqual(bottoms.height)
   })
 
   /**
