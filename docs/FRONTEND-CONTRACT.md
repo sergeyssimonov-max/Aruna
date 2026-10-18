@@ -589,7 +589,7 @@ and the names are part of the contract:
 | `corpus_stats` | package path | counts, the CTH spread, the writing counters, and which of the two answered |
 | `corpus_xml` | package path | how many documents the document model refuses (`objected_to`, the one number with a consequence: not converted), its parts — refused by the parser (`unread`), accepted by the parser but not well-formed XML, well-formed XML but not namespace-well-formed — and the name, reason and position of each |
 | `open_inventory` | inventory path | nothing, or one sentence saying why it did not open |
-| `build_corpus` | a destination folder, or nothing for the downloads folder, and `pdf` – whether to build the PDFs | `BuildReport`, or `BuildFailure` |
+| `build_corpus` | a destination folder, or nothing for the downloads folder | `BuildReport`, or `BuildFailure` |
 | `cancel_build` | — | nothing; the confirmation arrives as the failure |
 
 `open_inventory` is here rather than in the window because a permission is not
@@ -607,30 +607,26 @@ as it stands.
 |---|---|
 | `build-progress` | `{ job, stage, done, total, built, manuscripts, groups, note }` |
 
-**The PDF phase reaches the window** (2026-10-18, part3-1). Until then the shell
-dropped `WritingPdfs` and `PdfsWritten` before the wire, by the owner's decision
-of 2026-09-30 (question 8). Now they cross as their own stage, `writing-pdfs`:
-the announcement carries `done: 0` and `total`, every placed document, and each
-tick carries `done`, `total` and `built`, the PDFs built rather than refused,
-all three the core's numbers as they are. `built` is `null` on every other
-event, the announcement of the phase included. `BuildReport` gained `pdfs`,
-`{ built, refused }` from the core's `PackageReport::pdfs`, and `null` for a
-build without PDFs: a zero there would say none came out, where none was asked
-for. The shell test
-`the_pdf_phase_reaches_the_window` builds a small archive with PDFs and holds
-what the wire carries.
+**Every package carries a PDF of each document** (owner's decision of
+2026-10-18: from 3.0.0 the program builds only with PDFs). The PDF phase
+crosses as its own stage, `writing-pdfs`: the announcement carries `done: 0`,
+`total`, every placed document, and `built: 0`; each tick carries `done`,
+`total` and `built`, the PDFs built rather than refused, all three the core's
+numbers as they are. `built` is `null` only before the phase begins; every
+event after it carries the last count. `BuildReport.pdfs` is `{ built,
+refused }` from the core's `PackageReport::pdfs`, never `null`. The shell test
+`the_pdf_phase_reaches_the_window` builds a small archive and holds what the
+wire carries.
 
-**`pdf` is the window's checkbox «Строить PDF»** (2026-10-18, part3-2, owner's
-decisions 4.2 and 4.3 of that day). It is on at every launch, not remembered,
-and unavailable during a build. `true` asks the core for `PdfRequest::On`
-with the fonts in the application's resource directory, which the command
-asks Tauri for at the moment of the build. With no resource directory the
+**The fonts.** `build_corpus` asks Tauri for the application's resource
+directory at the moment of the build and hands the core
+`window_request(resource_dir)`, its one argument being that directory, not a
+choice: the fonts are `resource_dir/fonts`. With no resource directory the
 fonts are `None` and the core refuses `font_missing` before any work, so the
-window never looks for fonts anywhere else. The fonts are checked once, by
-the core, in `PdfRequest::fonts`: the check the shell makes at start-up is a
-line for the log and the build does not read it. `false` asks for
-`PdfRequest::Off`. On `font_missing` and `font_altered` the window offers
-«Собрать без PDF», the same build into the same folder with `pdf: false`.
+window never looks for fonts anywhere else. The fonts are checked once, by the
+core, in `app::load_fonts`: the check the shell makes at start-up is a line for
+the log and the build does not read it. `font_missing` and `font_altered` get
+their own sentence and the usual actions of a refusal, like any other code.
 
 The number the window compares refused PDFs with, `objected_to`, does not
 cross in `BuildReport`: the core's `PackageReport::pdfs` carries built and

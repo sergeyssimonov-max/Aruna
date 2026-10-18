@@ -306,14 +306,19 @@ the first such document.
 (2026-09-30): the module `cli/src/pdf/` builds one PDF beside each XML document
 of the package, in a phase of `export` (§4). In release 2.6.3 it is off by
 default, in the window and in the console, and runs only when asked for
-explicitly (`ARUNA_PDF=on` in the console) – the path of the release gate,
+explicitly (by a console switch, removed on 2026-10-18) – the path of the release gate,
 `pdf_gate` and the tests. On by default returns with the window in ~~2.7.0~~
 3.0.0.
 
 *Amended 2026-10-11.* The next release is 3.0.0, not 2.7.0 (owner's decision
-of 2026-10-08). On by default is back in the console since 2026-10-11 –
-`ARUNA_PDF=off` turns it off – by the owner's decision of that day; the window
-asks for no PDF until the third part of the transfer, in 3.0.0.
+of 2026-10-08). On by default is back in the console since 2026-10-11 by the
+owner's decision of that day; the window asks for no PDF until the third part
+of the transfer, in 3.0.0.
+
+*Amended 2026-10-18.* From 3.0.0 every package carries a PDF of each document,
+in the window and in the console alike (owner's decision of 2026-10-18):
+nothing in either leaves them out. Without fonts no package is built – the
+refusal is `font_missing` or `font_altered`.
 
 ---
 
@@ -524,10 +529,12 @@ passed. **An incomplete PDF** is what already refuses a document with
 `"pdf": { "refused": … }`: Typst refuses it, the model does not read it, or it
 holds two repeated clusters in a row. No new kind of refusal is introduced.
 
-**The two modes.** Without PDFs there is no `"pdfs"`, no `"pdf"` and no
-`"completeness"`; every
-other line of the manifest is the same as with them, the run and the digests
-included (`export_pdf::the_switch_changes_nothing_but_the_pdfs_and_what_names_them`).
+**Every package carries its PDF record** (owner's decision of 2026-10-18).
+The manifest always has `"pdfs"`, and every document a `"pdf"` entry – the path
+of its PDF with `"completeness"`, or why it was refused. The package check
+refuses a manifest without the `"pdfs"` section, or with fewer or more reasons
+for a refused PDF than documents without one
+(`validate::a_manifest_without_its_pdf_record_fails`).
 
 Where the items of the paragraph above now are: the original path –
 ~~**not written**: the manifest names the group, the siglum and the file in the
