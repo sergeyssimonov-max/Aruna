@@ -8,6 +8,12 @@
 # slowest test in the set takes about seven seconds (the download retries, which
 # wait out real backoff), so thirty seconds is a warning that something is
 # wrong and two minutes is the point at which it is killed and reported.
+#
+# One test has its own limit, in an override below. The heavy `#[ignore]`
+# test `cancelling::the_window_builds_the_corpus_with_pdfs` of the shell builds
+# the whole package with PDFs, and in the dev profile that takes about 170–180
+# seconds (169.0 s for the PDF phase alone, measured 2026-10-18), so it gets
+# 300 seconds. Under the two minutes here it was killed at 120.008 s.
 slow-timeout = { period = "30s", terminate-after = 4 }
 
 # How long after a test's process exits nextest waits for its output pipe to
@@ -53,6 +59,14 @@ priority = 100
 [[profile.default.overrides]]
 filter = "(package(aruna) & kind(lib) & test(/^download::tests::/)) | binary(cli_process) | binary(cache_concurrency) | binary(cache_lifecycle)"
 priority = 50
+
+# The heavy window test with PDFs (`#[ignore]`, part3-2, 2026-10-18): the
+# whole package with PDFs in the dev profile, about 170–180 s. Named exactly,
+# not by a substring or a pattern, so no other test inherits the limit. The
+# reason is in the comment over `slow-timeout` above.
+[[profile.default.overrides]]
+filter = 'package(aruna-desktop) & test(=cancelling::the_window_builds_the_corpus_with_pdfs)'
+slow-timeout = { period = "60s", terminate-after = 5 }
 
 [profile.ci]
 # Same guards, more said out loud: CI has no one watching it run.
