@@ -589,7 +589,7 @@ and the names are part of the contract:
 | `corpus_stats` | package path | counts, the CTH spread, the writing counters, and which of the two answered |
 | `corpus_xml` | package path | how many documents the document model refuses (`objected_to`, the one number with a consequence: not converted), its parts — refused by the parser (`unread`), accepted by the parser but not well-formed XML, well-formed XML but not namespace-well-formed — and the name, reason and position of each |
 | `open_inventory` | inventory path | nothing, or one sentence saying why it did not open |
-| `build_corpus` | a destination folder, or nothing for the downloads folder | `BuildReport`, or `BuildFailure` |
+| `build_corpus` | a destination folder, or nothing for the downloads folder, and `pdf` – whether to build the PDFs | `BuildReport`, or `BuildFailure` |
 | `cancel_build` | — | nothing; the confirmation arrives as the failure |
 
 `open_inventory` is here rather than in the window because a permission is not
@@ -616,10 +616,27 @@ all three the core's numbers as they are. `built` is `null` on every other
 event, the announcement of the phase included. `BuildReport` gained `pdfs`,
 `{ built, refused }` from the core's `PackageReport::pdfs`, and `null` for a
 build without PDFs: a zero there would say none came out, where none was asked
-for. The window's own request still asks for no PDFs until part3-2, so on its
-screen the phase does not occur yet. The shell test
+for. The shell test
 `the_pdf_phase_reaches_the_window` builds a small archive with PDFs and holds
 what the wire carries.
+
+**`pdf` is the window's checkbox «Строить PDF»** (2026-10-18, part3-2, owner's
+decisions 4.2 and 4.3 of that day). It is on at every launch, not remembered,
+and unavailable during a build. `true` asks the core for `PdfRequest::On`
+with the fonts in the application's resource directory, which the command
+asks Tauri for at the moment of the build. With no resource directory the
+fonts are `None` and the core refuses `font_missing` before any work, so the
+window never looks for fonts anywhere else. The fonts are checked once, by
+the core, in `PdfRequest::fonts`: the check the shell makes at start-up is a
+line for the log and the build does not read it. `false` asks for
+`PdfRequest::Off`. On `font_missing` and `font_altered` the window offers
+«Собрать без PDF», the same build into the same folder with `pdf: false`.
+
+The number the window compares refused PDFs with, `objected_to`, does not
+cross in `BuildReport`: the core's `PackageReport::pdfs` carries built and
+refused and nothing finer, and the split lives only in the manifest's `xml`
+section. So after a build with refusals the window asks `corpus_xml` for the
+package it has just built, the one extra call, and only then.
 
 **The types are generated, not written twice.** `frontend/src/bindings.ts` comes
 out of the same declarations that register the commands — specta 2.0.0-rc.25,
@@ -667,7 +684,7 @@ that is not there.
 - *The frontend never gets a raw filesystem handle.* Paths cross as strings, and
   the shell turns exactly one of them into a path: `chosen_destination`, where a
   string with no directory behind it is refused — `destination_missing`, before
-  anything starts. The window names where the package goes and nothing else; it
+  anything starts, and before the fonts are looked at. The window names where the package goes and nothing else; it
   cannot name where the corpus comes from, because `build_corpus` has no
   argument for that. One axis is a choice, the other is settled.
 - *Progress is an event stream, aggregated.* One event per document across
