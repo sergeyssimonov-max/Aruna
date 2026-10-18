@@ -1702,14 +1702,16 @@ mod markup {
             .collect()
     }
 
-    /// Ссылки описи на PDF – те же имена, что у манифеста, байт в байт.
+    /// Ссылки описи – те же имена, что у манифеста, байт в байт.
     ///
-    /// Для каждого документа манифеста с построенным PDF: ссылка на PDF есть в
-    /// описи ровно одна, раскодированная дает побайтно путь `pdf` манифеста, а
-    /// без «.pdf» совпадает побайтно со ссылкой того же документа на XML – то
-    /// же экранирование. Других ссылок на PDF нет. У `refused` (имен, которые
-    /// модель не читает) PDF нет, и ссылки на него тоже.
-    fn pdf_links_carry_every_name(
+    /// У каждого документа манифеста в описи одна ссылка, на имени, в порядке
+    /// манифеста (решение владельца 19.10.2026). У документа с построенным PDF
+    /// она ведет на PDF: раскодированная дает побайтно путь `pdf` манифеста, а
+    /// без «.pdf» совпадает побайтно с `href` того же документа без «.xml» – то
+    /// же экранирование. У документа, чей PDF отказан, ссылка – его `href`,
+    /// раскодированная дает побайтно его `file`. Других ссылок нет. У `refused`
+    /// (имен, которые модель не читает) PDF нет, и ссылка у них – на XML.
+    fn every_link_carries_its_name(
         package: &std::path::Path,
         manifest: &serde_json::Value,
         refused: &[String],
@@ -1717,48 +1719,49 @@ mod markup {
         use std::os::unix::ffi::OsStrExt as _;
         let html = fs::read_to_string(package.join(aruna::paths::OUTPUT_FILE_NAME)).unwrap();
         let links = aruna::export::hrefs(&html);
-        let pdf_links: Vec<&str> = links
-            .iter()
-            .copied()
-            .filter(|h| h.ends_with(".pdf"))
-            .collect();
-        let mut named = 0usize;
+        let mut wanted: Vec<String> = Vec::new();
         for group in manifest["groups"].as_array().unwrap() {
             for document in group["documents"].as_array().unwrap() {
-                let Some(pdf) = document["pdf"].as_str() else {
-                    continue;
-                };
-                named += 1;
+                let file = document["file"].as_str().unwrap();
                 let xml_href = document["href"].as_str().unwrap();
-                let stem = xml_href.strip_suffix(".xml").unwrap();
-                let wanted = format!("{stem}.pdf");
-                assert_eq!(
-                    pdf_links.iter().filter(|h| **h == wanted).count(),
-                    1,
-                    "опись не ссылается ровно один раз на {wanted:?}"
-                );
-                let target = aruna::export::resolve(&wanted).unwrap();
+                let (link, path) = match document["pdf"].as_str() {
+                    Some(pdf) => {
+                        let stem = xml_href.strip_suffix(".xml").unwrap();
+                        (format!("{stem}.pdf"), pdf)
+                    }
+                    None => (xml_href.to_owned(), file),
+                };
+                let target = aruna::export::resolve(&link).unwrap();
                 assert_eq!(
                     target.as_os_str().as_bytes(),
-                    pdf.as_bytes(),
-                    "ссылка на PDF раскодируется не в путь манифеста"
+                    path.as_bytes(),
+                    "ссылка {link:?} раскодируется не в путь манифеста"
                 );
-                assert!(package.join(&target).is_file(), "в пакете нет {pdf:?}");
+                assert!(package.join(&target).is_file(), "в пакете нет {path:?}");
+                wanted.push(link);
             }
         }
         assert_eq!(
-            pdf_links.len(),
-            named,
-            "в описи есть ссылки на PDF сверх манифеста"
+            links.len(),
+            wanted.len(),
+            "ссылок в описи не по одной на документ"
         );
+        for (at, (link, want)) in links.iter().zip(&wanted).enumerate() {
+            assert_eq!(
+                *link,
+                want.as_str(),
+                "ссылка {at} описи не та, что у документа манифеста"
+            );
+        }
         for name in refused {
             let pdf = std::path::Path::new(name).with_extension("pdf");
             assert!(!package.join(&pdf).exists(), "у {name:?} есть PDF");
             assert!(
-                !pdf_links
+                links
                     .iter()
-                    .any(|h| aruna::export::resolve(h).as_deref() == Some(pdf.as_path())),
-                "опись ссылается на PDF {name:?}"
+                    .any(|h| aruna::export::resolve(h).as_deref()
+                        == Some(std::path::Path::new(name))),
+                "опись не ссылается на XML {name:?}"
             );
         }
     }
@@ -1785,7 +1788,7 @@ mod markup {
         for name in &arrived {
             assert!(package.join(name).is_file(), "в пакете нет {name:?}");
         }
-        pdf_links_carry_every_name(package, &manifest, &arrived);
+        every_link_carries_its_name(package, &manifest, &arrived);
         assert!(
             arrived
                 .iter()

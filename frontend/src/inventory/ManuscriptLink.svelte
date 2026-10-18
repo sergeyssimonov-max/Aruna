@@ -2,7 +2,9 @@
 
 <script lang="ts">
   /**
-   * The title cell's contents when the manuscript has a file beside it.
+   * The title cell's contents when the manuscript has a file to link at:
+   * its PDF, or its XML where no PDF was built (owner's decision of
+   * 2026-10-19).
    *
    * Rendered once at build time into `cli/src/generated/manuscript_link.html`.
    * The crate fills it and passes the result on as `ManuscriptRow.svelte`'s
@@ -14,7 +16,10 @@
     href = '',
     title = '',
   }: {
-    /** Where the manuscript's own file sits, relative to the document. */
+    /**
+     * Where the manuscript's name leads, relative to the document: its PDF,
+     * or its XML where no PDF was built.
+     */
     href?: string
     /** The name the manuscript is listed under. */
     title?: string

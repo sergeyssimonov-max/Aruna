@@ -12,6 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import documentHtml from '../../../cli/src/generated/document.html?raw'
 import groupHeadingHtml from '../../../cli/src/generated/group_heading.html?raw'
+import manuscriptLinkHtml from '../../../cli/src/generated/manuscript_link.html?raw'
 import manuscriptRowHtml from '../../../cli/src/generated/manuscript_row.html?raw'
 import { attachInventoryFilter } from './filter'
 
@@ -636,5 +637,41 @@ describe('marks in a siglum', () => {
       type(query)
       expect(sigla(), query).toHaveLength(2)
     }
+  })
+})
+
+/**
+ * The one link a name carries in a package's inventory: at the manuscript's
+ * PDF, or at its XML where no PDF was built (owner's decision of 2026-10-19).
+ * The row's text is the name, so the search reads what it read before, and the
+ * word `PDF` is no longer in any row: there is no second link named so.
+ */
+describe('a name linked at its PDF', () => {
+  const link = (href: string, title: string) =>
+    fill(artifact(manuscriptLinkHtml), { HREF: href, TITLE: title })
+
+  beforeEach(() => {
+    inventory([
+      {
+        label: 'CTH 5',
+        rows: [
+          { siglum: link('./CTH%205/KBo%201.1.pdf', 'KBo 1.1') },
+          { siglum: link('./CTH%205/KBo%201.2.xml', 'KBo 1.2') },
+        ],
+      },
+    ])
+    attachInventoryFilter(document)
+  })
+
+  it('is not found by «pdf», which is in its address and not in its text', () => {
+    type('pdf')
+    expect(shown()).toHaveLength(0)
+    expect(hint().textContent).toBe('No matches')
+  })
+
+  it('is found by its name, as before', () => {
+    type('kbo 1.1')
+    expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KBo 1.1'])
+    expect(shown()[0].querySelector('a')?.getAttribute('href')).toBe('./CTH%205/KBo%201.1.pdf')
   })
 })
