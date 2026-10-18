@@ -50,7 +50,8 @@ impl PdfState {
 const PDFS_PER_TICK: usize = 250;
 
 /// Builds the PDF of every placed document, in the order they were placed –
-/// the one display order of the program – and writes each beside its XML.
+/// the one display order of the program – and writes each into the folder of
+/// its XML, under the same name.
 pub(crate) fn write_pdfs(
     staging: &Path,
     records: &[ManuscriptRecord],

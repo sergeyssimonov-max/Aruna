@@ -9,7 +9,7 @@ use aruna::export::{
     Placed,
 };
 use aruna::parse::ManuscriptRecord;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 struct Rng(u64);
@@ -221,9 +221,11 @@ fn main() {
         // document here until 2026-08-23, one page per CTH folder; those are no
         // longer written.
         //
-        // With the PDF links, as the build writes it.
+        // With the links at the PDFs, as the build writes it.
         let html = render_package_inventory(&recs, &placed, &text(&mut rng), &pdfs);
-        if let Err(why) = check_html(&html).and_then(|()| check_pdf_links(&html, &pdfs)) {
+        if let Err(why) =
+            check_html(&html).and_then(|()| check_document_links(&html, &placed, &pdfs))
+        {
             html_bad += 1;
             if html_bad <= 3 {
                 eprintln!("BAD HTML (round {round}): {why}");
@@ -238,28 +240,38 @@ fn main() {
     println!("--- ok ---");
 }
 
-/// The page is the one the build writes: a built PDF is linked beside its
-/// document, a refused one is not – the absence of the link is how the page
-/// says it, the reason being the manifest's. Fails on a page rendered without
-/// the PDFs, which is what this harness fuzzed until 2026-10-02.
-fn check_pdf_links(html: &str, pdfs: &[PdfState]) -> Result<(), String> {
+/// The page is the one the build writes: every document has one link, at its
+/// PDF when it was built and at its XML when it was refused (owner's decision
+/// of 2026-10-19), in the order the documents were placed – the reason for a
+/// refusal being the manifest's. Fails on a page rendered without the PDFs,
+/// which is what this harness fuzzed until 2026-10-02.
+fn check_document_links(html: &str, placed: &[Placed], pdfs: &[PdfState]) -> Result<(), String> {
     // Read the way the package validator reads it: `hrefs` and `resolve`.
-    let mut linked = BTreeSet::new();
-    for link in hrefs(html).into_iter().filter(|h| h.ends_with(".pdf")) {
-        let path = resolve(link).ok_or_else(|| format!("unresolvable PDF link: {link}"))?;
-        if !linked.insert(path) {
-            return Err(format!("PDF linked twice: {link}"));
-        }
+    let mut linked = Vec::new();
+    for link in hrefs(html) {
+        linked.push(resolve(link).ok_or_else(|| format!("unresolvable link: {link}"))?);
     }
-    let built: BTreeSet<PathBuf> = pdfs
+    let wanted: Vec<PathBuf> = placed
         .iter()
-        .filter_map(|s| s.built().map(Path::to_path_buf))
+        .zip(pdfs)
+        .map(|(place, state)| {
+            state
+                .built()
+                .map_or_else(|| place.relative.clone(), Path::to_path_buf)
+        })
         .collect();
-    if linked != built {
-        let unlinked = built.difference(&linked).next();
-        let refused = linked.difference(&built).next();
+    if linked != wanted {
+        let at = linked
+            .iter()
+            .zip(&wanted)
+            .position(|(a, b)| a != b)
+            .unwrap_or(linked.len().min(wanted.len()));
         return Err(format!(
-            "built PDF not linked: {unlinked:?}; refused PDF linked: {refused:?}"
+            "{} links for {} documents, first apart at {at}: {:?} where {:?}",
+            linked.len(),
+            wanted.len(),
+            linked.get(at),
+            wanted.get(at)
         ));
     }
     Ok(())

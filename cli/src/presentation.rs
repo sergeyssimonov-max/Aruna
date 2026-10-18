@@ -148,22 +148,25 @@ pub struct FragmentPresentation<'a> {
     /// branch used to live in the inventory's row writer and, in a slightly
     /// different form, in the group page's; one of them was going to drift.
     pub display_name: &'a str,
-    /// This manuscript's file, relative to the package root:
-    /// `./CTH%205/KBo%201.1.xml`.
+    /// Where the manuscript's name leads, relative to the package root: its
+    /// PDF, `./CTH%205/KBo%201.1.pdf`, and its XML,
+    /// `./CTH%205/KBo%201.1.xml`, when its PDF was not built – refused by
+    /// Typst or by the model, the manifest says which (owner's decision of
+    /// 2026-10-19). One link per manuscript: a document with a PDF is not
+    /// linked at its XML, though the XML stays in the package and in the
+    /// manifest.
     ///
-    /// `None` when the corpus is being shown without a folder behind it — the
+    /// `None` when the corpus is being shown without a folder behind it – the
     /// CLI's standalone inventory has no files to link to, and a link that
     /// resolved to nothing would be worse than plain text.
     ///
     /// One href, not two: until 2026-08-23 there was a second, relative to the
     /// group's own folder, for the page that folder opened with. There are no
     /// group pages any more, so the inventory is the only document that links
-    /// and the package root is the only place a link is written from.
+    /// and the package root is the only place a link is written from. From
+    /// 2026-09-30 to 2026-10-19 a built PDF had a second link of its own,
+    /// named `PDF`, after the name.
     pub href: Option<String>,
-    /// This manuscript's PDF, beside its XML: `./CTH%205/KBo%201.1.pdf`.
-    /// `None` when its PDF was refused (owner's decision of 2026-09-30,
-    /// question 5).
-    pub pdf_href: Option<String>,
     /// The record itself, for the fields a renderer lays out in columns.
     pub record: &'a ManuscriptRecord,
 }
@@ -227,7 +230,6 @@ impl<'a> CorpusPresentation<'a> {
                     FragmentPresentation {
                         display_name: display_name(record, place),
                         href: place.map(|p| href(&p.relative)),
-                        pdf_href: None,
                         record,
                     }
                 })
@@ -239,14 +241,15 @@ impl<'a> CorpusPresentation<'a> {
         CorpusPresentation { source, groups }
     }
 
-    /// The PDFs a build made, linked beside their documents. `pdfs` is
-    /// parallel to `placed`, as `placed` is to the records; a refused PDF is
-    /// not linked.
+    /// The PDFs a build made, each the target of its document's name in
+    /// place of the XML (owner's decision of 2026-10-19). `pdfs` is parallel
+    /// to `placed`, as `placed` is to the records; a document whose PDF was
+    /// refused keeps the link to its XML.
     pub(crate) fn with_pdfs(mut self, placed: &[Placed], pdfs: &[PdfState]) -> Self {
         let fragments = self.groups.iter_mut().flat_map(|g| g.fragments.iter_mut());
         for ((fragment, place), state) in fragments.zip(placed).zip(pdfs) {
             if state.built().is_some() {
-                fragment.pdf_href = Some(href(&crate::export::naming::pdf_path(&place.relative)));
+                fragment.href = Some(href(&crate::export::naming::pdf_path(&place.relative)));
             }
         }
         self
@@ -338,6 +341,40 @@ mod tests {
         assert_eq!(href, "./CTH%205/544%252Ff.xml");
         // And the name a reader sees is not the escaped one.
         assert_eq!(slash.display_name, "544/f");
+    }
+
+    /// **The name leads to the PDF where one was built, and to the XML where
+    /// it was refused** (owner's decision of 2026-10-19): one target per
+    /// manuscript, in place of the XML, and nothing beside it.
+    #[test]
+    fn a_built_pdf_takes_the_place_of_the_xml_and_a_refused_one_leaves_it() {
+        let (records, placed) = corpus();
+        let pdfs: Vec<PdfState> = placed
+            .iter()
+            .enumerate()
+            .map(|(i, place)| {
+                if i == 1 {
+                    PdfState::Refused("the document model: a fixture".into())
+                } else {
+                    PdfState::Built(crate::export::naming::pdf_path(&place.relative))
+                }
+            })
+            .collect();
+        let corpus =
+            CorpusPresentation::linked(&records, &placed, "test").with_pdfs(&placed, &pdfs);
+        let hrefs: Vec<Option<&str>> = corpus
+            .groups
+            .iter()
+            .flat_map(|g| g.fragments.iter().map(|f| f.href.as_deref()))
+            .collect();
+        assert_eq!(
+            hrefs,
+            [
+                Some("./CTH%205/KBo%201.1.pdf"),
+                Some("./CTH%205/544%252Ff.xml"),
+                Some("./CTH%209/KUB%202.1.pdf"),
+            ]
+        );
     }
 
     /// Inside a group the siglum names a manuscript; the group heading has

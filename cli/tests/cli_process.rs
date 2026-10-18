@@ -334,11 +334,16 @@ fn an_ordinary_run_writes_the_package_with_its_inventory_inside() {
     }
 
     // The difference between the two inventories, and the whole point of the
-    // package: this one links at the documents beside it.
+    // package: this one links at the documents beside it – at the PDF of
+    // each since 2026-10-19, and at the XML only where no PDF was built.
     let linked = fs::read_to_string(&inventory).expect("read");
     assert!(
-        linked.contains("href=\"./CTH%205/KBo%201.1.xml\""),
+        linked.contains("href=\"./CTH%205/KBo%201.1.pdf\""),
         "the package's inventory does not link at its documents"
+    );
+    assert!(
+        root.join("CTH 5").join("KBo 1.1.pdf").is_file(),
+        "no PDF behind the link"
     );
     // There is no second inventory beside the package any more, and nothing
     // else in Downloads either.

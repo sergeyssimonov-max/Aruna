@@ -93,7 +93,7 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
 
     assert_eq!(built.groups, 2, "CTH 5 and CTH 9");
     assert_eq!(built.documents, 4, "the debris is not a document");
-    assert_eq!(built.fragment_links, 4);
+    assert_eq!(built.document_links, 4, "one link per document");
     assert_eq!(built.disambiguated, 1, "the repeated KBo 1.1");
     // **Instructions, not documents.** Four documents carry a stylesheet
     // instruction and one of them carries two, so five are removed. Until
@@ -154,11 +154,14 @@ fn every_link_resolves_and_opens_in_a_new_context() {
     let (_, root) = built(dir.path());
     let html = fs::read_to_string(root.join(format!("{PACKAGE}.html"))).expect("inventory");
 
+    // Was 8 – four fragments and the PDF of each – until 2026-10-19; now one
+    // link per document, at its PDF (owner's decision of that day). Every
+    // document here gets a PDF, so every link is one.
     let links = export::hrefs(&html);
     assert_eq!(
         links.len(),
-        8,
-        "four fragments and the PDF of each, and nothing else"
+        4,
+        "four fragments, one link each, and nothing else"
     );
 
     for href in &links {
@@ -169,21 +172,18 @@ fn every_link_resolves_and_opens_in_a_new_context() {
         // for a `file://` directory — and never a page about a folder, which is
         // what the CTH index pages were until they were given up.
         assert!(target.is_file(), "{href} is not a file");
-        // Or the PDF of one, linked beside the manuscript it belongs to.
-        if let Some(stem) = href.strip_suffix(".pdf") {
-            assert!(
-                links.contains(&format!("{stem}.xml").as_str()),
-                "{href} is the PDF of no manuscript the inventory links"
-            );
-        } else {
-            assert!(
-                href.ends_with(".xml"),
-                "{href} is not a manuscript, so the inventory links something it should not"
-            );
-        }
+        // At its PDF, and the manuscript the PDF belongs to is in the package.
+        assert!(
+            href.ends_with(".pdf"),
+            "{href} is not the PDF of a manuscript, so the inventory links something it should not"
+        );
+        assert!(
+            target.with_extension("xml").is_file(),
+            "{href} is the PDF of no manuscript in the package"
+        );
     }
-    let manuscripts = links.iter().filter(|h| h.ends_with(".xml")).count();
-    assert_eq!(manuscripts, 4, "four fragments");
+    let distinct: std::collections::BTreeSet<&&str> = links.iter().collect();
+    assert_eq!(distinct.len(), 4, "a manuscript linked twice: {links:?}");
 
     // Every anchor carries both attributes, and none of them is absolute.
     assert_eq!(html.matches("target=\"_blank\"").count(), links.len());

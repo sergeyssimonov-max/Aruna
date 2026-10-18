@@ -233,7 +233,8 @@ pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &st
     render(&CorpusPresentation::plain(records, source), generated_at)
 }
 
-/// The same inventory, with every manuscript a link to its own XML file.
+/// The same inventory, with every manuscript a link to its own PDF, or to
+/// its XML where no PDF was built.
 ///
 /// The same function on purpose. A package's inventory needs the search, the
 /// folding and the attribution this one already has, and a second renderer
@@ -378,25 +379,13 @@ fn write_item_row(
     let rec = fragment.record;
     let title = escape_html(fragment.display_name);
     // A link where there is one, the bare name where there is not. The cell's
-    // text is the same either way, which is what the search reads.
+    // text is the same either way, which is what the search reads. One link
+    // per manuscript, on its name, at its PDF or at its XML as the
+    // presentation decided (owner's decision of 2026-10-19).
     let title = match href {
         Some(href) => filled(
             trimmed(MANUSCRIPT_LINK),
             &[("HREF", &escape_html(href)), ("TITLE", &title)],
-        ),
-        None => title,
-    };
-    // The PDF beside the XML, when the build made one: the same link the
-    // frontend renders for the document, a second time, named `PDF` (owner's
-    // decision of 2026-09-30, question 5). Its own markup belongs to the
-    // window's part of the transfer; until then it is this fragment reused.
-    let title = match &fragment.pdf_href {
-        Some(pdf) => format!(
-            "{title} {}",
-            filled(
-                trimmed(MANUSCRIPT_LINK),
-                &[("HREF", &escape_html(pdf)), ("TITLE", "PDF")],
-            )
         ),
         None => title,
     };
@@ -575,6 +564,21 @@ mod tests {
         assert!(k1 < k2);
         // Group rows use siglum only, not full "· CTH"
         assert!(!html.contains("KBo 1 · CTH"));
+    }
+
+    /// **The standalone inventory links nothing**, as before: no folder is
+    /// behind it, so every name is bare, and there is no `PDF` either.
+    #[test]
+    fn the_standalone_inventory_has_bare_names_and_no_link() {
+        let records = vec![
+            rec("KBo 1", Some("CTH 1"), 1, "SG", "2020"),
+            rec("KBo 2", Some("CTH 1"), 1, "SG", "2020"),
+        ];
+        let html = render_html(&records, "src", "now");
+        assert!(!html.contains("<a "), "a link without a folder behind it");
+        assert!(!html.contains("href="));
+        assert!(html.contains("<td>KBo 1</td>") && html.contains("<td>KBo 2</td>"));
+        assert!(!html.contains("PDF"));
     }
 
     #[test]
@@ -756,7 +760,6 @@ mod tests {
                 fragments: vec![FragmentPresentation {
                     display_name: "KBo 1",
                     href: Some("./a.xml\" onload=\"boom".into()),
-                    pdf_href: None,
                     record: &record,
                 }],
             }],

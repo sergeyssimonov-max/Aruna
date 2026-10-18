@@ -328,7 +328,10 @@ pub fn group_slices<'a>(
 pub struct Built {
     pub groups: usize,
     pub documents: usize,
-    pub fragment_links: usize,
+    /// The inventory's links to a document: one per document, at its PDF or,
+    /// where none was built, at its XML. Counted by the validator over the
+    /// package as published.
+    pub document_links: usize,
     /// Fragments that needed a suffix because their siglum was already taken.
     pub disambiguated: usize,
     /// Stylesheet instructions the package does without, removed.
@@ -488,7 +491,7 @@ pub fn build(
     Ok(Built {
         groups: crate::parse::group_runs(&records).count(),
         documents: placed.len(),
-        fragment_links: published.fragment_links,
+        document_links: published.document_links,
         disambiguated,
         stylesheet_dropped,
         pdfs: PdfCount::of(&pdfs),

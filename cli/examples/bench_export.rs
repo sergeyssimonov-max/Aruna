@@ -11,9 +11,10 @@
 //!   entry. Bounded by the ZIP, like the CLI's own run.
 //! * **place** — deciding where 24 000 documents go. Pure, in memory, and the
 //!   part an algorithm change would touch.
-//! * **inventory** — rendering the page the way the build does, with PDF
-//!   links: through `render_package_inventory`, over a synthetic map of PDF
-//!   outcomes (no PDF is compiled). Pure, in memory.
+//! * **inventory** – rendering the page the way the build does, each name a
+//!   link at its PDF or, refused, at its XML: through
+//!   `render_package_inventory`, over a synthetic map of PDF outcomes (no PDF
+//!   is compiled). Pure, in memory.
 //! * **normalise** — the transform alone, over documents already read, with the
 //!   reading not counted. This is what the second pass spends its CPU on.
 //! * **build** – the whole thing including the PDFs and writing the package
@@ -184,8 +185,8 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// One refused PDF in every 107 placed documents, the rest built beside
-/// their XML.
+/// One refused PDF in every 107 placed documents, the rest built in the
+/// folder of their XML.
 fn synthetic_pdfs(placed: &[export::Placed]) -> Vec<export::PdfState> {
     placed
         .iter()

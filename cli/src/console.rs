@@ -326,14 +326,40 @@ pub(crate) const PHRASES: &[(&str, &str)] = &[
         "на выходе появилась инструкция, которой в источнике не было",
     ),
     // export::validate – проверка пакета
-    ("link is not a relative path inside the package: {}", "ссылка ведет не внутрь пакета: {}"),
-    ("fragment link points at nothing: {}", "ссылка на документ ведет в пустоту: {}"),
-    ("the inventory links something that is not a fragment: {}", "опись ссылается не на документ: {}"),
-    ("placed but not linked: {}", "документ размещен, но в описи на него нет ссылки: {}"),
-    ("linked but not placed: {}", "в описи есть ссылка, но нет документа: {}"),
+    ("the inventory links something outside its rows: {}", "опись ссылается на что-то вне строк документов: {}"),
+    ("the inventory lists {} documents, and {} were placed", "в описи {} документов, а размещено {}"),
+    ("{} has no link in the inventory", "у документа {} нет ссылки в описи"),
+    (
+        "{} has {} links in the inventory, and a document has one",
+        "у документа {} в описи {} ссылок, а ссылка у документа одна",
+    ),
+    (
+        "the link of {} is not a relative path inside the package: {}",
+        "ссылка документа {} ведет не внутрь пакета: {}",
+    ),
+    ("the link of {} is not to a document: {}", "ссылка документа {} ведет не на документ: {}"),
+    (
+        "{} links a PDF, and its PDF was refused: {}",
+        "документ {} ссылается на PDF, а в его PDF отказано: {}",
+    ),
+    (
+        "{} links its XML, and its PDF was built: {}",
+        "документ {} ссылается на свой XML, а его PDF построен: {}",
+    ),
+    // Раньше шаблона с двумя именами: тот прочел бы и эту фразу.
+    (
+        "{} links a file of no document: {}",
+        "документ {} ссылается на файл, который не принадлежит ни одному документу: {}",
+    ),
+    ("{} links a file of {}: {}", "документ {} ссылается на файл документа {}: {}"),
+    ("the link of {} points at nothing: {}", "ссылка документа {} ведет в пустоту: {}"),
     ("the package is missing {}", "в пакете нет {}"),
     ("orphan file in the package: {}", "в пакете лишний файл: {}"),
     ("expected document missing: {}", "нет ожидаемого документа: {}"),
+    (
+        "expected document does not open by its name: {}",
+        "ожидаемый документ не открывается по своему имени: {}",
+    ),
     (
         "two documents differ only in Unicode form and the disk holds one file for both: {} and {}",
         "два документа различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
@@ -413,8 +439,6 @@ pub(crate) const PHRASES: &[(&str, &str)] = &[
         "PDF, а каталог шрифтов не назван (в консоли – ARUNA_FONTS)",
     ),
     // export::validate и export::pdf – фаза PDF
-    ("PDF link points at no PDF of this build: {}", "ссылка на PDF ведет не к PDF этой сборки: {}"),
-    ("PDF built but not linked: {}", "PDF построен, но опись на него не ссылается: {}"),
     ("PDF built but not on disk: {}", "PDF построен, но на диске его нет: {}"),
     ("PDF on disk that no document built: {}", "PDF на диске, которого не строил ни один документ: {}"),
     (
@@ -645,13 +669,13 @@ mod tests {
             ArunaError::ExportInvalid {
                 root: p(),
                 count: 3,
-                first: "fragment link points at nothing: ./Х".into(),
+                first: "the link of Х points at nothing: ./Х".into(),
             },
             // Несколько расхождений через «; », как их сводит проверка пакета.
             ArunaError::ExportInvalid {
                 root: p(),
                 count: 2,
-                first: "placed but not linked: ./Х; the manifest cannot be read: Ш".into(),
+                first: "Х has no link in the inventory; the manifest cannot be read: Ш".into(),
             },
             ArunaError::ExportInvalid {
                 root: p(),
@@ -757,8 +781,9 @@ mod tests {
         assert!(!english_in(&ArunaError::EmptyArchive.to_string()).is_empty());
     }
 
-    /// Все пять разных многоместных случаев перевода, включая данные с
-    /// двоеточием внутри.
+    /// Многоместные случаи перевода, включая данные с двоеточием внутри, и
+    /// два шаблона ссылки описи, где более общий прочел бы и частный: частный
+    /// стоит в таблице раньше.
     #[test]
     fn a_phrase_is_filled_in_with_its_data() {
         assert_eq!(
@@ -770,8 +795,16 @@ mod tests {
             "процесс 12, с 1790000000.5"
         );
         assert_eq!(
-            translated("fragment link points at nothing: ./CTH%201/a:b.xml"),
-            "ссылка на документ ведет в пустоту: ./CTH%201/a:b.xml"
+            translated("the link of CTH 1/a:b.xml points at nothing: ./CTH%201/a:b.xml"),
+            "ссылка документа CTH 1/a:b.xml ведет в пустоту: ./CTH%201/a:b.xml"
+        );
+        assert_eq!(
+            translated("CTH 1/a.xml links a file of CTH 1/b.xml: ./CTH%201/b.pdf"),
+            "документ CTH 1/a.xml ссылается на файл документа CTH 1/b.xml: ./CTH%201/b.pdf"
+        );
+        assert_eq!(
+            translated("CTH 1/a.xml links a file of no document: ./CTH%201/c.pdf"),
+            "документ CTH 1/a.xml ссылается на файл, который не принадлежит ни одному документу: ./CTH%201/c.pdf"
         );
         assert_eq!(translated("никакой шаблон"), "никакой шаблон");
     }

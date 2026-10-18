@@ -7,8 +7,9 @@
 //!
 //! **There was a second document until 2026-08-23**, an `index.html` in every
 //! CTH folder, and most of this file was about those pages. They were given up
-//! deliberately — a CTH label is a way of reading the table, not a place to go —
-//! and the inventory now links each manuscript straight at its XML. So the
+//! deliberately – a CTH label is a way of reading the table, not a place to go –
+//! and the inventory now links each manuscript straight at its file: its PDF,
+//! or its XML where no PDF was built (since 2026-10-19). So the
 //! first assertion here is the one that keeps that decision: **no `index.html`
 //! anywhere in the package, ever.** Left untested, the feature could return
 //! unnoticed, which is the failure mode this file exists to prevent.
@@ -197,8 +198,9 @@ fn the_package_carries_no_index_page_for_any_group() {
     );
 }
 
-/// A CTH heading is text. Only manuscripts are links, and the PDF of each
-/// beside it.
+/// A CTH heading is text. Only manuscripts are links, one each, on the name:
+/// at its PDF, or at its XML where it has none (owner's decision of
+/// 2026-10-19). No link is named `PDF` any more.
 #[test]
 fn a_group_heading_is_not_a_link_and_every_link_is_a_manuscript() {
     let package = Package::build();
@@ -214,28 +216,35 @@ fn a_group_heading_is_not_a_link_and_every_link_is_a_manuscript() {
     );
 
     let links = hrefs(&inventory);
-    assert!(!links.is_empty(), "an inventory with no links at all");
+    assert_eq!(links.len(), 5, "five manuscripts, one link each: {links:?}");
     for href in &links {
-        match href.strip_suffix(".pdf") {
-            Some(stem) => assert!(
-                links.contains(&format!("{stem}.xml")),
-                "the inventory links {href}, the PDF of no manuscript it links"
-            ),
-            None => assert!(
+        let target = target_of(&package.root, href);
+        assert!(target.is_file(), "{href} names a file that is not there");
+        if href.ends_with(".pdf") {
+            assert!(
+                target.with_extension("xml").is_file(),
+                "the inventory links {href}, the PDF of no manuscript in the folder"
+            );
+        } else {
+            assert!(
                 href.ends_with(".xml"),
                 "the inventory links {href}, which is not a manuscript"
-            ),
+            );
+            assert!(
+                !target.with_extension("pdf").exists(),
+                "the inventory links {href}, the XML of a manuscript with a PDF"
+            );
         }
-        assert!(
-            target_of(&package.root, href).is_file(),
-            "{href} names a file that is not there"
-        );
     }
+    assert!(
+        !inventory.contains(">PDF</a>"),
+        "a link named PDF beside a name, which was given up"
+    );
 }
 
-/// Every manuscript in the package is linked, and its PDF beside it, and
-/// nothing else is. The one manuscript whose PDF the model refused has none
-/// and no link to one, and the manifest says why.
+/// Every manuscript in the package is linked once, at its PDF, and nothing
+/// else is. The one manuscript whose PDF the model refused has none, its
+/// link is its XML, and the manifest says why.
 #[test]
 fn the_inventory_links_exactly_the_manuscripts_the_folder_holds() {
     let package = Package::build();
@@ -265,8 +274,22 @@ fn the_inventory_links_exactly_the_manuscripts_the_folder_holds() {
         })
         .collect();
 
+    // What each manuscript's link has to be: its PDF where the folder holds
+    // one, its XML where it does not.
+    let wanted: BTreeSet<PathBuf> = on_disk
+        .iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "xml"))
+        .map(|xml| {
+            let pdf = xml.with_extension("pdf");
+            if on_disk.contains(&pdf) {
+                pdf
+            } else {
+                xml.clone()
+            }
+        })
+        .collect();
     assert_eq!(
-        linked, on_disk,
+        linked, wanted,
         "the inventory and the folder do not hold the same manuscripts"
     );
 
@@ -283,6 +306,18 @@ fn the_inventory_links_exactly_the_manuscripts_the_folder_holds() {
     assert!(
         !linked.contains(&refused.with_extension("pdf")),
         "{linked:?}"
+    );
+    // Its link is its XML, byte for byte: every character of the name that
+    // means something to a URL escaped once.
+    let escaped = "./CTH%209/A%26B%20%22d%22%20%23e%20%3Ff%20%F0%92%80%80.xml";
+    assert!(
+        hrefs(&package.inventory()).iter().any(|h| h == escaped),
+        "{:?}",
+        hrefs(&package.inventory())
+    );
+    assert_eq!(
+        target_of(&package.root, escaped),
+        package.root.join(&refused)
     );
     let without: Vec<&PathBuf> = on_disk
         .iter()
@@ -345,30 +380,18 @@ fn a_siglum_holding_a_separator_is_escaped_once_in_the_name_and_once_in_the_link
         "its PDF does not take the same escaped name"
     );
 
+    // One link, at its PDF: was the XML and the PDF, each asked the same way,
+    // until 2026-10-19.
     let links = hrefs(&package.inventory());
-    let href = links
-        .iter()
-        .find(|h| h.contains("544") && h.ends_with(".xml"))
-        .expect("the inventory links it");
+    let of_it: Vec<&String> = links.iter().filter(|h| h.contains("544")).collect();
     assert_eq!(
-        *href, "./CTH%205/544%252Ff.xml",
-        "the name's % is not escaped in the link"
+        of_it,
+        ["./CTH%205/544%252Ff.pdf"],
+        "the name's % is not escaped once in the link, or the link is not one"
     );
     assert!(
-        target_of(&package.root, href).is_file(),
+        target_of(&package.root, of_it[0]).is_file(),
         "decoding the link does not give the file back"
-    );
-    let pdf = links
-        .iter()
-        .find(|h| h.contains("544") && h.ends_with(".pdf"))
-        .expect("the inventory links its PDF");
-    assert_eq!(
-        *pdf, "./CTH%205/544%252Ff.pdf",
-        "the name's % is not escaped in the PDF's link"
-    );
-    assert!(
-        target_of(&package.root, pdf).is_file(),
-        "decoding the PDF's link does not give the file back"
     );
 
     // And the reader still sees the siglum as it is written.
@@ -603,7 +626,7 @@ fn the_manifest_says_about_fonts_what_the_package_holds() {
 ///
 /// Three independent descriptions of one package; the exporter writes them from
 /// one model, and this is what says so. The inventory's opinion is now read off
-/// its fragment links — the folder each one goes through — because it no longer
+/// its document links – the folder each one goes through – because it no longer
 /// names a group in any other way.
 #[test]
 fn the_manifest_the_inventory_and_the_folder_name_the_same_groups() {
@@ -681,9 +704,12 @@ fn the_manifest_the_inventory_and_the_folder_name_the_same_groups() {
                 file.starts_with(&format!("{label}/")),
                 "the manifest files {file} under {label}, which is not where it is"
             );
+            // The link is the PDF the manifest names, or the file itself
+            // where the manifest gives the reason there is none.
+            let link = document.get("pdf").and_then(Json::as_str).unwrap_or(file);
             assert!(
-                linked.contains(file),
-                "{file} is in the manifest and not linked from the inventory"
+                linked.contains(link),
+                "{file} is in the manifest and not linked from the inventory at {link}"
             );
         }
     }

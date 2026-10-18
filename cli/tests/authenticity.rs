@@ -151,8 +151,8 @@ fn expected_from_archive(archive: &Path) -> (Bodies, usize) {
     (bodies, admitted)
 }
 
-/// Every `.xml` file the package holds, every `.pdf` beside them, and every
-/// file in it.
+/// Every `.xml` file the package holds, every `.pdf` in their folders, and
+/// every file in it.
 fn published(
     root: &Path,
 ) -> (
@@ -234,8 +234,8 @@ fn assert_same_documents(
         admitted, in_package,
         "the number of documents written is not the number the gates admitted"
     );
-    // Every PDF is the PDF of a document: beside the XML of the same name,
-    // and as many as the build says it built.
+    // Every PDF is the PDF of a document: in the folder of the XML of the same
+    // name, and as many as the build says it built.
     let strays: Vec<&PathBuf> = pdfs
         .iter()
         .filter(|pdf| !xmls.contains(&pdf.with_extension("xml")))

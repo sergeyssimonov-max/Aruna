@@ -608,7 +608,7 @@ fn an_archive_that_changes_between_the_two_passes_stops_the_build() {
 /// on Linux it stopped with a bare I/O error the window called a disk problem.
 /// Since 2026-09-24 the name is cut on a character boundary to fit with its
 /// extension, and nothing of the siglum is lost: the inventory shows it whole,
-/// and its link follows the file.
+/// and its link – at its PDF, cut the same way – follows the file.
 #[test]
 fn a_siglum_longer_than_a_filesystem_component_leaves_nothing_behind() {
     let dir = tempdir().expect("tempdir");
@@ -661,6 +661,18 @@ fn a_siglum_longer_than_a_filesystem_component_leaves_nothing_behind() {
     assert!(
         inventory.contains(&long),
         "the siglum is not whole in the inventory"
+    );
+    // The name's one link is its PDF, of the same base as its XML.
+    let links: Vec<&str> = export::hrefs(&inventory)
+        .into_iter()
+        .filter(|h| h.contains("KKKK"))
+        .collect();
+    assert_eq!(links.len(), 1, "{links:?}");
+    let target = export::resolve(links[0]).expect("a relative link");
+    assert_eq!(
+        target.file_name().and_then(|n| n.to_str()),
+        Some(pdf.as_str()),
+        "the link is not the PDF on the disk"
     );
 }
 

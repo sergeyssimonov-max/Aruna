@@ -53,7 +53,7 @@ fn main() -> ExitCode {
             println!("package:          {}", destination.join(PACKAGE).display());
             println!("CTH groups:       {}", built.groups);
             println!("documents:        {}", built.documents);
-            println!("fragment links:   {}", built.fragment_links);
+            println!("document links:   {}", built.document_links);
             println!("disambiguated:    {}", built.disambiguated);
             println!("stylesheet PIs dropped: {}", built.stylesheet_dropped);
             println!("validation errors: 0");

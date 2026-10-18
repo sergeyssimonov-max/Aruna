@@ -71,9 +71,11 @@ fn tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     out
 }
 
-/// **Every document gets its PDF beside its XML, but the one refused**, and
-/// the manifest and the inventory name what became of each: the path of a
-/// built PDF and the link to it, the reason a PDF was refused and no link.
+/// **Every document gets its PDF in the folder of its XML, but the one
+/// refused**, and the manifest and the inventory name what became of each: the
+/// path of a built PDF and the document's link at it, the reason a PDF was
+/// refused and the document's link at its XML (owner's decision of
+/// 2026-10-19).
 #[test]
 fn every_pdf_lies_beside_its_document_and_the_package_names_it() {
     let dir = tempdir().expect("tempdir");
@@ -121,14 +123,29 @@ fn every_pdf_lies_beside_its_document_and_the_package_names_it() {
     assert!(manifest.contains("\"template\": \"aruna-pdf-template 1\""));
     let inventory =
         String::from_utf8_lossy(&b[&PathBuf::from(format!("{PACKAGE}.html"))]).into_owned();
-    assert!(
-        inventory.contains("href=\"./CTH%205/KBo%201.2.pdf\""),
-        "no link beside the XML"
-    );
+    // Was: a second link at the PDF after the name, and no link at the refused one's
+    // PDF. Now one link per document, and the whole set is asked for.
+    let links: std::collections::BTreeSet<&str> = export::hrefs(&inventory).into_iter().collect();
+    let wanted: std::collections::BTreeSet<&str> = [
+        "./CTH%2012/IBoT%201.1.pdf",
+        "./CTH%205/KBo%201.1.pdf",
+        "./CTH%205/KBo%201.2.pdf",
+        "./CTH%209/KUB%202.1.pdf",
+        "./CTH%209/KUB%202.2.xml",
+    ]
+    .into_iter()
+    .collect();
+    assert_eq!(export::hrefs(&inventory).len(), 5, "{links:?}");
+    assert_eq!(links, wanted);
     assert!(
         !inventory.contains("KUB%202.2.pdf"),
         "a link to a PDF that is not there"
     );
+    assert!(
+        !inventory.contains("href=\"./CTH%205/KBo%201.2.xml\""),
+        "the XML of a document with a PDF is linked"
+    );
+    assert!(!inventory.contains(">PDF</a>"), "a second link named PDF");
 }
 
 /// **Two repeated clusters in a row refuse this document only** (owner's

@@ -2,9 +2,9 @@
 //!
 //! Not a second renderer: the package gets the same document the CLI writes —
 //! the same table, the same search, the same folding, the same attribution —
-//! with every manuscript turned into a link to its own XML file. The rendering
-//! itself belongs to [`crate::html`], and this module only says where the links
-//! point.
+//! with every manuscript's name turned into a link to its own PDF, or to its
+//! XML where no PDF was built. The rendering itself belongs to
+//! [`crate::html`], and this module only says where the links point.
 //!
 //! Until 2026-08-23 it also wrote a page for every CTH folder and linked the
 //! group headings at those. That was given up: a CTH label is a way of reading
@@ -22,9 +22,10 @@ use crate::parse::ManuscriptRecord;
 use crate::presentation::CorpusPresentation;
 
 /// The package's inventory: the CLI's own, with the links a folder makes
-/// possible – each document's XML and, beside it, its PDF.
+/// possible – each document's name leads to its PDF, or to its XML when the
+/// PDF was refused (owner's decision of 2026-10-19).
 ///
-/// `pdfs` is parallel to `placed`. A refused PDF gets no link; why it was
+/// `pdfs` is parallel to `placed`. A refused PDF is not marked; why it was
 /// refused is the manifest's to say. This is the function the build calls,
 /// so that a benchmark or a fuzzer calls the same one.
 ///
@@ -63,26 +64,92 @@ pub fn hrefs(html: &str) -> Vec<&str> {
     out
 }
 
+/// Where a manuscript's row begins: the cell with its number, which no other
+/// row of the inventory carries. `manuscript_row.html` is held to it by a test
+/// below.
+const ROW_START: &str = "<td class=\"num\">";
+
+/// The `href="…"` values of an inventory, row by row: those before the first
+/// manuscript's row, then each manuscript's own, in the order the inventory
+/// lists them.
+///
+/// The reading of [`hrefs`], cut where a row begins, so that a link can be
+/// held to the document whose row it sits in. Text out of the archive is
+/// escaped before it is written, so neither `href="` nor a row's first cell
+/// can come out of it. What follows the last row is read as part of it: a
+/// link after the table is a second link of the last document.
+pub(crate) fn links_by_row(html: &str) -> (Vec<&str>, Vec<Vec<&str>>) {
+    let mut pieces = html.split(ROW_START);
+    let before = pieces.next().map(hrefs).unwrap_or_default();
+    (before, pieces.map(hrefs).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::export::place;
     use crate::export::tests_support::fragment;
 
-    /// The inventory of `fragments`, every PDF refused: each row carries its
-    /// XML link and nothing beside it, which is what these tests read. The
-    /// PDF links are held by `tests/export_pdf.rs`.
+    /// The inventory of `fragments`, every PDF refused: each row carries the
+    /// link at its XML, which is what most of these tests read. [`built_with`]
+    /// gives the others.
     fn built(fragments: &[crate::export::Fragment]) -> (String, Vec<Placed>) {
+        let refused: Vec<usize> = (0..fragments.len()).collect();
+        let (html, placed, _) = built_with(fragments, &refused);
+        (html, placed)
+    }
+
+    /// The inventory of `fragments` with the PDF of those at `refused`
+    /// refused and every other one built, and what became of each.
+    fn built_with(
+        fragments: &[crate::export::Fragment],
+        refused: &[usize],
+    ) -> (String, Vec<Placed>, Vec<PdfState>) {
         let placed = place(fragments).expect("placed");
         let records: Vec<ManuscriptRecord> = fragments.iter().map(|f| f.record.clone()).collect();
-        let refused: Vec<PdfState> = placed
+        let pdfs: Vec<PdfState> = placed
             .iter()
-            .map(|_| PdfState::Refused("the document model: a fixture".into()))
+            .enumerate()
+            .map(|(i, place)| {
+                if refused.contains(&i) {
+                    PdfState::Refused("the document model: a fixture".into())
+                } else {
+                    PdfState::Built(crate::export::naming::pdf_path(&place.relative))
+                }
+            })
             .collect();
         (
-            render_package_inventory(&records, &placed, "test", &refused),
+            render_package_inventory(&records, &placed, "test", &pdfs),
             placed,
+            pdfs,
         )
+    }
+
+    /// The three ways a set of documents can come out: every PDF refused,
+    /// every PDF built, and the two mixed.
+    fn variants(n: usize) -> [Vec<usize>; 3] {
+        [
+            (0..n).collect(),
+            Vec::new(),
+            (0..n).filter(|i| i % 2 == 1).collect(),
+        ]
+    }
+
+    /// The file a document's link has to name: its PDF where one was built.
+    fn target(place: &Placed, state: &PdfState) -> String {
+        match state.built() {
+            Some(pdf) => crate::export::naming::href(pdf),
+            None => crate::export::naming::href(&place.relative),
+        }
+    }
+
+    /// Three documents of one group – built, refused, built.
+    fn mixed() -> Vec<crate::export::Fragment> {
+        vec![
+            fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/a.xml"),
+            fragment("KBo 1.2", "CTH 5", "root/CTH 5_XML_HFR/b.xml"),
+            fragment("KBo 1.3", "CTH 5", "root/CTH 5_XML_HFR/c.xml"),
+        ]
     }
 
     #[test]
@@ -100,6 +167,12 @@ mod tests {
         );
         assert_eq!(html.matches("rel=\"noopener\"").count(), 1);
         assert!(html.contains("href=\"./CTH%20786/KBo%2017.86%2B.xml\""));
+        // And on a mixed group: every link, at a PDF or at an XML, carries
+        // both attributes.
+        let (html, _, _) = built_with(&mixed(), &[1]);
+        assert_eq!(html.matches("<a ").count(), 3, "one link per document");
+        assert_eq!(html.matches("target=\"_blank\"").count(), 3);
+        assert_eq!(html.matches("rel=\"noopener\"").count(), 3);
         assert!(
             !html.contains("index.html"),
             "a CTH folder has no page, and nothing may link to one"
@@ -168,26 +241,29 @@ mod tests {
     fn a_siglum_carrying_markup_reaches_neither_the_link_text_nor_its_address() {
         let mut hostile = fragment("KBo \"1<b>", "CTH 5", "root/CTH 5_XML_HFR/a.xml");
         hostile.record.title = "KBo \"1<b> · CTH 5".into();
-        let (html, _) = built(&[hostile]);
+        // At its XML and at its PDF: the link is the same attribute either way.
+        for refused in variants(1) {
+            let (html, _, _) = built_with(std::slice::from_ref(&hostile), &refused);
 
-        let addresses = hrefs(&html);
-        assert_eq!(addresses.len(), 1, "one manuscript, one link");
-        for forbidden in ['"', '<', '>', '\''] {
+            let addresses = hrefs(&html);
+            assert_eq!(addresses.len(), 1, "one manuscript, one link");
+            for forbidden in ['"', '<', '>', '\''] {
+                assert!(
+                    !addresses[0].contains(forbidden),
+                    "{forbidden} survived into the address: {}",
+                    addresses[0]
+                );
+            }
+
             assert!(
-                !addresses[0].contains(forbidden),
-                "{forbidden} survived into the address: {}",
-                addresses[0]
+                html.contains(">KBo &quot;1&lt;b&gt;</a>"),
+                "the link's text is the escaped siglum and nothing else"
+            );
+            assert!(
+                !html.contains("<b>"),
+                "markup out of the archive reached the document"
             );
         }
-
-        assert!(
-            html.contains(">KBo &quot;1&lt;b&gt;</a>"),
-            "the link's text is the escaped siglum and nothing else"
-        );
-        assert!(
-            !html.contains("<b>"),
-            "markup out of the archive reached the document"
-        );
     }
 
     /// A CTH heading is text inside its fold button, and carries no link.
@@ -238,6 +314,163 @@ mod tests {
         for place in &placed {
             let want = super::super::naming::href(&place.relative);
             assert!(found.contains(&want.as_str()), "{want} was not linked");
+        }
+
+        // On a mixed group the reader gives back both kinds, in the order the
+        // writer wrote them, and row by row.
+        let (html, placed, pdfs) = built_with(&mixed(), &[1]);
+        let wanted: Vec<String> = placed
+            .iter()
+            .zip(&pdfs)
+            .map(|(p, s)| target(p, s))
+            .collect();
+        assert_eq!(hrefs(&html), wanted);
+        assert!(wanted[0].ends_with(".pdf") && wanted[1].ends_with(".xml"));
+        let (outside, rows) = links_by_row(&html);
+        assert!(outside.is_empty(), "{outside:?}");
+        assert_eq!(
+            rows,
+            wanted.iter().map(|h| vec![h.as_str()]).collect::<Vec<_>>()
+        );
+    }
+
+    /// **A document with a PDF: one link in its cell, at the PDF, on its
+    /// name** (owner's decision of 2026-10-19).
+    #[test]
+    fn a_document_with_a_pdf_links_its_name_at_the_pdf_and_nothing_else() {
+        let (html, _, _) = built_with(
+            &[fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/a.xml")],
+            &[],
+        );
+        let row = &html[html.find(ROW_START).expect("a row")..];
+        let cell = &row[..row.find("</tr>").expect("closed")];
+        assert_eq!(cell.matches("<a ").count(), 1, "{cell}");
+        assert!(
+            cell.contains(
+                "<a href=\"./CTH%205/KBo%201.1.pdf\" target=\"_blank\" rel=\"noopener\">KBo 1.1</a>"
+            ),
+            "{cell}"
+        );
+        assert!(!html.contains("KBo%201.1.xml"), "the XML is linked as well");
+    }
+
+    /// **A document whose PDF was refused: one link, at its XML.** Not
+    /// marked: why is the manifest's to say.
+    #[test]
+    fn a_document_with_a_refused_pdf_links_its_name_at_the_xml() {
+        let (html, _) = built(&[fragment("KBo 1.1", "CTH 5", "root/CTH 5_XML_HFR/a.xml")]);
+        let row = &html[html.find(ROW_START).expect("a row")..];
+        let cell = &row[..row.find("</tr>").expect("closed")];
+        assert_eq!(cell.matches("<a ").count(), 1, "{cell}");
+        assert!(
+            cell.contains(
+                "<a href=\"./CTH%205/KBo%201.1.xml\" target=\"_blank\" rel=\"noopener\">KBo 1.1</a>"
+            ),
+            "{cell}"
+        );
+        assert!(!html.contains(".pdf"), "a PDF that was refused is named");
+    }
+
+    /// **Built, refused, built in one group**: the rows keep their order, and
+    /// each name leads where its own PDF decided.
+    #[test]
+    fn a_mixed_group_links_each_document_by_its_own_pdf() {
+        let (html, _, _) = built_with(&mixed(), &[1]);
+        let names: Vec<usize> = ["KBo 1.1", "KBo 1.2", "KBo 1.3"]
+            .iter()
+            .map(|n| html.find(&format!(">{n}</a>")).expect("a linked name"))
+            .collect();
+        assert!(names.windows(2).all(|w| w[0] < w[1]), "{names:?}");
+        let (_, rows) = links_by_row(&html);
+        assert_eq!(
+            rows,
+            [
+                ["./CTH%205/KBo%201.1.pdf"],
+                ["./CTH%205/KBo%201.2.xml"],
+                ["./CTH%205/KBo%201.3.pdf"],
+            ]
+        );
+    }
+
+    /// **No link is named `PDF`**, in any of the three ways a set can come
+    /// out: the second link after the name was given up on 2026-10-19.
+    #[test]
+    fn no_link_in_the_inventory_is_named_pdf() {
+        for refused in variants(3) {
+            let (html, _, _) = built_with(&mixed(), &refused);
+            assert!(!html.contains(">PDF</a>"), "{refused:?}");
+            assert_eq!(html.matches("<a ").count(), 3, "{refused:?}");
+        }
+    }
+
+    /// **One siglum, both ways, escaped byte for byte.** A space, a
+    /// separator (escaped in the file name as `%2F`, and that `%` again in the
+    /// link), `&`, `#`, `?` and a sign above the Basic Multilingual Plane –
+    /// each encoded once, at the PDF and at the XML alike.
+    #[test]
+    fn a_link_is_escaped_once_at_the_pdf_and_at_the_xml() {
+        let siglum = fragment(
+            "A b/c&d #e ?f \u{12000}",
+            "CTH 5",
+            "root/CTH 5_XML_HFR/a.xml",
+        );
+        let base = "./CTH%205/A%20b%252Fc%26d%20%23e%20%3Ff%20%F0%92%80%80";
+        for (refused, extension) in [(vec![], "pdf"), (vec![0], "xml")] {
+            let (html, placed, _) = built_with(std::slice::from_ref(&siglum), &refused);
+            assert_eq!(
+                hrefs(&html),
+                [format!("{base}.{extension}")],
+                "{:?}",
+                placed[0]
+            );
+            assert!(!html.contains("%2525"), "encoded twice");
+        }
+    }
+
+    /// **A siglum of 255 bytes** is cut to fit with its extension, and its
+    /// PDF takes the same cut: the link at the PDF has the base of the XML,
+    /// and neither name is longer than a file name may be.
+    #[test]
+    fn a_siglum_of_255_bytes_links_a_pdf_of_the_same_base_as_its_xml() {
+        let long = "K".repeat(255);
+        let (html, placed, pdfs) =
+            built_with(&[fragment(&long, "CTH 5", "root/CTH 5_XML_HFR/a.xml")], &[]);
+        let xml = &placed[0].relative;
+        let pdf = pdfs[0].built().expect("built");
+        for name in [xml, pdf] {
+            let file = name.file_name().expect("a name").len();
+            assert!(file <= 255, "{file} bytes: {}", name.display());
+        }
+        assert_eq!(pdf.with_extension("xml"), *xml, "another base");
+        assert_eq!(hrefs(&html), [crate::export::naming::href(pdf)]);
+        assert!(
+            html.contains(&format!(">{long}</a>")),
+            "the siglum is cut in the name"
+        );
+    }
+
+    /// The row's first cell is where [`links_by_row`] cuts, so it has to be
+    /// in the row's markup once and in no other fragment the inventory is
+    /// made of.
+    #[test]
+    fn only_a_manuscript_row_begins_with_its_number() {
+        assert_eq!(
+            include_str!("../generated/manuscript_row.html")
+                .matches(ROW_START)
+                .count(),
+            1
+        );
+        for other in [
+            include_str!("../generated/document.html"),
+            include_str!("../generated/group_heading.html"),
+            include_str!("../generated/column_heading.html"),
+            include_str!("../generated/column_width.html"),
+            include_str!("../generated/legend_entry.html"),
+            include_str!("../generated/generated_line.html"),
+            include_str!("../generated/manuscript_link.html"),
+            include_str!("../generated/inventory_filter.js"),
+        ] {
+            assert!(!other.contains(ROW_START));
         }
     }
 }

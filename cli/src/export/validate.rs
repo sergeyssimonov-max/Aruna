@@ -2,20 +2,21 @@
 //!
 //! Both directions, because one of them alone proves nothing useful. Every link
 //! in the inventory has to reach a file that is there; every file that is there
-//! has to be linked. A package that satisfies only the first can hold documents
-//! nobody can reach from it, and one that satisfies only the second can promise
-//! documents it does not have.
+//! has to belong to a document the inventory links, by its PDF or, where none
+//! was built, by its XML. A package that satisfies only the first can hold
+//! documents nobody can reach from it, and one that satisfies only the second
+//! can promise documents it does not have.
 //!
 //! It reads the package rather than the build that produced it, so it is worth
 //! running against a directory this program did not just write — which is what
 //! the second call in [`super::build`] does, after the rename.
 
 use super::manifest;
-use super::naming::{dir_component, resolve};
+use super::naming::{dir_component, pdf_path, resolve};
 use super::{inventory, Placed, MANIFEST};
 use crate::error::{ArunaError, Result};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -78,7 +79,9 @@ fn read_bounded(path: &Path, limit: u64) -> Result<String> {
 /// What a clean package contains, counted while checking it.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Validation {
-    pub fragment_links: usize,
+    /// The links of the inventory to a document's file, its PDF or its XML:
+    /// one per document on a clean package, 23 936 on the corpus.
+    pub document_links: usize,
 }
 
 /// Check `root` against the records and placements it was built from, and
@@ -87,8 +90,8 @@ pub struct Validation {
 /// Every problem is collected before any is reported: a package with four
 /// hundred broken links should say so once, not four hundred times, and the
 /// first failure is rarely the informative one. Every PDF built is on disk,
-/// linked once from the inventory and named in the manifest; no other PDF is
-/// anywhere.
+/// the one link of its document in the inventory and named in the manifest;
+/// no other PDF is anywhere.
 pub fn validate(
     root: &Path,
     records: &[ManuscriptRecord],
@@ -104,21 +107,12 @@ pub fn validate(
 
     let mut errors: Vec<String> = Vec::new();
     let mut counts = Validation::default();
-    let Linked {
-        files: linked_files,
-        pdfs: linked_pdfs,
-    } = classify_links(&html, root, &expected_pdfs, &mut counts, &mut errors);
+    // The inventory must link every placed document once, at its file…
+    check_links(&html, root, placed, pdfs, &mut counts, &mut errors);
 
-    // The inventory must link exactly what was placed…
+    // …and the filesystem must hold exactly what was placed: the XML of every
+    // document, linked or not, and the PDF of those that have one.
     let expected: HashSet<PathBuf> = placed.iter().map(|p| p.relative.clone()).collect();
-    for missing in expected.difference(&linked_files) {
-        errors.push(format!("placed but not linked: {}", missing.display()));
-    }
-    for extra in linked_files.difference(&expected) {
-        errors.push(format!("linked but not placed: {}", extra.display()));
-    }
-
-    // …and the filesystem must hold exactly what the inventory links.
     let mut on_disk: HashSet<PathBuf> = HashSet::new();
     let mut at_the_root: HashSet<String> = HashSet::new();
     let mut pdfs_on_disk: HashSet<PathBuf> = HashSet::new();
@@ -133,9 +127,6 @@ pub fn validate(
         },
         &mut errors,
     );
-    for missing in expected_pdfs.difference(&linked_pdfs) {
-        errors.push(format!("PDF built but not linked: {}", missing.display()));
-    }
     let pdfs_against_disk = against_disk(&expected_pdfs, &pdfs_on_disk);
     for missing in &pdfs_against_disk.missing {
         errors.push(format!("PDF built but not on disk: {}", missing.display()));
@@ -167,6 +158,27 @@ pub fn validate(
         errors.push(format!("expected document missing: {}", absent.display()));
     }
     documents_against_disk.twins_into(&mut errors, false);
+    // The XML of a document with a PDF is linked from nowhere, so no link
+    // opens it, and the pairing above forgives the disk its Unicode form. On a
+    // disk that tells the forms apart – Linux – the file under another form
+    // would pass both; it is asked to open by its name here, as the link of a
+    // document without a PDF is asked in [`check_links`].
+    let reported: HashSet<&PathBuf> = documents_against_disk
+        .missing
+        .iter()
+        .chain(documents_against_disk.twins_placed.iter().map(|(a, _)| a))
+        .collect();
+    for (place, state) in placed.iter().zip(pdfs) {
+        if state.built().is_some()
+            && !reported.contains(&place.relative)
+            && !root.join(&place.relative).is_file()
+        {
+            errors.push(format!(
+                "expected document does not open by its name: {}",
+                place.relative.display()
+            ));
+        }
+    }
 
     // The manifest describes the same package, and is checked against the same
     // model rather than against the inventory: two documents agreeing with each
@@ -250,9 +262,10 @@ impl AgainstDisk {
 /// bytes. What is held strictly stays strict: the inventory's links and the
 /// manifest's entries are set against the placed paths byte for byte above and
 /// in [`check_manifest`], since both are written here from one model; and a
-/// link still has to open its file through the filesystem (`is_file` in
-/// [`classify_links`]), so on a disk that does tell the forms apart – Linux – a
-/// document written under another form is still a link to nothing.
+/// document still has to open through the filesystem by its name (`is_file` on
+/// its link in [`check_links`], and on the XML of a document with a PDF in
+/// [`validate`]), so on a disk that does tell the forms apart – Linux – a
+/// document written under another form is still refused.
 ///
 /// Nothing may merge on the way. Two placed paths that differ only in form
 /// over one file, or two files of one name in two forms, are reported as
@@ -330,61 +343,93 @@ fn against_disk(expected: &HashSet<PathBuf>, on_disk: &HashSet<PathBuf>) -> Agai
     found
 }
 
-/// What the inventory links, by kind: the XML documents and the PDFs.
-struct Linked {
-    files: HashSet<PathBuf>,
-    pdfs: HashSet<PathBuf>,
-}
-
-/// Sort every link of the inventory into a document, a PDF of this build, or
-/// a fault, counting the document links on the way.
+/// Hold every link of the inventory to the document whose row it sits in.
+///
+/// One link per document, on its name (owner's decision of 2026-10-19): at
+/// its PDF when the PDF was built, at its XML when it was refused, and at a
+/// file of the package that is there. The rows come in the order of
+/// `placed`, which is the order the inventory is rendered in, and `pdfs` is
+/// parallel to both. Each link is counted as a document link once it names a
+/// document's kind of file.
 ///
 /// The first section of [`validate`], taken out whole: what it reports still
 /// comes first among the errors.
-fn classify_links(
+fn check_links(
     html: &str,
     root: &Path,
-    expected_pdfs: &HashSet<PathBuf>,
+    placed: &[Placed],
+    pdfs: &[super::PdfState],
     counts: &mut Validation,
     errors: &mut Vec<String>,
-) -> Linked {
-    let mut linked_files: HashSet<PathBuf> = HashSet::new();
-    let mut linked_pdfs: HashSet<PathBuf> = HashSet::new();
-    for href in inventory::hrefs(html) {
-        let Some(relative) = resolve(href) else {
-            errors.push(format!(
-                "link is not a relative path inside the package: {href}"
-            ));
-            continue;
-        };
-        let target = root.join(&relative);
-
-        // Every link in this document names an XML file. Group headings carried
-        // links to a page inside each CTH folder until 2026-08-23; that page is
-        // no longer written and nothing may link to one, so anything that is not
-        // a fragment is a fault rather than a second kind of link.
-        if href.ends_with(".pdf") {
-            if expected_pdfs.contains(&relative) && target.is_file() {
-                linked_pdfs.insert(relative);
-            } else {
-                errors.push(format!("PDF link points at no PDF of this build: {href}"));
-            }
-        } else if href.ends_with(".xml") {
-            counts.fragment_links += 1;
-            if target.is_file() {
-                linked_files.insert(relative);
-            } else {
-                errors.push(format!("fragment link points at nothing: {href}"));
-            }
-        } else {
-            errors.push(format!(
-                "the inventory links something that is not a fragment: {href}"
-            ));
-        }
+) {
+    let (outside, rows) = inventory::links_by_row(html);
+    for href in outside {
+        errors.push(format!(
+            "the inventory links something outside its rows: {href}"
+        ));
     }
-    Linked {
-        files: linked_files,
-        pdfs: linked_pdfs,
+    if rows.len() != placed.len() {
+        errors.push(format!(
+            "the inventory lists {} documents, and {} were placed",
+            rows.len(),
+            placed.len()
+        ));
+    }
+    // Whose file each name is, so that a link to the wrong one can say whose.
+    let mut owner: HashMap<PathBuf, &Path> = HashMap::new();
+    for place in placed {
+        owner.insert(place.relative.clone(), &place.relative);
+        owner.insert(pdf_path(&place.relative), &place.relative);
+    }
+    for ((links, place), state) in rows.iter().zip(placed).zip(pdfs) {
+        let document = place.relative.display();
+        match links.len() {
+            0 => errors.push(format!("{document} has no link in the inventory")),
+            1 => {}
+            n => errors.push(format!(
+                "{document} has {n} links in the inventory, and a document has one"
+            )),
+        }
+        let built = state.built();
+        let pdf = built.map_or_else(|| pdf_path(&place.relative), Path::to_path_buf);
+        for href in links {
+            let Some(relative) = resolve(href) else {
+                errors.push(format!(
+                    "the link of {document} is not a relative path inside the package: {href}"
+                ));
+                continue;
+            };
+            // A group heading carried a link to a page inside each CTH folder
+            // until 2026-08-23; that page is no longer written and nothing may
+            // link to one, so anything that is not a document's file is a
+            // fault rather than another kind of link.
+            if !(href.ends_with(".pdf") || href.ends_with(".xml")) {
+                errors.push(format!(
+                    "the link of {document} is not to a document: {href}"
+                ));
+                continue;
+            }
+            counts.document_links += 1;
+            if relative == pdf && built.is_none() {
+                errors.push(format!(
+                    "{document} links a PDF, and its PDF was refused: {href}"
+                ));
+            } else if relative == place.relative && built.is_some() {
+                errors.push(format!(
+                    "{document} links its XML, and its PDF was built: {href}"
+                ));
+            } else if relative != pdf && relative != place.relative {
+                match owner.get(&relative) {
+                    Some(other) => errors.push(format!(
+                        "{document} links a file of {}: {href}",
+                        other.display()
+                    )),
+                    None => errors.push(format!("{document} links a file of no document: {href}")),
+                }
+            } else if !root.join(&relative).is_file() {
+                errors.push(format!("the link of {document} points at nothing: {href}"));
+            }
+        }
     }
 }
 
@@ -659,7 +704,14 @@ mod tests {
         let placed = place(fragments).expect("placed");
         let pdfs = states(&placed, refused);
         let records: Vec<ManuscriptRecord> = fragments.iter().map(|f| f.record.clone()).collect();
-        for (place, state) in placed.iter().zip(&pdfs) {
+        write_documents(dir, &placed, &pdfs);
+        write_root(dir, &records, &placed, &pdfs);
+        (placed, pdfs)
+    }
+
+    /// The XML of every placed document and the PDF of those built.
+    fn write_documents(dir: &Path, placed: &[Placed], pdfs: &[PdfState]) {
+        for (place, state) in placed.iter().zip(pdfs) {
             let path = dir.join(&place.relative);
             fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
             fs::write(
@@ -671,17 +723,22 @@ mod tests {
                 fs::write(dir.join(pdf), b"%PDF-1.7 fixture").expect("pdf");
             }
         }
+    }
+
+    /// The files at the root of a package: the inventory, the manifest, the
+    /// font and the two texts of terms.
+    fn write_root(dir: &Path, records: &[ManuscriptRecord], placed: &[Placed], pdfs: &[PdfState]) {
         fs::write(
             dir.join(format!("{PACKAGE}.html")),
-            render_package_inventory(&records, &placed, "test", &pdfs),
+            render_package_inventory(records, placed, "test", pdfs),
         )
         .expect("inventory");
         // The manifest is part of a package too, and the validator now says so.
         fs::write(
             dir.join(MANIFEST),
             manifest::render_manifest(
-                &records,
-                &placed,
+                records,
+                placed,
                 &manifest::Source {
                     label: "test",
                     archive_md5: "0",
@@ -691,7 +748,7 @@ mod tests {
                 &Default::default(),
                 &Default::default(),
                 &[],
-                &pdfs,
+                pdfs,
             ),
         )
         .expect("manifest");
@@ -713,7 +770,37 @@ mod tests {
             crate::cth_titles::PACKAGED_TERMS_BYTES,
         )
         .expect("CTH terms");
-        (placed, pdfs)
+    }
+
+    /// The inventory of the package at `dir`, rewritten by `edit`, which has
+    /// to change it.
+    fn rewrite_inventory(dir: &Path, edit: impl FnOnce(&str) -> String) {
+        let path = dir.join(format!("{PACKAGE}.html"));
+        let html = fs::read_to_string(&path).expect("read");
+        let edited = edit(&html);
+        assert_ne!(edited, html, "the inventory was not changed");
+        fs::write(&path, edited).expect("write");
+    }
+
+    /// The anchor the inventory writes for `href` and `name`.
+    fn anchor(href: &str, name: &str) -> String {
+        format!("<a href=\"{href}\" target=\"_blank\" rel=\"noopener\">{name}</a>")
+    }
+
+    /// The link the inventory writes to `path`.
+    fn link_to(path: &Path) -> String {
+        crate::export::naming::href(path)
+    }
+
+    /// The error `validate` gives the package at `dir`, as text.
+    fn refusal(
+        dir: &Path,
+        fragments: &[crate::export::Fragment],
+        placed: &[Placed],
+        pdfs: &[PdfState],
+    ) -> String {
+        let err = validate(dir, &records(fragments), placed, pdfs).expect_err("refused");
+        format!("{err}")
     }
 
     fn sample() -> Vec<crate::export::Fragment> {
@@ -817,7 +904,170 @@ mod tests {
 
         let counts =
             validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed)).expect("valid");
-        assert_eq!(counts.fragment_links, 3);
+        assert_eq!(counts.document_links, 3);
+    }
+
+    /// **One link per document, by what became of its PDF** (owner's decision
+    /// of 2026-10-19): built, refused, built – the PDF, the XML, the PDF – and
+    /// the count is one per document, whichever file it names.
+    #[test]
+    fn a_package_whose_pdfs_are_mixed_passes_with_one_link_per_document() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[1]);
+
+        let counts = validate(dir.path(), &records(&fragments), &placed, &pdfs).expect("valid");
+        assert_eq!(counts.document_links, placed.len());
+        let html = fs::read_to_string(dir.path().join(format!("{PACKAGE}.html"))).expect("read");
+        let (outside, rows) = inventory::links_by_row(&html);
+        assert!(outside.is_empty(), "{outside:?}");
+        let wanted = [
+            link_to(&pdf_path(&placed[0].relative)),
+            link_to(&placed[1].relative),
+            link_to(&pdf_path(&placed[2].relative)),
+        ];
+        assert_eq!(
+            rows,
+            wanted.iter().map(|h| vec![h.as_str()]).collect::<Vec<_>>()
+        );
+    }
+
+    /// A document whose row has no link, with every file in its place.
+    #[test]
+    fn a_document_without_a_link_fails() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
+        let own = anchor(&link_to(&pdf_path(&placed[0].relative)), "KBo 1.1");
+        rewrite_inventory(dir.path(), |html| html.replacen(&own, "KBo 1.1", 1));
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains("CTH 5/KBo 1.1.xml has no link in the inventory"),
+            "{text}"
+        );
+    }
+
+    /// Two links in one row, the PDF and the XML of the same document.
+    #[test]
+    fn a_document_with_two_links_fails() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
+        let own = anchor(&link_to(&pdf_path(&placed[0].relative)), "KBo 1.1");
+        let both = format!("{own} {}", anchor(&link_to(&placed[0].relative), "XML"));
+        rewrite_inventory(dir.path(), |html| html.replacen(&own, &both, 1));
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains("CTH 5/KBo 1.1.xml has 2 links in the inventory"),
+            "{text}"
+        );
+    }
+
+    /// A document with a PDF linked at its XML: the file is there, and it is
+    /// the wrong one.
+    #[test]
+    fn a_document_with_a_pdf_linked_at_its_xml_fails() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
+        let pdf = link_to(&pdf_path(&placed[0].relative));
+        let xml = link_to(&placed[0].relative);
+        rewrite_inventory(dir.path(), |html| html.replacen(&pdf, &xml, 1));
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains(&format!(
+                "CTH 5/KBo 1.1.xml links its XML, and its PDF was built: {xml}"
+            )),
+            "{text}"
+        );
+    }
+
+    /// A document whose PDF was refused, linked at a PDF.
+    #[test]
+    fn a_document_with_a_refused_pdf_linked_at_a_pdf_fails() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[1]);
+        let xml = link_to(&placed[1].relative);
+        let pdf = link_to(&pdf_path(&placed[1].relative));
+        rewrite_inventory(dir.path(), |html| html.replacen(&xml, &pdf, 1));
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains(&format!(
+                "{} links a PDF, and its PDF was refused: {pdf}",
+                placed[1].relative.display()
+            )),
+            "{text}"
+        );
+    }
+
+    /// A document linked at the PDF of another: its own PDF is there and
+    /// unlinked, the other's is linked twice, and the row says whose file it
+    /// names.
+    #[test]
+    fn a_document_linked_at_the_file_of_another_fails() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
+        let own = link_to(&pdf_path(&placed[0].relative));
+        let other = link_to(&pdf_path(&placed[1].relative));
+        rewrite_inventory(dir.path(), |html| html.replacen(&own, &other, 1));
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains(&format!(
+                "CTH 5/KBo 1.1.xml links a file of {}: {other}",
+                placed[1].relative.display()
+            )),
+            "{text}"
+        );
+    }
+
+    /// A link at a name of no document of the package, and a row missing:
+    /// the table is held to the placement row by row, and a link before the
+    /// first row belongs to none.
+    #[test]
+    fn a_link_to_no_document_a_link_outside_the_rows_and_a_missing_row_fail() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
+        let own = link_to(&pdf_path(&placed[2].relative));
+        rewrite_inventory(dir.path(), |html| {
+            html.replacen(&own, "./CTH%209/KUB%202.9.pdf", 1)
+        });
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains("CTH 9/KUB 2.1.xml links a file of no document: ./CTH%209/KUB%202.9.pdf"),
+            "{text}"
+        );
+
+        let dir = tempdir().expect("tempdir");
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
+        rewrite_inventory(dir.path(), |html| {
+            let last = html.rfind("<tr>").expect("a row");
+            let end = last + html[last..].find("</tr>").expect("closed") + "</tr>".len();
+            let stray = anchor("./CTH%205/KBo%201.1.pdf", "KBo 1.1");
+            format!("{}{}", &html[..last], &html[end..]).replacen(
+                "<body",
+                &format!("{stray}<body"),
+                1,
+            )
+        });
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains(
+                "the inventory links something outside its rows: ./CTH%205/KBo%201.1.pdf"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("the inventory lists 2 documents, and 3 were placed"),
+            "{text}"
+        );
     }
 
     /// `CTH 470/München 3.xml` with the `ü` composed, as the corpus spells it.
@@ -969,10 +1219,17 @@ mod tests {
         let checked = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed));
         if cfg!(target_os = "macos") {
             let counts = checked.expect("the disk's spelling of a placed name is that name");
-            assert_eq!(counts.fragment_links, 2);
+            assert_eq!(counts.document_links, 2);
         } else {
-            let err = checked.expect_err("a link to a name the disk does not have");
-            assert!(format!("{err}").contains("points at nothing"), "{err}");
+            // Its PDF is what the inventory links, so it is the document's
+            // own name that is asked to open.
+            let err = checked.expect_err("a document under a name the disk does not have");
+            assert!(
+                format!("{err}").contains(&format!(
+                    "expected document does not open by its name: {NFC_PATH}"
+                )),
+                "{err}"
+            );
         }
     }
 
@@ -1018,10 +1275,9 @@ mod tests {
         let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
             .expect_err("refused");
         let text = format!("{err}");
-        assert!(
-            text.contains("not linked") || text.contains("points at nothing"),
-            "{text}"
-        );
+        // Was: «not linked» or «points at nothing», by the order of the checks.
+        // Now the turned link names no document's file on either system.
+        assert!(text.contains("links a file of no document"), "{text}");
     }
 
     /// Прочитанное заново дерево должно нести все четыре корневых файла.
@@ -1057,17 +1313,128 @@ mod tests {
     }
 
     /// The failure this whole check exists for: the inventory promises a
-    /// document that is not there.
+    /// document that is not there. Its link is its PDF, so the PDF is what is
+    /// taken away, and for a document without a PDF, the XML.
     #[test]
     fn a_link_with_no_file_behind_it_fails() {
         let dir = tempdir().expect("tempdir");
         let fragments = sample();
-        let placed = package(dir.path(), &fragments);
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[1]);
+        let pdf = pdf_path(&placed[0].relative);
+        fs::remove_file(dir.path().join(&pdf)).expect("remove");
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains(&format!(
+                "the link of CTH 5/KBo 1.1.xml points at nothing: {}",
+                link_to(&pdf)
+            )),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("PDF built but not on disk: {}", pdf.display())),
+            "{text}"
+        );
+
+        let dir = tempdir().expect("tempdir");
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[1]);
+        fs::remove_file(dir.path().join(&placed[1].relative)).expect("remove");
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains(&format!(
+                "the link of {} points at nothing: {}",
+                placed[1].relative.display(),
+                link_to(&placed[1].relative)
+            )),
+            "{text}"
+        );
+    }
+
+    /// The XML of a document with a PDF is linked from nowhere, and is still
+    /// required: the package holds the XML of every document.
+    #[test]
+    fn the_xml_of_a_document_with_a_pdf_is_required_though_nothing_links_it() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
         fs::remove_file(dir.path().join(&placed[0].relative)).expect("remove");
 
-        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
-            .expect_err("must fail");
-        assert!(format!("{err}").contains("points at nothing"), "{err}");
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains("expected document missing: CTH 5/KBo 1.1.xml"),
+            "{text}"
+        );
+        assert!(!text.contains("link"), "its link is whole: {text}");
+    }
+
+    /// A PDF on the disk that no document built: refused, as it always was.
+    #[test]
+    fn a_pdf_of_no_document_on_the_disk_fails() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[1]);
+        // The PDF the refused document would have had.
+        let stray = pdf_path(&placed[1].relative);
+        fs::write(dir.path().join(&stray), b"%PDF-1.7 stray").expect("write");
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        assert!(
+            text.contains(&format!(
+                "PDF on disk that no document built: {}",
+                stray.display()
+            )),
+            "{text}"
+        );
+    }
+
+    /// **Two PDFs that differ only in Unicode form over one file** are the
+    /// refusal they always were, now that each is its document's link.
+    /// Placed by hand: [`place`] does not place the pair where the disk
+    /// would merge it.
+    #[test]
+    fn two_pdfs_that_differ_only_in_form_over_one_file_are_refused_on_their_links() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = vec![
+            fragment("M\u{fc}nchen 3", "CTH 470", "root/CTH 470_XML_TLH/a.xml"),
+            fragment("Mu\u{308}nchen 3", "CTH 470", "root/CTH 470_XML_TLH/b.xml"),
+        ];
+        let placed: Vec<Placed> = [NFC_PATH, NFD_PATH]
+            .into_iter()
+            .map(|path| Placed {
+                relative: PathBuf::from(path),
+                label: Path::new(path)
+                    .file_stem()
+                    .expect("a stem")
+                    .to_string_lossy()
+                    .into_owned(),
+            })
+            .collect();
+        let pdfs = pdfs_of(&placed);
+        // One file for both, as a disk that merges the forms would hold.
+        write_documents(dir.path(), &placed[..1], &pdfs[..1]);
+        write_root(dir.path(), &records(&fragments), &placed, &pdfs);
+        let html = fs::read_to_string(dir.path().join(format!("{PACKAGE}.html"))).expect("read");
+        let (_, rows) = inventory::links_by_row(&html);
+        assert!(
+            rows.iter()
+                .all(|links| links.len() == 1 && links[0].ends_with(".pdf")),
+            "{rows:?}"
+        );
+
+        let text = refusal(dir.path(), &fragments, &placed, &pdfs);
+        let (nfc, nfd) = (pdf_path(Path::new(NFC_PATH)), pdf_path(Path::new(NFD_PATH)));
+        assert!(
+            text.contains(&format!(
+                "two PDFs differ only in Unicode form and the disk holds one file for both: {} and {}",
+                nfc.display(),
+                nfd.display()
+            )) || text.contains(&format!(
+                "two PDFs differ only in Unicode form and the disk holds one file for both: {} and {}",
+                nfd.display(),
+                nfc.display()
+            )),
+            "{text}"
+        );
     }
 
     /// The other direction: a document nobody can reach from the inventory.
