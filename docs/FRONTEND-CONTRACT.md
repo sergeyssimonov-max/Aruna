@@ -605,7 +605,21 @@ as it stands.
 
 | event | payload |
 |---|---|
-| `build-progress` | `{ job, stage, done, total, manuscripts, groups, note }` |
+| `build-progress` | `{ job, stage, done, total, built, manuscripts, groups, note }` |
+
+**The PDF phase reaches the window** (2026-10-18, part3-1). Until then the shell
+dropped `WritingPdfs` and `PdfsWritten` before the wire, by the owner's decision
+of 2026-09-30 (question 8). Now they cross as their own stage, `writing-pdfs`:
+the announcement carries `done: 0` and `total`, every placed document, and each
+tick carries `done`, `total` and `built`, the PDFs built rather than refused,
+all three the core's numbers as they are. `built` is `null` on every other
+event, the announcement of the phase included. `BuildReport` gained `pdfs`,
+`{ built, refused }` from the core's `PackageReport::pdfs`, and `null` for a
+build without PDFs: a zero there would say none came out, where none was asked
+for. The window's own request still asks for no PDFs until part3-2, so on its
+screen the phase does not occur yet. The shell test
+`the_pdf_phase_reaches_the_window` builds a small archive with PDFs and holds
+what the wire carries.
 
 **The types are generated, not written twice.** `frontend/src/bindings.ts` comes
 out of the same declarations that register the commands — specta 2.0.0-rc.25,
@@ -659,13 +673,17 @@ that is not there.
 - *Progress is an event stream, aggregated.* One event per document across
   23 936 documents would be 23 936 round trips; the core batches instead, and
   says which way: the transfer by interval (a quarter-second), the write by
-  count (every five hundred documents, forty-eight messages for this corpus).
+  count (every five hundred documents, forty-eight messages for this corpus),
+  the PDFs by count as well (every two hundred and fifty, ninety-six messages).
   The stage announces the denominator, the ticks fill the numerator in.
 - *Errors cross as a tagged structure.* `BuildFailure` carries `code`, `phase`,
   `message`, `retryable` and `cancelled` — `app::Failure`'s five fields, one for
   one. The two reading commands keep a bare sentence, because each has exactly
-  one failure and there is nothing to branch on; the build has twenty codes and
-  the window's next move depends on which.
+  one failure and there is nothing to branch on; the build has twenty-eight
+  codes – twenty-five from the core's `app::Failure::of` and three from the
+  shell, `busy`, `interrupted` and `destination_missing` – and the window's
+  next move depends on which. The window adds one of its own, `broken`, for a
+  bridge that failed. This document said twenty until 2026-10-18.
 - *Nothing long-running touches the main thread.* `build_corpus` is `async` and
   the work is on `spawn_blocking`. `Job<'a>` borrows its sink and its flag, so
   it is built inside the worker; `Cancel` is `Clone` over an `Arc`, so the
@@ -686,17 +704,20 @@ stripped it. And no count crosses as a 64-bit integer: specta refuses `usize` an
 `archive::MAX_ENTRIES` (500 000), a download by the gibibyte the client will
 accept, and a length above that is not shown as a denominator at all.
 
-**`Stage` is a union, not a string.** Twenty literals generated from a Rust
-enum, so `svelte-check` fails when the core gains a stage and the window forgets
-it — the same guarantee, one language further on, that `progress::Event` gets
-from not being `#[non_exhaustive]`. Twenty against the core's twenty-two events,
-because two pairs – a stage announced and its tick – are one stage each. The
-last three came with the polish block for 2.6.1: `waiting-for-publication`
+**`Stage` is a union, not a string.** Twenty-one literals generated from a
+Rust enum, so `svelte-check` fails when the core gains a stage and the window
+forgets it – the same guarantee, one language further on, that
+`progress::Event` gets from not being `#[non_exhaustive]`. Twenty-one against
+the core's twenty-four events, because three pairs – a stage announced and its
+tick, for the download, the write and the PDFs – are one stage each. The last
+came on 2026-10-18: `writing-pdfs`, the PDF phase (part3-1, above). Three came
+before it with the polish block for 2.6.1: `waiting-for-publication`
 (2026-09-24, another run is publishing into the same folder),
 `publishing-without-lock` (2026-09-25, the disk cannot hold the publish lock)
 and `proxy-unusable` (2026-09-25, a proxy is named but this program cannot use
 it; the note carries the variable's name, never its value). This document said
-seventeen until 2026-09-25.
+seventeen until 2026-09-25, and twenty against twenty-two events until
+2026-10-18, when the core already had twenty-four.
 
 ---
 
