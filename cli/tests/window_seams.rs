@@ -703,6 +703,17 @@ fn every_failure() -> Vec<ArunaError> {
             count: 1,
             first: format!("{} is missing", secret.display()),
         },
+        // A broken rule of the PDF phase: the document inside the package, or
+        // no document and the family the font stack lacks. Neither carries a
+        // path of this machine, and the test above holds that.
+        ArunaError::PdfInvariant {
+            document: Some("CTH 12/IBoT 1.3.xml".into()),
+            invariant: "the world of the template could not be built".into(),
+        },
+        ArunaError::PdfInvariant {
+            document: None,
+            invariant: "Noto Serif".into(),
+        },
         ArunaError::PublishBusy {
             path: secret.clone(),
             holder: "pid 1, since 1.0".into(),
@@ -743,6 +754,7 @@ fn covers(error: &ArunaError) {
         | ArchiveTooManyEntries { .. }
         | ExportPackageTooLarge { .. }
         | ExportInvalid { .. }
+        | PdfInvariant { .. }
         | PublishBusy { .. }
         | ExportDestination { .. }
         | DownloadsDir => {}

@@ -98,16 +98,28 @@ pub fn load_fonts(dir: Option<&Path>) -> Result<Fonts> {
             covers: NO_FONT_DIRECTORY,
         });
     };
-    match crate::pdf::Fonts::load(dir) {
-        Ok(fonts) => Ok(fonts),
-        Err(crate::pdf::PdfError::Fonts(error)) => Err(error),
-        // A stack without one of its faces, from files that passed their
-        // digests: a defect, told as the export tells one.
-        Err(other) => Err(crate::export::pdf::invariant_broken(
-            dir,
-            crate::pdf::fonts::STACK[0],
-            &other.to_string(),
-        )),
+    crate::pdf::Fonts::load(dir).map_err(font_refusal)
+}
+
+/// What a font directory that did not load comes to: the refusal of the
+/// fonts as it is, or – a stack without one of its faces, from files that
+/// passed their digests – a defect of the program, `pdf_invariant` with no
+/// document and the family named in its place, never the directory.
+fn font_refusal(error: crate::pdf::PdfError) -> ArunaError {
+    match error {
+        crate::pdf::PdfError::Fonts(error) => error,
+        crate::pdf::PdfError::Invariant(crate::pdf::Invariant::StackFace(family)) => {
+            ArunaError::PdfInvariant {
+                document: None,
+                invariant: family.to_string(),
+            }
+        }
+        // `Fonts::load` fails no other way; the first family of the stack is
+        // named, as it was before this variant existed.
+        _ => ArunaError::PdfInvariant {
+            document: None,
+            invariant: crate::pdf::fonts::STACK[0].to_string(),
+        },
     }
 }
 
@@ -346,6 +358,12 @@ impl Failure {
             ExportDocumentTooLarge { .. } => ("document_too_large", Some(Phase::Exporting), false),
             ExportDistorted { .. } => ("distorted", Some(Phase::Exporting), false),
             ExportDestination { .. } => ("destination_not_ours", Some(Phase::Exporting), false),
+            // A PDF broke a rule of this program: the build stopped in the PDF
+            // phase, a defect of the program that the same run will repeat
+            // (owner's decision 4.4 of 2026-10-18). Until that day it came as
+            // `package_invalid`, which said the package did not match its
+            // model – the wrong phase and the wrong fault.
+            PdfInvariant { .. } => ("pdf_invariant", Some(Phase::Exporting), false),
             // The cure is the other run finishing, which is what waiting was
             // for — but a caller that wants to try again is not wrong to.
             PublishBusy { .. } => ("publish_busy", Some(Phase::Publishing), true),
@@ -436,6 +454,17 @@ fn message_of(error: &ArunaError) -> String {
             None => format!("{first_group} / {second_group} – {first}, {second}"),
         },
         ArchiveDuplicateEntry { entry } => entry.clone(),
+        // The document inside the package, or the family the font stack lacks:
+        // a name and no English around it, as `collision` – the window shows it
+        // as the second line under its own sentence (`DETAILED`).
+        PdfInvariant {
+            document: Some(document),
+            ..
+        } => document.clone(),
+        PdfInvariant {
+            document: None,
+            invariant,
+        } => invariant.clone(),
         // The file's name and not where it lies: the name is the application's
         // own and says which face is at fault, the directory is this machine's.
         // Both variants had `Display` alone and so sent the whole path — kept
@@ -495,6 +524,53 @@ mod tests {
             load_fonts(Some(Path::new("/nonexistent/fonts"))),
             Err(ArunaError::FontMissing { .. })
         ));
+    }
+
+    /// **A broken rule of the PDF phase is its own failure** (owner's decision
+    /// 4.4 of 2026-10-18): `pdf_invariant`, in the export, not worth another
+    /// attempt, and the window's second line is the document inside the
+    /// package – no path of this machine and no English around it.
+    #[test]
+    fn a_broken_pdf_invariant_is_its_own_failure() {
+        let failure = Failure::of(&ArunaError::PdfInvariant {
+            document: Some("CTH 12/IBoT 1.3.xml".into()),
+            invariant: "the world of the template could not be built".into(),
+        });
+        assert_eq!(failure.code, "pdf_invariant");
+        assert_eq!(failure.phase, Some(Phase::Exporting));
+        assert!(!failure.retryable);
+        assert!(!failure.cancelled);
+        assert_eq!(failure.message, "CTH 12/IBoT 1.3.xml");
+    }
+
+    /// **The font stack without a face names the family, and no document**:
+    /// `document` is `None`, the family takes its place in the sentence and
+    /// in the window's second line, and the directory is named nowhere.
+    #[test]
+    fn a_font_stack_without_a_face_is_a_pdf_invariant_naming_the_family() {
+        let error = font_refusal(crate::pdf::PdfError::Invariant(
+            crate::pdf::Invariant::StackFace("Noto Serif"),
+        ));
+        match &error {
+            ArunaError::PdfInvariant {
+                document: None,
+                invariant,
+            } => assert_eq!(invariant, "Noto Serif"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(
+            error.to_string(),
+            "the font stack has no regular face of Noto Serif"
+        );
+        let failure = Failure::of(&error);
+        assert_eq!(failure.code, "pdf_invariant");
+        assert_eq!(failure.message, "Noto Serif");
+        // The refusal of the fonts themselves passes through as it is.
+        let missing = font_refusal(crate::pdf::PdfError::Fonts(ArunaError::FontMissing {
+            path: PathBuf::from("NotoSerif-Regular.ttf"),
+            covers: NO_FONT_DIRECTORY,
+        }));
+        assert_eq!(Failure::of(&missing).code, "font_missing");
     }
 
     /// The fonts of the tree, which every PDF is set in.

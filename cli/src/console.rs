@@ -113,6 +113,19 @@ pub(crate) fn headline(err: &ArunaError) -> String {
                 .collect::<Vec<_>>()
                 .join("; ")
         ),
+        // Документ внутри пакета и правило, которое PDF нарушил, или
+        // семейство, которого нет в стеке шрифтов. Путей машины здесь нет.
+        PdfInvariant {
+            document: Some(document),
+            invariant,
+        } => format!(
+            "PDF документа {document} нарушил правило программы; {}",
+            translated(invariant)
+        ),
+        PdfInvariant {
+            document: None,
+            invariant,
+        } => format!("в стеке шрифтов нет прямого начертания {invariant}"),
         PublishBusy { path, holder } => format!(
             "в эту папку публикует другой запуск: {} ({})",
             path.display(),
@@ -407,14 +420,6 @@ pub(crate) const PHRASES: &[(&str, &str)] = &[
     (
         "two PDFs differ only in Unicode form and the disk holds one file for both: {} and {}",
         "два PDF различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
-    ),
-    (
-        "the PDF of {} broke an invariant of this program",
-        "PDF документа {} нарушил правило программы",
-    ),
-    (
-        "the PDF of {} broke an invariant of this program; {}",
-        "PDF документа {} нарушил правило программы; {}",
     ),
     // pdf – нарушенные правила сборки PDF
     (

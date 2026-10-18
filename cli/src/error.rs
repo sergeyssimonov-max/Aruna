@@ -200,6 +200,21 @@ pub enum ArunaError {
         first: String,
     },
 
+    /// A PDF broke an invariant of this program: the build stops in the PDF
+    /// phase and nothing is published. A defect of the program, not of the
+    /// data (owner's decision 4.4 of 2026-10-18).
+    ///
+    /// `document` is the document's path inside the package, as the export
+    /// placed it, and `invariant` the rule it broke. `None` when no document
+    /// is at fault – the font stack has no regular face of a family – and
+    /// then `invariant` is that family: the name a reader can act on, never a
+    /// path on this machine.
+    #[error("{}", pdf_invariant(document.as_deref(), invariant))]
+    PdfInvariant {
+        document: Option<String>,
+        invariant: String,
+    },
+
     /// Another run is publishing into the same directory and has not finished.
     ///
     /// Publishing is a move, a rename and a read-back, and two runs interleaving
@@ -251,6 +266,17 @@ impl ArunaError {
 }
 
 pub type Result<T> = std::result::Result<T, ArunaError>;
+
+/// The sentence of [`ArunaError::PdfInvariant`]: the document and the rule, or
+/// the family the font stack lacks.
+fn pdf_invariant(document: Option<&str>, invariant: &str) -> String {
+    match document {
+        Some(document) => {
+            format!("the PDF of {document} broke an invariant of this program; {invariant}")
+        }
+        None => format!("the font stack has no regular face of {invariant}"),
+    }
+}
 
 /// Where two spellings of one name part ways, as code points: the part of
 /// each between what they share at the start and at the end, as `U+XXXX`.

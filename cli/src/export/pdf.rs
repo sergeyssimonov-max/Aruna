@@ -12,7 +12,7 @@
 //! record in the manifest, and the build goes on (`PDF-ACCEPTANCE.md` §5) –
 //! as does one with two repeated clusters in a row (owner's decision of
 //! 2026-10-02). A broken invariant of this program stops the whole build and
-//! names the document and the invariant.
+//! names the document and the invariant (`ArunaError::PdfInvariant`).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -90,15 +90,14 @@ pub(crate) fn write_pdfs(
     Ok(states)
 }
 
-/// A broken invariant as the export tells a package that does not match its
-/// model: not published, a defect of the program and not of the data – the
-/// sentence the window already has for it. The document and the invariant are
-/// the first problem, two parts the console translates one by one.
-pub(crate) fn invariant_broken(root: &Path, document: &str, invariant: &str) -> ArunaError {
-    ArunaError::ExportInvalid {
-        root: root.to_path_buf(),
-        count: 1,
-        first: format!("the PDF of {document} broke an invariant of this program; {invariant}"),
+/// A broken invariant of the PDF phase: the build stops, nothing is published,
+/// a defect of the program and not of the data (owner's decision 4.4 of
+/// 2026-10-18). `document` is the path inside the package; the console and the
+/// window name it, and the rule it broke.
+pub(crate) fn invariant_broken(document: &str, invariant: &str) -> ArunaError {
+    ArunaError::PdfInvariant {
+        document: Some(document.to_string()),
+        invariant: invariant.to_string(),
     }
 }
 
@@ -131,13 +130,13 @@ fn one(
             std::io::Write::write_all(&mut handle, &rendered.pdf).map_err(ArunaError::io(&out))?;
             Ok(PdfState::Built(relative))
         }
-        Err(error) => not_built(staging, &place.relative, error),
+        Err(error) => not_built(&place.relative, error),
     }
 }
 
 /// What a PDF that was not built comes to: the document refused with a
 /// record, or the build stopped.
-fn not_built(staging: &Path, document: &Path, error: PdfError) -> Result<PdfState> {
+fn not_built(document: &Path, error: PdfError) -> Result<PdfState> {
     match error {
         PdfError::Document(messages) => {
             Ok(PdfState::Refused(format!("Typst: {}", messages.join("; "))))
@@ -146,7 +145,6 @@ fn not_built(staging: &Path, document: &Path, error: PdfError) -> Result<PdfStat
         clusters @ PdfError::Clusters { .. } => Ok(PdfState::Refused(clusters.to_string())),
         PdfError::Fonts(error) => Err(error),
         PdfError::Invariant(invariant) => Err(invariant_broken(
-            staging,
             &document.to_string_lossy(),
             &invariant.to_string(),
         )),
@@ -157,16 +155,13 @@ fn not_built(staging: &Path, document: &Path, error: PdfError) -> Result<PdfStat
 mod tests {
     use super::*;
 
-    /// **A broken invariant is told as a package that does not match its
-    /// model**, naming the document and the invariant – the sentence the
-    /// window and the console already have. No document of a corpus reaches
-    /// an invariant (that is what makes it one), so the telling is held here;
-    /// until 2026-10-02 two repeated clusters in a row did reach it, and the
-    /// export test that held this then holds the refusal now.
+    /// **A broken invariant stops the build as `pdf_invariant`**, naming the
+    /// document and the invariant (owner's decision 4.4 of 2026-10-18). No
+    /// document of a corpus reaches an invariant (that is what makes it one),
+    /// so the telling is held here.
     #[test]
     fn a_broken_invariant_names_the_document_and_the_invariant() {
         let err = not_built(
-            Path::new("/staging"),
             Path::new("CTH 12/IBoT 1.3.xml"),
             PdfError::Invariant(crate::pdf::Invariant::World),
         )
@@ -181,13 +176,21 @@ mod tests {
             text.contains("the world of the template could not be built"),
             "{text}"
         );
-        assert_eq!(crate::app::Failure::of(&err).code, "package_invalid");
+        assert!(
+            matches!(&err, ArunaError::PdfInvariant { document: Some(d), .. } if d == "CTH 12/IBoT 1.3.xml"),
+            "{err:?}"
+        );
+        let failure = crate::app::Failure::of(&err);
+        assert_eq!(failure.code, "pdf_invariant");
+        assert_eq!(failure.phase, Some(crate::job::Phase::Exporting));
+        assert!(!failure.retryable);
+        assert_eq!(failure.message, "CTH 12/IBoT 1.3.xml");
     }
 
     /// The two refusals of one document are records, not stops.
     #[test]
     fn a_refused_document_is_recorded_and_the_build_goes_on() {
-        let refused = |e| not_built(Path::new("/staging"), Path::new("CTH 1/A.xml"), e);
+        let refused = |e| not_built(Path::new("CTH 1/A.xml"), e);
         assert_eq!(
             refused(PdfError::Document(vec!["a".into(), "b".into()])).ok(),
             Some(PdfState::Refused("Typst: a; b".into()))
