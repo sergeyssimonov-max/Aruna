@@ -692,11 +692,23 @@ that is not there.
 - *Errors cross as a tagged structure.* `BuildFailure` carries `code`, `phase`,
   `message`, `retryable` and `cancelled` — `app::Failure`'s five fields, one for
   one. The two reading commands keep a bare sentence, because each has exactly
-  one failure and there is nothing to branch on; the build has twenty-eight
-  codes – twenty-five from the core's `app::Failure::of` and three from the
+  one failure and there is nothing to branch on; the build has twenty-nine
+  codes – twenty-six from the core's `app::Failure::of` and three from the
   shell, `busy`, `interrupted` and `destination_missing` – and the window's
   next move depends on which. The window adds one of its own, `broken`, for a
-  bridge that failed. This document said twenty until 2026-10-18.
+  bridge that failed. This document said twenty until 2026-10-18, and
+  twenty-eight until `pdf_invariant` came the same day.
+- *A PDF that breaks a rule of the program is `pdf_invariant`* (owner's
+  decision 4.4 of 2026-10-18). Phase `exporting`, `retryable: false`: the
+  same run breaks the same rule, and the defect is the program's, not the
+  data's. Until that day it crossed as `package_invalid`, a package that does
+  not match its model – the wrong phase and the wrong fault. The window says
+  «Сборка PDF остановилась на ошибке программы, пакет не опубликован. Ваши
+  файлы и прежний пакет не тронуты.» and shows `message` as its second line,
+  as for `collision`: the document's path inside the package, and nothing
+  around it. When the font stack has no regular face of a family, no document
+  is at fault: the core's `PdfInvariant` carries `document: None`, and the
+  second line is the family – never the directory the fonts were read from.
 - *Nothing long-running touches the main thread.* `build_corpus` is `async` and
   the work is on `spawn_blocking`. `Job<'a>` borrows its sink and its flag, so
   it is built inside the worker; `Cancel` is `Clone` over an `Arc`, so the
