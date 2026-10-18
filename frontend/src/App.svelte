@@ -96,6 +96,18 @@
   let destination: string | null = $state(null)
 
   /**
+   * Строить ли PDF – решение 4.2 от 18.10.2026.
+   *
+   * Переключатель стоит над кнопками низа окна и включен при каждом запуске:
+   * значение нигде не запоминается, ни в `localStorage`, ни в хранилище, и
+   * новое окно всегда начинает со сборки с PDF. Во время сборки переключатель
+   * виден и недоступен: прогон уже идет с тем значением, с которым его начали,
+   * и переключатель, который можно сдвинуть посреди прогона, говорил бы о
+   * сборке не то, что с ней происходит.
+   */
+  let pdf: boolean = $state(true)
+
+  /**
    * Разряды неразрывным пробелом, вручную.
    *
    * `toLocaleString` дал бы то же самое там, где ICU полон, и другое – там, где
@@ -251,7 +263,7 @@
     stopping = false
     screen = { kind: 'building' }
     try {
-      const built = await commands.buildCorpus(chosen)
+      const built = await commands.buildCorpus(chosen, pdf)
       if (built.status === 'ok') {
         finished = built.data.job
         // Число отказов модели – из манифеста только что собранного пакета.
@@ -569,6 +581,18 @@
   ])
 
   /**
+   * Два кода отказа шрифтов – решение 4.3 от 18.10.2026.
+   *
+   * Проверка шрифтов одна и идет при сборке, и к фразе «переустановите» окно
+   * добавляет действие «Собрать без PDF»: шрифты нужны только переводу в PDF,
+   * и пакет без него собрать можно и с неполной установкой. Папка та же, что
+   * у отказавшей попытки: отказ ничего не говорит о папке, и спрашивать ее
+   * заново незачем. Переключатель при этом выключается, чтобы экран не
+   * утверждал сборку с PDF, пока идет сборка без него.
+   */
+  const FONT_REFUSALS: ReadonlySet<string> = new Set(['font_missing', 'font_altered'])
+
+  /**
    * Чистая функция, а не `$derived`: пояснение читает одна ветка разметки, и
    * `kind` там уже сужен до `failed`. Производная величина потребовала бы
    * часового на прочие состояния и пустой строки, которой на экране не бывает.
@@ -591,7 +615,7 @@
       <p class="about">
         Программа возьмет TLHdig с Hethitologie-Portal Mainz (запись на Zenodo), разложит корпус по
         папкам в загрузках и создаст опись – один файл HTML, который открывается в браузере без
-        сети. Это занимает от нескольких секунд до минуты с небольшим.
+        сети. С PDF это занимает около двух минут, без PDF – до минуты с небольшим.
       </p>
     {:else if screen.kind === 'present'}
       <!--
@@ -798,6 +822,17 @@
   </div>
 
   <div class="foot">
+    {#if screen.kind !== 'reading'}
+      <label class="pdf-switch">
+        <input
+          type="checkbox"
+          data-testid="pdf"
+          bind:checked={pdf}
+          disabled={screen.kind === 'building'}
+        />
+        Строить PDF
+      </label>
+    {/if}
     <div class="controls">
       {#if screen.kind === 'building'}
         <button
@@ -918,15 +953,36 @@
           каталог вывода обходится другим каталогом. Экран без единого действия
           был бы тупиком. Обещания успеха кнопка не дает, поэтому названа
           «Собрать по умолчанию», а не «Повторить».
+
+          У отказов шрифтов главное действие свое – «Собрать без PDF» в ту же
+          папку (довод над `FONT_REFUSALS`), а «Собрать по умолчанию» уходит
+          вторым, тихим.
         -->
-        <button
-          type="button"
-          class="control"
-          data-testid="primary"
-          onclick={() => void build(null)}
-        >
-          Собрать по умолчанию
-        </button>
+        {#if FONT_REFUSALS.has(screen.failure.code)}
+          <button
+            type="button"
+            class="control"
+            data-testid="primary"
+            onclick={() => {
+              pdf = false
+              void build(destination)
+            }}
+          >
+            Собрать без PDF
+          </button>
+          <button type="button" class="control control-quiet" onclick={() => void build(null)}>
+            Собрать по умолчанию
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="control"
+            data-testid="primary"
+            onclick={() => void build(null)}
+          >
+            Собрать по умолчанию
+          </button>
+        {/if}
         <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
           Собрать в папку…
         </button>
@@ -1012,5 +1068,28 @@
     max-width: 480px;
     margin: 0;
     text-align: center;
+  }
+
+  /* Переключатель PDF над кнопками – тихо и младшим размером, как строки
+   * низа окна: это настройка следующего прогона, а не действие. Недоступный
+   * во время сборки, он гаснет так же, как выключенная кнопка. `:has` Safari
+   * 16 понимает (с 15.4). */
+  .pdf-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .pdf-switch:has(input:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .pdf-switch input {
+    margin: 0;
+    cursor: inherit;
   }
 </style>
