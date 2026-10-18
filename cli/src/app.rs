@@ -45,30 +45,26 @@
 
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, JobId, Phase};
+use crate::pdf::Fonts;
 use std::path::{Path, PathBuf};
 
 /// Build the package, and say what is in it.
 pub fn build_package(request: &PackageRequest, job: &Job<'_>) -> Result<PackageReport> {
-    let fonts = request.pdf.fonts()?;
-    build_package_with(request, fonts.as_ref(), job)
+    let fonts = load_fonts(request.fonts.as_deref())?;
+    build_package_with(request, &fonts, job)
 }
 
-/// [`build_package`] with the fonts already read: the one place the setting
-/// becomes a phase of the export.
+/// [`build_package`] with the fonts already read.
 fn build_package_with(
     request: &PackageRequest,
-    fonts: Option<&crate::pdf::Fonts>,
+    fonts: &Fonts,
     job: &Job<'_>,
 ) -> Result<PackageReport> {
-    let pdf = match fonts {
-        Some(fonts) => crate::export::Pdf::On(fonts),
-        None => crate::export::Pdf::Off,
-    };
-    let built = crate::export::build_with(
+    let built = crate::export::build(
         &request.archive,
         &request.destination,
         &request.source_label,
-        pdf,
+        fonts,
         job,
     )?;
 
@@ -83,61 +79,35 @@ fn build_package_with(
     })
 }
 
-/// Whether the package carries a PDF of every document – on unless asked
-/// otherwise (owner's decision of 2026-09-30, question 3) – and the fonts it
-/// is set in.
-///
-/// Off by default from 2026-10-08 to 2026-10-11, in release 2.6.3 (owner's
-/// decision of 2026-10-06); on again since the owner's decision of
-/// 2026-10-11, which returns the default in the console. The window does not
-/// take it: it asks for its own request, `PdfRequest::Off`, until the third
-/// part of the PDF transfer and release 3.0.0.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PdfRequest {
-    /// The package without PDFs; everything else as with them.
-    Off,
-    /// A PDF beside each document, set in the seven files of `docs/FONTS.md`
-    /// in `fonts`. The window gives its resource directory, the console the
-    /// path it was told; `None` is refused before any work starts and names
-    /// the first file wanted – nothing is looked for elsewhere (question 10).
-    On { fonts: Option<PathBuf> },
-}
-
 /// What a font directory nobody named would have covered: the PDF.
 pub const NO_FONT_DIRECTORY: &str =
     "the PDF, and no directory of fonts was named (ARUNA_FONTS in the console)";
 
-impl Default for PdfRequest {
-    fn default() -> Self {
-        PdfRequest::On { fonts: None }
-    }
-}
-
-impl PdfRequest {
-    /// The fonts, read and checked, or `None` for no PDFs.
-    pub fn fonts(&self) -> Result<Option<crate::pdf::Fonts>> {
-        match self {
-            PdfRequest::Off => Ok(None),
-            // No directory named: the fonts are not there, and the error says
-            // which file is wanted first. In the window it means an install
-            // whose resources cannot be found – the same sentence as a font
-            // missing from them.
-            PdfRequest::On { fonts: None } => Err(ArunaError::FontMissing {
-                path: PathBuf::from(crate::fonts::FONTS[0].file),
-                covers: NO_FONT_DIRECTORY,
-            }),
-            PdfRequest::On { fonts: Some(dir) } => match crate::pdf::Fonts::load(dir) {
-                Ok(fonts) => Ok(Some(fonts)),
-                Err(crate::pdf::PdfError::Fonts(error)) => Err(error),
-                // A stack without one of its faces, from files that passed
-                // their digests: a defect, told as the export tells one.
-                Err(other) => Err(crate::export::pdf::invariant_broken(
-                    dir,
-                    crate::pdf::fonts::STACK[0],
-                    &other.to_string(),
-                )),
-            },
-        }
+/// The fonts every PDF is set in: the seven files of `docs/FONTS.md` in
+/// `dir`, read and checked. The window gives its resource directory, the
+/// console the path it was told. No directory is refused before any work
+/// starts and names the first file wanted – nothing is looked for elsewhere
+/// (owner's decision of 2026-09-30, question 10).
+pub fn load_fonts(dir: Option<&Path>) -> Result<Fonts> {
+    // No directory named: the fonts are not there, and the error says which
+    // file is wanted first. In the window it means an install whose resources
+    // cannot be found – the same sentence as a font missing from them.
+    let Some(dir) = dir else {
+        return Err(ArunaError::FontMissing {
+            path: PathBuf::from(crate::fonts::FONTS[0].file),
+            covers: NO_FONT_DIRECTORY,
+        });
+    };
+    match crate::pdf::Fonts::load(dir) {
+        Ok(fonts) => Ok(fonts),
+        Err(crate::pdf::PdfError::Fonts(error)) => Err(error),
+        // A stack without one of its faces, from files that passed their
+        // digests: a defect, told as the export tells one.
+        Err(other) => Err(crate::export::pdf::invariant_broken(
+            dir,
+            crate::pdf::fonts::STACK[0],
+            &other.to_string(),
+        )),
     }
 }
 
@@ -152,8 +122,8 @@ pub struct PackageRequest {
     pub destination: PathBuf,
     /// The attribution line every document carries.
     pub source_label: String,
-    /// Whether a PDF goes beside each document.
-    pub pdf: PdfRequest,
+    /// The directory of the fonts the PDFs are set in ([`load_fonts`]).
+    pub fonts: Option<PathBuf>,
 }
 
 /// What building the package came to.
@@ -175,8 +145,8 @@ pub struct PackageReport {
     ///
     /// Instructions, not documents: one document of the corpus carries two.
     pub stylesheet_dropped: usize,
-    /// The PDFs, when there were to be any: built, and refused.
-    pub pdfs: Option<crate::export::PdfCount>,
+    /// The PDFs: built, and refused.
+    pub pdfs: crate::export::PdfCount,
 }
 
 /// Build the corpus: the package, and the inventory inside it.
@@ -201,8 +171,8 @@ pub struct CorpusRequest {
     /// offline runs pass a path; so will a window that lets someone choose a
     /// file they already have.
     pub local_archive: Option<PathBuf>,
-    /// Whether a PDF goes beside each document: on by default.
-    pub pdf: PdfRequest,
+    /// The directory of the fonts the PDFs are set in ([`load_fonts`]).
+    pub fonts: Option<PathBuf>,
 }
 
 /// What building the corpus came to.
@@ -243,7 +213,7 @@ pub fn build_corpus_into(
 
     // The fonts before the archive: a PDF that cannot be set is refused
     // before a byte is downloaded or written.
-    let fonts = request.pdf.fonts()?;
+    let fonts = load_fonts(request.fonts.as_deref())?;
 
     let source = match &request.local_archive {
         Some(path) => crate::cache::Archive::Cached(path.clone()),
@@ -259,9 +229,9 @@ pub fn build_corpus_into(
             archive: source.path().to_path_buf(),
             destination,
             source_label: crate::SOURCE_LABEL.to_string(),
-            pdf: request.pdf.clone(),
+            fonts: request.fonts.clone(),
         },
-        fonts.as_ref(),
+        &fonts,
         job,
     );
 
@@ -496,16 +466,16 @@ impl From<&ArunaError> for Failure {
 #[cfg(test)]
 mod tests {
 
-    /// **The PDF is on by default, and without fonts the run stops before it
-    /// reads anything** – here before an archive that does not exist is
-    /// even looked at (owner's decisions of 2026-09-30, questions 3 and 10).
+    /// **Without fonts the run stops before it reads anything** – here before
+    /// an archive that does not exist is even looked at (owner's decision of
+    /// 2026-09-30, question 10).
     #[test]
-    fn a_default_request_wants_pdfs_and_is_refused_without_fonts_before_any_work() {
+    fn a_default_request_is_refused_without_fonts_before_any_work() {
         let request = CorpusRequest {
             local_archive: Some(PathBuf::from("/nonexistent/archive.zip")),
             ..CorpusRequest::default()
         };
-        assert_eq!(request.pdf, PdfRequest::On { fonts: None });
+        assert_eq!(request.fonts, None);
         let dir = tempfile::tempdir().expect("tempdir");
         let err = build_corpus_into(&request, dir.path(), &Job::unattended()).expect_err("refused");
         match &err {
@@ -520,15 +490,16 @@ mod tests {
     }
 
     #[test]
-    fn fonts_from_a_directory_that_is_not_the_tree_are_refused_by_the_request() {
-        let request = PdfRequest::On {
-            fonts: Some(PathBuf::from("/nonexistent/fonts")),
-        };
+    fn fonts_from_a_directory_that_is_not_the_tree_are_refused() {
         assert!(matches!(
-            request.fonts(),
+            load_fonts(Some(Path::new("/nonexistent/fonts"))),
             Err(ArunaError::FontMissing { .. })
         ));
-        assert!(matches!(PdfRequest::Off.fonts(), Ok(None)));
+    }
+
+    /// The fonts of the tree, which every PDF is set in.
+    fn fonts() -> Option<PathBuf> {
+        Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts"))
     }
 
     use super::*;
@@ -590,7 +561,7 @@ mod tests {
                 archive: zip,
                 destination: destination.clone(),
                 source_label: "test".into(),
-                pdf: PdfRequest::Off,
+                fonts: fonts(),
             },
             &job,
         )
@@ -626,7 +597,7 @@ mod tests {
                 archive: zip,
                 destination,
                 source_label: "test".into(),
-                pdf: PdfRequest::Off,
+                fonts: fonts(),
             },
             &Job::new(&Silent, &cancel),
         );

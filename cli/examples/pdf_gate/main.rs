@@ -6,7 +6,7 @@
 //! cd cli
 //! cargo build --release --locked --example pdf_gate
 //! G=../target/release/examples/pdf_gate
-//! $G build  <archive.zip> <fonts> <destination> [off]  # one build, its time and sum
+//! $G build  <archive.zip> <fonts> <destination>        # one build, its time and sum
 //! $G series <archive.zip> <fonts> <scratch> 5          # five builds, five processes
 //! $G check  <package> <fonts> [--c14n] [--pdfkit]      # every criterion, every PDF
 //! $G sum    <package>                                  # the package's sum, as 6.7 takes it
@@ -31,7 +31,7 @@ use std::process::{Command, ExitCode};
 use std::time::Instant;
 
 use aruna::document::Document;
-use aruna::export::{self, Pdf};
+use aruna::export;
 use aruna::job::{Cancel, Job};
 use aruna::pdf::layout::Page;
 use aruna::pdf::Fonts;
@@ -46,12 +46,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let arg = |i: usize| args.get(i).map(String::as_str).unwrap_or_default();
     let ok = match arg(0) {
-        "build" => build(
-            Path::new(arg(1)),
-            Path::new(arg(2)),
-            Path::new(arg(3)),
-            arg(4) == "off",
-        ),
+        "build" => build(Path::new(arg(1)), Path::new(arg(2)), Path::new(arg(3))),
         "series" => series(
             Path::new(arg(1)),
             Path::new(arg(2)),
@@ -107,7 +102,7 @@ impl Progress for Clock {
     }
 }
 
-fn build(zip: &Path, fonts: &Path, destination: &Path, off: bool) -> bool {
+fn build(zip: &Path, fonts: &Path, destination: &Path) -> bool {
     let fonts = Fonts::load(fonts).expect("the fonts of docs/FONTS.md");
     std::fs::create_dir_all(destination).expect("destination");
     let clock = Clock {
@@ -116,12 +111,11 @@ fn build(zip: &Path, fonts: &Path, destination: &Path, off: bool) -> bool {
     };
     let cancel = Cancel::new();
     let started = Instant::now();
-    let pdf = if off { Pdf::Off } else { Pdf::On(&fonts) };
-    let built = export::build_with(
+    let built = export::build(
         zip,
         destination,
         aruna::SOURCE_LABEL,
-        pdf,
+        &fonts,
         &Job::new(&clock, &cancel),
     );
     let whole = started.elapsed().as_secs_f64();
@@ -137,9 +131,10 @@ fn build(zip: &Path, fonts: &Path, destination: &Path, off: bool) -> bool {
     println!("phase_seconds {phase:.1}");
     println!("build_seconds {whole:.1}");
     println!("documents {}", built.documents);
-    if let Some(p) = built.pdfs {
-        println!("pdfs built {} refused {}", p.built, p.refused);
-    }
+    println!(
+        "pdfs built {} refused {}",
+        built.pdfs.built, built.pdfs.refused
+    );
     println!("package {sum} {files}");
     true
 }

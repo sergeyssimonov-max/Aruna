@@ -58,9 +58,7 @@ pub const RUN_ID_FORM: &str = "aruna-run-v1";
 ///
 /// Deterministic by design: one archive, one program and one template give
 /// one identifier, so two builds of the same package stay byte for byte one
-/// package, and any of the three changing changes it. The template's version
-/// is the same with and without PDFs – the identifier names what the program
-/// would make of the archive, not which switch was set.
+/// package, and any of the three changing changes it.
 pub fn run_id(archive_md5: &str, version: &str, template: &str) -> String {
     crate::sha256::sha256_hex(
         format!("{RUN_ID_FORM}\n{archive_md5}\n{version}\n{template}\n").as_bytes(),
@@ -534,7 +532,7 @@ pub fn render_manifest(
     fonts: &FontContract,
     xml: &XmlReport,
     sums: &[Sums],
-    pdfs: Option<&[super::PdfState]>,
+    pdfs: &[super::PdfState],
 ) -> String {
     // The real manifest averaged about 350 bytes per document; 1 MiB for an
     // 8.3 MB result meant four reallocations and settling at 16 MiB. The two
@@ -552,9 +550,7 @@ pub fn render_manifest(
     );
     render_run(&mut out, source.archive_md5);
 
-    if let Some(states) = pdfs {
-        render_pdfs(&mut out, states);
-    }
+    render_pdfs(&mut out, pdfs);
     render_source(&mut out, source);
     let _ = writeln!(out, "  \"counts\": {{");
     let _ = writeln!(out, "    \"groups\": {groups},");
@@ -886,7 +882,7 @@ fn render_groups(
     placed: &[Placed],
     groups: usize,
     sums: &[Sums],
-    pdfs: Option<&[super::PdfState]>,
+    pdfs: &[super::PdfState],
 ) {
     out.push_str("  \"groups\": [\n");
     let mut index = 0usize;
@@ -925,7 +921,7 @@ fn render_groups(
                     string(&sums.source_entry)
                 );
             }
-            render_pdf_field(out, pdfs.and_then(|states| states.get(index)));
+            render_pdf_field(out, &pdfs[index]);
             index += 1;
             let _ = writeln!(out, "          \"lang\": {},", string(&record.lang));
             let _ = writeln!(out, "          \"corpus\": {},", string(&record.corpus));
@@ -940,16 +936,16 @@ fn render_groups(
 }
 
 /// This document's PDF: its path when it was built, why not when it was
-/// refused, nothing when the build made no PDFs. The path is
-/// `naming::pdf_path`, the one naming rule for it.
+/// refused. The path is `naming::pdf_path`, the one naming rule for it.
+/// `pdfs` is parallel to `placed`, one state for every document.
 ///
 /// A built PDF carries the outcome of the completeness check beside it, one
 /// line: the checks of [`crate::pdf::COMPLETENESS`], each passed – a failed
 /// one stops the build, so no manifest names one (owner's decisions 1 and 2
 /// of 2026-10-11). A refused document has none.
-fn render_pdf_field(out: &mut String, state: Option<&super::PdfState>) {
+fn render_pdf_field(out: &mut String, state: &super::PdfState) {
     match state {
-        Some(super::PdfState::Built(pdf)) => {
+        super::PdfState::Built(pdf) => {
             let _ = writeln!(
                 out,
                 "          \"pdf\": {},",
@@ -965,14 +961,13 @@ fn render_pdf_field(out: &mut String, state: Option<&super::PdfState>) {
                 checks.join(", ")
             );
         }
-        Some(super::PdfState::Refused(reason)) => {
+        super::PdfState::Refused(reason) => {
             let _ = writeln!(
                 out,
                 "          \"pdf\": {{ \"refused\": {} }},",
                 string(reason)
             );
         }
-        None => {}
     }
 }
 
@@ -1211,12 +1206,6 @@ mod tests {
                 source_entry: format!("corpus/entry {i}.xml"),
             })
             .collect();
-        // Every document with its PDF built: the manifest of a build with the
-        // PDF phase, which is the one by default.
-        let pdfs: Vec<super::super::PdfState> = placed
-            .iter()
-            .map(|p| super::super::PdfState::Built(super::super::pdf_path(&p.relative)))
-            .collect();
         render_manifest(
             &records,
             &placed,
@@ -1225,8 +1214,16 @@ mod tests {
             &fonts,
             &xml,
             &sums,
-            Some(&pdfs),
+            &all_built(&placed),
         )
+    }
+
+    /// Every document with its PDF built.
+    fn all_built(placed: &[Placed]) -> Vec<super::super::PdfState> {
+        placed
+            .iter()
+            .map(|p| super::super::PdfState::Built(super::super::pdf_path(&p.relative)))
+            .collect()
     }
 
     /// The manifest has to be JSON before it has to be anything else.
@@ -1295,7 +1292,7 @@ mod tests {
 
     /// The head names the run, and with it the two versions the identifier
     /// is made of beside the archive's digest – so it can be computed again
-    /// from the manifest alone, with or without PDFs.
+    /// from the manifest alone.
     #[test]
     fn the_head_names_the_run_and_what_it_is_made_of() {
         let version = env!("CARGO_PKG_VERSION");
@@ -1304,22 +1301,6 @@ mod tests {
             run_id("abc123", version, crate::pdf::TEMPLATE_VERSION)
         );
         assert!(manifest().contains(&expected), "{}", manifest());
-        let (records, placed) = built();
-        let off = render_manifest(
-            &records,
-            &placed,
-            &Source {
-                label: "test",
-                archive_md5: "abc123",
-                not_manuscripts: &[],
-            },
-            &BTreeMap::new(),
-            &FontContract::default(),
-            &XmlReport::default(),
-            &[],
-            None,
-        );
-        assert!(off.contains(&expected), "{off}");
     }
 
     /// Each document carries its two digests and the entry they were read
@@ -1360,11 +1341,11 @@ mod tests {
 
     /// **The outcome of the completeness check is at a built PDF and nowhere
     /// else** (owner's decisions 1 and 2 of 2026-10-11): not at a refused
-    /// document, and not in a build without PDFs.
+    /// document.
     #[test]
     fn only_a_built_pdf_carries_the_outcome_of_the_completeness_check() {
         let (records, placed) = built();
-        let render = |pdfs: Option<&[super::super::PdfState]>| {
+        let render = |pdfs: &[super::super::PdfState]| {
             render_manifest(
                 &records,
                 &placed,
@@ -1381,7 +1362,7 @@ mod tests {
             .map(|p| super::super::PdfState::Built(super::super::pdf_path(&p.relative)))
             .collect();
         states[1] = super::super::PdfState::Refused("Typst: no".into());
-        let text = render(Some(&states));
+        let text = render(&states);
         assert_eq!(
             text.matches("\"completeness\": ").count(),
             placed.len() - 1,
@@ -1390,7 +1371,6 @@ mod tests {
         let refused = &text[text.find("\"pdf\": { \"refused\"").expect("the refusal")..];
         let next = refused.find("\"lang\"").expect("the entry goes on");
         assert!(!refused[..next].contains("completeness"), "{refused}");
-        assert!(!render(None).contains("completeness"));
     }
 
     /// An archive with nothing turned away says so with an empty list, not by
@@ -1406,7 +1386,7 @@ mod tests {
             &FontContract::default(),
             &XmlReport::default(),
             &[],
-            None,
+            &all_built(&placed),
         );
         assert!(text.contains("\"entries\": []\n    }\n  },"), "{text}");
     }
@@ -1443,7 +1423,7 @@ mod tests {
             &fonts,
             &XmlReport::default(),
             &[],
-            None,
+            &all_built(&placed),
         );
         assert!(text.contains("𒀀 source"));
         assert!(!text.contains("\\u12000"));

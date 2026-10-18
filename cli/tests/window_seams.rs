@@ -126,7 +126,7 @@ fn a_build_on_another_thread_is_stopped_from_this_one() {
     let outcome = std::thread::scope(|scope| {
         let worker = scope.spawn(|| {
             let job = Job::new(&sink, &cancel);
-            export::build(&zip, &destination, "label", &job)
+            export::build(&zip, &destination, "label", support::fonts(), &job)
         });
 
         at_the_stage.recv().expect("the worker reached the stage");
@@ -293,7 +293,7 @@ fn the_corpus_is_built_where_the_caller_says() {
     let report = app::build_corpus_into(
         &CorpusRequest {
             local_archive: Some(zip),
-            pdf: aruna::app::PdfRequest::Off,
+            fonts: Some(support::fonts_dir()),
         },
         &destination,
         &Job::unattended(),
@@ -338,7 +338,7 @@ fn two_runs_in_one_process_produce_the_same_bytes() {
         let report = app::build_corpus_into(
             &CorpusRequest {
                 local_archive: Some(zip.clone()),
-                pdf: aruna::app::PdfRequest::Off,
+                fonts: Some(support::fonts_dir()),
             },
             &destination,
             &Job::unattended(),
@@ -431,7 +431,8 @@ fn a_run_with_a_sink_reports_its_stages_and_changes_nothing() {
     let build = |name: &str, job: &Job<'_>| {
         let destination = dir.path().join(name);
         std::fs::create_dir(&destination).expect("destination");
-        let built = export::build(&zip, &destination, "seam", job).expect("builds");
+        let built =
+            export::build(&zip, &destination, "seam", support::fonts(), job).expect("builds");
         (destination.join(PACKAGE), built)
     };
 
@@ -549,17 +550,41 @@ fn a_group_is_the_part_of_the_whole_that_belongs_to_it() {
     );
 
     // And the whole is what the build actually wrote: the same corpus, built,
-    // holds one file per placement and nothing else besides the five root
-    // files — inventory, manifest, the font and its terms, the CTH titles'
-    // terms.
+    // holds one file per placement, the PDF of each placement it built, and
+    // nothing else besides the five root files – inventory, manifest, the font
+    // and its terms, the CTH titles' terms.
     let destination = dir.path().join("out");
     std::fs::create_dir(&destination).expect("destination");
-    export::build(&zip, &destination, "seams", &Job::unattended()).expect("builds");
+    let built = export::build(
+        &zip,
+        &destination,
+        "seams",
+        support::fonts(),
+        &Job::unattended(),
+    )
+    .expect("builds");
     let written = files(&destination.join(PACKAGE));
+    let pdfs: Vec<&PathBuf> = written
+        .iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "pdf"))
+        .collect();
+    for pdf in &pdfs {
+        assert!(
+            placed
+                .iter()
+                .any(|p| p.relative == pdf.with_extension("xml")),
+            "a PDF of no placement: {pdf:?}"
+        );
+    }
+    assert_eq!(
+        pdfs.len(),
+        built.pdfs.built,
+        "the PDFs the build says it built"
+    );
     assert_eq!(
         written.len(),
-        placed.len() + aruna::export::ROOT_FILES.len(),
-        "the package holds something other than the placements plus the root files"
+        placed.len() + pdfs.len() + aruna::export::ROOT_FILES.len(),
+        "the package holds something other than the placements, their PDFs and the root files"
     );
     for placement in &placed {
         assert!(

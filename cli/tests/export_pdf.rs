@@ -1,28 +1,18 @@
-//! The PDF phase of the export, on synthetic archives: both settings of the
-//! switch, a document refused, an invariant broken, cancellation inside the
+//! The PDF phase of the export, on synthetic archives: a PDF beside every
+//! document, a document refused, an invariant broken, cancellation inside the
 //! phase, and a build that is the same twice (owner's decisions of
-//! 2026-09-30, questions 1, 3, 5 and 11).
+//! 2026-09-30, questions 1, 5 and 11).
 
 mod support;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 
-use aruna::export::{self, Pdf, PACKAGE};
+use aruna::export::{self, PACKAGE};
 use aruna::job::{Cancel, Job};
-use aruna::pdf::Fonts;
 use aruna::progress::{Event, Progress};
-use support::{archive, manuscript};
+use support::{archive, fonts, manuscript};
 use tempfile::tempdir;
-
-fn fonts() -> &'static Fonts {
-    static FONTS: OnceLock<Fonts> = OnceLock::new();
-    FONTS.get_or_init(|| {
-        Fonts::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts"))
-            .expect("the fonts of the tree")
-    })
-}
 
 /// A manuscript whose body is `body`.
 fn with_body(siglum: &str, body: &str) -> String {
@@ -58,9 +48,9 @@ fn corpus(dir: &Path, extra: &[(&str, String)]) -> PathBuf {
     archive(&dir.join("corpus.zip"), &entries)
 }
 
-fn build(zip: &Path, out: &Path, pdf: Pdf<'_>) -> aruna::error::Result<export::Built> {
+fn build(zip: &Path, out: &Path) -> aruna::error::Result<export::Built> {
     std::fs::create_dir_all(out).expect("destination");
-    export::build_with(zip, out, "test", pdf, &Job::unattended())
+    export::build(zip, out, "test", fonts(), &Job::unattended())
 }
 
 /// Every file of a tree, by path, with its bytes.
@@ -81,62 +71,22 @@ fn tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     out
 }
 
-/// The inventory with the PDF links taken out, and the manifest with its
-/// PDF entries and the outcome of their completeness check taken out: what
-/// the package says apart from the PDFs.
-fn without_pdfs(name: &Path, bytes: &[u8]) -> String {
-    let text = String::from_utf8_lossy(bytes).into_owned();
-    if name == Path::new(export::MANIFEST) {
-        let mut out = String::new();
-        let mut in_block = false;
-        for line in text.lines() {
-            if line == "  \"pdfs\": {" {
-                in_block = true;
-                continue;
-            }
-            if in_block {
-                in_block = line != "  },";
-                continue;
-            }
-            let line_key = line.trim_start();
-            if line_key.starts_with("\"pdf\": ") || line_key.starts_with("\"completeness\": ") {
-                continue;
-            }
-            out.push_str(line);
-            out.push('\n');
-        }
-        out
-    } else {
-        let mut out = text.clone();
-        while let Some(at) = out.find(" <a href=\"./") {
-            let end = out[at..].find("</a>").map(|e| at + e + 4).expect("closed");
-            if out[at..end].ends_with(">PDF</a>") {
-                out.replace_range(at..end, "");
-            } else {
-                break;
-            }
-        }
-        out
-    }
-}
-
+/// **Every document gets its PDF beside its XML, but the one refused**, and
+/// the manifest and the inventory name what became of each: the path of a
+/// built PDF and the link to it, the reason a PDF was refused and no link.
 #[test]
-fn the_switch_changes_nothing_but_the_pdfs_and_what_names_them() {
+fn every_pdf_lies_beside_its_document_and_the_package_names_it() {
     let dir = tempdir().expect("tempdir");
     let zip = corpus(dir.path(), &[]);
-    let off = build(&zip, &dir.path().join("off"), Pdf::Off).expect("builds without");
-    let on = build(&zip, &dir.path().join("on"), Pdf::On(fonts())).expect("builds with");
-    assert_eq!(off.pdfs, None);
+    let built = build(&zip, &dir.path().join("on")).expect("builds");
     assert_eq!(
-        on.pdfs,
-        Some(export::PdfCount {
+        built.pdfs,
+        export::PdfCount {
             built: 4,
             refused: 1
-        })
+        }
     );
-    assert_eq!((off.documents, off.groups), (on.documents, on.groups));
 
-    let a = tree(&dir.path().join("off").join(PACKAGE));
     let b = tree(&dir.path().join("on").join(PACKAGE));
     let pdfs: Vec<&PathBuf> = b
         .keys()
@@ -146,28 +96,18 @@ fn the_switch_changes_nothing_but_the_pdfs_and_what_names_them() {
     for pdf in &pdfs {
         assert!(b[*pdf].starts_with(b"%PDF-"));
         assert!(
-            a.contains_key(&pdf.with_extension("xml")),
+            b.contains_key(&pdf.with_extension("xml")),
             "a PDF beside no XML: {pdf:?}"
         );
     }
     assert!(
+        b.contains_key(Path::new("CTH 9/KUB 2.2.xml")),
+        "the refused one lost its XML"
+    );
+    assert!(
         !b.contains_key(Path::new("CTH 9/KUB 2.2.pdf")),
         "the refused one has a PDF"
     );
-    for (path, bytes) in &a {
-        let other = &b[path];
-        if path.extension().is_some_and(|e| e == "html") || path == Path::new(export::MANIFEST) {
-            assert_ne!(bytes, other, "{path:?} does not name the PDFs");
-            assert_eq!(
-                without_pdfs(path, other),
-                String::from_utf8_lossy(bytes),
-                "{path:?}"
-            );
-        } else {
-            assert_eq!(bytes, other, "{path:?} changed with the PDFs");
-        }
-    }
-    assert_eq!(b.len(), a.len() + 4);
 
     let manifest = String::from_utf8_lossy(&b[Path::new(export::MANIFEST)]).into_owned();
     assert!(
@@ -179,11 +119,6 @@ fn the_switch_changes_nothing_but_the_pdfs_and_what_names_them() {
         "{manifest}"
     );
     assert!(manifest.contains("\"template\": \"aruna-pdf-template 1\""));
-    let off_manifest = String::from_utf8_lossy(&a[Path::new(export::MANIFEST)]).into_owned();
-    assert!(
-        !off_manifest.contains("\"pdf\""),
-        "a build without PDFs names one"
-    );
     let inventory =
         String::from_utf8_lossy(&b[&PathBuf::from(format!("{PACKAGE}.html"))]).into_owned();
     assert!(
@@ -213,13 +148,13 @@ fn a_broken_invariant_stops_the_build_and_names_the_document() {
         )],
     );
     let out = dir.path().join("out");
-    let built = build(&zip, &out, Pdf::On(fonts())).expect("the build goes on");
+    let built = build(&zip, &out).expect("the build goes on");
     assert_eq!(
         built.pdfs,
-        Some(export::PdfCount {
+        export::PdfCount {
             built: 4,
             refused: 2
-        })
+        }
     );
     let root = out.join(PACKAGE);
     assert!(!root.join("CTH 12/IBoT 1.3.pdf").exists(), "a PDF of it");
@@ -261,13 +196,13 @@ fn one_repeated_cluster_or_two_apart_still_get_their_pdf() {
         ],
     );
     let out = dir.path().join("out");
-    let built = build(&zip, &out, Pdf::On(fonts())).expect("builds");
+    let built = build(&zip, &out).expect("builds");
     assert_eq!(
         built.pdfs,
-        Some(export::PdfCount {
+        export::PdfCount {
             built: 6,
             refused: 1
-        })
+        }
     );
     let root = out.join(PACKAGE);
     for pdf in ["CTH 12/IBoT 1.4.pdf", "CTH 12/IBoT 1.5.pdf"] {
@@ -279,14 +214,12 @@ fn one_repeated_cluster_or_two_apart_still_get_their_pdf() {
 /// **The outcome of the completeness check, at each PDF and only there**
 /// (owner's decisions 1 and 2 of 2026-10-11, `XML-CONTRACT.md` §4): the four
 /// checks (a)–(d) of the export under their keys, each passed, one line after
-/// the PDF's path; the refused document has none, and a build without PDFs
-/// has none at all.
+/// the PDF's path; the refused document has none.
 #[test]
 fn each_pdf_and_only_a_pdf_carries_the_outcome_of_the_completeness_check() {
     let dir = tempdir().expect("tempdir");
     let zip = corpus(dir.path(), &[]);
-    build(&zip, &dir.path().join("on"), Pdf::On(fonts())).expect("builds with");
-    build(&zip, &dir.path().join("off"), Pdf::Off).expect("builds without");
+    build(&zip, &dir.path().join("on")).expect("builds with");
     let read = |mode: &str| {
         std::fs::read_to_string(dir.path().join(mode).join(PACKAGE).join(export::MANIFEST))
             .expect("manifest")
@@ -314,15 +247,14 @@ fn each_pdf_and_only_a_pdf_carries_the_outcome_of_the_completeness_check() {
     }
     assert_eq!(built, 4);
     assert_eq!(on.matches("\"completeness\"").count(), 4);
-    assert!(!read("off").contains("completeness"));
 }
 
 #[test]
 fn two_builds_are_the_same_package() {
     let dir = tempdir().expect("tempdir");
     let zip = corpus(dir.path(), &[]);
-    build(&zip, &dir.path().join("a"), Pdf::On(fonts())).expect("builds");
-    build(&zip, &dir.path().join("b"), Pdf::On(fonts())).expect("builds");
+    build(&zip, &dir.path().join("a")).expect("builds");
+    build(&zip, &dir.path().join("b")).expect("builds");
     assert!(
         tree(&dir.path().join("a").join(PACKAGE)) == tree(&dir.path().join("b").join(PACKAGE)),
         "two builds differ"
@@ -355,14 +287,8 @@ fn a_run_stopped_in_the_pdf_phase_publishes_nothing() {
     std::fs::create_dir_all(&out).expect("destination");
     let cancel = Cancel::new();
     let sink = StopInPdfs(&cancel, std::sync::Mutex::new(Vec::new()));
-    let err = export::build_with(
-        &zip,
-        &out,
-        "test",
-        Pdf::On(fonts()),
-        &Job::new(&sink, &cancel),
-    )
-    .expect_err("cancelled");
+    let err = export::build(&zip, &out, "test", fonts(), &Job::new(&sink, &cancel))
+        .expect_err("cancelled");
     assert!(
         matches!(err, aruna::error::ArunaError::Cancelled { .. }),
         "{err}"
@@ -394,14 +320,7 @@ fn the_pdf_phase_reports_its_progress_to_the_end() {
     std::fs::create_dir_all(&out).expect("destination");
     let ticks = Ticks(std::sync::Mutex::new(Vec::new()));
     let cancel = Cancel::new();
-    export::build_with(
-        &zip,
-        &out,
-        "test",
-        Pdf::On(fonts()),
-        &Job::new(&ticks, &cancel),
-    )
-    .expect("builds");
+    export::build(&zip, &out, "test", fonts(), &Job::new(&ticks, &cancel)).expect("builds");
     assert_eq!(ticks.0.lock().expect("unpoisoned").last(), Some(&(5, 4, 5)));
 }
 
@@ -410,8 +329,6 @@ fn the_pdf_phase_reports_its_progress_to_the_end() {
 /// the pair, and the PDF itself carries no copy of the source – no embedded
 /// file, no digest of it – only the constant fields of decision 13, which
 /// `pdf_module::the_file_carries_no_date_and_builds_the_same_twice` holds.
-/// Without PDFs the manifest and the inventory name none
-/// (`the_switch_changes_nothing_but_the_pdfs_and_what_names_them`).
 ///
 /// The manifest's entry of the pair also carries the SHA-256 of the XML in the
 /// package and of its source – since 2026-10-11, by the owner's decision of
@@ -424,7 +341,7 @@ fn each_pdf_is_paired_with_its_xml_and_carries_no_copy_of_it() {
     let dir = tempdir().expect("tempdir");
     let zip = corpus(dir.path(), &[]);
     let out = dir.path().join("on");
-    build(&zip, &out, Pdf::On(fonts())).expect("builds");
+    build(&zip, &out).expect("builds");
     let root = out.join(PACKAGE);
     let files = tree(&root);
     let manifest = String::from_utf8_lossy(&files[Path::new(export::MANIFEST)]).into_owned();

@@ -171,8 +171,14 @@ fn build_recording(zip: &Path) -> (Built, Recording) {
     let dir = tempdir().expect("tempdir");
     let sink = Recording::default();
     let cancel = Cancel::new();
-    let built = export::build(zip, dir.path(), "progress", &Job::new(&sink, &cancel))
-        .expect("the package builds");
+    let built = export::build(
+        zip,
+        dir.path(),
+        "progress",
+        support::fonts(),
+        &Job::new(&sink, &cancel),
+    )
+    .expect("the package builds");
     // The tempdir is dropped here on purpose: the assertions are about what was
     // reported, and the package itself is other files' business.
     (built, sink)
@@ -181,8 +187,9 @@ fn build_recording(zip: &Path) -> (Built, Recording) {
 /// The export's stages arrive in the order the pipeline runs them.
 ///
 /// Asserted as the whole sequence rather than a subsequence: unlike the parse,
-/// every one of these five is unconditional, so an extra or missing stage is a
-/// change to the pipeline and should be read as one.
+/// every one of these six is unconditional, so an extra or missing stage is a
+/// change to the pipeline and should be read as one. The PDFs come after the
+/// documents they are built from and before the package is checked.
 #[test]
 fn the_export_reports_its_stages_in_the_order_it_runs_them() {
     let dir = tempdir().expect("tempdir");
@@ -194,6 +201,7 @@ fn the_export_reports_its_stages_in_the_order_it_runs_them() {
             "ReadingHeaders",
             "HeadersRead",
             "WritingDocuments",
+            "WritingPdfs",
             "CheckingPackage",
             "CheckingPublished",
         ],
@@ -272,6 +280,7 @@ fn a_failed_build_does_not_report_stages_it_never_reached() {
         &zip,
         destination.path(),
         "progress",
+        support::fonts(),
         &Job::new(&sink, &cancel),
     );
 
@@ -565,8 +574,22 @@ fn a_run_that_is_listened_to_builds_the_same_bytes_as_one_that_is_not() {
 
     let sink = Recording(Mutex::new(Vec::new()));
     let cancel = Cancel::new();
-    let a = export::build(&zip, &heard, "fixture", &Job::new(&sink, &cancel)).expect("heard");
-    let b = export::build(&zip, &unheard, "fixture", &Job::unattended()).expect("unheard");
+    let a = export::build(
+        &zip,
+        &heard,
+        "fixture",
+        support::fonts(),
+        &Job::new(&sink, &cancel),
+    )
+    .expect("heard");
+    let b = export::build(
+        &zip,
+        &unheard,
+        "fixture",
+        support::fonts(),
+        &Job::unattended(),
+    )
+    .expect("unheard");
 
     assert!(
         sink.ticks()
@@ -597,7 +620,14 @@ fn a_run_that_is_listened_to_builds_the_same_bytes_as_one_that_is_not() {
     // build under another source label differs in every document's attribution.
     let other = dir.path().join("other");
     std::fs::create_dir(&other).expect("other");
-    export::build(&zip, &other, "another label", &Job::unattended()).expect("other");
+    export::build(
+        &zip,
+        &other,
+        "another label",
+        support::fonts(),
+        &Job::unattended(),
+    )
+    .expect("other");
     let other = other.join(export::PACKAGE);
     assert!(
         listed

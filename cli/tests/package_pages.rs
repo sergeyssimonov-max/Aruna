@@ -69,8 +69,14 @@ impl Package {
         );
         let destination = dir.path().join("out");
         std::fs::create_dir(&destination).expect("destination");
-        export::build(&zip, &destination, "test source", &Job::unattended())
-            .expect("the package builds");
+        export::build(
+            &zip,
+            &destination,
+            "test source",
+            support::fonts(),
+            &Job::unattended(),
+        )
+        .expect("the package builds");
         Package {
             root: destination.join(PACKAGE),
             _dir: dir,
@@ -191,7 +197,8 @@ fn the_package_carries_no_index_page_for_any_group() {
     );
 }
 
-/// A CTH heading is text. Only manuscripts are links.
+/// A CTH heading is text. Only manuscripts are links, and the PDF of each
+/// beside it.
 #[test]
 fn a_group_heading_is_not_a_link_and_every_link_is_a_manuscript() {
     let package = Package::build();
@@ -209,10 +216,16 @@ fn a_group_heading_is_not_a_link_and_every_link_is_a_manuscript() {
     let links = hrefs(&inventory);
     assert!(!links.is_empty(), "an inventory with no links at all");
     for href in &links {
-        assert!(
-            href.ends_with(".xml"),
-            "the inventory links {href}, which is not a manuscript"
-        );
+        match href.strip_suffix(".pdf") {
+            Some(stem) => assert!(
+                links.contains(&format!("{stem}.xml")),
+                "the inventory links {href}, the PDF of no manuscript it links"
+            ),
+            None => assert!(
+                href.ends_with(".xml"),
+                "the inventory links {href}, which is not a manuscript"
+            ),
+        }
         assert!(
             target_of(&package.root, href).is_file(),
             "{href} names a file that is not there"
@@ -220,7 +233,9 @@ fn a_group_heading_is_not_a_link_and_every_link_is_a_manuscript() {
     }
 }
 
-/// Every manuscript in the package is linked, and nothing else is.
+/// Every manuscript in the package is linked, and its PDF beside it, and
+/// nothing else is. The one manuscript whose PDF the model refused has none
+/// and no link to one, and the manifest says why.
 #[test]
 fn the_inventory_links_exactly_the_manuscripts_the_folder_holds() {
     let package = Package::build();
@@ -228,8 +243,18 @@ fn the_inventory_links_exactly_the_manuscripts_the_folder_holds() {
     let on_disk: BTreeSet<PathBuf> = package
         .files()
         .into_iter()
-        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("xml"))
+        .filter(|p| matches!(p.extension().and_then(|e| e.to_str()), Some("xml" | "pdf")))
         .collect();
+    for pdf in on_disk
+        .iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "pdf"))
+    {
+        assert!(
+            on_disk.contains(&pdf.with_extension("xml")),
+            "{} is the PDF of no manuscript in the folder",
+            pdf.display()
+        );
+    }
     let linked: BTreeSet<PathBuf> = hrefs(&package.inventory())
         .iter()
         .map(|h| {
@@ -243,6 +268,40 @@ fn the_inventory_links_exactly_the_manuscripts_the_folder_holds() {
     assert_eq!(
         linked, on_disk,
         "the inventory and the folder do not hold the same manuscripts"
+    );
+
+    // The document with the raw `&` in its text: the model reads none of it,
+    // so it has no PDF, no link to one, and the manifest gives the reason.
+    // `<c>` is not in its name – the header's tags are stripped from a siglum,
+    // as they always were.
+    let refused = PathBuf::from("CTH 9/A&B \"d\" #e ?f 𒀀.xml");
+    assert!(on_disk.contains(&refused), "{on_disk:?}");
+    assert!(
+        !on_disk.contains(&refused.with_extension("pdf")),
+        "{on_disk:?}"
+    );
+    assert!(
+        !linked.contains(&refused.with_extension("pdf")),
+        "{linked:?}"
+    );
+    let without: Vec<&PathBuf> = on_disk
+        .iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "xml"))
+        .filter(|p| !on_disk.contains(&p.with_extension("pdf")))
+        .collect();
+    assert_eq!(without, vec![&refused], "one manuscript without a PDF");
+    let whole = std::fs::read_to_string(package.root.join(export::MANIFEST)).expect("the manifest");
+    // `file` is a key of the XML findings too; the documents are below.
+    let manifest = &whole[whole.find("\"groups\": [").expect("the groups")..];
+    let at = manifest
+        .find("\"file\": \"CTH 9/A&B \\\"d\\\" #e ?f 𒀀.xml\"")
+        .expect("its entry");
+    let entry = &manifest[at..at + manifest[at..].find('}').expect("closed")];
+    assert!(
+        entry.contains(
+            "\"pdf\": { \"refused\": \"the document model: unread: unclassified at line 2, column 47\""
+        ),
+        "{entry}"
     );
 }
 
@@ -278,21 +337,38 @@ fn a_siglum_holding_a_separator_is_escaped_once_in_the_name_and_once_in_the_link
         .expect("read group")
         .flatten()
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .find(|n| n.starts_with("544"))
+        .find(|n| n.starts_with("544") && n.ends_with(".xml"))
         .expect("the manuscript with a slash in its siglum");
     assert_eq!(name, "544%2Ff.xml", "the separator is not in the file name");
+    assert!(
+        package.root.join("CTH 5").join("544%2Ff.pdf").is_file(),
+        "its PDF does not take the same escaped name"
+    );
 
-    let href = hrefs(&package.inventory())
-        .into_iter()
-        .find(|h| h.contains("544"))
+    let links = hrefs(&package.inventory());
+    let href = links
+        .iter()
+        .find(|h| h.contains("544") && h.ends_with(".xml"))
         .expect("the inventory links it");
     assert_eq!(
-        href, "./CTH%205/544%252Ff.xml",
+        *href, "./CTH%205/544%252Ff.xml",
         "the name's % is not escaped in the link"
     );
     assert!(
-        target_of(&package.root, &href).is_file(),
+        target_of(&package.root, href).is_file(),
         "decoding the link does not give the file back"
+    );
+    let pdf = links
+        .iter()
+        .find(|h| h.contains("544") && h.ends_with(".pdf"))
+        .expect("the inventory links its PDF");
+    assert_eq!(
+        *pdf, "./CTH%205/544%252Ff.pdf",
+        "the name's % is not escaped in the PDF's link"
+    );
+    assert!(
+        target_of(&package.root, pdf).is_file(),
+        "decoding the PDF's link does not give the file back"
     );
 
     // And the reader still sees the siglum as it is written.
@@ -418,9 +494,10 @@ fn the_inventory_carries_screen_and_print_rules() {
 // The package as a whole
 // ---------------------------------------------------------------------------
 
-/// The folder holds the inventory, the manifest, the manuscripts, the one font
-/// the page cannot be read without together with its terms, and the terms of
-/// the CTH titles the inventory shows. Nothing else.
+/// The folder holds the inventory, the manifest, the manuscripts and the PDF
+/// of each beside it, the one font the page cannot be read without together
+/// with its terms, and the terms of the CTH titles the inventory shows.
+/// Nothing else.
 ///
 /// A build that left an intermediate representation, a temporary file or a
 /// backup behind would still pass every link check above.
@@ -428,12 +505,16 @@ fn the_inventory_carries_screen_and_print_rules() {
 fn the_package_holds_only_what_a_reader_needs() {
     let package = Package::build();
 
-    for file in package.files() {
+    let files = package.files();
+    for file in &files {
         let name = file
             .file_name()
             .and_then(|n| n.to_str())
             .expect("a file name");
+        let pdf_of_a_manuscript =
+            name.ends_with(".pdf") && files.contains(&file.with_extension("xml"));
         let allowed = name.ends_with(".xml")
+            || pdf_of_a_manuscript
             || name == format!("{PACKAGE}.html")
             || name == "manifest.json"
             || name == aruna::fonts::PACKAGED_FONT

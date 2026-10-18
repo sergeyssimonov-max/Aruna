@@ -40,25 +40,13 @@ fn main() -> ExitCode {
     // same one a window will call, and a binary that reached past it would be
     // the second answer to "what does building the inventory come to" — which
     // is the arrangement that layer exists to prevent.
-    // The PDF beside each document: on unless `ARUNA_PDF=off`, and set in the
-    // fonts of `ARUNA_FONTS` – a directory, named, never searched for (owner's
-    // decisions of 2026-09-30, questions 3 and 10). Without it the core
-    // refuses before any work and names the file it wanted. Off by default in
-    // release 2.6.3 (owner's decision of 2026-10-06), on again in the console
-    // since the owner's decision of 2026-10-11.
-    let pdf = match pdf_request(
-        std::env::var_os("ARUNA_PDF").as_deref(),
-        std::env::var_os("ARUNA_FONTS").map(PathBuf::from),
-    ) {
-        Ok(pdf) => pdf,
-        Err(message) => {
-            complain(&format!("Ошибка: {message}\n"));
-            return ExitCode::FAILURE;
-        }
-    };
+    // The PDF beside each document, set in the fonts of `ARUNA_FONTS` – a
+    // directory, named, never searched for (owner's decision of 2026-09-30,
+    // question 10). Without it the core refuses before any work and names the
+    // file it wanted.
     let request = aruna::app::CorpusRequest {
         local_archive: local,
-        pdf,
+        fonts: std::env::var_os("ARUNA_FONTS").map(PathBuf::from),
     };
     match aruna::app::build_corpus(&request, &job) {
         Ok(report) => {
@@ -79,25 +67,6 @@ fn main() -> ExitCode {
             report(&err);
             ExitCode::FAILURE
         }
-    }
-}
-
-/// `ARUNA_PDF` and `ARUNA_FONTS` as a request: `off` or `0` builds no PDF,
-/// `on`, `1` or nothing builds one beside each document in the fonts named.
-/// Any other value is refused rather than guessed at.
-fn pdf_request(
-    switch: Option<&std::ffi::OsStr>,
-    fonts: Option<PathBuf>,
-) -> Result<aruna::app::PdfRequest, String> {
-    match switch
-        .map(|v| v.to_string_lossy().to_lowercase())
-        .as_deref()
-    {
-        None | Some("on" | "1") => Ok(aruna::app::PdfRequest::On { fonts }),
-        Some("off" | "0") => Ok(aruna::app::PdfRequest::Off),
-        Some(other) => Err(format!(
-            "ARUNA_PDF={other} не понято: нужно off или 0 – без PDF, on или 1 – с ним"
-        )),
     }
 }
 
@@ -142,8 +111,7 @@ fn usage() -> String {
          с Zenodo (71 МиБ), собирает пакет с описью в папке Downloads.\n\
          \n\
          ARUNA_ZIP=/путь/к/архиву.zip – взять готовый архив вместо загрузки.\n\
-         ARUNA_FONTS=/путь/к/шрифтам – каталог семи шрифтов docs/FONTS.md для PDF.\n\
-         ARUNA_PDF=off – собрать пакет без PDF (по умолчанию PDF строится).\n",
+         ARUNA_FONTS=/путь/к/шрифтам – каталог семи шрифтов docs/FONTS.md для PDF.\n",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -379,7 +347,7 @@ fn advice(err: &ArunaError) -> Option<String> {
         // about the variable rather than about an install.
         ArunaError::FontMissing { covers, .. } if *covers == aruna::app::NO_FONT_DIRECTORY => {
             "Назовите каталог шрифтов переменной ARUNA_FONTS – в дереве это\n\
-             cli/resources/fonts – или соберите пакет без PDF: ARUNA_PDF=off.\n\
+             cli/resources/fonts.\n\
              Шрифты из системы не берутся: в PDF чужой шрифт нарисовал бы не тот знак."
                 .to_string()
         }

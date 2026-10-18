@@ -21,35 +21,27 @@ use crate::html::render_linked_html;
 use crate::parse::ManuscriptRecord;
 use crate::presentation::CorpusPresentation;
 
-/// The package's inventory: the CLI's own, with the links a folder makes possible.
+/// The package's inventory: the CLI's own, with the links a folder makes
+/// possible – each document's XML and, beside it, its PDF.
+///
+/// `pdfs` is parallel to `placed`. A refused PDF gets no link; why it was
+/// refused is the manifest's to say. This is the function the build calls,
+/// so that a benchmark or a fuzzer calls the same one.
 ///
 /// No timestamp is passed. A package is rebuilt from the same archive and has
 /// to come out identical every time, and a clock reading is the one thing that
 /// would not.
-pub fn render_inventory(records: &[ManuscriptRecord], placed: &[Placed], source: &str) -> String {
-    // Where every link points is [`crate::presentation`]'s decision, made once
-    // for the package rather than once per document. At the XML file itself —
-    // never at a folder, which Safari renders as a blank page for a `file://`
-    // URL, and never at a page about the folder, which is the thing this
-    // stopped producing.
-    render_linked_html(&CorpusPresentation::linked(records, placed, source), "")
-}
-
-/// The package's inventory as a build writes it: [`render_inventory`] with the
-/// PDFs the build made linked beside their documents.
-///
-/// `pdfs` is parallel to `placed`; `None` – a build without PDFs – links none.
-/// A refused PDF gets no link; why it was refused is the manifest's to say.
-/// This is the function the build calls, so that a benchmark or a fuzzer can
-/// call the same one: until 2026-10-02 both exercised [`render_inventory`],
-/// the path without PDF links, which the product does not take (finding № 8
-/// of refactor-1).
 pub fn render_package_inventory(
     records: &[ManuscriptRecord],
     placed: &[Placed],
     source: &str,
-    pdfs: Option<&[PdfState]>,
+    pdfs: &[PdfState],
 ) -> String {
+    // Where every link points is [`crate::presentation`]'s decision, made once
+    // for the package rather than once per document. At the XML file itself –
+    // never at a folder, which Safari renders as a blank page for a `file://`
+    // URL, and never at a page about the folder, which is the thing this
+    // stopped producing.
     let corpus = CorpusPresentation::linked(records, placed, source).with_pdfs(placed, pdfs);
     render_linked_html(&corpus, "")
 }
@@ -77,10 +69,20 @@ mod tests {
     use crate::export::place;
     use crate::export::tests_support::fragment;
 
+    /// The inventory of `fragments`, every PDF refused: each row carries its
+    /// XML link and nothing beside it, which is what these tests read. The
+    /// PDF links are held by `tests/export_pdf.rs`.
     fn built(fragments: &[crate::export::Fragment]) -> (String, Vec<Placed>) {
         let placed = place(fragments).expect("placed");
         let records: Vec<ManuscriptRecord> = fragments.iter().map(|f| f.record.clone()).collect();
-        (render_inventory(&records, &placed, "test"), placed)
+        let refused: Vec<PdfState> = placed
+            .iter()
+            .map(|_| PdfState::Refused("the document model: a fixture".into()))
+            .collect();
+        (
+            render_package_inventory(&records, &placed, "test", &refused),
+            placed,
+        )
     }
 
     #[test]

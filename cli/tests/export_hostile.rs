@@ -83,6 +83,7 @@ fn an_entry_that_walks_out_of_the_archive_cannot_walk_out_of_the_package() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     );
 
@@ -116,6 +117,7 @@ fn a_siglum_that_is_a_path_stays_one_file_inside_one_group() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("builds");
@@ -160,6 +162,7 @@ fn two_documents_that_want_one_path_stop_the_build_rather_than_overwrite() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Err(ArunaError::ExportCollision { .. }) => {}
@@ -216,6 +219,7 @@ fn an_entry_that_unpacks_to_more_than_the_limit_is_refused_by_name() {
         &path,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Err(ArunaError::ExportDocumentTooLarge { entry, limit }) => {
@@ -251,6 +255,7 @@ fn a_body_that_is_not_text_is_carried_through_without_being_corrected() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("builds");
@@ -287,6 +292,7 @@ fn a_destination_holding_someone_elses_files_is_refused_untouched() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Err(ArunaError::ExportDestination { .. }) => {}
@@ -318,6 +324,7 @@ fn an_archive_with_nothing_the_gates_accept_is_named_as_such() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Err(ArunaError::EmptyArchive) => {}
@@ -358,6 +365,7 @@ fn two_archive_entries_with_one_name_do_not_produce_one_document_twice() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Ok(built) => {
@@ -403,6 +411,7 @@ fn a_destination_that_is_a_symbolic_link_is_refused_rather_than_followed() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Err(ArunaError::ExportDestination { .. }) => {}
@@ -433,6 +442,7 @@ fn building_twice_replaces_the_package_and_leaves_nothing_beside_it() {
         &first,
         &destination,
         "first",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("first build");
@@ -452,6 +462,7 @@ fn building_twice_replaces_the_package_and_leaves_nothing_beside_it() {
         &second,
         &destination,
         "second",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("second build");
@@ -501,6 +512,7 @@ fn a_destination_that_cannot_be_written_to_fails_without_leaving_anything() {
             &zip,
             &destination,
             "hostile",
+            support::fonts(),
             &aruna::job::Job::unattended(),
         ))
     };
@@ -560,6 +572,7 @@ fn an_archive_that_changes_between_the_two_passes_stops_the_build() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Ok(built) => {
@@ -614,19 +627,31 @@ fn a_siglum_longer_than_a_filesystem_component_leaves_nothing_behind() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .unwrap_or_else(|e| panic!("a long siglum stopped the build: {e}"));
 
     assert_eq!(built.documents, 2, "a document went missing");
     let names = files(&destination.join(PACKAGE));
-    let cut = names
-        .iter()
-        .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
-        .find(|n| n.starts_with("KKKK"))
-        .unwrap_or_else(|| panic!("the long document is not in the package: {names:?}"));
+    let named = |extension: &str| -> String {
+        names
+            .iter()
+            .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
+            .find(|n| n.starts_with("KKKK") && n.ends_with(extension))
+            .unwrap_or_else(|| panic!("no {extension} of the long document: {names:?}"))
+            .to_string()
+    };
+    let cut = named(".xml");
     assert!(cut.len() <= 255, "{} bytes: {cut}", cut.len());
-    assert!(cut.ends_with(".xml"), "{cut}");
+    // Its PDF takes the same cut name, and fits as well.
+    let pdf = named(".pdf");
+    assert!(pdf.len() <= 255, "{} bytes: {pdf}", pdf.len());
+    assert_eq!(
+        pdf.strip_suffix(".pdf"),
+        cut.strip_suffix(".xml"),
+        "the PDF is not named as its document"
+    );
     let inventory = fs::read_to_string(
         destination
             .join(PACKAGE)
@@ -701,7 +726,14 @@ fn an_archive_exchanged_between_the_passes_does_not_reach_the_package() {
         impostor: impostor.clone(),
     };
     let cancel = Cancel::new();
-    export::build(&genuine, &destination, "hostile", &Job::new(&swap, &cancel)).expect("builds");
+    export::build(
+        &genuine,
+        &destination,
+        "hostile",
+        support::fonts(),
+        &Job::new(&swap, &cancel),
+    )
+    .expect("builds");
 
     let root = destination.join(PACKAGE);
     let documents: Vec<PathBuf> = files(&root)
@@ -757,6 +789,7 @@ fn a_siglum_that_is_not_utf8_names_no_file_with_invented_characters() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("builds");
@@ -838,6 +871,7 @@ fn every_document_the_normalisation_check_refuses_is_named() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     ) {
         Err(ArunaError::ExportDistorted { entry, reason }) => {
@@ -891,6 +925,7 @@ fn two_groups_that_differ_only_in_unicode_form_are_not_merged() {
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     );
     if cfg!(target_os = "macos") {
@@ -939,6 +974,7 @@ fn two_sigla_that_differ_only_in_unicode_form_are_a_collision_not_a_disk_failure
         &zip,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     );
     // Which answer is due is the filesystem's, and a test that took either

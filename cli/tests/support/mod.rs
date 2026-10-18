@@ -17,6 +17,22 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------------------
+// The fonts every PDF is set in
+// ---------------------------------------------------------------------------
+
+/// The fonts of the tree, `cli/resources/fonts`: the directory every build in
+/// these tests sets its PDFs in, as the console's `ARUNA_FONTS` names it.
+pub fn fonts_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts")
+}
+
+/// [`fonts_dir`], read and checked once per test binary.
+pub fn fonts() -> &'static aruna::pdf::Fonts {
+    static FONTS: std::sync::OnceLock<aruna::pdf::Fonts> = std::sync::OnceLock::new();
+    FONTS.get_or_init(|| aruna::pdf::Fonts::load(&fonts_dir()).expect("the fonts of the tree"))
+}
+
+// ---------------------------------------------------------------------------
 // The archive, obtained without asking Zenodo anything
 // ---------------------------------------------------------------------------
 

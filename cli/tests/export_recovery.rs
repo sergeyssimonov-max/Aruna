@@ -90,8 +90,14 @@ fn published() -> (TempDir, PathBuf, PathBuf) {
     let zip = mixed_archive(dir.path());
     let destination = dir.path().join("out");
     std::fs::create_dir(&destination).expect("destination");
-    export::build(&zip, &destination, "first", &aruna::job::Job::unattended())
-        .expect("the first build");
+    export::build(
+        &zip,
+        &destination,
+        "first",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("the first build");
     (dir, zip, destination)
 }
 
@@ -121,8 +127,14 @@ fn a_staging_directory_from_a_killed_run_does_not_stop_the_next_one() {
     std::fs::write(staging.join("stray.txt"), "left over").expect("stray");
     abandoned(&staging);
 
-    let built = export::build(&zip, &destination, "second", &aruna::job::Job::unattended())
-        .expect("a leftover staging directory must not stop a build");
+    let built = export::build(
+        &zip,
+        &destination,
+        "second",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("a leftover staging directory must not stop a build");
 
     assert_eq!(built.documents, 5);
     assert!(
@@ -155,7 +167,14 @@ fn a_staging_directory_whose_owner_is_gone_is_removed_by_the_next_build() {
     )
     .expect("marker");
 
-    export::build(&zip, &destination, "second", &aruna::job::Job::unattended()).expect("the build");
+    export::build(
+        &zip,
+        &destination,
+        "second",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("the build");
 
     assert!(
         beside(&destination).is_empty(),
@@ -184,8 +203,14 @@ fn a_package_left_aside_by_a_killed_run_is_cleared_by_the_next_one() {
     std::fs::rename(destination.join(PACKAGE), &aside).expect("aside");
     assert!(!destination.join(PACKAGE).exists());
 
-    let built = export::build(&zip, &destination, "second", &aruna::job::Job::unattended())
-        .expect("a package left aside must not stop the next build");
+    let built = export::build(
+        &zip,
+        &destination,
+        "second",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("a package left aside must not stop the next build");
 
     assert_eq!(built.documents, 5);
     assert!(
@@ -222,8 +247,14 @@ fn a_destination_holding_every_kind_of_leftover_still_builds() {
     std::fs::create_dir_all(&aside).expect("aside");
     std::fs::write(aside.join("older.xml"), "an older package").expect("older");
 
-    let built = export::build(&zip, &destination, "second", &aruna::job::Job::unattended())
-        .expect("the leftovers of two killed runs must not stop a third");
+    let built = export::build(
+        &zip,
+        &destination,
+        "second",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("the leftovers of two killed runs must not stop a third");
 
     assert_eq!(built.documents, 5);
     assert!(
@@ -253,8 +284,14 @@ fn a_build_that_recovered_produces_the_package_a_clean_one_would() {
 
     let clean = dir.path().join("clean");
     std::fs::create_dir(&clean).expect("clean");
-    export::build(&zip, &clean, "reference", &aruna::job::Job::unattended())
-        .expect("the clean build");
+    export::build(
+        &zip,
+        &clean,
+        "reference",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("the clean build");
 
     let messy = dir.path().join("messy");
     std::fs::create_dir(&messy).expect("messy");
@@ -263,8 +300,14 @@ fn a_build_that_recovered_produces_the_package_a_clean_one_would() {
     std::fs::write(staging.join("CTH 9").join("KUB 2.1.xml"), "not this").expect("half");
     abandoned(&staging);
     std::fs::create_dir_all(messy.join(format!(".{PACKAGE}.previous"))).expect("aside");
-    export::build(&zip, &messy, "reference", &aruna::job::Job::unattended())
-        .expect("the build that had to recover");
+    export::build(
+        &zip,
+        &messy,
+        "reference",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("the build that had to recover");
 
     let (a, b) = (clean.join(PACKAGE), messy.join(PACKAGE));
     assert_eq!(
@@ -386,6 +429,7 @@ fn a_failed_build_leaves_an_orphaned_package_where_it_found_it() {
         &zip,
         &destination,
         "failing",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     );
 
@@ -419,10 +463,24 @@ fn recovering_once_is_enough_and_running_again_changes_nothing() {
     let staging = destination.join(format!(".{PACKAGE}.build"));
     std::fs::create_dir_all(&staging).expect("staging");
     abandoned(&staging);
-    export::build(&zip, &destination, "second", &aruna::job::Job::unattended()).expect("recovers");
+    export::build(
+        &zip,
+        &destination,
+        "second",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("recovers");
     let after_recovery = files(&destination.join(PACKAGE));
 
-    export::build(&zip, &destination, "second", &aruna::job::Job::unattended()).expect("and again");
+    export::build(
+        &zip,
+        &destination,
+        "second",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("and again");
     assert_eq!(
         after_recovery,
         files(&destination.join(PACKAGE)),
@@ -469,6 +527,7 @@ fn a_pipe_where_a_marker_belongs_does_not_hold_the_build() {
             &worker_zip,
             &worker_destination,
             "second",
+            support::fonts(),
             &aruna::job::Job::unattended(),
         )
         .map(|_| ());

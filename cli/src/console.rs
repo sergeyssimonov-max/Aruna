@@ -344,6 +344,14 @@ pub(crate) const PHRASES: &[(&str, &str)] = &[
         "the manifest lists {} distinct {} names for {} documents",
         "в манифесте {} разных имен {} на {} документов",
     ),
+    (
+        "the manifest has no pdfs section",
+        "в манифесте нет раздела pdfs",
+    ),
+    (
+        "the manifest gives {} reasons for a refused PDF, and {} documents have none",
+        "в манифесте {} причин отказа в PDF, а без PDF {} документов",
+    ),
     ("{} is nested deeper than a package can be", "{} вложен глубже, чем бывает в пакете"),
     ("cannot read {}", "не читается {}"),
     (

@@ -27,15 +27,6 @@ use crate::progress::Event;
 use super::naming::{dir_component, pdf_path};
 use super::Placed;
 
-/// Whether the package carries a PDF of every document.
-#[derive(Clone, Copy)]
-pub enum Pdf<'f> {
-    /// The package as before: XML documents, the inventory, the manifest.
-    Off,
-    /// And a PDF beside each document, set in these fonts.
-    On(&'f Fonts),
-}
-
 /// What became of one document's PDF.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PdfState {

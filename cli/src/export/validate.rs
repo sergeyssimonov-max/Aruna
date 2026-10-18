@@ -81,32 +81,22 @@ pub struct Validation {
     pub fragment_links: usize,
 }
 
-/// Check `root` against the records and placements it was built from.
+/// Check `root` against the records and placements it was built from, and
+/// against `pdfs`, what became of each placed document's PDF.
 ///
 /// Every problem is collected before any is reported: a package with four
 /// hundred broken links should say so once, not four hundred times, and the
-/// first failure is rarely the informative one.
+/// first failure is rarely the informative one. Every PDF built is on disk,
+/// linked once from the inventory and named in the manifest; no other PDF is
+/// anywhere.
 pub fn validate(
     root: &Path,
     records: &[ManuscriptRecord],
     placed: &[Placed],
-) -> Result<Validation> {
-    validate_with(root, records, placed, None)
-}
-
-/// [`validate`], for a package that may carry PDFs: `pdfs` is what became of
-/// each placed document's PDF, `None` when the build made none. Every PDF
-/// built is on disk, linked once from the inventory and named in the
-/// manifest; no other PDF is anywhere.
-pub(crate) fn validate_with(
-    root: &Path,
-    records: &[ManuscriptRecord],
-    placed: &[Placed],
-    pdfs: Option<&[super::PdfState]>,
+    pdfs: &[super::PdfState],
 ) -> Result<Validation> {
     let expected_pdfs: HashSet<PathBuf> = pdfs
-        .into_iter()
-        .flatten()
+        .iter()
         .filter_map(|s| s.built().map(Path::to_path_buf))
         .collect();
     let inventory_path = root.join(crate::paths::OUTPUT_FILE_NAME);
@@ -117,14 +107,7 @@ pub(crate) fn validate_with(
     let Linked {
         files: linked_files,
         pdfs: linked_pdfs,
-    } = classify_links(
-        &html,
-        root,
-        pdfs.is_some(),
-        &expected_pdfs,
-        &mut counts,
-        &mut errors,
-    );
+    } = classify_links(&html, root, &expected_pdfs, &mut counts, &mut errors);
 
     // The inventory must link exactly what was placed…
     let expected: HashSet<PathBuf> = placed.iter().map(|p| p.relative.clone()).collect();
@@ -145,7 +128,7 @@ pub(crate) fn validate_with(
         MAX_DEPTH,
         &mut Found {
             files: &mut on_disk,
-            pdfs: pdfs.is_some().then_some(&mut pdfs_on_disk),
+            pdfs: &mut pdfs_on_disk,
             at_the_root: &mut at_the_root,
         },
         &mut errors,
@@ -356,12 +339,11 @@ struct Linked {
 /// Sort every link of the inventory into a document, a PDF of this build, or
 /// a fault, counting the document links on the way.
 ///
-/// The first section of [`validate_with`], taken out whole: what it reports
-/// still comes first among the errors.
+/// The first section of [`validate`], taken out whole: what it reports still
+/// comes first among the errors.
 fn classify_links(
     html: &str,
     root: &Path,
-    pdf_build: bool,
     expected_pdfs: &HashSet<PathBuf>,
     counts: &mut Validation,
     errors: &mut Vec<String>,
@@ -381,7 +363,7 @@ fn classify_links(
         // links to a page inside each CTH folder until 2026-08-23; that page is
         // no longer written and nothing may link to one, so anything that is not
         // a fragment is a fault rather than a second kind of link.
-        if pdf_build && href.ends_with(".pdf") {
+        if href.ends_with(".pdf") {
             if expected_pdfs.contains(&relative) && target.is_file() {
                 linked_pdfs.insert(relative);
             } else {
@@ -462,6 +444,20 @@ fn check_manifest(
             ));
         }
     }
+
+    // Every package carries PDFs: the manifest has its `pdfs` section, and
+    // every document it names has a PDF entry – the path of one built, or why
+    // one was refused.
+    if !json.contains("\n  \"pdfs\": {\n") {
+        errors.push("the manifest has no pdfs section".to_string());
+    }
+    let refusals = manifest::values_of(&json, "refused").len();
+    let without = placed.len().saturating_sub(expected_pdfs.len());
+    if refusals != without {
+        errors.push(format!(
+            "the manifest gives {refusals} reasons for a refused PDF, and {without} documents have none"
+        ));
+    }
 }
 
 /// Every `.xml` under `root`, relative to it; anything else is an error.
@@ -473,8 +469,8 @@ fn check_manifest(
 /// What a walk collects.
 struct Found<'a> {
     files: &'a mut HashSet<PathBuf>,
-    /// PDFs, when the package may carry them; `None` makes a PDF a stray.
-    pdfs: Option<&'a mut HashSet<PathBuf>>,
+    /// The PDFs beside the documents.
+    pdfs: &'a mut HashSet<PathBuf>,
     at_the_root: &'a mut HashSet<String>,
 }
 
@@ -534,11 +530,9 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
             // ответом на вопрос, который этот обход уже задал.
             found.at_the_root.insert(name);
             continue;
-        } else if let (Some(pdfs), true, false) =
-            (found.pdfs.as_deref_mut(), name.ends_with(".pdf"), at_root)
-        {
+        } else if name.ends_with(".pdf") && !at_root {
             if let Ok(relative) = path.strip_prefix(root) {
-                pdfs.insert(relative.to_path_buf());
+                found.pdfs.insert(relative.to_path_buf());
             }
         } else if !name.ends_with(".xml") {
             errors.push(format!(
@@ -624,15 +618,48 @@ mod tests {
     // other way — after the package — so that the two ways of saying it
     // are still compared by something, and by a test rather than by
     // coincidence.
-    use crate::export::{place, render_inventory, tests_support::fragment, PACKAGE};
+    use crate::export::{
+        place, render_package_inventory, tests_support::fragment, PdfState, PACKAGE,
+    };
     use tempfile::tempdir;
 
     /// A package built by hand, so the validator can be shown things a real
     /// build would never produce.
+    /// What became of each placed document's PDF: built, but for the indices
+    /// in `refused`.
+    fn states(placed: &[Placed], refused: &[usize]) -> Vec<PdfState> {
+        placed
+            .iter()
+            .enumerate()
+            .map(|(i, place)| {
+                if refused.contains(&i) {
+                    PdfState::Refused("the document model: a fixture".into())
+                } else {
+                    PdfState::Built(crate::export::naming::pdf_path(&place.relative))
+                }
+            })
+            .collect()
+    }
+
+    /// Every PDF of [`package`]: each document has one.
+    fn pdfs_of(placed: &[Placed]) -> Vec<PdfState> {
+        states(placed, &[])
+    }
+
     fn package(dir: &Path, fragments: &[crate::export::Fragment]) -> Vec<Placed> {
+        package_refusing(dir, fragments, &[]).0
+    }
+
+    /// A package whose documents at `refused` got no PDF.
+    fn package_refusing(
+        dir: &Path,
+        fragments: &[crate::export::Fragment],
+        refused: &[usize],
+    ) -> (Vec<Placed>, Vec<PdfState>) {
         let placed = place(fragments).expect("placed");
+        let pdfs = states(&placed, refused);
         let records: Vec<ManuscriptRecord> = fragments.iter().map(|f| f.record.clone()).collect();
-        for place in &placed {
+        for (place, state) in placed.iter().zip(&pdfs) {
             let path = dir.join(&place.relative);
             fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
             fs::write(
@@ -640,10 +667,13 @@ mod tests {
                 b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<AOxml/>",
             )
             .expect("write");
+            if let Some(pdf) = state.built() {
+                fs::write(dir.join(pdf), b"%PDF-1.7 fixture").expect("pdf");
+            }
         }
         fs::write(
             dir.join(format!("{PACKAGE}.html")),
-            render_inventory(&records, &placed, "test"),
+            render_package_inventory(&records, &placed, "test", &pdfs),
         )
         .expect("inventory");
         // The manifest is part of a package too, and the validator now says so.
@@ -661,7 +691,7 @@ mod tests {
                 &Default::default(),
                 &Default::default(),
                 &[],
-                None,
+                &pdfs,
             ),
         )
         .expect("manifest");
@@ -683,7 +713,7 @@ mod tests {
             crate::cth_titles::PACKAGED_TERMS_BYTES,
         )
         .expect("CTH terms");
-        placed
+        (placed, pdfs)
     }
 
     fn sample() -> Vec<crate::export::Fragment> {
@@ -724,7 +754,7 @@ mod tests {
             MAX_DEPTH,
             &mut Found {
                 files: &mut files,
-                pdfs: None,
+                pdfs: &mut Default::default(),
                 at_the_root: &mut at_the_root,
             },
             &mut errors,
@@ -766,7 +796,7 @@ mod tests {
             MAX_DEPTH,
             &mut Found {
                 files: &mut files,
-                pdfs: None,
+                pdfs: &mut Default::default(),
                 at_the_root: &mut at_the_root,
             },
             &mut errors,
@@ -785,7 +815,8 @@ mod tests {
         let fragments = sample();
         let placed = package(dir.path(), &fragments);
 
-        let counts = validate(dir.path(), &records(&fragments), &placed).expect("valid");
+        let counts =
+            validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed)).expect("valid");
         assert_eq!(counts.fragment_links, 3);
     }
 
@@ -935,7 +966,7 @@ mod tests {
         fs::remove_file(dir.path().join(NFC_PATH)).expect("remove");
         fs::write(dir.path().join(NFD_PATH), body).expect("write");
 
-        let checked = validate(dir.path(), &records(&fragments), &placed);
+        let checked = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed));
         if cfg!(target_os = "macos") {
             let counts = checked.expect("the disk's spelling of a placed name is that name");
             assert_eq!(counts.fragment_links, 2);
@@ -962,7 +993,8 @@ mod tests {
         assert_ne!(turned, json, "the entry was not turned");
         fs::write(&path, turned).expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("refused");
         assert!(format!("{err}").contains("manifest"), "{err}");
     }
 
@@ -983,7 +1015,8 @@ mod tests {
         assert_ne!(turned, html, "the link was not turned");
         fs::write(&path, turned).expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("refused");
         let text = format!("{err}");
         assert!(
             text.contains("not linked") || text.contains("points at nothing"),
@@ -1015,7 +1048,7 @@ mod tests {
 
             fs::remove_file(root.join(missing)).expect("remove");
 
-            let refused = validate(root, &records, &placed);
+            let refused = validate(root, &records, &placed, &pdfs_of(&placed));
             assert!(
                 refused.is_err(),
                 "a package without {missing} was read back as whole"
@@ -1032,7 +1065,8 @@ mod tests {
         let placed = package(dir.path(), &fragments);
         fs::remove_file(dir.path().join(&placed[0].relative)).expect("remove");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("must fail");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("must fail");
         assert!(format!("{err}").contains("points at nothing"), "{err}");
     }
 
@@ -1044,7 +1078,8 @@ mod tests {
         let placed = package(dir.path(), &fragments);
         fs::write(dir.path().join("CTH 5").join("stowaway.xml"), b"<a/>").expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("must fail");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("must fail");
         assert!(format!("{err}").contains("orphan"), "{err}");
     }
 
@@ -1055,7 +1090,8 @@ mod tests {
         let placed = package(dir.path(), &fragments);
         fs::write(dir.path().join("CTH 5").join("notes.txt"), b"scratch").expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("must fail");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("must fail");
         assert!(format!("{err}").contains("unexpected file"), "{err}");
     }
 
@@ -1066,7 +1102,8 @@ mod tests {
         let placed = package(dir.path(), &fragments);
         fs::remove_file(dir.path().join(MANIFEST)).expect("remove");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("refused");
         assert!(format!("{err}").contains("manifest"), "{err}");
     }
 
@@ -1083,19 +1120,21 @@ mod tests {
         let first = placed[0].relative.to_string_lossy().to_string();
         fs::write(&path, json.replace(&first, "CTH 5/invented.xml")).expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("refused");
         let text = format!("{err}");
         assert!(text.contains("invented.xml"), "{text}");
         assert!(text.contains(&first), "{text}");
     }
 
-    /// A package built without PDFs has no `pdf` entry in its manifest: one
-    /// that names a PDF the build did not make describes another package.
+    /// A document whose PDF was refused has no `pdf` path in the manifest:
+    /// one that names a PDF the build did not make describes another package.
     #[test]
     fn a_manifest_naming_a_pdf_the_build_did_not_make_fails() {
         let dir = tempdir().expect("tempdir");
         let fragments = sample();
-        let placed = package(dir.path(), &fragments);
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[0]);
+        validate(dir.path(), &records(&fragments), &placed, &pdfs).expect("the fixture is whole");
 
         let path = dir.path().join(MANIFEST);
         let json = fs::read_to_string(&path).expect("read");
@@ -1111,12 +1150,39 @@ mod tests {
         assert_ne!(named, json, "the entry was not planted");
         fs::write(&path, named).expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs).expect_err("refused");
         let text = format!("{err}");
         assert!(text.contains("pdf"), "{text}");
         assert!(
             text.contains(&pdf),
             "the PDF named is the one to say: {text}"
+        );
+    }
+
+    /// **Every package carries its PDF record.** A manifest without the
+    /// `pdfs` section, or one that drops the reason a document's PDF was
+    /// refused, describes a package this program does not build.
+    #[test]
+    fn a_manifest_without_its_pdf_record_fails() {
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[1]);
+        let path = dir.path().join(MANIFEST);
+        let whole = fs::read_to_string(&path).expect("read");
+
+        let without_section = whole.replacen("\n  \"pdfs\": {\n", "\n  \"pdfs_\": {\n", 1);
+        assert_ne!(without_section, whole, "the section was not removed");
+        fs::write(&path, &without_section).expect("write");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs).expect_err("refused");
+        assert!(format!("{err}").contains("pdfs section"), "{err}");
+
+        let at = whole.find("\"refused\": \"").expect("a reason is there");
+        let without_reason = format!("{}\"refuse_\": \"{}", &whole[..at], &whole[at + 13..]);
+        fs::write(&path, &without_reason).expect("write");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs).expect_err("refused");
+        assert!(
+            format!("{err}").contains("reasons for a refused PDF"),
+            "{err}"
         );
     }
 
@@ -1129,7 +1195,8 @@ mod tests {
             let path = dir.path().join(at).join("index.html");
             fs::write(&path, b"<html/>").expect("write");
 
-            let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+            let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+                .expect_err("refused");
             assert!(
                 format!("{err}").contains("index.html"),
                 "an index.html in {at:?} was accepted: {err}"
@@ -1144,7 +1211,8 @@ mod tests {
         let placed = package(dir.path(), &fragments);
         fs::write(dir.path().join("CTH 5").join(MANIFEST), b"{}").expect("write");
 
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("refused");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("refused");
         assert!(format!("{err}").contains(MANIFEST), "{err}");
     }
 
@@ -1243,7 +1311,8 @@ mod tests {
 
         // The process survives and says what is wrong; without either guard this
         // never returns.
-        let err = validate(dir.path(), &records(&fragments), &placed).expect_err("must fail");
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs_of(&placed))
+            .expect_err("must fail");
         assert!(
             format!("{err}").contains("symbolic link"),
             "the loop was not the thing reported: {err}"

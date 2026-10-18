@@ -170,7 +170,13 @@ fn a_cancelled_scan_stops_before_reading_an_entry() {
     let cancel = Cancel::new();
     let sink = CancelAt::new("ReadingHeaders", &cancel);
 
-    let outcome = export::build(&zip, &destination, "cancelled", &Job::new(&sink, &cancel));
+    let outcome = export::build(
+        &zip,
+        &destination,
+        "cancelled",
+        support::fonts(),
+        &Job::new(&sink, &cancel),
+    );
 
     assert!(
         matches!(outcome, Err(ArunaError::Cancelled { .. })),
@@ -191,7 +197,13 @@ fn a_build_cancelled_at_the_first_stage_writes_no_documents() {
     let cancel = Cancel::new();
     let sink = CancelAt::new("ReadingHeaders", &cancel);
 
-    let outcome = export::build(&zip, &destination, "cancelled", &Job::new(&sink, &cancel));
+    let outcome = export::build(
+        &zip,
+        &destination,
+        "cancelled",
+        support::fonts(),
+        &Job::new(&sink, &cancel),
+    );
 
     assert!(
         matches!(outcome, Err(ArunaError::Cancelled { .. })),
@@ -221,7 +233,13 @@ fn a_build_cancelled_while_writing_leaves_the_destination_empty() {
     let cancel = Cancel::new();
     let sink = CancelAt::new("WritingDocuments", &cancel);
 
-    let outcome = export::build(&zip, &destination, "cancelled", &Job::new(&sink, &cancel));
+    let outcome = export::build(
+        &zip,
+        &destination,
+        "cancelled",
+        support::fonts(),
+        &Job::new(&sink, &cancel),
+    );
 
     assert!(matches!(
         outcome,
@@ -256,14 +274,27 @@ fn a_build_cancelled_while_writing_leaves_the_destination_empty() {
 fn a_cancelled_rebuild_leaves_the_existing_package_untouched() {
     let (_dir, zip, destination) = scene(40);
 
-    export::build(&zip, &destination, "first", &Job::unattended()).expect("the first build");
+    export::build(
+        &zip,
+        &destination,
+        "first",
+        support::fonts(),
+        &Job::unattended(),
+    )
+    .expect("the first build");
     let before = files(&destination);
     let inventory = std::fs::read(destination.join(PACKAGE).join(format!("{PACKAGE}.html")))
         .expect("the first inventory");
 
     let cancel = Cancel::new();
     let sink = CancelAt::new("WritingDocuments", &cancel);
-    let outcome = export::build(&zip, &destination, "second", &Job::new(&sink, &cancel));
+    let outcome = export::build(
+        &zip,
+        &destination,
+        "second",
+        support::fonts(),
+        &Job::new(&sink, &cancel),
+    );
     assert!(matches!(outcome, Err(ArunaError::Cancelled { .. })));
 
     assert_eq!(
@@ -298,7 +329,13 @@ fn a_run_stopped_half_way_is_followed_by_a_complete_one() {
 
     let cancel = Cancel::new();
     let sink = CancelAt::new("WritingDocuments", &cancel);
-    let stopped = export::build(&zip, &destination, "label", &Job::new(&sink, &cancel));
+    let stopped = export::build(
+        &zip,
+        &destination,
+        "label",
+        support::fonts(),
+        &Job::new(&sink, &cancel),
+    );
     assert!(matches!(stopped, Err(ArunaError::Cancelled { .. })));
     assert_eq!(
         files(&destination),
@@ -308,10 +345,22 @@ fn a_run_stopped_half_way_is_followed_by_a_complete_one() {
 
     // The same process, a fresh handle, and nothing said about the first
     // attempt.
-    let again = export::build(&zip, &destination, "label", &Job::unattended())
-        .expect("the second run builds");
-    let reference = export::build(&zip, elsewhere.path(), "label", &Job::unattended())
-        .expect("a run that was never stopped");
+    let again = export::build(
+        &zip,
+        &destination,
+        "label",
+        support::fonts(),
+        &Job::unattended(),
+    )
+    .expect("the second run builds");
+    let reference = export::build(
+        &zip,
+        elsewhere.path(),
+        "label",
+        support::fonts(),
+        &Job::unattended(),
+    )
+    .expect("a run that was never stopped");
     assert_eq!(again.documents, reference.documents);
     assert_eq!(again.groups, reference.groups);
 
@@ -423,6 +472,7 @@ fn a_finished_run_is_not_undone_by_a_late_cancellation() {
         &zip,
         &destination,
         "done",
+        support::fonts(),
         &Job::new(&aruna::progress::Silent, &cancel),
     )
     .expect("the build finishes");
@@ -459,11 +509,18 @@ fn a_run_that_is_never_cancelled_produces_exactly_what_it_did_before() {
         &zip,
         &destination,
         "watched",
+        support::fonts(),
         &Job::new(&aruna::progress::Silent, &cancel),
     )
     .expect("built");
-    let unwatched =
-        export::build(&zip, elsewhere.path(), "watched", &Job::unattended()).expect("built");
+    let unwatched = export::build(
+        &zip,
+        elsewhere.path(),
+        "watched",
+        support::fonts(),
+        &Job::unattended(),
+    )
+    .expect("built");
 
     assert_eq!(watched.documents, unwatched.documents);
     assert_eq!(watched.groups, unwatched.groups);
@@ -494,7 +551,13 @@ fn a_cancellation_says_which_stage_it_stopped() {
     ] {
         let cancel = Cancel::new();
         let sink = CancelAt::new(at, &cancel);
-        let outcome = export::build(&zip, &destination, "x", &Job::new(&sink, &cancel));
+        let outcome = export::build(
+            &zip,
+            &destination,
+            "x",
+            support::fonts(),
+            &Job::new(&sink, &cancel),
+        );
         match outcome {
             Err(ArunaError::Cancelled { phase }) => assert_eq!(
                 phase, expected,

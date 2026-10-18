@@ -12,6 +12,8 @@
 //! **a document carrying two of them**, and junk that the corpus's own gates
 //! have to keep out.
 
+mod support;
+
 use aruna::export::{self, PACKAGE};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -73,8 +75,14 @@ fn write_archive(path: &Path) {
 fn built(dir: &Path) -> (export::Built, PathBuf) {
     let archive = dir.join("corpus.zip");
     write_archive(&archive);
-    let built = export::build(&archive, dir, "test source", &aruna::job::Job::unattended())
-        .expect("the package builds");
+    let built = export::build(
+        &archive,
+        dir,
+        "test source",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("the package builds");
     (built, dir.join(PACKAGE))
 }
 
@@ -124,9 +132,17 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
     group5.sort();
     assert_eq!(
         group5,
-        vec!["544%2Ff.xml", "KBo 1.1 (CTH 5_XML_TLH).xml", "KBo 1.1.xml",],
+        vec![
+            "544%2Ff.pdf",
+            "544%2Ff.xml",
+            "KBo 1.1 (CTH 5_XML_TLH).pdf",
+            "KBo 1.1 (CTH 5_XML_TLH).xml",
+            "KBo 1.1.pdf",
+            "KBo 1.1.xml",
+        ],
         "the slash is escaped, the repeat has a place of its own, and the \
-         folder holds documents and nothing else"
+         folder holds documents and the PDF of each, in pairs by name, and \
+         nothing else"
     );
 }
 
@@ -139,7 +155,11 @@ fn every_link_resolves_and_opens_in_a_new_context() {
     let html = fs::read_to_string(root.join(format!("{PACKAGE}.html"))).expect("inventory");
 
     let links = export::hrefs(&html);
-    assert_eq!(links.len(), 4, "four fragments, and nothing else");
+    assert_eq!(
+        links.len(),
+        8,
+        "four fragments and the PDF of each, and nothing else"
+    );
 
     for href in &links {
         let relative = export::resolve(href).unwrap_or_else(|| panic!("{href} is not relative"));
@@ -149,11 +169,21 @@ fn every_link_resolves_and_opens_in_a_new_context() {
         // for a `file://` directory — and never a page about a folder, which is
         // what the CTH index pages were until they were given up.
         assert!(target.is_file(), "{href} is not a file");
-        assert!(
-            href.ends_with(".xml"),
-            "{href} is not a manuscript, so the inventory links something it should not"
-        );
+        // Or the PDF of one, linked beside the manuscript it belongs to.
+        if let Some(stem) = href.strip_suffix(".pdf") {
+            assert!(
+                links.contains(&format!("{stem}.xml").as_str()),
+                "{href} is the PDF of no manuscript the inventory links"
+            );
+        } else {
+            assert!(
+                href.ends_with(".xml"),
+                "{href} is not a manuscript, so the inventory links something it should not"
+            );
+        }
     }
+    let manuscripts = links.iter().filter(|h| h.ends_with(".xml")).count();
+    assert_eq!(manuscripts, 4, "four fragments");
 
     // Every anchor carries both attributes, and none of them is absolute.
     assert_eq!(html.matches("target=\"_blank\"").count(), links.len());
@@ -201,8 +231,8 @@ fn none_of_the_archive_debris_reaches_the_package() {
     collect(&root, &mut files);
     assert_eq!(
         files.len(),
-        9,
-        "four documents, one inventory, one manifest, the font and its terms, the CTH titles' terms: {files:?}"
+        13,
+        "four documents and the PDF of each, one inventory, one manifest, the font and its terms, the CTH titles' terms: {files:?}"
     );
     for path in &files {
         let name = path
@@ -210,8 +240,11 @@ fn none_of_the_archive_debris_reaches_the_package() {
             .expect("name")
             .to_string_lossy()
             .to_string();
+        let pdf_of_a_document =
+            name.ends_with(".pdf") && files.contains(&path.with_extension("xml"));
         assert!(
             name.ends_with(".xml")
+                || pdf_of_a_document
                 || name == format!("{PACKAGE}.html")
                 || name == "manifest.json"
                 || name == aruna::fonts::PACKAGED_FONT
@@ -240,6 +273,7 @@ fn building_twice_gives_the_same_package() {
         &dir.path().join("corpus.zip"),
         dir.path(),
         "test source",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("rebuilds over itself");
@@ -275,6 +309,7 @@ fn a_destination_that_is_not_ours_stops_the_build() {
         &archive,
         dir.path(),
         "test source",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect_err("must refuse");
@@ -339,6 +374,7 @@ fn one_enormous_document_does_not_take_the_memory_with_it() {
         &archive,
         dir.path(),
         "test source",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect_err("must refuse");
@@ -389,6 +425,7 @@ fn a_failed_build_takes_its_half_written_package_with_it() {
         &archive,
         dir.path(),
         "test source",
+        support::fonts(),
         &aruna::job::Job::unattended()
     )
     .is_err());
@@ -405,8 +442,8 @@ fn a_failed_build_takes_its_half_written_package_with_it() {
     );
 }
 
-/// **Schema 3: the run and the two digests of every document, without PDFs
-/// too** (owner's decision of 2026-10-08, `XML-CONTRACT.md` §4). The run
+/// **Schema 3: the run and the two digests of every document** (owner's
+/// decision of 2026-10-08, `XML-CONTRACT.md` §4). The run
 /// identifier is computed again from the archive's MD5 and the two versions;
 /// each document's `sha256` is that of the file in the package, and its
 /// `source_sha256` that of the archive entry it was normalised from – found
@@ -430,10 +467,6 @@ fn the_manifest_names_the_run_and_the_two_digests_of_every_document() {
     assert!(
         manifest.contains(&format!("  \"run\": {{\n    \"id\": \"{id}\",")),
         "{manifest}"
-    );
-    assert!(
-        !manifest.contains("\"pdf\""),
-        "a build without PDFs names one"
     );
 
     // Every entry of the archive, normalised: what each would be in the
@@ -554,6 +587,7 @@ fn each_document_names_its_archive_entry_byte_for_byte() {
             &zip,
             dir.path(),
             "test source",
+            support::fonts(),
             &aruna::job::Job::unattended(),
         )
         .expect("the package builds");
@@ -588,6 +622,7 @@ fn two_builds_give_one_manifest() {
         &dir.path().join("corpus.zip"),
         &other,
         "test source",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("builds again");

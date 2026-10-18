@@ -206,7 +206,7 @@ fn main() {
             &fonts,
             &Default::default(),
             &[],
-            Some(&pdfs),
+            &pdfs,
         );
         if let Err(why) = check_json(&json) {
             json_bad += 1;
@@ -221,9 +221,8 @@ fn main() {
         // document here until 2026-08-23, one page per CTH folder; those are no
         // longer written.
         //
-        // With the PDF links, as the build writes it since 2026-09-30: until
-        // 2026-10-02 this fuzzed `render_inventory`, the page without them.
-        let html = render_package_inventory(&recs, &placed, &text(&mut rng), Some(&pdfs));
+        // With the PDF links, as the build writes it.
+        let html = render_package_inventory(&recs, &placed, &text(&mut rng), &pdfs);
         if let Err(why) = check_html(&html).and_then(|()| check_pdf_links(&html, &pdfs)) {
             html_bad += 1;
             if html_bad <= 3 {

@@ -34,6 +34,8 @@
 //! cargo nextest run --test authenticity --run-ignored ignored-only
 //! ```
 
+mod support;
+
 use aruna::export::verify::{self, DECLARATION};
 use aruna::export::{self, PACKAGE};
 use aruna::md5::md5_hex;
@@ -45,11 +47,13 @@ use tempfile::tempdir;
 
 /// What TLHdig Beta 0.3 holds, and what the specification records in 3.6.
 const DOCUMENTS: usize = 23_936;
-/// The documents, plus the inventory, the manifest, the one packaged font, the
-/// text of its terms and the terms of the CTH titles — five files since
-/// 2026-09-22, four since 2026-09-17, two before it. Specification 3.6 still
-/// says 23 940 until its edit is made; this number is the measured one.
-const FILES_IN_PACKAGE: usize = DOCUMENTS + 5;
+/// The documents whose PDF is built: all but the 223 the model refuses.
+const PDFS: usize = 23_713;
+/// The documents, the PDF of each one built, plus the inventory, the manifest,
+/// the one packaged font, the text of its terms and the terms of the CTH
+/// titles – five files since 2026-09-22, four since 2026-09-17, two before
+/// it. 47 654, the reference package's count.
+const FILES_IN_PACKAGE: usize = DOCUMENTS + PDFS + 5;
 
 /// The document as the package is expected to hold it, built from the permit
 /// list rather than from the normaliser.
@@ -147,13 +151,27 @@ fn expected_from_archive(archive: &Path) -> (Bodies, usize) {
     (bodies, admitted)
 }
 
-/// Every `.xml` file the package holds, and every file in it.
-fn published(root: &Path) -> (Bodies, usize) {
+/// Every `.xml` file the package holds, every `.pdf` beside them, and every
+/// file in it.
+fn published(
+    root: &Path,
+) -> (
+    Bodies,
+    Vec<PathBuf>,
+    std::collections::HashSet<PathBuf>,
+    usize,
+) {
     let mut bodies = Bodies::new();
+    let mut pdfs = Vec::new();
+    let mut xmls = std::collections::HashSet::new();
     let mut files = 0usize;
     walk(root, &mut |path| {
         files += 1;
+        if path.extension().and_then(|e| e.to_str()) == Some("pdf") {
+            pdfs.push(path.to_path_buf());
+        }
         if path.extension().and_then(|e| e.to_str()) == Some("xml") {
+            xmls.insert(path.to_path_buf());
             let bytes = std::fs::read(path).expect("read a published document");
             assert!(
                 bytes.starts_with(DECLARATION),
@@ -163,7 +181,7 @@ fn published(root: &Path) -> (Bodies, usize) {
             count(&mut bodies, md5_hex(&bytes));
         }
     });
-    (bodies, files)
+    (bodies, pdfs, xmls, files)
 }
 
 fn walk(dir: &Path, each: &mut impl FnMut(&Path)) {
@@ -178,9 +196,15 @@ fn walk(dir: &Path, each: &mut impl FnMut(&Path)) {
 }
 
 /// The two sides, matched, with the difference spelled out when they are not.
-fn assert_same_documents(archive: &Path, root: &Path, admitted: usize, in_package: usize) {
+fn assert_same_documents(
+    archive: &Path,
+    root: &Path,
+    admitted: usize,
+    in_package: usize,
+    built_pdfs: usize,
+) {
     let (expected, _) = expected_from_archive(archive);
-    let (found, files) = published(root);
+    let (found, pdfs, xmls, files) = published(root);
 
     let mut missing: Vec<(&String, usize, usize)> = Vec::new();
     for (digest, wanted) in &expected {
@@ -210,15 +234,33 @@ fn assert_same_documents(archive: &Path, root: &Path, admitted: usize, in_packag
         admitted, in_package,
         "the number of documents written is not the number the gates admitted"
     );
-    // Five files that are not documents, and the number is the assertion: the
-    // inventory, the manifest, the font the page draws `U+100000` with, the
-    // terms that font is distributed under, and the terms of the CTH titles the
-    // inventory shows. Two until 2026-09-17, four until 2026-09-22; anything
-    // beyond these five is something nobody decided to ship.
+    // Every PDF is the PDF of a document: beside the XML of the same name,
+    // and as many as the build says it built.
+    let strays: Vec<&PathBuf> = pdfs
+        .iter()
+        .filter(|pdf| !xmls.contains(&pdf.with_extension("xml")))
+        .collect();
+    assert!(
+        strays.is_empty(),
+        "{} PDF(s) beside no document of the same name: {:?}",
+        strays.len(),
+        &strays[..strays.len().min(5)]
+    );
+    assert_eq!(
+        pdfs.len(),
+        built_pdfs,
+        "the PDFs in the package are not the ones the build says it built"
+    );
+    // Five files that are neither a document nor its PDF, and the number is
+    // the assertion: the inventory, the manifest, the font the page draws
+    // `U+100000` with, the terms that font is distributed under, and the terms
+    // of the CTH titles the inventory shows. Two until 2026-09-17, four until
+    // 2026-09-22; anything beyond these five is something nobody decided to
+    // ship.
     assert_eq!(
         files,
-        in_package + 5,
-        "the package holds files that are none of: a document, the inventory, the manifest, \
+        in_package + pdfs.len() + 5,
+        "the package holds files that are none of: a document, its PDF, the inventory, the manifest, \
          UllikummiA.ttf, UllikummiA-TERMS.txt, CTH-TITLES-TERMS.txt"
     );
 }
@@ -273,8 +315,14 @@ fn write_archive(path: &Path) {
 }
 
 fn build(dir: &Path, archive: &Path) -> (export::Built, PathBuf) {
-    let built = export::build(archive, dir, "test source", &aruna::job::Job::unattended())
-        .expect("the package builds");
+    let built = export::build(
+        archive,
+        dir,
+        "test source",
+        support::fonts(),
+        &aruna::job::Job::unattended(),
+    )
+    .expect("the package builds");
     (built, dir.join(PACKAGE))
 }
 
@@ -299,7 +347,7 @@ fn a_package_holds_every_admitted_document_once_and_unchanged() {
     let (built, root) = build(&destination, &archive);
 
     assert_eq!(built.documents, 4, "the debris is not a document");
-    assert_same_documents(&archive, &root, 4, built.documents);
+    assert_same_documents(&archive, &root, 4, built.documents, built.pdfs.built);
 }
 
 /// **The one entry the content gate turns away is named in the manifest.**
@@ -347,9 +395,16 @@ fn the_whole_corpus_reaches_the_package_once_and_unchanged() {
         built.documents, DOCUMENTS,
         "the export wrote a different number of documents than the corpus holds"
     );
-    assert_same_documents(&archive, &root, DOCUMENTS, built.documents);
+    assert_same_documents(
+        &archive,
+        &root,
+        DOCUMENTS,
+        built.documents,
+        built.pdfs.built,
+    );
 
-    let (_, files) = published(&root);
+    assert_eq!(built.pdfs.built, PDFS, "the PDFs the corpus gets");
+    let (_, _, _, files) = published(&root);
     assert_eq!(
         files, FILES_IN_PACKAGE,
         "the package holds a different number of files than 3.6 records"

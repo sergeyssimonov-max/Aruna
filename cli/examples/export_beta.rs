@@ -30,11 +30,22 @@ fn main() -> ExitCode {
         .or_else(dirs::download_dir)
         .unwrap_or_else(|| PathBuf::from("."));
 
+    // The fonts of the tree: every package carries a PDF of each document.
+    let fonts = match aruna::app::load_fonts(Some(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts"),
+    )) {
+        Ok(fonts) => fonts,
+        Err(err) => {
+            eprintln!("{err}");
+            return ExitCode::FAILURE;
+        }
+    };
     eprintln!("Building {PACKAGE} from {}…", zip.display());
     match export::build(
         &zip,
         &destination,
         aruna::SOURCE_LABEL,
+        &fonts,
         &aruna::job::Job::unattended(),
     ) {
         Ok(built) => {

@@ -13,12 +13,11 @@
 //!   part an algorithm change would touch.
 //! * **inventory** — rendering the page the way the build does, with PDF
 //!   links: through `render_package_inventory`, over a synthetic map of PDF
-//!   outcomes (no PDF is compiled). Pure, in memory. Until 2026-10-02 this
-//!   measured `render_inventory`, the path without PDF links.
+//!   outcomes (no PDF is compiled). Pure, in memory.
 //! * **normalise** — the transform alone, over documents already read, with the
 //!   reading not counted. This is what the second pass spends its CPU on.
-//! * **build** — the whole thing including writing 372 MB to disk, which is
-//!   what a user waits for.
+//! * **build** – the whole thing including the PDFs and writing the package
+//!   to disk, which is what a user waits for.
 //!
 //! The pure stages are repeated `ARUNA_BENCH_RUNS` times (default 5) after
 //! `ARUNA_BENCH_WARMUP` unrecorded runs; the two that touch the disk run once,
@@ -90,7 +89,7 @@ fn main() -> ExitCode {
         black_box(&fresh);
 
         let start = Instant::now();
-        let html = export::render_package_inventory(&records, &placed, "bench", Some(&pdfs));
+        let html = export::render_package_inventory(&records, &placed, "bench", &pdfs);
         let rendering = start.elapsed();
         black_box(&html);
 
@@ -111,12 +110,28 @@ fn main() -> ExitCode {
         }
     }
 
-    // The whole build, once, into a directory that is removed afterwards.
+    // The whole build, once, into a directory that is removed afterwards –
+    // with the PDFs, set in the fonts of the tree.
+    let fonts = match aruna::app::load_fonts(Some(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts"),
+    )) {
+        Ok(fonts) => fonts,
+        Err(err) => {
+            eprintln!("{err}");
+            return ExitCode::FAILURE;
+        }
+    };
     eprintln!("building a package…");
     let scratch = std::env::temp_dir().join(format!("aruna-bench-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&scratch);
     let start = Instant::now();
-    let built = export::build(&zip, &scratch, "bench", &aruna::job::Job::unattended());
+    let built = export::build(
+        &zip,
+        &scratch,
+        "bench",
+        &fonts,
+        &aruna::job::Job::unattended(),
+    );
     let whole = start.elapsed();
     let documents_written = match &built {
         Ok(built) => built.documents,

@@ -22,11 +22,22 @@ fn main() {
         std::fs::create_dir_all(d).expect("mkdir");
     }
 
+    // The fonts of the tree: every package carries a PDF of each document.
+    let fonts = aruna::app::load_fonts(Some(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts"),
+    ))
+    .expect("the fonts of the tree");
     let mut digests: Vec<BTreeMap<PathBuf, String>> = Vec::new();
     for (i, dest) in [&a, &b].into_iter().enumerate() {
         let start = Instant::now();
-        let built = export::build(&zip, dest, "determinism", &aruna::job::Job::unattended())
-            .expect("build");
+        let built = export::build(
+            &zip,
+            dest,
+            "determinism",
+            &fonts,
+            &aruna::job::Job::unattended(),
+        )
+        .expect("build");
         eprintln!(
             "build {}: {} documents in {} groups, {:.1}s",
             i + 1,

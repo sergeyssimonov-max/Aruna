@@ -70,6 +70,7 @@ fn two_builds_of_one_archive_are_byte_identical() {
             &zip,
             &destination,
             "reproducibility",
+            support::fonts(),
             &aruna::job::Job::unattended(),
         )
         .expect("builds");
@@ -104,7 +105,14 @@ fn only_the_source_label_changes_when_the_source_label_changes() {
     for (name, label) in [("a", "label one"), ("b", "label two")] {
         let destination = dir.path().join(name);
         std::fs::create_dir(&destination).expect("destination");
-        export::build(&zip, &destination, label, &aruna::job::Job::unattended()).expect("builds");
+        export::build(
+            &zip,
+            &destination,
+            label,
+            support::fonts(),
+            &aruna::job::Job::unattended(),
+        )
+        .expect("builds");
         built.push(contents(&destination.join(PACKAGE)));
     }
 
@@ -149,6 +157,7 @@ fn building_repeatedly_does_not_accumulate_file_descriptors() {
         &zip,
         &destination,
         "warm-up",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("builds");
@@ -159,6 +168,7 @@ fn building_repeatedly_does_not_accumulate_file_descriptors() {
             &zip,
             &destination,
             "leak check",
+            support::fonts(),
             &aruna::job::Job::unattended(),
         )
         .expect("builds");
@@ -180,8 +190,14 @@ fn a_build_leaves_nothing_of_its_own_beside_the_package() {
     std::fs::create_dir(&destination).expect("destination");
 
     for _ in 0..3 {
-        export::build(&zip, &destination, "repeat", &aruna::job::Job::unattended())
-            .expect("builds");
+        export::build(
+            &zip,
+            &destination,
+            "repeat",
+            support::fonts(),
+            &aruna::job::Job::unattended(),
+        )
+        .expect("builds");
         let beside: Vec<String> = std::fs::read_dir(&destination)
             .expect("read")
             .flatten()

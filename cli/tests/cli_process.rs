@@ -919,40 +919,36 @@ fn a_closed_stderr_leaves_a_failure_a_failure() {
 }
 
 // ---------------------------------------------------------------------------
-// The PDF: ARUNA_PDF and ARUNA_FONTS (owner's decisions of 2026-09-30,
-// questions 3 and 10)
+// The PDF: ARUNA_FONTS (owner's decision of 2026-09-30, question 10)
 // ---------------------------------------------------------------------------
 
-/// The run the sandbox makes, with the PDF variables as given.
-fn run_pdf(sandbox: &Sandbox, archive: &Path, vars: &[(&str, &str)], drop_fonts: bool) -> Output {
+/// The run the sandbox makes, its fonts in `fonts` – or none named.
+fn run_pdf(sandbox: &Sandbox, archive: &Path, fonts: Option<&Path>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_aruna"));
     command
         .env("HOME", sandbox.path())
         .env("ARUNA_ZIP", archive)
         .env("ARUNA_CACHE_DIR", sandbox.path().join("cache"))
         .env_remove("XDG_CACHE_HOME")
-        .env_remove("ARUNA_PDF")
         .stdin(Stdio::null());
-    if drop_fonts {
-        command.env_remove("ARUNA_FONTS");
-    } else {
-        command.env(
-            "ARUNA_FONTS",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"),
-        );
-    }
-    for (k, v) in vars {
-        command.env(k, v);
-    }
+    match fonts {
+        Some(dir) => command.env("ARUNA_FONTS", dir),
+        None => command.env_remove("ARUNA_FONTS"),
+    };
     command.output().expect("the binary runs")
 }
 
-/// **By default a PDF stands beside each document**, set in the fonts the run
-/// was told of, and the inventory links it.
+/// The fonts of the tree.
+fn tree_fonts() -> &'static Path {
+    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"))
+}
+
+/// **A PDF stands beside each document**, set in the fonts the run was told
+/// of, and the inventory links it.
 #[test]
-fn a_run_builds_a_pdf_beside_each_document_by_default() {
+fn a_run_builds_a_pdf_beside_each_document() {
     let sandbox = Sandbox::new();
-    let out = run_pdf(&sandbox, &sandbox.corpus(), &[], false);
+    let out = run_pdf(&sandbox, &sandbox.corpus(), Some(tree_fonts()));
     assert_no_panic(&out);
     assert!(out.status.success(), "{}", stderr(&out));
     let (root, _, inventory) = package(&sandbox.downloads());
@@ -972,48 +968,17 @@ fn a_run_builds_a_pdf_beside_each_document_by_default() {
 #[test]
 fn without_a_font_directory_the_run_is_refused_before_any_work() {
     let sandbox = Sandbox::new();
-    let out = run_pdf(&sandbox, &sandbox.corpus(), &[], true);
+    let out = run_pdf(&sandbox, &sandbox.corpus(), None);
     assert_no_panic(&out);
     assert!(!out.status.success());
     let said = format!("{}{}", stdout(&out), stderr(&out));
     assert!(said.contains(aruna::fonts::FONTS[0].file), "{said}");
     assert!(said.contains("не назван"), "{said}");
     assert!(said.contains("ARUNA_FONTS"), "{said}");
-    assert!(said.contains("ARUNA_PDF=off"), "{said}");
     assert!(
         !sandbox.downloads().join(PACKAGE).exists(),
         "a package was written"
     );
-}
-
-/// **`ARUNA_PDF=off` builds the package as before**: no PDF, no link to one.
-#[test]
-fn a_run_without_pdf_writes_none_and_needs_no_fonts() {
-    let sandbox = Sandbox::new();
-    let out = run_pdf(&sandbox, &sandbox.corpus(), &[("ARUNA_PDF", "off")], true);
-    assert_no_panic(&out);
-    assert!(out.status.success(), "{}", stderr(&out));
-    let (root, _, inventory) = package(&sandbox.downloads());
-    assert!(!root.join("CTH 5/KBo 1.1.pdf").exists());
-    assert!(!fs::read_to_string(inventory)
-        .expect("read")
-        .contains(".pdf"));
-}
-
-/// **A value the switch does not know is refused, not guessed at.**
-#[test]
-fn an_unknown_pdf_switch_is_refused() {
-    let sandbox = Sandbox::new();
-    let out = run_pdf(
-        &sandbox,
-        &sandbox.corpus(),
-        &[("ARUNA_PDF", "maybe")],
-        false,
-    );
-    assert_no_panic(&out);
-    assert!(!out.status.success());
-    assert!(format!("{}{}", stdout(&out), stderr(&out)).contains("ARUNA_PDF=maybe"));
-    assert!(!sandbox.downloads().join(PACKAGE).exists());
 }
 
 /// **A font directory that is not the recorded one is refused by name.**
@@ -1022,12 +987,7 @@ fn a_font_directory_missing_a_file_is_refused_by_its_name() {
     let sandbox = Sandbox::new();
     let empty = sandbox.path().join("fonts");
     fs::create_dir_all(&empty).expect("mkdir");
-    let out = run_pdf(
-        &sandbox,
-        &sandbox.corpus(),
-        &[("ARUNA_FONTS", empty.to_str().expect("utf-8"))],
-        true,
-    );
+    let out = run_pdf(&sandbox, &sandbox.corpus(), Some(&empty));
     assert!(!out.status.success());
     let said = format!("{}{}", stdout(&out), stderr(&out));
     assert!(said.contains(aruna::fonts::FONTS[0].file), "{said}");

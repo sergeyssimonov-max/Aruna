@@ -19,6 +19,8 @@
 //! something: a TCP connection to an unroutable address takes seconds to time
 //! out, so completing in under two is evidence that none was attempted.
 
+mod support;
+
 use aruna::document::{Document, Kind, Refusal, Undecided};
 use aruna::export::{self, normalize_into, verify, PACKAGE};
 use aruna::parse::{looks_like_manuscript, parse_manuscript, HEADER_READ_LIMIT};
@@ -158,6 +160,7 @@ fn field_values_that_are_paths_stay_inside_the_package() {
         &archive,
         &destination,
         "hostile",
+        support::fonts(),
         &aruna::job::Job::unattended(),
     )
     .expect("builds");

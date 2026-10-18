@@ -31,14 +31,13 @@ pub mod validate;
 pub mod verify;
 
 pub use counts::{count_package, spread, CountError, GroupSize, PackageCounts, Spread};
-pub use inventory::{hrefs, render_inventory, render_package_inventory};
+pub use inventory::{hrefs, render_package_inventory};
 pub use manifest::{render_manifest, FontContract, XmlReport};
 pub use naming::{
     dir_component, href, output_path, path_component, pdf_path, percent_decode, resolve,
 };
 pub use normalize::{normalize_document, normalize_into};
-pub use pdf::{Pdf, PdfState};
-pub(crate) use validate::validate_with;
+pub use pdf::PdfState;
 pub use validate::{validate, Validation};
 
 use crate::error::{ArunaError, Result};
@@ -339,9 +338,9 @@ pub struct Built {
     /// 8 423. Until 2026-09-10 this field held the second and every label on it
     /// said the first.
     pub stylesheet_dropped: usize,
-    /// The PDFs, when the build made them: how many were built beside their
-    /// XML and how many documents got none.
-    pub pdfs: Option<PdfCount>,
+    /// The PDFs: how many were built beside their XML and how many documents
+    /// got none.
+    pub pdfs: PdfCount,
 }
 
 /// What the PDF phase came to.
@@ -359,12 +358,6 @@ impl PdfCount {
             refused: states.len() - built,
         }
     }
-}
-
-/// [`build_with`] without PDFs: the package of XML documents, the inventory
-/// and the manifest, byte for byte as before the PDF phase existed.
-pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) -> Result<Built> {
-    build_with(zip, destination, source_label, Pdf::Off, job)
 }
 
 /// Build the package under `destination`, and return what it contains.
@@ -386,15 +379,14 @@ pub fn build(zip: &Path, destination: &Path, source_label: &str, job: &Job<'_>) 
 /// the destination exactly as it was found — the same guarantee a failed build
 /// already had, reached by the same mechanism.
 ///
-/// With [`Pdf::On`] each document also gets its PDF, built between the XML
+/// Each document also gets its PDF, set in `fonts` and built between the XML
 /// documents and the inventory ([`pdf`]); the inventory links it beside the
-/// XML and the manifest names it. [`Pdf::Off`] leaves every file but those
-/// links and entries as it was.
-pub fn build_with(
+/// XML and the manifest names it.
+pub fn build(
     zip: &Path,
     destination: &Path,
     source_label: &str,
-    pdf: Pdf<'_>,
+    fonts: &crate::pdf::Fonts,
     job: &Job<'_>,
 ) -> Result<Built> {
     let final_root = destination.join(PACKAGE);
@@ -453,24 +445,15 @@ pub fn build_with(
 
     // The PDFs, before the inventory and the manifest: both say what became
     // of each one.
-    let pdfs = match pdf {
-        Pdf::Off => None,
-        Pdf::On(fonts) => Some(pdf::write_pdfs(
-            staging.path(),
-            &records,
-            &placed,
-            fonts,
-            &mut package_bytes,
-            job,
-        )?),
-    };
-    write_inventory(
+    let pdfs = pdf::write_pdfs(
         staging.path(),
         &records,
         &placed,
-        source_label,
-        pdfs.as_deref(),
+        fonts,
+        &mut package_bytes,
+        job,
     )?;
+    write_inventory(staging.path(), &records, &placed, source_label, &pdfs)?;
     write_root_files(staging.path())?;
     write_manifest(
         staging.path(),
@@ -482,14 +465,14 @@ pub fn build_with(
             not_manuscripts: &not_manuscripts,
         },
         &tallies,
-        pdfs.as_deref(),
+        &pdfs,
     )?;
 
     // Validation reads back everything just written; a run cancelled during
     // the write should not spend six more seconds proving it was written.
     job.check(Phase::Validating)?;
     job.report(Event::CheckingPackage);
-    let staged = validate_with(staging.path(), &records, &placed, pdfs.as_deref())?;
+    let staged = validate(staging.path(), &records, &placed, &pdfs)?;
 
     let published = publish(
         destination,
@@ -497,7 +480,7 @@ pub fn build_with(
         staging,
         &records,
         &placed,
-        pdfs.as_deref(),
+        &pdfs,
         staged,
         job,
     )?;
@@ -508,7 +491,7 @@ pub fn build_with(
         fragment_links: published.fragment_links,
         disambiguated,
         stylesheet_dropped,
-        pdfs: pdfs.as_deref().map(PdfCount::of),
+        pdfs: PdfCount::of(&pdfs),
     })
 }
 
@@ -576,7 +559,7 @@ fn write_inventory(
     records: &[ManuscriptRecord],
     placed: &[Placed],
     source_label: &str,
-    pdfs: Option<&[PdfState]>,
+    pdfs: &[PdfState],
 ) -> Result<()> {
     let html = inventory::render_package_inventory(records, placed, source_label, pdfs);
     let inventory = root.join(crate::paths::OUTPUT_FILE_NAME);
@@ -619,7 +602,7 @@ fn write_manifest(
     placed: &[Placed],
     source: &manifest::Source<'_>,
     tallies: &Tallies,
-    pdfs: Option<&[PdfState]>,
+    pdfs: &[PdfState],
 ) -> Result<()> {
     {
         let manifest_json = manifest::render_manifest(
@@ -649,7 +632,7 @@ fn publish(
     staging: Staging,
     records: &[ManuscriptRecord],
     placed: &[Placed],
-    pdfs: Option<&[PdfState]>,
+    pdfs: &[PdfState],
     staged: Validation,
     job: &Job<'_>,
 ) -> Result<Validation> {
@@ -684,7 +667,7 @@ fn publish(
     previous.published();
 
     job.report(Event::CheckingPublished);
-    let published = validate_with(&final_root, records, placed, pdfs)?;
+    let published = validate(&final_root, records, placed, pdfs)?;
 
     // Опубликованное обязано совпасть с собранным – и проверяется это здесь,
     // пока копия читателя еще в `Replaced`, и отказом, а не паникой. Стоял тут
@@ -1240,7 +1223,7 @@ mod tests {
             .find("staging.publish(&final_root)")
             .expect("staging больше не публикуется под окончательным именем");
         let read_again = code
-            .find("let published = validate_with(&final_root")
+            .find("let published = validate(&final_root")
             .expect("опубликованное дерево больше не читается заново");
         let let_go = code
             .find("previous.committed()")
