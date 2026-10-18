@@ -17,7 +17,7 @@
    * Имя каждой стадии по-русски – и записью по объединению, а не словарем со
    * строковым ключом.
    *
-   * `Stage` приходит из `bindings.ts` объединением двадцати литералов, и
+   * `Stage` приходит из `bindings.ts` объединением двадцати одного литерала, и
    * `Record<Stage, string>` обязывает назвать их все: стадия, добавленная в
    * ядре, роняет `pnpm check` здесь. Ветки «на все остальное» тут нет нарочно –
    * она и есть тот отказ, ради которого стадия объявлена перечислением, а не
@@ -39,6 +39,7 @@
     'reading-headers': 'Читаю заголовки документов',
     'headers-read': 'Заголовки прочитаны',
     writing: 'Записываю документы',
+    'writing-pdfs': 'Перевожу документы в PDF',
     'checking-package': 'Проверяю, что получилось',
     'waiting-for-publication': 'Жду, пока другой запуск закончит публикацию в эту папку',
     'publishing-without-lock':
@@ -62,7 +63,7 @@
     | { kind: 'present'; stats: CorpusStats; inventory: string | null; markup: XmlSummary | null }
     | { kind: 'unreadable'; inventory: string | null }
     | { kind: 'building' }
-    | { kind: 'built'; report: BuildReport }
+    | { kind: 'built'; report: BuildReport; objected: number | null }
     | { kind: 'failed'; failure: BuildFailure }
 
   let screen: Screen = $state({ kind: 'reading' })
@@ -253,7 +254,27 @@
       const built = await commands.buildCorpus(chosen)
       if (built.status === 'ok') {
         finished = built.data.job
-        screen = { kind: 'built', report: built.data }
+        // Число отказов модели – из манифеста только что собранного пакета.
+        //
+        // Строку «Без PDF» решение 4.3 от 18.10.2026 показывает только тогда,
+        // когда отказов перевода больше, чем документов, которые не принимает
+        // модель (`objected_to` – то самое число, которое называет экран
+        // `present`): иначе она повторила бы уже сказанное. Где это число для
+        // этого пакета, знает его собственный манифест, и спрашивается он
+        // только при отказах – сборка без PDF или без отказов идет как прежде,
+        // без лишнего вызова. Неизвестное число считается нулем: строка тогда
+        // стоит при любых отказах, и это новый факт, а не повтор.
+        let objected: number | null = null
+        const pdfs = built.data.pdfs
+        if (pdfs !== null && pdfs.refused > 0) {
+          try {
+            const parsed = await commands.corpusXml(built.data.package)
+            objected = parsed.status === 'ok' ? parsed.data.objected_to : null
+          } catch {
+            objected = null
+          }
+        }
+        screen = { kind: 'built', report: built.data, objected }
       } else {
         finished = job
         screen = { kind: 'failed', failure: built.error }
@@ -359,6 +380,25 @@
       return null
     }
     return Math.min(100, Math.round((progress.done / total) * 100))
+  })
+
+  /**
+   * Счет PDF-фазы, когда такт его несет, и `null` во всех прочих случаях.
+   *
+   * Одна производная величина вместо четырех проверок в разметке: ветка
+   * читает уже суженные числа, и условие показа записано в одном месте.
+   */
+  const pdfTally: { done: number; total: number; built: number } | null = $derived.by(() => {
+    if (
+      progress === null ||
+      progress.stage !== 'writing-pdfs' ||
+      progress.built === null ||
+      progress.done === null ||
+      progress.total === null
+    ) {
+      return null
+    }
+    return { done: progress.done, total: progress.total, built: progress.built }
   })
 
   /**
@@ -668,6 +708,22 @@
           <div class="bar-fill" style="width: {fraction}%"></div>
         {/if}
       </div>
+      <!--
+        Строка стоит только на тактах PDF-фазы: `built` приходит лишь с ними,
+        и в объявлении стадии его еще нет. Числа – ядра как есть: `done` и
+        `total` – сколько документов обработано и сколько всего записано в
+        пакет, `built` – сколько из обработанных стали PDF. Решение 4.1 от
+        18.10.2026.
+      -->
+      {#if pdfTally !== null}
+        <p class="metrics">
+          <span>
+            Обработано – <span class="count">{spaced(pdfTally.done)}</span> из
+            <span class="count">{spaced(pdfTally.total)}</span>, PDF построено –
+            <span class="count">{spaced(pdfTally.built)}</span>
+          </span>
+        </p>
+      {/if}
       {#if manuscripts !== null}
         <p class="metrics">
           <span>Рукописей – <span class="count">{spaced(manuscripts)}</span></span>
@@ -683,7 +739,18 @@
       <p class="metrics">
         <span>Документов – <span class="count">{spaced(screen.report.documents)}</span></span>
         <span>Групп CTH – <span class="count">{spaced(screen.report.groups)}</span></span>
+        {#if screen.report.pdfs !== null}
+          <span>PDF – <span class="count">{spaced(screen.report.pdfs.built)}</span></span>
+        {/if}
       </p>
+      {#if screen.report.pdfs !== null && screen.report.pdfs.refused > (screen.objected ?? 0)}
+        <p class="spread">
+          <span>
+            Без PDF – <span class="count">{spaced(screen.report.pdfs.refused)}</span>: причины
+            записаны в манифесте пакета
+          </span>
+        </p>
+      {/if}
       <!--
         Двумя числами экран и кончается – решением владельца 08.09.2026.
         «Переименовано из-за совпадения» и «С лишней ссылкой на оформление»
@@ -697,6 +764,14 @@
         `stylesheet_dropped` идут по проводу по-прежнему и лежат в отчете
         ядра. Ровно так же сняты счетчики письма 06.09.2026 – с экрана, но не
         с провода, и последняя проверка их обоих – в `App.test.ts`.
+
+        С 18.10.2026 (решение 4.3) сборка с PDF добавляет третье число
+        «PDF – N» (сколько документов стали PDF) и под итогами строку «Без
+        PDF», когда отказов перевода больше, чем документов, которые не
+        принимает модель (`objected_to` из манифеста этого пакета, неизвестное
+        – нулем): иначе строка повторила бы то, что экран пакета и так
+        называет. Сборка без PDF числа PDF не показывает вовсе – ни нулем, ни
+        прочерком.
       -->
       <p class="where">Пакет – {screen.report.package}</p>
     {:else if screen.kind === 'failed'}

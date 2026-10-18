@@ -102,6 +102,7 @@ function tock(over: Partial<BuildProgress> = {}): BuildProgress {
     stage: 'writing',
     done: null,
     total: null,
+    built: null,
     manuscripts: null,
     groups: null,
     note: null,
@@ -118,6 +119,7 @@ function report(over: Partial<BuildReport> = {}): BuildReport {
     groups: 663,
     disambiguated: 0,
     stylesheet_dropped: 0,
+    pdfs: null,
     ...over,
   }
 }
@@ -724,6 +726,38 @@ describe('идет сборка', () => {
   })
 
   /**
+   * **Фаза PDF названа своей стадией, а ее ход – строкой под полосой**
+   * (решение владельца 18.10.2026, 4.1).
+   *
+   * Объявление стадии несет `built: null`, и строки при нем нет: сколько
+   * построено, говорят только тики. Числа – разрядкой, как всюду в окне.
+   */
+  it('называет фазу PDF и ее ход с построенными', async () => {
+    const { container } = await building()
+    const line = () => container.querySelector('.metrics')?.textContent?.replace(/\s+/g, ' ').trim()
+
+    emit(tock({ stage: 'writing-pdfs', done: 0, total: 23936 }))
+    await tick()
+    expect(screen.getByText('Перевожу документы в PDF')).toBeInTheDocument()
+    expect(screen.queryByText(/Обработано/)).toBeNull()
+
+    emit(tock({ stage: 'writing-pdfs', done: 5984, built: 5980, total: 23936 }))
+    await tick()
+    expect(line()).toBe('Обработано – 5 984 из 23 936, PDF построено – 5 980')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25')
+  })
+
+  /** Строка хода PDF – только в фазе PDF: у записи документов ее нет. */
+  it('не говорит о PDF на записи документов', async () => {
+    await building()
+
+    emit(tock({ stage: 'writing', done: 5984, total: 23936 }))
+    await tick()
+    expect(screen.getByText('Записываю документы')).toBeInTheDocument()
+    expect(screen.queryByText(/PDF/)).toBeNull()
+  })
+
+  /**
    * **Числа и предложение прогона держатся на экране, а не мигают.**
    *
    * «Нашлось 23 936 документов» сказано один раз, стадией `indexed`, и
@@ -911,6 +945,72 @@ describe('кончилось', () => {
     expect(screen.queryByText(/С лишней ссылкой на оформление/)).toBeNull()
     const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
     expect(counts).toEqual(['23 936', '663'])
+  })
+
+  /**
+   * **Сборка с PDF называет третье число – построенные** (решение владельца
+   * 18.10.2026, 4.3).
+   *
+   * Отказов ровно столько, сколько документов не принимает модель (тех
+   * самых 223, которые назвал экран пакета), и строки «Без PDF» нет: она
+   * повторила бы известное.
+   */
+  it('с PDF показывает их число, а отказы модели не повторяет', async () => {
+    const container = await ran(ok(report({ pdfs: { built: 23713, refused: 223 } })))
+
+    await screen.findByText(/^PDF –/)
+    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    expect(counts).toEqual(['23 936', '663', '23 713'])
+    expect(screen.queryByText(/Без PDF/)).toBeNull()
+    expect(corpusXml).toHaveBeenLastCalledWith(PACKAGE)
+  })
+
+  /** Отказов больше, чем у модели: это новый факт, и строка его называет. */
+  it('называет отказы PDF сверх отказов модели', async () => {
+    const container = await ran(ok(report({ pdfs: { built: 23706, refused: 230 } })))
+
+    const line = await screen.findByText(/Без PDF/)
+    expect(line.closest('p')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Без PDF – 230: причины записаны в манифесте пакета',
+    )
+    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    expect(counts).toEqual(['23 936', '663', '23 706', '230'])
+  })
+
+  /**
+   * Сведений о разметке у пакета нет – число модели неизвестно и считается
+   * нулем: строка стоит при любом отказе.
+   */
+  it('без сведений о разметке называет любой отказ PDF', async () => {
+    buildCorpus.mockResolvedValue(ok(report({ pdfs: { built: 23935, refused: 1 } })))
+    await overPackage()
+    corpusXml.mockResolvedValue(bad('манифест пакета не содержит сведений о разметке'))
+    await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
+
+    expect(await screen.findByText(/Без PDF/)).toBeInTheDocument()
+  })
+
+  /**
+   * **Сборка без PDF чисел PDF не показывает вовсе** (ни нуля, ни строки)
+   * и сведений о разметке второй раз не спрашивает.
+   */
+  it('без PDF не говорит о PDF', async () => {
+    const container = await ran(ok(report()))
+
+    await screen.findByText(/Документов/)
+    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    expect(counts).toEqual(['23 936', '663'])
+    expect(screen.queryByText(/PDF/)).toBeNull()
+    expect(corpusXml).toHaveBeenCalledTimes(1)
+  })
+
+  /** PDF построены все: спрашивать о разметке незачем, строки нет. */
+  it('без отказов PDF не спрашивает о разметке', async () => {
+    await ran(ok(report({ pdfs: { built: 23936, refused: 0 } })))
+
+    await screen.findByText(/^PDF –/)
+    expect(screen.queryByText(/Без PDF/)).toBeNull()
+    expect(corpusXml).toHaveBeenCalledTimes(1)
   })
 
   /**

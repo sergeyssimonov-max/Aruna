@@ -89,8 +89,9 @@ fn counted<T: TryInto<u32>>(value: T) -> u32 {
 ///
 /// Разбирать в окне нечего ни у читающих команд, ни у открытия описи: отказ
 /// показывается целиком, как он написан, и ветвиться по нему окну незачем.
-/// Тегированная структура появляется там, где ветвление есть, — у сборки, где
-/// кодов двадцать и от них зависит, предлагать ли повтор (`BuildFailure`).
+/// Тегированная структура появляется там, где ветвление есть: у сборки, где
+/// кодов двадцать восемь (двадцать пять у ядра, три у оболочки) и от них
+/// зависит, предлагать ли повтор (`BuildFailure`).
 /// Проводной вид при этом тот же, что был до specta: голая строка.
 fn said(error: impl std::fmt::Display) -> String {
     error.to_string()
@@ -234,14 +235,30 @@ pub(crate) struct BuildReport {
     /// 10.09.2026 число считалось по документам, а называлось инструкциями –
     /// на корпусе это ровно единица разницы, 8 424 против 8 423.
     pub stylesheet_dropped: u32,
+    /// PDF, когда сборка их строила: `PackageReport::pdfs` ядра. `None` у
+    /// сборки без PDF: ноль там значил бы «ни одного не вышло», а их не
+    /// строили. С 18.10.2026 (part3-1).
+    pub pdfs: Option<PdfReport>,
+}
+
+/// Сколько PDF построено и сколько отказано: `export::PdfCount` ядра.
+///
+/// Одна пара под одним `Option`, а не два поля по отдельности: построенные без
+/// отказанных – это половина числа, которой провод не должен уметь сказать.
+/// Причины отказов записаны в манифесте пакета, сюда они не идут.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub(crate) struct PdfReport {
+    pub built: u32,
+    pub refused: u32,
 }
 
 /// Почему сборка не дошла до конца.
 ///
 /// Тегированная структура, как требует §3 `docs/FRONTEND-CONTRACT.md`: вид,
 /// предложение для человека, фаза и — отдельно от всего — стоит ли предлагать
-/// повтор. Строкой это быть не может: у отказа двадцать видов, и от вида
-/// зависит, что окну делать дальше.
+/// повтор. Строкой это быть не может: у отказа двадцать восемь видов – двадцать
+/// пять у ядра (`app::Failure::of`) и три у оболочки (`busy`, `interrupted`,
+/// `destination_missing`). От вида зависит, что окну делать дальше.
 ///
 /// Поля один в один повторяют `app::Failure` ядра, включая `retryable`, который
 /// там не переписан заново, а делегирован клиенту загрузки: две независимые
@@ -295,8 +312,9 @@ impl BuildFailure {
 /// `#[non_exhaustive]`.
 ///
 /// Имена принадлежат оболочке: по `docs/ARCHITECTURE.md` §7 события IPC — ее
-/// собственность, а не ядра. Их двадцать против двадцати двух вариантов
-/// события, потому что две пары — объявление стадии и ее тик — это одна стадия.
+/// собственность, а не ядра. Их двадцать одна против двадцати четырех
+/// вариантов события, потому что три пары – объявление стадии и ее тик у
+/// загрузки, записи документов и PDF – это одна стадия.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Stage {
@@ -318,6 +336,9 @@ pub(crate) enum Stage {
     ReadingHeaders,
     HeadersRead,
     Writing,
+    /// PDF каждого документа строится рядом с ним. Своя стадия с 18.10.2026
+    /// (part3-1): до того фаза PDF до окна не доходила вовсе.
+    WritingPdfs,
     CheckingPackage,
     /// Другой запуск публикует в ту же папку, и этот его ждет. С 24.09.2026:
     /// до того ожидание шло молча, а за брошенной блокировкой – пять минут.
@@ -349,6 +370,10 @@ pub(crate) struct BuildProgress {
     /// знаменателя может не быть: сервер не обязан объявлять длину.
     pub done: Option<u32>,
     pub total: Option<u32>,
+    /// Сколько PDF построено, а не отказано. Только у тиков фазы PDF, у всех
+    /// прочих событий `None`. `done` и `total` этих тиков – числа ядра как
+    /// есть: обработано и всего размещенных документов.
+    pub built: Option<u32>,
     /// Сколько нашлось, когда это уже известно, — окно говорит числа до того,
     /// как появится отчет.
     pub manuscripts: Option<u32>,
@@ -371,6 +396,7 @@ impl BuildProgress {
             stage: Stage::Parsing,
             done: None,
             total: None,
+            built: None,
             manuscripts: None,
             groups: None,
             note: None,
@@ -438,11 +464,17 @@ impl BuildProgress {
                 progress.total = Some(counted(*total));
                 Stage::Writing
             }
-            // Фаза PDF: окно ее не показывает до третьей части переноса
-            // (решение владельца 30.09.2026, вопрос 8) – `WindowProgress`
-            // отбрасывает эти события до провода. Здесь они названы, чтобы
-            // разбор остался исчерпывающим, и провода не достигают.
-            Core::WritingPdfs { .. } | Core::PdfsWritten { .. } => Stage::Writing,
+            Core::WritingPdfs { documents } => {
+                progress.done = Some(0);
+                progress.total = Some(counted(*documents));
+                Stage::WritingPdfs
+            }
+            Core::PdfsWritten { done, built, total } => {
+                progress.done = Some(counted(*done));
+                progress.total = Some(counted(*total));
+                progress.built = Some(counted(*built));
+                Stage::WritingPdfs
+            }
             Core::CheckingPackage => Stage::CheckingPackage,
             Core::WaitingForPublication => Stage::WaitingForPublication,
             Core::PublishingWithoutLock => Stage::PublishingWithoutLock,
@@ -451,16 +483,6 @@ impl BuildProgress {
         };
         progress
     }
-}
-
-/// События фазы PDF: окно их пока не получает (решение владельца
-/// 30.09.2026, вопрос 8) – ни стадии, ни фраз, ни `bindings.ts` для них еще
-/// нет; это третья часть переноса.
-fn is_pdf_phase(event: &aruna::progress::Event<'_>) -> bool {
-    matches!(
-        event,
-        aruna::progress::Event::WritingPdfs { .. } | aruna::progress::Event::PdfsWritten { .. }
-    )
 }
 
 /// Синк прогресса, который шлет события в окно.
@@ -477,9 +499,6 @@ struct WindowProgress {
 impl aruna::progress::Progress for WindowProgress {
     fn report(&self, event: aruna::progress::Event<'_>) {
         use tauri_specta::Event as _;
-        if is_pdf_phase(&event) {
-            return;
-        }
         let _ = BuildProgress::of(self.job, &event).emit(&self.app);
     }
 }
@@ -665,7 +684,9 @@ async fn build_corpus(
 /// окно его не строит и не показывает – это третья часть переноса и выпуск
 /// 3.0.0, до решения владельца 08.10.2026 – 2.7.0). С 11.10.2026 консоль
 /// снова строит PDF по умолчанию, окно – по-прежнему нет (решение владельца
-/// 11.10.2026).
+/// 11.10.2026). С 18.10.2026 (part3-1) провод несет стадию и ход фазы PDF и
+/// окно их называет, но запрос окна остается без PDF до part3-2, и на его
+/// экране фазы PDF не бывает.
 /// Шрифты окно по-прежнему проверяет при запуске (`FONT_RESOURCES`), они
 /// понадобятся третьей части. До 06.10.2026 здесь стояло
 /// `PdfRequest::On { fonts }` с каталогом ресурсов приложения.
@@ -710,6 +731,10 @@ fn build_once(
         groups: counted(report.package.groups),
         disambiguated: counted(report.package.disambiguated),
         stylesheet_dropped: counted(report.package.stylesheet_dropped),
+        pdfs: report.package.pdfs.map(|pdfs| PdfReport {
+            built: counted(pdfs.built),
+            refused: counted(pdfs.refused),
+        }),
     })
     .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
 }
@@ -763,9 +788,10 @@ pub(crate) const FONT_RESOURCES: &str = "fonts";
 ///
 /// Хранится, а не печатается и забывается – с расчетом на то, что контур PDF
 /// откажет со ссылкой на эту причину, а не будет искать шрифт заново. Контур
-/// пришел 30.09.2026 и этого итога не читает: `build_corpus` берет каталог из
-/// ресурсов сам. Метод чтения, которого никто не звал, снят 01.10.2026;
-/// перейти ли сборке на этот итог – вопрос поведения, а не уборки.
+/// пришел 30.09.2026 и этого итога не читает: запрос окна (`window_request`)
+/// PDF не просит и каталога шрифтов не берет вовсе, а когда возьмет (part3-2),
+/// проверит файлы сам, при сборке. Метод чтения, которого никто не звал, снят
+/// 01.10.2026; перейти ли сборке на этот итог – вопрос поведения, а не уборки.
 #[derive(Default)]
 pub(crate) struct FontResources(
     std::sync::Mutex<Option<std::result::Result<std::path::PathBuf, String>>>,
@@ -992,29 +1018,6 @@ mod wire {
         let note = progress.note.expect("повтор объясняет себя");
         assert!(!note.contains("Secrets"), "в тексте повтора оказался путь");
         assert!(!note.is_empty());
-    }
-
-    /// **Фаза PDF окна пока не достигает** (решение владельца 30.09.2026,
-    /// вопрос 8): ее события отбрасываются до провода, прочие идут как шли.
-    #[test]
-    fn the_pdf_phase_does_not_reach_the_window_yet() {
-        use aruna::progress::Event as Core;
-
-        let phase = [
-            Core::WritingPdfs { documents: 3 },
-            Core::PdfsWritten {
-                done: 1,
-                built: 1,
-                total: 3,
-            },
-        ];
-        for event in &phase {
-            assert!(is_pdf_phase(event), "{event:?}");
-            // Разбор назвал бы их записью, но до него они не доходят.
-            assert_eq!(BuildProgress::of(1, event).stage, Stage::Writing);
-        }
-        assert!(!is_pdf_phase(&Core::WritingDocuments { documents: 3 }));
-        assert!(!is_pdf_phase(&Core::CheckingPackage));
     }
 
     /// Стадия объявляет знаменатель, тик заполняет числитель.
@@ -2362,6 +2365,103 @@ mod cancelling {
         let out = tempfile::tempdir().expect("каталог назначения");
         let report = the_window_builds_without_pdfs(small_archive(dir.path(), 5), out.path());
         assert_eq!(report.documents, 5);
+    }
+
+    /// Окно, которое копит то, что дошло бы до него по проводу.
+    ///
+    /// Перекладывает событие тем же `BuildProgress::of`, что и
+    /// `WindowProgress`, и ничего не отсеивает: отсева на пути к окну больше
+    /// нет, так что накопленное здесь и есть то, что окно получило бы.
+    #[derive(Default)]
+    struct WindowThatListens(Mutex<Vec<BuildProgress>>);
+
+    impl aruna::progress::Progress for WindowThatListens {
+        fn report(&self, event: aruna::progress::Event<'_>) {
+            self.0
+                .lock()
+                .expect("не отравлен")
+                .push(BuildProgress::of(1, &event));
+        }
+    }
+
+    /// **Фаза PDF доходит до окна** (part3-1, 18.10.2026; до того ее события
+    /// отбрасывались до провода по решению владельца 30.09.2026, вопрос 8).
+    ///
+    /// Сборка идет путем окна, но с PDF и шрифтами из `cli/resources/fonts`:
+    /// запрос самого окна остается без PDF до part3-2, и тест ниже это
+    /// держит. Видны своя стадия, объявление без `built`, тики с `built`,
+    /// последний тик на всем числе и числа PDF в отчете.
+    #[test]
+    fn the_pdf_phase_reaches_the_window() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let out = tempfile::tempdir().expect("каталог назначения");
+        let fonts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../cli/resources/fonts");
+        let request = aruna::app::CorpusRequest {
+            local_archive: Some(small_archive(dir.path(), 5)),
+            pdf: aruna::app::PdfRequest::On { fonts: Some(fonts) },
+        };
+        let window = WindowThatListens::default();
+        let report = build_once(
+            aruna::job::JobId::next(),
+            &request,
+            Some(out.path()),
+            &aruna::job::Cancel::new(),
+            &window,
+        )
+        .expect("сборка с PDF доходит до конца");
+
+        let heard = window.0.into_inner().expect("не отравлен");
+        let phase: Vec<&BuildProgress> = heard
+            .iter()
+            .filter(|p| p.stage == Stage::WritingPdfs)
+            .collect();
+        let (announced, ticks) = phase.split_first().expect("стадия PDF дошла до окна");
+        assert_eq!(
+            (announced.done, announced.total, announced.built),
+            (Some(0), Some(5), None),
+            "объявление стадии"
+        );
+        assert!(!ticks.is_empty(), "тиков фазы PDF нет");
+        assert!(ticks
+            .iter()
+            .all(|t| t.built.is_some() && t.total == Some(5)));
+        let last = ticks.last().expect("тик есть");
+        assert_eq!(last.done, last.total, "последний тик не на всем числе");
+        assert!(
+            heard
+                .iter()
+                .filter(|p| p.stage != Stage::WritingPdfs)
+                .all(|p| p.built.is_none()),
+            "`built` вне фазы PDF"
+        );
+
+        let pdfs = report.pdfs.expect("отчет сборки с PDF несет числа PDF");
+        assert_eq!(pdfs.built + pdfs.refused, 5);
+        assert_eq!(Some(pdfs.built), last.built, "отчет разошелся с ходом");
+        assert!(
+            pdfs.built > 0,
+            "ни один PDF не построен – тест доказывает меньше"
+        );
+        let package = out.path().join(aruna::export::PACKAGE);
+        assert_eq!(pdfs_under(&package).len(), pdfs.built as usize);
+
+        // Без PDF чисел PDF нет вовсе, а не нули.
+        let off = tempfile::tempdir().expect("каталог назначения");
+        let without = WindowThatListens::default();
+        let report = build_once(
+            aruna::job::JobId::next(),
+            &aruna::app::CorpusRequest {
+                pdf: aruna::app::PdfRequest::Off,
+                ..request
+            },
+            Some(off.path()),
+            &aruna::job::Cancel::new(),
+            &without,
+        )
+        .expect("сборка без PDF доходит до конца");
+        assert_eq!(report.pdfs, None);
+        let heard = without.0.into_inner().expect("не отравлен");
+        assert!(heard.iter().all(|p| p.stage != Stage::WritingPdfs));
     }
 
     /// **То же на архиве корпуса.** Пакет кладется в каталог `ARUNA_WINDOW_PACKAGE`,
