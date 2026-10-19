@@ -41,7 +41,8 @@ export const SCRIPT = 'inventory_filter.js'
  *
  * `canonical` is what any document this program writes is before it adds
  * anything of its own; `screen` is the inventory's own rules; `print` is how it
- * prints, and the future PDF joins there.
+ * prints. A PDF was expected to join there; the one written since 2026-09-30
+ * is set by Typst from its own template and joins none of them.
  */
 const SECTIONS = ['canonical', 'screen', 'print'] as const
 

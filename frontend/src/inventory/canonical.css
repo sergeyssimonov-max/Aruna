@@ -11,8 +11,9 @@
  * Emitted before the page's own section, so a page can still override — but
  * nothing here is written expecting that.
  *
- * Values are tokens rather than literals because they are read in two documents
- * now and a third (the future PDF) later. The numbers are the ones the inventory
+ * Values are tokens rather than literals because they were read in two documents
+ * and a third, a PDF, was expected to read them later; the PDF written since
+ * 2026-09-30 is set by Typst from its own template and reads none of them. The numbers are the ones the inventory
  * already used: this file was cut out of the screen section, not written over it,
  * and every declaration below computes to what it computed to before.
  */
