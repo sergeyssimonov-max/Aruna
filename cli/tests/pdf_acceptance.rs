@@ -1,6 +1,7 @@
-//! Preparations for accepting a PDF, before there is a PDF to accept.
+//! Preparations for accepting a PDF, written before there was a PDF to accept
+//! (the converter came on 2026-09-30).
 //!
-//! `docs/PDF-ACCEPTANCE.md` names the instruments a converter will be held to,
+//! `docs/PDF-ACCEPTANCE.md` names the instruments the converter is held to,
 //! and every one of them ships with macOS: `xmllint --c14n` for the structure
 //! of the XML side and `xsltproc` for an independent extraction — both already
 //! driven by `xml_contract.rs` and `document_model.rs` — and `sips` for turning

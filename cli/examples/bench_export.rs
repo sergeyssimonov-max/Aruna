@@ -7,15 +7,15 @@
 //! Four numbers, and they are apart on purpose because they are limited by
 //! different things:
 //!
-//! * **headers** — pass 1: inflating and parsing the first 16 KiB of every
+//! * **headers** – pass 1: inflating and parsing the first 16 KiB of every
 //!   entry. Bounded by the ZIP, like the CLI's own run.
-//! * **place** — deciding where 24 000 documents go. Pure, in memory, and the
+//! * **place** – deciding where 24 000 documents go. Pure, in memory, and the
 //!   part an algorithm change would touch.
 //! * **inventory** – rendering the page the way the build does, each name a
 //!   link at its PDF or, refused, at its XML: through
 //!   `render_package_inventory`, over a synthetic map of PDF outcomes (no PDF
 //!   is compiled). Pure, in memory.
-//! * **normalise** — the transform alone, over documents already read, with the
+//! * **normalise** – the transform alone, over documents already read, with the
 //!   reading not counted. This is what the second pass spends its CPU on.
 //! * **build** – the whole thing including the PDFs and writing the package
 //!   to disk, which is what a user waits for.
@@ -23,7 +23,7 @@
 //! The pure stages are repeated `ARUNA_BENCH_RUNS` times (default 5) after
 //! `ARUNA_BENCH_WARMUP` unrecorded runs; the two that touch the disk run once,
 //! because repeating them measures the page cache more than the program.
-//! Reported as min / p50 / max — a median alone hides the pause a user notices.
+//! Reported as min / p50 / max – a median alone hides the pause a user notices.
 //!
 //! Deliberately dependency-free, like the rest of the benchmarks here.
 

@@ -31,8 +31,10 @@
 //! shared section exists at all — the two documents had drifted, one turning in
 //! dark mode while the other stayed light. The pages were given up on
 //! 2026-08-23 and the group stylesheet with them. The split is kept because the
-//! shared/print seam is what a future PDF joins, and because collapsing it now
-//! would bury the reason the tokens live where they do.
+//! shared/print seam was where a PDF was expected to join, and because
+//! collapsing it now would bury the reason the tokens live where they do. The
+//! PDF, written since 2026-09-30, joined elsewhere: Typst sets it from its own
+//! template (`crate::pdf`), and no section here is read by it.
 
 /// Tokens and the base document: what both pages are before either adds
 /// anything.

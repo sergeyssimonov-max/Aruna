@@ -16,8 +16,9 @@
 //! them to be checked against.
 //!
 //! **The group pages are gone**, by decision rather than by simplification: the
-//! inventory now links each manuscript straight at its XML file and a CTH label
-//! is plain text. So there is one document doing the linking, and one href per
+//! inventory now links each manuscript straight at its file – its PDF, or its
+//! XML where no PDF was built (since 2026-10-19) – and a CTH label is plain
+//! text. So there is one document doing the linking, and one href per
 //! manuscript — but the layer stays, because the naming rule it settled is still
 //! shared with the manifest and with whatever renders next.
 //!
@@ -26,9 +27,12 @@
 //!               │
 //!               ▼
 //!        CorpusPresentation ─┬─► the inventory
-//!                            ├─► a future PDF
 //!                            └─► a future DTO ──► Tauri ──► TypeScript
 //! ```
+//!
+//! The PDF is not a branch of this layer. It was drawn here as a future one
+//! until it was written, on 2026-09-30, from the document model instead
+//! (`crate::pdf`, `docs/ARCHITECTURE.md` §6).
 //!
 //! **Borrowed, not owned.** The corpus is 23 936 records and every string in
 //! them is already in memory; a presentation that cloned them would allocate

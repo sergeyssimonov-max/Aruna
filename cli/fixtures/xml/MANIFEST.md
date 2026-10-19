@@ -27,6 +27,12 @@ that needs them, because they are large and their size is the whole point:
 | expected | what the current system must do with it |
 | future PDF | what a converter will have to do with it |
 
+*Corrected 2026-10-19.* The converter exists since 2026-09-30 (`cli/src/pdf/`),
+and every build makes the PDF of each document since 2026-10-18. The
+`future PDF` lines below are what was asked of it before it was written, kept
+as they were; what it does with these constructs is held by
+`tests/pdf_module.rs`.
+
 
 ## Well-formed
 
