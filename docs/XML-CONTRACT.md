@@ -56,7 +56,9 @@ The export files every document under `CTH N/<siglum>.xml`. Only the path
 changes; the bytes do not, beyond a prologue rewrite named in §3. Checked:
 23 936 in, 23 936 out, no duplicates, no silent replacement (`create_new` on
 every file), the manifest names each output and its source group, and the
-inventory links exactly the set that was placed — both directions. 34 documents
+inventory links every placed document once and nothing else – at its PDF, or
+at its XML where no PDF was built (owner's decision of 2026-10-19) – both
+directions. 34 documents
 need a suffix because their siglum is already taken inside their group — the
 `disambiguated` line of `example export_beta` below — and a collision the suffix
 cannot resolve stops the build rather than overwriting.
@@ -478,8 +480,8 @@ manifest carries for the PDF at all; the code did, and this is it, schema 3.
   away – and a document's key of that name would read as a second
   description of it. `source_entry` pairs with `source_sha256`: the name and
   the bytes of one entry;
-- `"pdf"` – with PDFs only: the path of the PDF beside the XML when it was
-  built, or `{ "refused": "<why>" }` when it was not. A refused document –
+- `"pdf"` – with PDFs only: the path of the PDF, in the folder of the XML,
+  when it was built, or `{ "refused": "<why>" }` when it was not. A refused document –
   the model does not read it, Typst refuses it, two repeated clusters in a row
   (owner's decision of 2026-10-02) – gets this record, and the build goes on
   (`PDF-ACCEPTANCE.md` §5). A broken invariant of this program is not a

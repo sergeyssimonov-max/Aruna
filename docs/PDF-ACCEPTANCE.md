@@ -395,7 +395,7 @@ the keys `world`, `labels`, `clusters` and `credit`, each `"passed"`
 ~~The batch is the whole corpus: 23 936 documents into 663 folders.~~
 
 *Corrected 2026-09-30.* The batch is every document the model reads: 23 713
-documents in 662 groups, one PDF per document beside its XML. The document
+documents in 662 groups, one PDF per document in the folder of its XML. The document
 model refuses 223 of the 23 936 — 206 the parser refuses and 17 beyond it — and
 group `CTH 756` is refused whole, so 662 folders receive PDFs, not 663
 (measured 2026-09-26, `PROJECT-SPEC.ru.md` 8.3). A correction of fact: no
@@ -616,7 +616,7 @@ a discrepancy, but a changed wording or a second copy is one. Do not ship a
 file that embeds `UllikummiA` without it.
 
 **Amended 2026-09-30, owner's decision of 2026-09-30: one PDF per document.**
-The PDF of a document is written beside its XML, `CTH N/<siglum>.pdf`, the
+The PDF of a document is written into the folder of its XML, `CTH N/<siglum>.pdf`, the
 path the package manifest already names for every document; there is no PDF
 per CTH group. "The file" of the paragraph above is therefore always the PDF of
 one document, and the credit stands once in each document's PDF that embeds a

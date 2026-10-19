@@ -39,7 +39,10 @@ single HTML inventory with its six columns and its filter, and the corpus
 written out as folders of documents — one HTML file in the whole package, and
 that is the inventory. This sentence used to end *"with a `CTH N/index.html` in
 each"*; those pages were abolished on 2026-08-23 (see *No page for a CTH
-folder*), and the inventory has linked straight at every `.xml` ever since. The
+folder*), and the inventory linked straight at every `.xml` from then until
+2026-10-19, when the link of every document with a PDF moved to the PDF and
+the `.xml` kept it only where no PDF was built (owner's decision of that day).
+The
 standalone copy the program also wrote into `~/Downloads` went in 2.3.0, for the
 same reason in miniature: two documents of one name, and the one without links
 opened first. Nothing is to be rolled back to
