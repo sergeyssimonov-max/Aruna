@@ -1,8 +1,21 @@
-# PDF: what will have to be true
+# PDF: what ~~will have to be~~ has to be true
 
-There is no converter. This document is the specification the future one will be
-held to, written before it exists so that its tests are a contract rather than a
-description of whatever it happened to do.
+~~There is no converter. This document is the specification the future one will be
+held to, written before it exists~~ This document is the specification the
+converter is held to, written before it existed so that its tests are a
+contract rather than a description of whatever it happened to do.
+
+**Corrected 2026-10-19.** The converter exists since 2026-09-30, the module
+`cli/src/pdf/` with a phase of the export, and since 2026-10-18 every build makes the
+PDF of each document – there is no build without them (owner's decision of
+2026-10-18). Each PDF is held to the criteria below twice: the build checks the
+invariants that cost it nearly nothing and stops on a broken one with
+`pdf_invariant`, and the release gate, the example `pdf_gate`, checks every
+criterion on every PDF of the package (`PROJECT-SPEC.ru.md` 6.8, 6.9). The
+inventory links each document's name at its PDF, and at its XML where no PDF
+was built (owner's decision of 2026-10-19). The sentences of this section that
+speak of the converter in the future are the history of the file, kept as they
+were; a correction of fact, not an amendment – no requirement changed.
 
 ~~Nothing here has been implemented, and no placeholder test has been written
 for it.~~ An `#[ignore]` that never runs is not coverage.
@@ -130,8 +143,9 @@ nothing installed outside Cargo, which is what a project with no Homebrew and a
 Java bar has to care about. Two licences would have to be added to `deny.toml`.
 The branch was rolled back in full; nothing of it is in the tree.
 
-The engine is therefore **measured and not adopted**, and that is the honest
-state to record. 702 crates is the largest dependency decision this project
+The engine is therefore ~~**measured and not adopted**~~ measured, and adopted on
+2026-09-30 by the owner after four trials against the real corpus
+(`PROJECT-SPEC.ru.md` 4.10) – what follows is the state recorded before that. 702 crates is the largest dependency decision this project
 would ever have taken, larger than the parser by an order of magnitude, and it
 is not a decision to make in passing while writing the first PDF. Whoever makes
 it says so explicitly, with this measurement in front of them.
@@ -593,8 +607,9 @@ says so.** The Mainz terms ask the user of `UllikummiA` to mention:
 
 > Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal Mainz
 
-The inventory carries it visibly on the page as of 2026-09-17. The PDF does not
-carry it anywhere, because there is no PDF; ~~the first one must, and in the
+The inventory carries it visibly on the page as of 2026-09-17. ~~The PDF does not
+carry it anywhere, because there is no PDF;~~ (*corrected 2026-10-19:* every PDF
+that embeds `UllikummiA` carries it, as settled below) ~~the first one must, and in the
 document metadata at least~~ — `set document(author: …)` is not the place, since
 the author of the corpus is not the author of the font, ~~so it belongs in the
 keywords or a colophon line that Typst writes into the file~~. ~~**Whether a visible

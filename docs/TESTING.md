@@ -2,11 +2,11 @@
 
 What exists, how to run it, and what each profile is for.
 
-The suite is **737 tests** as of 2026-10-15: 692 in the console crate – 25
-integration binaries plus the library and the binary's own tests – and 45 in the
-desktop shell. The crates were joined into one workspace on 2026-08-30, so
+The suite is **759 tests** as of 2026-10-19, counted at `f8d7f06`: 713 in the
+console crate – 25 integration binaries plus the library and the binary's own
+tests – and 46 in the desktop shell. The crates were joined into one workspace on 2026-08-30, so
 `cargo nextest run` from the repository root runs both, and `-p aruna` narrows it
-back to the console crate. It needs no network, and it runs **727**: ten are
+back to the console crate. It needs no network, and it runs **749**: ten are
 behind `#[ignore]` by design and come in with `--run-ignored all` — five that
 read the whole corpus in the core (two in `authenticity`, one each in `corpus`,
 `document_model` and `pdf_module`), four in the shell that build it or read a
@@ -14,7 +14,7 @@ package built from it (the three corpus `cancelling` tests and
 `markup::every_name_of_a_real_package_reaches_the_window_byte_for_byte`),
 and the shell's `regenerate_the_bindings`, which
 is not a check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **192 `vitest` tests** in
+Beside it, and in a language of its own, are the **207 `vitest` tests** in
 `frontend/` — see *Frontend* below — and the six end-to-end scenarios of
 `frontend/e2e/smoke.e2e.ts`, run against the real window by `pnpm test:e2e`. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
@@ -251,10 +251,15 @@ the stylesheet sections are built by Vite and compiled into the binary with
 one reason: **`cargo build` must never need Node.** The whole of `cli/` still builds and tests on a machine
 with no `pnpm` on it; what needs Node is the check that the artifact is current.
 
-### Future PDF acceptance
+### ~~Future~~ PDF acceptance
 
-It does not exist. See `PDF-ACCEPTANCE.md` for the criteria it will be held to.
-**No placeholder tests were written for it**: an `#[ignore]` that never runs is
+~~It does not exist. See `PDF-ACCEPTANCE.md` for the criteria it will be held to.~~
+*Corrected 2026-10-19:* the converter exists since 2026-09-30 and every build
+runs it since 2026-10-18. Its acceptance is `tests/pdf_module.rs` and
+`tests/export_pdf.rs` below, the instruments of `tests/pdf_acceptance.rs`, and
+the release gate's example `pdf_gate`, which checks every criterion of
+`PDF-ACCEPTANCE.md` on every PDF of the package (`PROJECT-SPEC.ru.md` 6.8).
+**No placeholder tests were written for it** before it existed: an `#[ignore]` that never runs is
 not coverage, and a fake converter built to satisfy a test is worse than no
 test.
 
@@ -264,9 +269,9 @@ test.
 
 | binary | tests | what it holds |
 |---|---|---|
-| library and `bin/aruna` | 481 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
+| library and `bin/aruna` | 504 | parsing, scanning, naming, ordering, the catalogue, MD5, the export's pure halves, the presentation model, the embedded stylesheet, the progress wording, and which failures get advice |
 | `tests/integration.rs` | 6 | archive to HTML, malformed input, the corpus if present |
-| `tests/cli_process.rs` | 25 | the binary as a child process, cache versus network, and the two words it answers on the command line |
+| `tests/cli_process.rs` | 23 | the binary as a child process, cache versus network, and the two words it answers on the command line |
 | `tests/cache_lifecycle.rs` | 10 | the cache against a local HTTP server: redirects, loops, failures, and the release advisory |
 | `tests/export_integration.rs` | 11 | the export against an archive shaped like the corpus |
 | `tests/export_hostile.rs` | 18 | archives written to break the export, and destinations that refuse it |
@@ -284,14 +289,14 @@ test.
 | `tests/corpus.rs` | 6 | the whole archive: non-distortion, no writes, the malformed count, and that nothing the gates admit comes out of decoding damaged |
 | `tests/document_model.rs` | 6 | the document model against `xsltproc`, node for node: the valid fixtures, a 52-document sample of the archive, and the whole corpus behind `#[ignore]`; the whole corpus read twice and refused exactly where the manifest says; and, since 2026-09-25, UTF-16 in both byte orders, Latin-1 bytes and a prolog cut in three places refused, never read and never a panic |
 | `tests/fonts.rs` | 4 | the one font this repository carries, held to the bytes it arrived as, the terms beside it, and that no source file reaches for a system font directory |
-| `tests/pdf_acceptance.rs` | 2 | the instruments a PDF will be held to, run before there is a PDF: `sips` turns a hand-written one-page PDF into pixels |
+| `tests/pdf_acceptance.rs` | 2 | the instruments a PDF is held to, written before there was a PDF: `sips` turns a hand-written one-page PDF into pixels |
 | `tests/quick_xml_guard.rs` | 3 | the guard of the `quick-xml` 0.38.4 exception: no template names a bibliography or a way to read files, no source names the citation crates, and markup in a document is set as text by `aruna::pdf` with only the template and the data asked for |
 | `tests/pdf_module.rs` | 11 | the PDF of one document on synthetic samples – a label, a repeated cluster, the credit, `text:tab`, a comment – each put to every check of the gate; no date and the same bytes twice; the tag tree against the model with its four negative controls; snapshots of structure (insta); the reader's teeth; and the same constructs on six corpus documents behind `#[ignore]` |
-| `tests/export_pdf.rs` | 8 | the PDF phase of the export: a PDF beside every document but the refused one, and the package naming each, a broken invariant stops the build, a run stopped in the phase publishes nothing, two builds are one package, the tick ends on the whole |
+| `tests/export_pdf.rs` | 8 | the PDF phase of the export: a PDF in the folder of every document but the refused one, and the package naming each – the manifest by path or reason, the inventory by one link on the name, at the PDF or at the XML – a broken invariant stops the build, a run stopped in the phase publishes nothing, two builds are one package, the tick ends on the whole |
 | `tests/verify_two_declarations.rs` | 1 | what `verify::compare` answers for a source with two `<?xml?>` declarations, held as it is today so a restructuring cannot change it unnoticed |
 | `tests/rustls_interim_guard.rs` | 4 | the guard of the temporary `rustls` 0.23.45 exceptions, and the one test in the suite that reads the clock: it fails from 2026-10-23 UTC |
 
-Counted on 2026-10-15 at `7f0ae50`, with `cargo nextest list --run-ignored all`: 692 in the `aruna` crate, as above, and 45 in `aruna-desktop`, which is 737; without `--run-ignored` the run is 727, 687 and 40. What each task between added is recorded in the specification's history (7.8); the numbers here are taken from the list, not reconstructed from it. Counted on 2026-09-30, after the second part of the PDF transfer: 655 in the `aruna` crate and 40 in `aruna-desktop`, which is 695; without `--run-ignored` 687. The 55 since 2.6.2 came with the PDF: the module and its samples, the phase of the export, the console's two PDF variables (the switch among them removed on 2026-10-18), the `quick-xml` guard, and one in the shell for the PDF phase the window does not show yet. Counted on 2026-09-29, at the release gate of 2.6.2, with `cargo nextest list --run-ignored all`: 601 in the `aruna` crate, as above, and 39 in `aruna-desktop`, which is 640. Without `--run-ignored` the run is 633: the seven heavy ones stay behind `#[ignore]` and need the archive. The one since 2026-09-26 came with `d18e1dd` – a run that waits through many holders of the publish lock takes the lock itself; 639 and 632 before it. The one since the release of 2.6.1 came with `69c2a9c` – a symlinked file inside the package refused rather than read as a document; 638 and 631 before it. The three since that afternoon came with `a0f929c` – the code points of a folder collision in Unicode form, told in the console and on the window; 635 and 628 before them. The two since 2026-09-25 came after the release gate of 2.6.1 – a question behind a silent proxy ending by its own deadline (`4550fee`) and a deadline under the TLS handshake named as one (`42529e6`); 633 and 626 before them. The thirty-three since 2026-09-24 came with the polish block for 2.6.1, `eef9f4e` to `ed8f48d` – a console that survives a closed stream and refuses in Russian, the published copy checked before the reader's goes, the proxy from the environment, the publish lock on `flock` and its race, a link under the package's name, long names cut to fit and names or group folders the disk takes for one, a cancel from the window on a small archive, the manifest's names reaching the window, and the model refusing what is not its to read; 600 and 594 before them. The nine since 2026-09-23 came with `ede953a` – a named pipe where the publish lock or a staging marker belongs, the window's font-error sentences, the model's boundary guard, and the new `pdf_acceptance.rs`; 591 and 585 before them. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts; on 2026-09-23 three download tests (the read timeout in force, a cancel reaching a silent server, a cut body reported as the network's) and two for the declared XML version, 586 and 580 before them.
+Counted on 2026-10-19 at `f8d7f06`, with `cargo nextest list --run-ignored all`: 713 in the `aruna` crate, as above, and 46 in `aruna-desktop`, which is 759; without `--run-ignored` the run is 749, 708 and 41. The 22 since 2026-10-15 came with the third part of the PDF transfer, part3-1 to part3-4, and the tasks between; each is recorded in the specification's history (7.8). Counted on 2026-10-15 at `7f0ae50`, with `cargo nextest list --run-ignored all`: 692 in the `aruna` crate, as above, and 45 in `aruna-desktop`, which is 737; without `--run-ignored` the run is 727, 687 and 40. What each task between added is recorded in the specification's history (7.8); the numbers here are taken from the list, not reconstructed from it. Counted on 2026-09-30, after the second part of the PDF transfer: 655 in the `aruna` crate and 40 in `aruna-desktop`, which is 695; without `--run-ignored` 687. The 55 since 2.6.2 came with the PDF: the module and its samples, the phase of the export, the console's two PDF variables (the switch among them removed on 2026-10-18), the `quick-xml` guard, and one in the shell for the PDF phase the window does not show yet. Counted on 2026-09-29, at the release gate of 2.6.2, with `cargo nextest list --run-ignored all`: 601 in the `aruna` crate, as above, and 39 in `aruna-desktop`, which is 640. Without `--run-ignored` the run is 633: the seven heavy ones stay behind `#[ignore]` and need the archive. The one since 2026-09-26 came with `d18e1dd` – a run that waits through many holders of the publish lock takes the lock itself; 639 and 632 before it. The one since the release of 2.6.1 came with `69c2a9c` – a symlinked file inside the package refused rather than read as a document; 638 and 631 before it. The three since that afternoon came with `a0f929c` – the code points of a folder collision in Unicode form, told in the console and on the window; 635 and 628 before them. The two since 2026-09-25 came after the release gate of 2.6.1 – a question behind a silent proxy ending by its own deadline (`4550fee`) and a deadline under the TLS handshake named as one (`42529e6`); 633 and 626 before them. The thirty-three since 2026-09-24 came with the polish block for 2.6.1, `eef9f4e` to `ed8f48d` – a console that survives a closed stream and refuses in Russian, the published copy checked before the reader's goes, the proxy from the environment, the publish lock on `flock` and its race, a link under the package's name, long names cut to fit and names or group folders the disk takes for one, a cancel from the window on a small archive, the manifest's names reaching the window, and the model refusing what is not its to read; 600 and 594 before them. The nine since 2026-09-23 came with `ede953a` – a named pipe where the publish lock or a staging marker belongs, the window's font-error sentences, the model's boundary guard, and the new `pdf_acceptance.rs`; 591 and 585 before them. The previous count, 555 and 549 on 2026-09-19, had gone stale by the acceptance audit of 21.09, which ran 560 and 554; since then came the catalogue's titles in the group headings, the package-name boundary of the shell's reading commands, and the manifest's list of entries that are not manuscripts; on 2026-09-23 three download tests (the read timeout in force, a cancel reaching a silent server, a cut body reported as the network's) and two for the declared XML version, 586 and 580 before them.
 
 ## Coverage floors
 

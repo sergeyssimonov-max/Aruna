@@ -4,8 +4,11 @@
 
 1. скачивает корпус [TLHdig Beta 0.3](https://zenodo.org/records/20328284) с Zenodo (~74 МБ ZIP);
 2. распаковывает и эвристически парсит все XML-транслитерации хеттских клинописных манускриптов;
-3. раскладывает документы по папкам CTH и собирает над ними минималистичную
-   HTML-опись в скандинавском стиле, где каждая строка ссылается на свой XML;
+3. раскладывает документы по папкам CTH, строит PDF каждого документа в папке
+   его XML и собирает над ними минималистичную HTML-опись в скандинавском стиле:
+   имя документа – одна ссылка, на его PDF, а у документа без PDF (на Beta 0.3
+   их 223, причины – в манифесте) – на XML. Сборка занимает около двух минут,
+   режима без PDF нет (решение владельца 18.10.2026);
 4. сохраняет результат в  
    `~/Downloads/TLHdig_Beta_0.3/`, опись — файл `TLHdig_Beta_0.3.html` внутри
    этой папки.
@@ -45,15 +48,20 @@
 
 ```bash
 git clone https://github.com/sergeyssimonov-max/Aruna.git
-cd cli
-cargo build --release
-./target/release/aruna
+cd Aruna
+cargo build --release --locked -p aruna
+ARUNA_FONTS=cli/resources/fonts ./target/release/aruna
 ```
+
+`ARUNA_FONTS` называет каталог семи шрифтов [`docs/FONTS.md`](../docs/FONTS.md), которыми набраны PDF;
+в дереве это `cli/resources/fonts`. Программа его не ищет: без переменной она отказывает
+до начала работы и называет файл, которого ждала. `ARUNA_PDF` больше не читается – с
+18.10.2026 PDF строится всегда, и скрипт, который его еще задает, получит те же PDF.
 
 Офлайн / свой ZIP:
 
 ```bash
-ARUNA_ZIP=/path/to/TLHbasisONLINE25_1_ZENODO_Beta_03.zip ./target/release/aruna
+ARUNA_ZIP=/path/to/TLHbasisONLINE25_1_ZENODO_Beta_03.zip ARUNA_FONTS=cli/resources/fonts ./target/release/aruna
 ```
 
 ### Что берется из API Zenodo
@@ -85,7 +93,7 @@ ARUNA_ZIP=/path/to/TLHbasisONLINE25_1_ZENODO_Beta_03.zip ./target/release/aruna
 когда рядом ложится новый.
 
 ```bash
-ARUNA_CACHE_DIR=/tmp/aruna-cache ./target/release/aruna   # кэш в другом месте
+ARUNA_CACHE_DIR=/tmp/aruna-cache ARUNA_FONTS=cli/resources/fonts ./target/release/aruna   # кэш в другом месте
 rm -rf ~/Library/Caches/aruna                             # выбросить кэш
 ```
 

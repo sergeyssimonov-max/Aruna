@@ -17,7 +17,7 @@ one took with it, and what the core still owes the new one.
 | where | `frontend/` (Svelte 5, Vite, TypeScript) and `src-tauri/` (Tauri 2) |
 | package manager | pnpm only, pinned by `packageManager` in the root `package.json` |
 | entry | `src-tauri/src/main.rs` → `aruna_desktop_lib::run()` |
-| plugins | dialog, opener, store, window-state, log |
+| plugins | dialog, opener, window-state, log; ~~store~~ removed on 2026-09-22 |
 | checked by CI | `pnpm check`, `pnpm lint`, `pnpm format:check`, `pnpm test:unit` and `pnpm build` in `frontend/`; `cargo fmt`, `clippy --all-features` and `nextest` for `src-tauri/`, on macOS because that is the only platform this targets; `cargo deny` runs once, in the Ubuntu `check` job, because the workspace is one dependency graph judged by one policy |
 | bundle | `pnpm build` targets `universal-apple-darwin` — Intel and Apple Silicon in one binary |
 
@@ -418,7 +418,11 @@ formality.
 
 ### 2.1 No `serde`
 
-Dependencies are `dirs`, `memchr`, `thiserror`, `ureq`, `zip`. Tauri's IPC needs
+~~Dependencies are `dirs`, `memchr`, `thiserror`, `ureq`, `zip`.~~ *Corrected
+2026-10-19:* the core's dependencies are `dirs`, `memchr`, `quick-xml`,
+`thiserror`, `ureq`, `zip`, `unicode-normalization` and, for the PDF, `typst`,
+`typst-layout`, `typst-pdf`, `lopdf` and `skrifa` (`cli/Cargo.toml`); `serde`
+is still not among them. Tauri's IPC needs
 `Serialize`/`Deserialize` on everything crossing the boundary.
 
 This is deliberate today — the crate hand-writes both JSON documents it produces
@@ -484,8 +488,9 @@ of the source rather than of one document's output: `html.rs` and
 **Borrowed, not owned**, and this is the part that matters for the DTO. The
 corpus is 23 936 records whose strings are already in memory; an owning
 presentation would allocate tens of megabytes to say the same thing twice. The
-lifetimes suit HTML and suit a future PDF — same process, same pass over the
-same data. They do **not** suit IPC: a value crossing a process boundary has to
+lifetimes suit HTML ~~and suit a future PDF~~ – same process, same pass over the
+same data; the PDF, written since 2026-09-30, is built from the document model
+rather than from this one. They do **not** suit IPC: a value crossing a process boundary has to
 outlive the call. So the Tauri DTO is a separate owning type built from this one
 by copying, in its own module where `serde` is derived without spreading inward
 (§2.1). **This model is not IPC-ready as it stands, and is not meant to be** —
@@ -751,7 +756,11 @@ seventeen until 2026-09-25, and twenty against twenty-two events until
 
 ## 4. The tests that come with each component
 
-None of these can be written yet, and none has been.
+~~None of these can be written yet, and none has been.~~ *Corrected
+2026-10-19:* they are written – the window's in `frontend/src/App.test.ts`, the
+wire's in `src-tauri/src/lib.rs`, the window driven end to end in
+`frontend/e2e/smoke.e2e.ts` – and `docs/TESTING.md` counts them. The list below
+is what was asked of them.
 
 **Rust ↔ Tauri**: command registration; DTO serialisation both ways; error
 serialisation; path validation; capability and permission scope; cancellation;

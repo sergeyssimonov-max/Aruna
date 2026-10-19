@@ -464,9 +464,11 @@ for word as the terms give it:
 
 It is one constant, `aruna::fonts::CREDIT`, held against the terms file by a
 test and put on the page by the exporter, so the page and the licence cannot
-say different things. **In the PDF it is not there yet**, and that is deferred
-rather than done: there is no PDF. The requirement is written into
-`docs/PDF-ACCEPTANCE.md` so the first PDF is not the one that forgets it.
+say different things. ~~**In the PDF it is not there yet**, and that is deferred
+rather than done: there is no PDF.~~ The requirement is written into
+`docs/PDF-ACCEPTANCE.md` so the first PDF is not the one that forgets it, and
+*since 2026-09-30* every PDF that embeds `UllikummiA` carries it, as settled
+below.
 
 **Where it goes in a PDF — the owner's decision of 2026-09-27.** A footnote on
 the first page of every PDF file that uses `UllikummiA` — once per file, not on

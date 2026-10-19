@@ -322,6 +322,11 @@ in the window and in the console alike (owner's decision of 2026-10-18):
 nothing in either leaves them out. Without fonts no package is built – the
 refusal is `font_missing` or `font_altered`.
 
+*Amended 2026-10-19.* The inventory links each document once, on its name: at
+its PDF, and at its XML where no PDF was built (owner's decision of
+2026-10-19). The XML of every document stays in the package and in the
+manifest; a document with a PDF has no link to its XML in the inventory.
+
 ---
 
 ## 4. XML → internal model → PDF

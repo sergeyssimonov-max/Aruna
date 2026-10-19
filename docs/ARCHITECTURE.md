@@ -116,9 +116,10 @@ that had no caller left.
 
 `presentation` is the single fan-out point, and that is the property to keep:
 there is no path from XML to a rendered artefact that goes around it. The
-architecture drawing the project works to shows the same shape — one
-presentation model feeding a static HTML branch, a future PDF branch, and a
-future frontend DTO.
+architecture drawing the project works to shows the same shape – one
+presentation model feeding a static HTML branch, ~~a future PDF branch,~~ and a
+future frontend DTO. The PDF branch goes from the document model instead (§6,
+since 2026-09-30).
 
 ## 5. Application services, progress, cancellation, errors
 
@@ -142,18 +143,28 @@ package, cancellation, I/O. Each keeps its source and a relative path. Nothing
 is flattened to a string before the outermost adapter: `main.rs` is where an
 error becomes text and advice.
 
-## 6. Where a PDF renderer attaches
+## 6. Where the PDF renderer attaches
 
-At `presentation`, the same place HTML attaches — not at `parse`, and not at
+*Corrected 2026-10-19.* The renderer is in the tree and attaches at the
+document model: `cli/src/pdf/` takes a document read by `document`, lays it out
+and hands Typst the template and the data, and `export` writes the bytes into
+the folder of the document's XML, in a phase after the documents and before the
+inventory and the manifest. Every build runs it since 2026-10-18 (owner's decision
+of that day, for 3.0.0); the inventory, written by `html` from `presentation`, links
+each document's name at its PDF, and at its XML where none was built (owner's
+decision of 2026-10-19). The two paragraphs below are what this section said
+before the converter was written.
+
+~~At `presentation`, the same place HTML attaches – not at `parse`, and not at
 `export`. What the renderer would need beyond `CorpusPresentation` is a print
 model, and whether one is needed is a question for the day someone measures it,
-not a trait to write in advance.
+not a trait to write in advance.~~
 
 The print half of the stylesheet is already separate for this reason:
 `frontend/src/inventory/print.css` is emitted last and is the only section that
-speaks about paper. `docs/PDF-ACCEPTANCE.md` holds the criteria. **No PDF
+speaks about paper. `docs/PDF-ACCEPTANCE.md` holds the criteria. ~~**No PDF
 library has been chosen**, and none is to be chosen without a comparison run
-against the real corpus.
+against the real corpus.~~
 
 **Decided 2026-09-30 by the owner, after four trials against the real
 corpus.** The engine is Typst (`PROJECT-SPEC.ru.md` 4.10), and the renderer is

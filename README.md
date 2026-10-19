@@ -2,29 +2,36 @@
 
 Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (Hittite cuneiform transliterations).
 
-**What exists today is a command-line program.** It downloads the corpus from
-Zenodo and writes it out as a folder of normalised documents with an inventory
-over them, in `~/Downloads`. That program is [`cli/`](cli/), it is what the
-releases ship, and it is the whole of the product.
+**What it makes.** Aruna downloads the corpus from Zenodo and writes it out in
+`~/Downloads` as one package: every document as normalised XML, the PDF of each
+document in the folder of its XML (`CTH N/<siglum>.pdf` beside
+`CTH N/<siglum>.xml`), an HTML inventory over them, and a manifest that records
+what became of each one. In the inventory every document is one link, on its
+name: it opens the document's PDF, and where no PDF was built it opens the XML
+instead. On TLHdig Beta 0.3 that is 223 of the 23 936 documents – the ones the
+document model does not read – and the manifest gives the reason for each.
 
-**A desktop application is being built and is not finished.**
-[`frontend/`](frontend/) and [`src-tauri/`](src-tauri/) hold the stack it is
-built on — the toolchain is installed and pinned, and the frontend half is
-checked and built by CI; `src-tauri` is not, and is kept buildable by the
-pre-commit battery and by CI on macOS. Since 2026-09-02 the window builds the
-corpus itself: it calls the same `app::build_corpus` the console binary calls,
-shows the run as it goes, can stop it, and ends on the report of that run. What
-is not settled is what a reader is given — the image is still built from the
-core (`docs/PROJECT-SPEC.ru.md` §7.3). Read those two directories as work in
-progress, not as a second program you can run.
+**A build takes about two minutes**, almost all of it the PDFs. Every build
+makes them: there is no mode without PDFs (owner's decision of 2026-10-18). The
+fonts the PDFs are set in travel with the application; a build that does not
+find them, or finds them altered, stops before any work with `font_missing` or
+`font_altered` and publishes nothing.
+
+**What ships is the application with a window.** Since 2026-09-04 a release is
+`Aruna.app`, built from [`src-tauri/`](src-tauri/) and
+[`frontend/`](frontend/). The window calls the same core,
+[`cli/`](cli/), that the console binary calls: it shows the run as it goes, the
+PDF phase included, can stop it, and ends on the report of that run. The
+console form is the same program without the screen, and it is what a
+developer runs.
 
 ## Layout
 
 | Path | Description |
 |------|-------------|
-| [`cli/`](cli/) | **Aruna** — Rust CLI: download Zenodo ZIP → parse XML → a folder of documents with an HTML inventory over them. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
-| [`frontend/`](frontend/) | **The window** — Svelte 5, Vite, TypeScript, no SvelteKit. One screen with seven states: what is on disk, an offer to build from Zenodo or from an archive you pick, the stage and the fraction while it builds, and the report of that run with the inventory a click away. Its types are generated from the Rust commands into `src/bindings.ts` |
-| [`src-tauri/`](src-tauri/) | **The Tauri 2 shell** that hosts it. Two commands: `corpus_location` says where the package is, `corpus_stats` counts what is in it — both answered by the `cli` crate's own paths and its own manifest |
+| [`cli/`](cli/) | **Aruna** – the core and the console binary: download the Zenodo ZIP → parse the XML → a folder of documents, the PDF of each, an HTML inventory and a manifest. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
+| [`frontend/`](frontend/) | **The window** – Svelte 5, Vite, TypeScript, no SvelteKit. One screen: what is on disk, an offer to build the package from Zenodo, the stage and the fraction while it builds, and the report of that run – the PDFs built among its numbers – with the inventory a click away. Its types are generated from the Rust commands into `src/bindings.ts` |
+| [`src-tauri/`](src-tauri/) | **The Tauri 2 shell** that hosts it. Six commands: `corpus_location`, `corpus_stats` and `corpus_xml` say where the package is and what is in it, `build_corpus` and `cancel_build` run and stop a build, `open_inventory` opens the inventory – all answered by the `cli` crate's own paths, its own manifest and its own build |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
 
 There was a React web application here until 2026-08-23, served from `src/` with a WASM search module under `wasm/search/`. It has been removed along with the ARUN container built for it; the desktop application is to replace it, once it exists. [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what went and why.
@@ -34,15 +41,22 @@ There was a React web application here until 2026-08-23, served from `src/` with
 Builds on macOS 13+ and Linux. The tests run in CI on Linux; the macOS jobs check the desktop crate and build the `.app` and the DMG, and run no CLI tests — the CLI's own suite is the Ubuntu one. Windows is untried. Only the `.app` bundle and the DMG are macOS-only.
 
 ```bash
-cargo build --release --locked -p aruna   # any supported platform, from the repository root
-./target/release/aruna                    # → ~/Downloads/TLHdig_Beta_0.3/ — open TLHdig_Beta_0.3.html inside it
+cargo build --release --locked -p aruna                     # any supported platform, from the repository root
+ARUNA_FONTS=cli/resources/fonts ./target/release/aruna      # → ~/Downloads/TLHdig_Beta_0.3/ – open TLHdig_Beta_0.3.html inside it
 ```
+
+`ARUNA_FONTS` names the directory of the fonts the PDFs are set in; in the tree
+that is [`cli/resources/fonts/`](cli/resources/fonts/), the seven files
+[`docs/FONTS.md`](docs/FONTS.md) lists. It is never searched for: without it
+the console refuses before any work and names the file it wanted. `ARUNA_PDF`
+is no longer read – every build makes PDFs since 2026-10-18 – so a script that
+still sets it builds them all the same.
 
 The path is the workspace's, not the crate's: since the two crates were joined
 on 2026-08-30 `cargo` writes to `target/` at the root whichever directory it is
 invoked from.
 
-The first run downloads 71 MiB from Zenodo and keeps it in the OS cache directory, so later runs take about two seconds and need no network. `ARUNA_ZIP=/path/to.zip` uses a local archive instead. Details in [`cli/README.md`](cli/README.md).
+The first run downloads 71 MiB from Zenodo and keeps it in the OS cache directory, so later runs need no network; a build takes about two minutes either way, almost all of it the PDFs. `ARUNA_ZIP=/path/to.zip` uses a local archive instead. Details in [`cli/README.md`](cli/README.md).
 
 Packaging, on macOS 13+ only:
 
@@ -65,9 +79,11 @@ Prebuilt DMG: [Releases](https://github.com/sergeyssimonov-max/Aruna/releases) (
 from Launchpad or started with `open Aruna.app`, it comes up 800 by 600 in the
 middle of the screen and says what is on disk: whether the package is already
 built, how large it is and how uneven the corpus is. From there it builds the
-corpus itself — from Zenodo or from an archive you pick — showing the stage and
-the fraction while it works, and it can be stopped mid-run. When it finishes it
-reports that run and offers the inventory it wrote.
+package itself, from Zenodo – the documents, then the PDF of each – showing the
+stage and the fraction while it works, and it can be stopped mid-run. When it
+finishes it reports that run, with how many PDFs it built, and offers the
+inventory it wrote. The fonts the PDFs need are inside the application, in
+`Aruna.app/Contents/Resources/fonts/`.
 
 Until 2026-09-04 what this DMG carried was the console program in an application
 bundle: no window, no progress, no dialogs, and a double click that ran to
@@ -79,7 +95,7 @@ window replaces.
 the shorter path when you want the package and not a screen:
 
 ```bash
-cargo build --release -p aruna && ./target/release/aruna
+cargo build --release -p aruna && ARUNA_FONTS=cli/resources/fonts ./target/release/aruna
 ```
 
 ### If a run is killed
@@ -149,17 +165,18 @@ in the dialog. On Ventura and later a blocked app can also be allowed under
 **System Settings → Privacy & Security**, where an *"Open Anyway"* button
 appears after the first refusal.
 
-## Desktop application — a status window, not yet a product
+## Desktop application – the program a reader installs
 
-**What exists is one screen, and it does the work.** The stack under it is
+**It is one screen, and it does the work.** The stack under it is
 wired end to end and kept green: `pnpm dev` opens a window, and since
 2026-09-02 that window is the program's front door rather than a view of its
 output. It reads what is on disk — how many manuscripts, how many CTH groups,
 how unevenly the one is spread across the other, and what the manifest counted
 about the corpus's writing — and it builds: `build_corpus` runs the core off the
 main thread, `build-progress` events carry the stage and the fraction, and
-`cancel_build` stops a run that is not wanted. The report it ends on is the
-run's own, not a second count taken afterwards.
+`cancel_build` stops a run that is not wanted. The PDF phase is a stage of its
+own on that screen, with the documents done and the PDFs built. The report it
+ends on is the run's own, not a second count taken afterwards.
 The screen was drawn through `/design` once and rebuilt by hand in `App.svelte`
 and `app.css`. It is not redrawn on a schedule: what it carries — the four
 commands, the states it can be in, and the counts — is a contract, written out
@@ -167,9 +184,8 @@ in [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) §3, and replacing i
 is a decision rather than a routine. The design tool is still checked against
 this stack, on a mockup built beside the repository and never carried into it.
 
-What the window still cannot do is be the thing a reader installs: the image is
-built from the core, and whether that changes is an open position in the
-specification rather than an oversight.
+Since 2026-09-04 this window is the thing a reader installs: the image is built
+from `aruna-desktop`, not from the console crate.
 [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records the contract
 between the two halves. The commands below build and check the shell; since
 2026-08-29 a `desktop` job on macOS runs the same battery in CI, so a break
@@ -199,7 +215,7 @@ macOS-only; `build:host` is the escape hatch anywhere else.
 
 [`.github/workflows/release-dmg.yml`](.github/workflows/release-dmg.yml) · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
-Four jobs on every push. Three on Ubuntu: tests and clippy for the CLI; `svelte-check`, vitest and a production build for the frontend; and a full parse of all 23 936 manuscripts against the real archive. The fourth is on macOS — formatting, clippy and tests for `src-tauri`, because a Tauri crate on Linux needs GTK and WebKitGTK to compile at all, and checking it there would say nothing about the one platform this ships on. Since 2026-08-31 that fourth job also gates the release: the DMG is built from the console crate and carries no shell code, but a release is not cut from a tree whose desktop crate is red — the shell consumes the core's public contract from outside, and it is the only job that does.
+Four jobs on every push. Three on Ubuntu: tests and clippy for the CLI; `svelte-check`, vitest and a production build for the frontend; and a full parse of all 23 936 manuscripts against the real archive. The fourth is on macOS – formatting, clippy and tests for `src-tauri`, because a Tauri crate on Linux needs GTK and WebKitGTK to compile at all, and checking it there would say nothing about the one platform this ships on. Since 2026-08-31 that fourth job also gates the release: a release is not cut from a tree whose desktop crate is red. Since 2026-09-04 the DMG is the desktop crate itself, so that job is the one that checks what ships.
 
 The Universal `.app` and DMG are built on macOS, but only when a release is being cut or when the workflow is run by hand — macOS minutes bill at ten times the rate, and nothing but a release consumes that artifact. Run it by hand before tagging, since a break in the packaging script no longer surfaces on the push that caused it:
 
@@ -266,9 +282,10 @@ All four references are recorded in [`.github/reference-release.json`](.github/r
 | document | what it holds |
 |---|---|
 | [`docs/TESTING.md`](docs/TESTING.md) | the test profiles — fast, standard, full corpus, stress, soak — and the exact command for each |
-| [`docs/XML-CONTRACT.md`](docs/XML-CONTRACT.md) | what may be done to the corpus, what must be preserved, what the corpus measurably contains, and where every kind of XML data has to end up in a PDF |
-| [`docs/PDF-ACCEPTANCE.md`](docs/PDF-ACCEPTANCE.md) | the criteria a future converter will be held to, written before it exists |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | the shape of the Rust side: the layers, which way they depend, and where a Tauri adapter and a PDF renderer attach |
+| [`docs/XML-CONTRACT.md`](docs/XML-CONTRACT.md) | what may be done to the corpus, what must be preserved, what the corpus measurably contains, and where every kind of XML data ends up in a PDF |
+| [`docs/PDF-ACCEPTANCE.md`](docs/PDF-ACCEPTANCE.md) | the criteria every PDF is held to – by the build itself and by the release gate – and the decisions behind them |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | the shape of the Rust side: the layers, which way they depend, where the PDF is built from the document model and written by the export, and where the Tauri adapter attaches |
+| [`docs/FONTS.md`](docs/FONTS.md) | the fonts the PDFs are set in and the inventory draws with, their licences and their digests |
 | [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) | the agreed desktop stack, what the Rust core still owes it, and what the removal of the React application took with it |
 | [`docs/PROJECT-SPEC.ru.md`](docs/PROJECT-SPEC.ru.md) | the normative specification of the desktop stack — every component pinned, with a status, and the rules a change is accepted under (in Russian) |
 | [`PERFORMANCE.md`](PERFORMANCE.md) | measured numbers, baselines, and the rules for changing them |
