@@ -25,6 +25,8 @@ const DOCUMENTS = [
   'docs/FRONTEND-CONTRACT.md',
   'docs/TESTING.md',
   'docs/FONTS.md',
+  'cli/releases/README.md',
+  'frontend/README.md',
 ]
 
 /** Local link targets in a markdown document, with the line they sit on. */

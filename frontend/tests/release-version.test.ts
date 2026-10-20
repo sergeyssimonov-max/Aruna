@@ -14,6 +14,10 @@ import { describe, expect, it } from 'vitest'
  *
  * The reference releases listed further down are deliberately out of scope:
  * they are supposed to be behind.
+ *
+ * The paragraph is found by its link to `/releases/latest`, not by its words:
+ * the link is what a reader presses, and the words depend on the language the
+ * README is written in.
  */
 
 const ROOT = normalize(join(dirname(fileURLToPath(import.meta.url)), '..', '..'))
@@ -26,10 +30,15 @@ function manifestVersion(relative: string): string {
   return match![1]
 }
 
+/** Where the README sends a reader for the release to download. */
+const LATEST = 'https://github.com/sergeyssimonov-max/Aruna/releases/latest'
+
 /** The paragraph that tells a reader which release to download. */
 function currentReleaseParagraph(markdown: string): string {
-  const paragraphs = markdown.split(/\n\s*\n/).filter((p) => p.includes('действующий выпуск'))
-  expect(paragraphs, 'README больше не называет действующий выпуск').toHaveLength(1)
+  const paragraphs = markdown.split(/\n\s*\n/).filter((p) => p.includes(LATEST))
+  expect(paragraphs, 'в README не ровно один абзац со ссылкой на действующий выпуск').toHaveLength(
+    1,
+  )
   return paragraphs[0]
 }
 
@@ -40,7 +49,7 @@ describe('the README names the release the manifest declares', () => {
 
     const named = [...paragraph.matchAll(/v(\d+\.\d+\.\d+)/g)].map((match) => match[1])
 
-    expect(named, 'the current release is named by no version at all').not.toHaveLength(0)
+    expect(named, 'действующий выпуск не назван ни одной версией').not.toHaveLength(0)
     expect([...new Set(named)]).toEqual([version])
   })
 })
