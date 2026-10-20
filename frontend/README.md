@@ -10,12 +10,12 @@
 `tests/inventory-artifact.test.ts` падает, если закоммиченное – не то, что
 сейчас дают эти исходники.
 
-**`src/App.svelte` и остальное в `src/`** – окно настольного приложения, которое
-все еще остается заготовкой, созданной `create-vite`. С 2026-08-30 в нем один
-настоящий экран, оболочка Tauri в `../src-tauri` регистрирует две команды
-(`corpus_location` и `corpus_stats`), и по-прежнему верно, что ничто отсюда не
-дотягивается до корпуса. Читайте это как незаконченную работу, а не как вторую
-программу.
+**`src/App.svelte` и остальное в `src/`** – окно настольного приложения. С
+2026-08-30 в нем один настоящий экран, а с 2026-09-04 именно это окно ставит
+читатель. Оболочка Tauri в `../src-tauri` регистрирует шесть команд
+(`corpus_location`, `corpus_stats`, `corpus_xml`, `open_inventory`,
+`build_corpus`, `cancel_build`): окно читает пакет на диске, собирает его тем же
+ядром, что и консольная программа, и открывает опись.
 
 Стек – Svelte 5, Vite и TypeScript, единственный менеджер пакетов – pnpm.
 **SvelteKit здесь нет**, и так это держит `tests/one-frontend-stack.test.ts`,
@@ -27,7 +27,7 @@
 pnpm check          # svelte-check over the app, tsc over the configs and node tests
 pnpm lint           # eslint
 pnpm format:check   # prettier
-pnpm test:unit      # vitest — node project for tests/, jsdom for src/
+pnpm test:unit      # vitest – node project for tests/, jsdom for src/
 pnpm build          # the window, into dist/
 pnpm build:inventory # the CLI's artifacts, into ../cli/src/generated/
 pnpm test:e2e       # WebdriverIO inside a debug Tauri build

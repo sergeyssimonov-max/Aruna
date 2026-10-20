@@ -2,7 +2,7 @@
 
 **Aruna** – компактная CLI-утилита на Rust, которая автоматически:
 
-1. скачивает корпус [TLHdig Beta 0.3](https://zenodo.org/records/20328284) с Zenodo (~74 МБ ZIP),
+1. скачивает корпус [TLHdig Beta 0.3](https://zenodo.org/records/20328284) с Zenodo (71 МБ ZIP),
 2. распаковывает и эвристически парсит все XML-транслитерации хеттских клинописных манускриптов,
 3. раскладывает документы по папкам CTH, строит PDF каждого документа в папке
    его XML и собирает над ними минималистичную HTML-опись в скандинавском стиле:
@@ -106,7 +106,7 @@ rm -rf ~/Library/Caches/aruna                             # выбросить �
 ## Тесты
 
 ```bash
-cargo test
+cargo nextest run --locked --no-tests=pass
 ```
 
 Покрытие:
@@ -148,6 +148,10 @@ lipo -info aruna-universal
 
 ### Одной командой → `Aruna.app`
 
+С 04.09.2026 выпуск этим скриптом не собирается: выпускается приложение с окном
+из `aruna-desktop` (корневой README), а скрипт остается для консольной программы
+в бандле.
+
 ```bash
 chmod +x build_app.sh
 ./build_app.sh
@@ -181,9 +185,9 @@ Aruna.app/Contents/MacOS/Aruna     # собранный здесь
 
 Ctrl-C останавливает программу так, как терминал останавливает любую другую:
 обработчика сигнала у нее нет. Внутри все для остановки готово (работа
-проверяет флаг отмены между документами), но нажать на него сейчас может только
-окно, которого пока нет. Для консольного запуска это осознанно оставлено
-терминалу.
+проверяет флаг отмены между документами), и нажимает на него окно: его
+«Отменить» доходит до того же флага. Для консольного запуска это осознанно
+оставлено терминалу.
 
 Что после этого остается в `~/Downloads`: каталог `.TLHdig_Beta_0.3.build.<pid>.<n>`
 – незавершенная сборка убитого прогона. Он скрытый (с точки), никуда не
@@ -241,19 +245,67 @@ Retina-экран показывает растянутую копию низк�
 ## Структура проекта
 
 ```text
-Aruna/
-├── Cargo.toml          # release: LTO, codegen-units=1, strip, opt-level=3
+cli/
+├── Cargo.toml
 ├── src/
-│   ├── main.rs         # CLI, zero args
-│   ├── lib.rs          # pipeline
-│   ├── download.rs     # Zenodo HTTPS
-│   ├── archive.rs      # ZIP → records
-│   ├── parse.rs        # heuristic AOxml / TEI parser
-│   ├── xml_scan.rs     # tag / attribute scanners
-│   ├── html.rs         # Scandinavian HTML
-│   ├── paths.rs        # ~/Downloads via dirs
-│   └── error.rs        # thiserror
-├── tests/integration.rs
+│   ├── app.rs              # что делает программа, для любой формы запуска
+│   ├── archive.rs          # обход и разбор ZIP-архива
+│   ├── cache.rs            # архив между запусками
+│   ├── catalog.rs          # каталог в JSON
+│   ├── console.rs          # отказ консольной формы по-русски
+│   ├── cth_titles.rs       # названия CTH из снимка в дереве
+│   ├── document.rs         # модель документа
+│   ├── download.rs         # загрузка ZIP с Zenodo
+│   ├── error.rs            # типы ошибок
+│   ├── export/             # экспорт пакета: опись, папки групп, манифест, PDF
+│   ├── fonts.rs            # шрифты программы и пакета
+│   ├── generated/          # артефакты фронтенда для описи
+│   ├── html.rs             # HTML-опись в скандинавском стиле
+│   ├── job.rs              # один прогон: кто слушает и как остановить
+│   ├── json.rs             # экранирование строки JSON
+│   ├── lib.rs              # библиотека
+│   ├── main.rs             # консольная программа без аргументов
+│   ├── md5.rs              # MD5, потоково
+│   ├── order.rs            # порядок описи
+│   ├── parse/              # эвристический разбор TLHdig / AOxml
+│   ├── paths.rs            # пути вывода (~/Downloads/...) и атомарная замена
+│   ├── pdf/                # PDF одного документа
+│   ├── presentation.rs     # что показывается читателю
+│   ├── progress.rs         # ход прогона
+│   ├── sha256.rs           # SHA-256, потоково
+│   ├── style.rs            # CSS порождаемых документов
+│   ├── xml_scan.rs         # байтовые сканеры заголовков AOxml
+│   ├── xml_wellformed.rs   # правильность XML и причина, если нет
+│   ├── zenodo/             # JSON записи Zenodo
+│   └── zenodo.rs           # запрос к записи Zenodo перед загрузкой
+├── tests/
+│   ├── authenticity.rs
+│   ├── cache_concurrency.rs
+│   ├── cache_lifecycle.rs
+│   ├── cancellation.rs
+│   ├── catalog_contract.rs
+│   ├── cli_process.rs
+│   ├── corpus.rs
+│   ├── document_model.rs
+│   ├── export_hostile.rs
+│   ├── export_integration.rs
+│   ├── export_pdf.rs
+│   ├── export_recovery.rs
+│   ├── fonts.rs
+│   ├── integration.rs
+│   ├── package_pages.rs
+│   ├── pdf_acceptance.rs
+│   ├── pdf_module.rs
+│   ├── progress_flow.rs
+│   ├── quick_xml_guard.rs
+│   ├── reliability.rs
+│   ├── rustls_interim_guard.rs
+│   ├── snapshots/
+│   ├── support/
+│   ├── verify_two_declarations.rs
+│   ├── window_seams.rs
+│   ├── xml_contract.rs
+│   └── xml_hostile.rs
 ├── icon.png
 ├── build_app.sh
 ├── .gitignore
@@ -281,21 +333,13 @@ opt-level = 3
 
 Репозиторий: [https://github.com/sergeyssimonov-max/Aruna](https://github.com/sergeyssimonov-max/Aruna)
 
-```bash
-cd cli
-git init
-git add .
-git commit -m "Initial release: Aruna TLHdig HTML inventory generator"
-git branch -M main
-git remote add origin https://github.com/sergeyssimonov-max/Aruna.git
-git push -u origin main
-```
-
 ---
 
 ## Лицензия
 
-MIT
+MIT. Исключение – шрифт `UllikummiA`, который распространяется на условиях
+Hethitologie-Portal Mainz, а не под MIT. Подробности – в разделе «Лицензия»
+[корневого README](../README.md).
 
 ## Выпуск (только macOS)
 
@@ -308,5 +352,5 @@ pnpm build   # scripts/build-release.sh → Universal .app + UDIF DMG
 CI и теги: [docs/AUTO_DMG.md](docs/AUTO_DMG.md)
 
 ```bash
-git tag v2.0.1 && git push origin v2.0.1   # тег должен совпадать с version в cli/Cargo.toml — CI проверяет
+git tag v2.0.1 && git push origin v2.0.1   # тег должен совпадать с version в cli/Cargo.toml – CI проверяет
 ```

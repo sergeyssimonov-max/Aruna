@@ -33,7 +33,7 @@ Beta 0.3 это 223 документа из 23 936 – те, которые м�
 | [`src-tauri/`](src-tauri/) | **Оболочка Tauri 2**, в которой окно живет. Шесть команд: `corpus_location`, `corpus_stats` и `corpus_xml` говорят, где пакет и что в нем, `build_corpus` и `cancel_build` запускают и останавливают сборку, `open_inventory` открывает опись. На все отвечают собственные пути крейта `cli`, его собственный манифест и его собственная сборка |
 | [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Выгрузка каталога из архива в JSON |
 
-До 2026-08-23 здесь было веб-приложение на React, которое отдавалось из `src/`, с модулем поиска на WASM в `wasm/search/`. Оно удалено вместе с собранным для него контейнером ARUN. Его место должно занять настольное приложение, когда оно появится. Что ушло и почему, записано в [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md).
+До 2026-08-23 здесь было веб-приложение на React, которое отдавалось из `src/`, с модулем поиска на WASM в `wasm/search/`. Оно удалено вместе с собранным для него контейнером ARUN. Что ушло и почему, записано в [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md).
 
 ## Консольная программа (Aruna)
 
@@ -206,7 +206,7 @@ pnpm dev             # Tauri window, frontend on Vite's dev server
 pnpm build           # → Universal .app + DMG (macOS, both architectures)
 pnpm build:host      # → .app + DMG for this machine's architecture only
 pnpm check           # svelte-check + tsc over all three tsconfigs
-pnpm test            # vitest — including the font-stack agreement check
+pnpm test            # vitest – including the font-stack agreement check
 ```
 
 `pnpm build` собирает под `universal-apple-darwin`, поэтому бандл работает и
