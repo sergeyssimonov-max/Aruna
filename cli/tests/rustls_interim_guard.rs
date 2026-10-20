@@ -1,6 +1,9 @@
 //! The guard of the four advisories excepted for one week in
 //! `.cargo/audit.toml` and `deny.toml`: RUSTSEC-2026-0346, -0347, -0348 and
 //! -0349 in `rustls` 0.23.45, which reaches this crate through `ureq` 2.12.1.
+//! RUSTSEC-2026-0381 and -0382 are excepted beside them since 2026-10-21 (task
+//! «webpki-interim-ignore»), with a guard of their own, and count here among
+//! the ones that were there before.
 //!
 //! The exception is the owner's decision of 2026-10-15 (task
 //! «rustls-interim-ignore»): the fix, rustls 0.23.46, was published on
@@ -36,17 +39,26 @@ const INTERIM: [&str; 4] = [
 ];
 
 /// What `.cargo/audit.toml` excepted before the week.
-const AUDIT_BEFORE: [&str; 6] = [
+const AUDIT_BEFORE: [&str; 8] = [
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
     "RUSTSEC-2025-0141",
     "RUSTSEC-2024-0320",
     "RUSTSEC-2026-0206",
     "RUSTSEC-2026-0192",
+    // excepted beside, 2026-10-21, task webpki-interim-ignore
+    "RUSTSEC-2026-0381",
+    "RUSTSEC-2026-0382",
 ];
 
 /// What `deny.toml` excepted before the week.
-const DENY_BEFORE: [&str; 2] = ["RUSTSEC-2026-0194", "RUSTSEC-2026-0195"];
+const DENY_BEFORE: [&str; 4] = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    // excepted beside, 2026-10-21, task webpki-interim-ignore
+    "RUSTSEC-2026-0381",
+    "RUSTSEC-2026-0382",
+];
 
 /// The first rustls that fixes all four.
 const FIXED: (u64, u64, u64) = (0, 23, 46);
@@ -406,7 +418,8 @@ fn each_check_fails_on_made_up_inputs() {
     // The lists.
     let both = "x\nignore = [\n    \"RUSTSEC-2026-0194\",\n    \"RUSTSEC-2026-0195\",\n    \
                 # RUSTSEC-2099-0001 in a comment is no entry\n    \"RUSTSEC-2026-0346\",\n    \
-                \"RUSTSEC-2026-0347\",\n    \"RUSTSEC-2026-0348\",\n    \"RUSTSEC-2026-0349\",\n]\n";
+                \"RUSTSEC-2026-0347\",\n    \"RUSTSEC-2026-0348\",\n    \"RUSTSEC-2026-0349\",\n    \
+                \"RUSTSEC-2026-0381\",\n    \"RUSTSEC-2026-0382\",\n]\n";
     assert_eq!(ignore_list_problem("deny.toml", both, &DENY_BEFORE), None);
     let short = both.replace("    \"RUSTSEC-2026-0348\",\n", "");
     assert!(ignore_list_problem("deny.toml", &short, &DENY_BEFORE)
