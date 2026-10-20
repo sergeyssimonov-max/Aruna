@@ -223,14 +223,15 @@ promises — both counts, the path they were asked for, the error text in place 
 the counts when the command refuses, and the click counter — while
 `e2e/smoke.e2e.ts` holds the same button in the real WKWebView, which is the one
 thing jsdom cannot answer for.
-**`node`** holds the tests that read the repository rather than a DOM, 82 in
-15 files:
+**`node`** holds the tests that read the repository rather than a DOM, 136 in
+16 files (counted on 2026-10-20 at `87e1b28`; 82 in 15 before the three documentation tests of readme-ru):
 
 | test | what it holds |
 |---|---|
 | `tests/font-stack.test.ts` | the cuneiform stack in `src/inventory/canonical.css` and `src/app.css` name the same faces, in the same order |
-| `tests/readme-links.test.ts` | every link in the seven documents resolves |
-| `tests/release-version.test.ts` | the release the README calls current is the version `cli/Cargo.toml` declares — CI holds the tag to the manifest, this holds the sentence a reader acts on |
+| `tests/readme-links.test.ts` | every link in the девять documents resolves – the seven of before and, since 2026-10-20, `cli/releases/README.md` and `frontend/README.md` |
+| `tests/release-version.test.ts` | the release the README calls current is the version `cli/Cargo.toml` declares — CI holds the tag to the manifest, this holds the sentence a reader acts on; the paragraph is found by its link to `/releases/latest`, not by its words, since 2026-10-20 |
+| `tests/docs-typography.test.ts` | the four README files and every `.github/release-notes/vX.Y.Z.md` keep the Russian typography of CLAUDE.md outside code – no em dash, no `ё`, no comma before a dash, a non-breaking space before `%` and after `№` – and are Cyrillic at all; every reference release has its page file |
 | `tests/one-frontend-stack.test.ts` | React is in no manifest, no lock file, no source file and no artifact — and the stack is Svelte without SvelteKit |
 | `tsconfig.e2e.json` | the E2E contour — `e2e/*.e2e.ts` and `wdio.conf.ts` — which no project covered until 2026-08-25. It found both a `wdio.conf.ts` annotated with `Options.Testrunner` (a standalone-session type with no `capabilities` key) and an import of `@wdio/types` that was never declared as a dependency and survived only because it is type-only |
 | `tests/spec-guard.test.ts` | the decisions [`PROJECT-SPEC.ru.md`](PROJECT-SPEC.ru.md) fixed — the pnpm pin, the `safari16` floor, the identifier and bundle targets, matching window and document titles, the window's permissions compared as a whole list (`core:default` and `dialog:allow-open`, since 2026-09-22) with `{ open }` from the dialog as the page's only plugin import, and the four gates that keep the E2E contour out of a release |
