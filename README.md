@@ -1,198 +1,204 @@
 # Aruna / TLHdig Inventory
 
-Production toolkit for [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (Hittite cuneiform transliterations).
+Набор рабочих инструментов для [TLHdig Beta 0.3](https://zenodo.org/records/20328284) (транслитерации хеттских клинописных текстов).
 
-**What it makes.** Aruna downloads the corpus from Zenodo and writes it out in
-`~/Downloads` as one package: every document as normalised XML, the PDF of each
-document in the folder of its XML (`CTH N/<siglum>.pdf` beside
-`CTH N/<siglum>.xml`), an HTML inventory over them, and a manifest that records
-what became of each one. In the inventory every document is one link, on its
-name: it opens the document's PDF, and where no PDF was built it opens the XML
-instead. On TLHdig Beta 0.3 that is 223 of the 23 936 documents – the ones the
-document model does not read – and the manifest gives the reason for each.
+**Что программа делает.** Aruna скачивает корпус с Zenodo и записывает его в
+`~/Downloads` одним пакетом: каждый документ в виде нормализованного XML, PDF
+каждого документа в папке его XML (`CTH N/<siglum>.pdf` рядом с
+`CTH N/<siglum>.xml`), HTML-опись над ними и манифест, где записано, что стало
+с каждым документом. В описи у каждого документа одна ссылка – на его имени.
+Она открывает PDF документа, а если PDF не построен, то его XML. На TLHdig
+Beta 0.3 это 223 документа из 23 936 – те, которые модель документа не
+читает, и манифест называет причину для каждого.
 
-**A build takes about two minutes**, almost all of it the PDFs. Every build
-makes them: there is no mode without PDFs (owner's decision of 2026-10-18). The
-fonts the PDFs are set in travel with the application; a build that does not
-find them, or finds them altered, stops before any work with `font_missing` or
-`font_altered` and publishes nothing.
+**Сборка занимает около двух минут**, почти все это время уходит на PDF. PDF
+строятся при каждой сборке: режима без PDF нет (решение владельца от
+2026-10-18). Шрифты, которыми набираются PDF, едут вместе с приложением. Если
+сборка их не находит или находит измененными, она останавливается до начала
+работы с отказом `font_missing` или `font_altered` и ничего не публикует.
 
-**What ships is the application with a window.** Since 2026-09-04 a release is
-`Aruna.app`, built from [`src-tauri/`](src-tauri/) and
-[`frontend/`](frontend/). The window calls the same core,
-[`cli/`](cli/), that the console binary calls: it shows the run as it goes, the
-PDF phase included, can stop it, and ends on the report of that run. The
-console form is the same program without the screen, and it is what a
-developer runs.
+**Выпускается приложение с окном.** С 2026-09-04 выпуск – это `Aruna.app`,
+собранное из [`src-tauri/`](src-tauri/) и [`frontend/`](frontend/). Окно
+вызывает то же ядро, [`cli/`](cli/), что и консольная программа: показывает
+ход сборки, включая фазу PDF, умеет ее остановить и заканчивает отчетом об
+этой сборке. Консольная форма – та же программа без экрана, и именно ее
+запускает разработчик.
 
-## Layout
+## Устройство репозитория
 
-| Path | Description |
+| Путь | Что там |
 |------|-------------|
-| [`cli/`](cli/) | **Aruna** – the core and the console binary: download the Zenodo ZIP → parse the XML → a folder of documents, the PDF of each, an HTML inventory and a manifest. Builds on macOS and Linux; the `.app` and DMG are macOS-only |
-| [`frontend/`](frontend/) | **The window** – Svelte 5, Vite, TypeScript, no SvelteKit. One screen: what is on disk, an offer to build the package from Zenodo, the stage and the fraction while it builds, and the report of that run – the PDFs built among its numbers – with the inventory a click away. Its types are generated from the Rust commands into `src/bindings.ts` |
-| [`src-tauri/`](src-tauri/) | **The Tauri 2 shell** that hosts it. Six commands: `corpus_location`, `corpus_stats` and `corpus_xml` say where the package is and what is in it, `build_corpus` and `cancel_build` run and stop a build, `open_inventory` opens the inventory – all answered by the `cli` crate's own paths, its own manifest and its own build |
-| [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Emit the catalog as JSON from the archive |
+| [`cli/`](cli/) | **Aruna** – ядро и консольная программа: загрузка ZIP с Zenodo → разбор XML → папка документов, PDF каждого, HTML-опись и манифест. Собирается на macOS и Linux, `.app` и DMG – только на macOS |
+| [`frontend/`](frontend/) | **Окно** – Svelte 5, Vite, TypeScript, без SvelteKit. Один экран: что лежит на диске, предложение собрать пакет с Zenodo, стадия и доля готового во время сборки и отчет об этой сборке – среди его чисел число построенных PDF – с описью в один щелчок. Типы окна порождаются из команд Rust в `src/bindings.ts` |
+| [`src-tauri/`](src-tauri/) | **Оболочка Tauri 2**, в которой окно живет. Шесть команд: `corpus_location`, `corpus_stats` и `corpus_xml` говорят, где пакет и что в нем, `build_corpus` и `cancel_build` запускают и останавливают сборку, `open_inventory` открывает опись. На все отвечают собственные пути крейта `cli`, его собственный манифест и его собственная сборка |
+| [`cli/examples/emit_inventory_json.rs`](cli/examples/emit_inventory_json.rs) | Выгрузка каталога из архива в JSON |
 
-There was a React web application here until 2026-08-23, served from `src/` with a WASM search module under `wasm/search/`. It has been removed along with the ARUN container built for it; the desktop application is to replace it, once it exists. [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records what went and why.
+До 2026-08-23 здесь было веб-приложение на React, которое отдавалось из `src/`, с модулем поиска на WASM в `wasm/search/`. Оно удалено вместе с собранным для него контейнером ARUN. Его место должно занять настольное приложение, когда оно появится. Что ушло и почему, записано в [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md).
 
-## CLI (Aruna)
+## Консольная программа (Aruna)
 
-Builds on macOS 13+ and Linux. The tests run in CI on Linux; the macOS jobs check the desktop crate and build the `.app` and the DMG, and run no CLI tests — the CLI's own suite is the Ubuntu one. Windows is untried. Only the `.app` bundle and the DMG are macOS-only.
+Собирается на macOS 13+ и Linux. Тесты в CI идут на Linux. Задания на macOS проверяют крейт настольного приложения и собирают `.app` и DMG, а тестов консольной программы не запускают – ее собственный набор идет на Ubuntu. Windows не проверялась. Только бандл `.app` и DMG требуют macOS.
 
 ```bash
 cargo build --release --locked -p aruna                     # any supported platform, from the repository root
 ARUNA_FONTS=cli/resources/fonts ./target/release/aruna      # → ~/Downloads/TLHdig_Beta_0.3/ – open TLHdig_Beta_0.3.html inside it
 ```
 
-`ARUNA_FONTS` names the directory of the fonts the PDFs are set in; in the tree
-that is [`cli/resources/fonts/`](cli/resources/fonts/), the seven files
-[`docs/FONTS.md`](docs/FONTS.md) lists. It is never searched for: without it
-the console refuses before any work and names the file it wanted. `ARUNA_PDF`
-is no longer read – every build makes PDFs since 2026-10-18 – so a script that
-still sets it builds them all the same.
+`ARUNA_FONTS` называет каталог шрифтов, которыми набираются PDF. В дереве это
+[`cli/resources/fonts/`](cli/resources/fonts/) – семь файлов, перечисленных в
+[`docs/FONTS.md`](docs/FONTS.md). Программа этот каталог не ищет: без
+переменной консоль отказывает до начала работы и называет файл, которого
+ждала. `ARUNA_PDF` больше не читается – с 2026-10-18 каждая сборка строит PDF,
+так что скрипт, который его еще задает, все равно получит их все.
 
-The path is the workspace's, not the crate's: since the two crates were joined
-on 2026-08-30 `cargo` writes to `target/` at the root whichever directory it is
-invoked from.
+Путь – путь воркспейса, а не крейта: с тех пор как 2026-08-30 оба крейта
+объединены, `cargo` пишет в `target/` в корне, из какого бы каталога его ни
+вызвали.
 
-The first run downloads 71 MiB from Zenodo and keeps it in the OS cache directory, so later runs need no network; a build takes about two minutes either way, almost all of it the PDFs. `ARUNA_ZIP=/path/to.zip` uses a local archive instead. Details in [`cli/README.md`](cli/README.md).
+Первый запуск скачивает с Zenodo 71 MiB и оставляет архив в каталоге кэша ОС, поэтому следующим запускам сеть не нужна. Сборка в любом случае занимает около двух минут, почти все это время уходит на PDF. `ARUNA_ZIP=/path/to.zip` берет вместо загрузки локальный архив. Подробности – в [`cli/README.md`](cli/README.md).
 
-Packaging, on macOS 13+ only:
+Упаковка, только на macOS 13+:
 
 ```bash
 pnpm build                     # → target/universal-apple-darwin/release/bundle/{macos/Aruna.app,dmg/*.dmg}
 ```
 
-That is `scripts/build-release.sh`, which runs `tauri build --target universal-apple-darwin`: it builds the frontend,
-packs it into `Aruna.app` for both architectures and writes the DMG beside it. It refuses any Xcode but 15.2 and any
-Node but the one in `.node-version`, and it strips the building machine's paths, so the application it produces is
-byte-for-byte the one in the published release built from the same commit — checked with v2.5.11.
-The console binary above is unaffected — `cargo build -p aruna` still produces
-it, and that is still what a developer runs.
+Это `scripts/build-release.sh`, который запускает `tauri build --target universal-apple-darwin`: собирает фронтенд,
+упаковывает его в `Aruna.app` для обеих архитектур и кладет рядом DMG. Скрипт отказывает при Xcode не 15.2 и при
+Node не из `.node-version` и убирает пути сборочной машины, поэтому приложение, которое он собирает, побайтно равно
+приложению опубликованного выпуска из того же коммита – проверено на v2.5.11.
+Консольной программы выше это не касается: `cargo build -p aruna` по-прежнему
+собирает ее, и именно ее по-прежнему запускает разработчик.
 
-Prebuilt DMG: [Releases](https://github.com/sergeyssimonov-max/Aruna/releases) (Universal Binary).
+Готовый DMG: [Releases](https://github.com/sergeyssimonov-max/Aruna/releases) (Universal Binary).
 
-### What the DMG contains, and what double-clicking it does
+### Что лежит в DMG и что происходит при двойном щелчке
 
-`Aruna.app` is an application with a window. Double-clicked from Finder, opened
-from Launchpad or started with `open Aruna.app`, it comes up 800 by 600 in the
-middle of the screen and says what is on disk: whether the package is already
-built, how large it is and how uneven the corpus is. From there it builds the
-package itself, from Zenodo – the documents, then the PDF of each – showing the
-stage and the fraction while it works, and it can be stopped mid-run. When it
-finishes it reports that run, with how many PDFs it built, and offers the
-inventory it wrote. The fonts the PDFs need are inside the application, in
+`Aruna.app` – приложение с окном. Если открыть его двойным щелчком в Finder,
+из Launchpad или командой `open Aruna.app`, оно появляется размером 800 на 600
+посреди экрана и говорит, что лежит на диске: собран ли уже пакет, насколько
+он велик и насколько неравномерен корпус. Отсюда оно само собирает пакет с
+Zenodo (сначала документы, затем PDF каждого) и показывает во время работы
+стадию и долю готового. Сборку можно остановить на середине. Закончив, оно
+сообщает об этой сборке, в том числе сколько PDF построено, и предлагает
+записанную опись. Шрифты, которые нужны PDF, лежат внутри приложения, в
 `Aruna.app/Contents/Resources/fonts/`.
 
-Until 2026-09-04 what this DMG carried was the console program in an application
-bundle: no window, no progress, no dialogs, and a double click that ran to
-completion and said nothing — on a good run and on a bad one alike, because
-everything it printed went to a terminal Finder never gave it. That is what the
-window replaces.
+До 2026-09-04 в этом DMG лежала консольная программа в бандле приложения: ни
+окна, ни хода сборки, ни диалогов, а двойной щелчок доходил до конца и ничего
+не говорил – что при удачном прогоне, что при неудачном, потому что все, что
+программа печатала, уходило в терминал, которого Finder ей не давал. Это и
+заменяет окно.
 
-**The console form has not gone anywhere.** It is the same core, and it is still
-the shorter path when you want the package and not a screen:
+**Консольная форма никуда не делась.** Это то же ядро, и оно по-прежнему
+короче, когда нужен пакет, а не экран:
 
 ```bash
 cargo build --release -p aruna && ARUNA_FONTS=cli/resources/fonts ./target/release/aruna
 ```
 
-### If a run is killed
+### Если прогон прервали
 
-Ctrl-C stops the console form the way the terminal stops any program: there is
-no signal handler. The machinery for a clean stop exists and is exercised — work
-checks a cancellation flag between documents — and the window is what presses
-it: its «Остановить» reaches the same flag, and a run stopped that way publishes
-nothing and leaves nothing behind. From a terminal, Ctrl-C is still the blunt
-version.
+Ctrl-C останавливает консольную форму так, как терминал останавливает любую
+программу: обработчика сигнала у нее нет. Механизм чистой остановки есть и
+проверен (работа сверяет флаг отмены между документами), и нажимает на него
+окно: его «Отменить» доходит до того же флага, и остановленная так сборка
+ничего не публикует и ничего после себя не оставляет. Из терминала Ctrl-C
+остается грубым способом.
 
-What a killed run leaves in `~/Downloads` is a hidden directory,
-`.TLHdig_Beta_0.3.build.<pid>.<n>` — its unfinished package, up to the size of a
-whole one — and a small `.owner` file beside it. Nothing is published from it,
-and the next run removes both before it writes anything: the run holds a lock on
-the `.owner` file while it works, the system drops that lock when the process
-ends however it ends, and only a directory whose lock nobody holds is removed —
-so a second copy of the program still building in the same folder is never
-touched. A directory without an `.owner` file, as 2.5.7 and earlier leave it, is
-removed once it is an hour old. A finished package is never at risk from this:
-the previous one is moved aside only after the new one is written whole and
-checked.
+Убитый прогон оставляет в `~/Downloads` скрытый каталог
+`.TLHdig_Beta_0.3.build.<pid>.<n>` – недособранный пакет размером до целого –
+и рядом маленький файл `.owner`. Из каталога ничего не публикуется, а
+следующий запуск удаляет оба, прежде чем что-либо записать. Прогон держит
+блокировку на файле `.owner`, пока работает, система снимает ее, когда процесс
+кончается, как бы он ни кончился, и удаляется только каталог, чью блокировку
+никто не держит. Поэтому вторая копия программы, которая еще собирает в той же
+папке, не тронута. Каталог без файла `.owner`, какие оставляют 2.5.7 и более
+ранние, удаляется, когда ему исполнится час. Готовому пакету это ничем не
+грозит: прежний отодвигается в сторону только после того, как новый целиком
+записан и проверен.
 
 ### Gatekeeper
 
-**Read this before the first launch, because there will be nothing else to
-read.** The `.app` is signed ad hoc: enough for macOS to run it locally, not a
-Developer ID, and it is not notarized — this project has no paid Apple
-membership. macOS will therefore refuse it on first open, with *"Aruna cannot
-be opened because the developer cannot be verified"* or *"is damaged and can't
-be opened"*, the second being what a quarantined download usually produces.
+**Прочтите это до первого запуска, потому что больше читать будет нечего.**
+`.app` подписан ad hoc: этого хватает, чтобы macOS запускала его локально, но
+это не Developer ID, и приложение не нотаризовано – платного членства Apple у
+проекта нет. Поэтому при первом открытии macOS откажет с сообщением *"Aruna
+cannot be opened because the developer cannot be verified"* (перевод: «Aruna
+не удается открыть, потому что не удается проверить разработчика») или *"is
+damaged and can't be opened"* (перевод: «поврежден, и его невозможно
+открыть»). Второе обычно и выдает загрузка, помеченная карантином.
 
-What that refusal costs changed on 2026-09-04, and it is worse than it was.
-While this bundle held the console program, a blocked launch was one more
-silence among others — the program said nothing from Finder anyway. Now the
-application has a window, and a person who double-clicks it expects one: the
-refusal is the whole of what they get, and nothing appears at all. So the steps
-below are not a footnote.
+Цена этого отказа изменилась 2026-09-04, и она выше прежней. Пока в бандле
+лежала консольная программа, заблокированный запуск был еще одним молчанием
+среди прочих – из Finder программа и так ничего не говорила. Теперь у
+приложения есть окно, и человек, который щелкает по нему дважды, ждет окна:
+отказ – это все, что он получает, и не появляется вообще ничего. Поэтому шаги
+ниже – не сноска.
 
-**Check what you are letting through before you let it through.** Every release
-publishes the digest of its DMG, and `shasum -a 256 -c SHA256SUMS` beside the
-downloaded file checks it. The steps below hand an unverified binary the
-system's benefit of the doubt; do them after the digest matches, not before.
+**Проверьте, что вы пропускаете, прежде чем пропустить.** Каждый выпуск
+публикует сумму своего DMG, и `shasum -a 256 -c SHA256SUMS` рядом со
+скачанным файлом ее проверяет. Шаги ниже дают непроверенному бинарнику
+снисхождение системы. Делайте их после того, как сумма сошлась, а не до.
 
-Then open it once through the exception, or clear the quarantine flag:
+Затем откройте приложение один раз через исключение или снимите метку
+карантина:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Aruna.app   # then run it normally
 ```
 
-`-r` because the flag is set on files inside the bundle as well as on the
-bundle itself, and clearing only the top one leaves the copy that stops it
-opening. Point it wherever the `.app` actually is — `/Applications` is where
-this project suggests putting it, not where macOS requires it.
+`-r` – потому что метка стоит и на файлах внутри бандла, и на самом бандле, и
+если снять только верхнюю, останется та копия, которая не дает его открыть.
+Укажите путь туда, где `.app` на самом деле лежит: `/Applications` – место,
+которое предлагает проект, а не то, которого требует macOS.
 
-**Clear the flag before the first attempt to open the app, not after.** Once
-macOS 13 has checked a quarantined bundle at launch, it protects it: `xattr -dr`
-on a copy that has already been opened answers *"Operation not permitted"* for
-every file in the bundle (22 of them, measured on the release gate of
-2026-09-23), while the same command on a fresh copy, before its first launch,
-clears every flag and leaves the signature intact. If the app has already been
-tried, the way left is **System Settings → Privacy & Security → Open Anyway**,
-below, or a fresh copy from the DMG.
+**Снимите метку до первой попытки открыть приложение, а не после.** Когда
+macOS 13 однажды проверила помеченный карантином бандл при запуске, она его
+защищает: `xattr -dr` на копии, которую уже открывали, отвечает *"Operation
+not permitted"* (перевод: «Операция не разрешена») на каждый файл бандла
+(их 22, замер заслона выпуска 2026-09-23), а та же команда на свежей копии,
+до ее первого запуска, снимает все метки и оставляет подпись целой. Если
+приложение уже пробовали открыть, остается путь **System Settings → Privacy &
+Security → Open Anyway** (перевод: «Системные настройки → Конфиденциальность и
+безопасность → Все равно открыть»), описанный ниже, или свежая копия из DMG.
 
-Finder's route to the same exception: right-click the app → **Open** → **Open**
-in the dialog. On Ventura and later a blocked app can also be allowed under
-**System Settings → Privacy & Security**, where an *"Open Anyway"* button
-appears after the first refusal.
+Путь Finder к тому же исключению: щелчок правой кнопкой по приложению →
+**Open** → **Open** в диалоге (перевод: «Открыть»). На Ventura и новее
+заблокированное приложение можно разрешить и в **System Settings → Privacy &
+Security** (перевод: «Системные настройки → Конфиденциальность и
+безопасность»), где после первого отказа появляется кнопка *"Open Anyway"*
+(перевод: «Все равно открыть»).
 
-## Desktop application – the program a reader installs
+## Настольное приложение – программа, которую ставит читатель
 
-**It is one screen, and it does the work.** The stack under it is
-wired end to end and kept green: `pnpm dev` opens a window, and since
-2026-09-02 that window is the program's front door rather than a view of its
-output. It reads what is on disk — how many manuscripts, how many CTH groups,
-how unevenly the one is spread across the other, and what the manifest counted
-about the corpus's writing — and it builds: `build_corpus` runs the core off the
-main thread, `build-progress` events carry the stage and the fraction, and
-`cancel_build` stops a run that is not wanted. The PDF phase is a stage of its
-own on that screen, with the documents done and the PDFs built. The report it
-ends on is the run's own, not a second count taken afterwards.
-The screen was drawn through `/design` once and rebuilt by hand in `App.svelte`
-and `app.css`. It is not redrawn on a schedule: what it carries — the four
-commands, the states it can be in, and the counts — is a contract, written out
-in [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) §3, and replacing it
-is a decision rather than a routine. The design tool is still checked against
-this stack, on a mockup built beside the repository and never carried into it.
+**Это один экран, и он делает работу.** Стек под ним связан от края до края и
+держится зеленым: `pnpm dev` открывает окно, и с 2026-09-02 это окно – вход в
+программу, а не просмотр ее результата. Оно читает, что лежит на диске:
+сколько манускриптов, сколько групп CTH, насколько неравномерно одни
+распределены по другим и что манифест насчитал о письме корпуса. И оно
+собирает: `build_corpus` запускает ядро не на главном потоке, события
+`build-progress` несут стадию и долю готового, а `cancel_build` останавливает
+ненужную сборку. Фаза PDF – отдельная стадия на этом экране, с числом готовых
+документов и построенных PDF. Экран заканчивается отчетом
+самой сборки, а не второй подсчет задним числом.
+Экран однажды был нарисован через `/design` и затем вручную пересобран в
+`App.svelte` и `app.css`. По расписанию он не перерисовывается: все, что он
+несет (четыре команды, состояния, в которых он бывает, и числа), составляет
+контракт, выписанный в [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md)
+§3, и заменить его – решение, а не рутина. Инструмент дизайна по-прежнему
+сверяется с этим стеком, на макете, собранном рядом с репозиторием и в него
+никогда не переносившемся.
 
-Since 2026-09-04 this window is the thing a reader installs: the image is built
-from `aruna-desktop`, not from the console crate.
-[`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) records the contract
-between the two halves. The commands below build and check the shell; since
-2026-08-29 a `desktop` job on macOS runs the same battery in CI, so a break
-surfaces on the push that caused it rather than on the next person to run them
-by hand.
+С 2026-09-04 читатель ставит именно это окно: образ собирается из
+`aruna-desktop`, а не из консольного крейта.
+[`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) записывает контракт
+между двумя половинами. Команды ниже собирают и проверяют оболочку. С
+2026-08-29 задание `desktop` на macOS гоняет тот же набор в CI, так что
+поломка видна на том пуше, который ее внес, а не у следующего, кто запустит
+команды руками.
 
-pnpm only — the version is pinned by `packageManager` in [`package.json`](package.json), so `corepack` hands every machine the same one.
+Только pnpm – версию закрепляет `packageManager` в [`package.json`](package.json), поэтому `corepack` выдает каждой машине одну и ту же.
 
 ```bash
 pnpm --dir frontend install
@@ -203,102 +209,105 @@ pnpm check           # svelte-check + tsc over all three tsconfigs
 pnpm test            # vitest — including the font-stack agreement check
 ```
 
-`pnpm build` targets `universal-apple-darwin`, so the bundle it produces runs on
-Intel and Apple Silicon alike — the same guarantee the CLI's DMG has always
-carried. It needs both Rust targets installed (`rustup target add
-x86_64-apple-darwin aarch64-apple-darwin`) and, being a macOS target, it is
-macOS-only; `build:host` is the escape hatch anywhere else.
+`pnpm build` собирает под `universal-apple-darwin`, поэтому бандл работает и
+на Intel, и на Apple Silicon – та же гарантия, что всегда давал DMG
+консольной программы. Нужны обе цели Rust (`rustup target add
+x86_64-apple-darwin aarch64-apple-darwin`), и, раз цель – macOS, собирается
+это только на macOS. В любом другом месте выход – `build:host`.
 
-`pnpm dev` and `pnpm build` drive the frontend themselves: `beforeDevCommand` and `beforeBuildCommand` in [`src-tauri/tauri.conf.json`](src-tauri/tauri.conf.json) run it, and `frontendDist` points at what `vite build` leaves in `frontend/dist`.
+`pnpm dev` и `pnpm build` сами запускают фронтенд: это делают `beforeDevCommand` и `beforeBuildCommand` в [`src-tauri/tauri.conf.json`](src-tauri/tauri.conf.json), а `frontendDist` указывает на то, что `vite build` оставляет в `frontend/dist`.
 
 ## CI
 
 [`.github/workflows/release-dmg.yml`](.github/workflows/release-dmg.yml) · [`cli/docs/AUTO_DMG.md`](cli/docs/AUTO_DMG.md)
 
-Four jobs on every push. Three on Ubuntu: tests and clippy for the CLI; `svelte-check`, vitest and a production build for the frontend; and a full parse of all 23 936 manuscripts against the real archive. The fourth is on macOS – formatting, clippy and tests for `src-tauri`, because a Tauri crate on Linux needs GTK and WebKitGTK to compile at all, and checking it there would say nothing about the one platform this ships on. Since 2026-08-31 that fourth job also gates the release: a release is not cut from a tree whose desktop crate is red. Since 2026-09-04 the DMG is the desktop crate itself, so that job is the one that checks what ships.
+На каждый пуш – четыре задания. Три на Ubuntu: тесты и clippy консольной программы, `svelte-check`, vitest и производственная сборка фронтенда и полный разбор всех 23 936 манускриптов на настоящем архиве. Четвертое – на macOS: форматирование, clippy и тесты `src-tauri`, потому что крейту Tauri на Linux для одной только компиляции нужны GTK и WebKitGTK, и проверка там ничего не сказала бы о единственной платформе, на которую он выходит. С 2026-08-31 четвертое задание еще и сторожит выпуск: из дерева, где крейт настольного приложения красный, выпуск не режется. С 2026-09-04 DMG – это и есть крейт настольного приложения, так что именно это задание проверяет то, что выходит.
 
-The Universal `.app` and DMG are built on macOS, but only when a release is being cut or when the workflow is run by hand — macOS minutes bill at ten times the rate, and nothing but a release consumes that artifact. Run it by hand before tagging, since a break in the packaging script no longer surfaces on the push that caused it:
+Universal `.app` и DMG собираются на macOS, но только когда режется выпуск или когда workflow запущен руками: минуты macOS стоят вдесятеро дороже, а этот артефакт не нужен никому, кроме выпуска. Запускайте его руками перед тегом, потому что поломка скрипта упаковки больше не видна на том пуше, который ее внес:
 
 ```bash
 gh workflow run release-dmg.yml --ref main
 ```
 
-A tag builds it and publishes the release:
+Тег собирает его и публикует выпуск:
 
 ```bash
 git tag v2.0.1 && git push origin v2.0.1   # → GitHub Release with DMG
 ```
 
-The tag has to match `version` in [`cli/Cargo.toml`](cli/Cargo.toml), and CI refuses the release if it does not: the `.app` takes its `CFBundleShortVersionString` from that manifest, so a tag and a manifest that disagree publish a DMG whose application reports a different version from the release it is attached to.
+Тег обязан совпадать с `version` в [`cli/Cargo.toml`](cli/Cargo.toml), и CI отказывает в выпуске, если нет: `.app` берет свой `CFBundleShortVersionString` из этого манифеста, поэтому тег и манифест, которые расходятся, публикуют DMG, чье приложение называет не ту версию, что выпуск, к которому оно приложено.
 
-The corpus job is the one that runs the parser against the real 71 MiB archive rather than fixtures, which is where the character-boundary panic on actual cuneiform was caught. It gates the release.
+Задание по корпусу – то, которое гоняет разборщик на настоящем архиве в 71 MiB, а не на фикстурах. Именно там была поймана паника на границе знака в настоящей клинописи. Оно сторожит выпуск.
 
-## Releases
+## Выпуски
 
-**[v2.6.3](https://github.com/sergeyssimonov-max/Aruna/releases/latest) is the
-current release — the one to download.** It is what `Releases` marks *Latest*,
-and it is the only version this project asks anyone to install.
+**[v2.6.3](https://github.com/sergeyssimonov-max/Aruna/releases/latest) –
+действующий выпуск, тот, который нужно скачивать.** Именно его `Releases`
+помечает как *Latest*, и это единственная версия, которую проект просит
+ставить.
 
-**Six releases are published, and four of them are references.** Three are
-kept as **references** only: states this project measures itself against and
-can fall back to when a fault has to be bracketed in time. They are baselines
-for the people working on it, not versions to run — a reference is by
-definition behind. The fourth reference is the release above, the one to
-install. v2.6.1 and v2.6.2 stay published, with their tags, but are no longer
-references.
+**Опубликовано шесть выпусков, и четыре из них опорные.** Три держатся только
+как **опорные**: состояния, с которыми проект себя сверяет и к которым может
+откатиться, когда неисправность нужно зажать во времени. Это точки отсчета для
+тех, кто над ним работает, а не версии для запуска – опорный выпуск по
+определению отстает. Четвертый опорный – выпуск выше, тот, который нужно
+ставить. v2.6.1 и v2.6.2 остаются опубликованными, с тегами, но опорными больше
+не являются.
 
-[v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) is the floor: the first release of the numbering that survives, and the oldest state still known to be good.
+[v1.0.5](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.5) – нижняя граница: первый выпуск сохранившейся нумерации и самое старое состояние, про которое еще известно, что оно исправно.
 
-[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) closes the 1.x line: it credits the corpus authors and bounds a download that had nothing but the disk to stop it.
+[v1.0.9](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v1.0.9) закрывает линию 1.x: в нем названы авторы корпуса и ограничена загрузка, которую прежде не останавливало ничто, кроме диска.
 
-[v2.5.11](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.11) is the previous reference, and the first release whose binary is reproducible across machines. It stays a reference: v2.6.0 was added beside it, not in its place, and v2.6.1 took v2.6.0's place, not its.
+[v2.5.11](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.5.11) – предыдущий опорный и первый выпуск, чей бинарник воспроизводим на разных машинах. Он остается опорным: v2.6.0 был добавлен рядом с ним, а не на его место, и v2.6.1 встал на место v2.6.0, а не его.
 
-[v2.6.1](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.6.1) and [v2.6.2](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.6.2) were references until 2026-10-08. By the owner's decision of 2026-10-06 the references with v2.6.3 are v2.6.3 and, before it, v2.5.11, and the intermediate images go: their copies left the tree and the installer archive. Their tags and releases stay.
+[v2.6.1](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.6.1) и [v2.6.2](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v2.6.2) были опорными до 2026-10-08. По решению владельца от 2026-10-06 опорные при v2.6.3 – v2.6.3 и, до него, v2.5.11, а промежуточные образы уходят: их копии ушли из дерева и из архива дистрибутивов. Их теги и выпуски остаются.
 
-**What that cost until 2026-09-23, said plainly.** v2.1.0, v2.2.0, v2.3.0 and v2.4.0 were
-withdrawn on 2026-08-30 — tags and DMGs both — and v2.5.0 followed on
-2026-09-01, when v2.5.1 replaced it as the third reference, v2.5.1 itself on
-2026-09-04, when v2.5.2 replaced it in turn — the release that carries the
-window as the thing a reader installs — v2.5.2 on 2026-09-06, replaced by
-v2.5.3, v2.5.3 on 2026-09-07, replaced by v2.5.4, v2.5.4 on 2026-09-10,
-replaced by v2.5.5, v2.5.5 on 2026-09-12, replaced by v2.5.6, v2.5.6 on
-2026-09-13, replaced by v2.5.7, v2.5.7 later the same day, replaced by v2.5.8, v2.5.8
-on 2026-09-20, replaced by v2.5.9, v2.5.9 hours later the same day, replaced by
-v2.5.10 — which carried no code change over it, only documentation — and v2.5.10 on
-2026-09-22, replaced by v2.5.11. A reference cannot be re-cut, so work that
-lands after one takes a number of its own; keeping the list at three meant
-retiring the release it replaced rather than letting both stand, and left
-nothing between v1.0.9 and the newest release to bracket a recent fault from
-below. v2.6.0 is the first release since 2026-08-30 that did not retire the one
-before it: by the owner's decision of 2026-09-23 v2.5.11 stays, and brackets it.
-v2.6.0 itself was withdrawn on 2026-09-26, by the owner's decision, when v2.6.1
-took its place; v2.5.11 stayed, and so did v2.6.1 when v2.6.2 was published on 2026-09-29.
-The history of what changed when is in the commits, which were not touched.
+**Чего это стоило до 2026-09-23, если сказать прямо.** v2.1.0, v2.2.0, v2.3.0 и v2.4.0 были
+сняты 2026-08-30 (и теги, и DMG), следом за ними 2026-09-01 ушел v2.5.0,
+когда v2.5.1 сменил его как третий опорный, сам v2.5.1 – 2026-09-04, когда его
+в свою очередь сменил v2.5.2 (выпуск, с которым читатель стал ставить окно),
+v2.5.2 – 2026-09-06, смененный
+v2.5.3, v2.5.3 – 2026-09-07, смененный v2.5.4, v2.5.4 – 2026-09-10,
+смененный v2.5.5, v2.5.5 – 2026-09-12, смененный v2.5.6, v2.5.6 –
+2026-09-13, смененный v2.5.7, v2.5.7 – позже в тот же день, смененный v2.5.8, v2.5.8 –
+2026-09-20, смененный v2.5.9, v2.5.9 – через несколько часов того же дня, смененный
+v2.5.10 (он не нес никаких изменений кода, только документацию), и v2.5.10 –
+2026-09-22, смененный v2.5.11. Опорный выпуск нельзя перевыпустить, поэтому работа,
+которая ложится после него, получает собственный номер. Держать список из трех
+значило снимать выпуск, который заменяли, вместо того чтобы оставить оба, и между v1.0.9 и
+новейшим выпуском не оставалось ничего, чем зажать недавнюю неисправность снизу.
+v2.6.0 – первый выпуск с 2026-08-30, который не снял предыдущий: по решению
+владельца от 2026-09-23 v2.5.11 остается и зажимает его.
+Сам v2.6.0 был снят 2026-09-26 решением владельца, когда его место занял v2.6.1.
+v2.5.11 остался, и v2.6.1 тоже, когда 2026-09-29 был опубликован v2.6.2.
+История изменений записана в коммитах, которых никто не трогал.
 
-All four references are recorded in [`.github/reference-release.json`](.github/reference-release.json) with the commit they point at and the digest of the DMG published from them, and CI fails if any tag disappears or moves to a different commit. A ruleset could stop a tag being deleted; it could not say which commit the tag was supposed to point at. The images of v2.5.11 and v2.6.3 are also kept in the tree, under [`cli/releases/`](cli/releases/README.md), each under its own version number.
+Все четыре опорных выпуска записаны в [`.github/reference-release.json`](.github/reference-release.json) с коммитом, на который указывают, и суммой опубликованного из них DMG, и CI падает, если хоть один тег исчезает или переезжает на другой коммит. Набор правил может запретить удалять тег, но не может сказать, на какой коммит тег должен указывать. Образы v2.5.11 и v2.6.3 хранятся и в дереве, в [`cli/releases/`](cli/releases/README.md), каждый под своим номером версии.
 
-## Documentation
+## Документация
 
-| document | what it holds |
+| документ | что в нем |
 |---|---|
-| [`docs/TESTING.md`](docs/TESTING.md) | the test profiles — fast, standard, full corpus, stress, soak — and the exact command for each |
-| [`docs/XML-CONTRACT.md`](docs/XML-CONTRACT.md) | what may be done to the corpus, what must be preserved, what the corpus measurably contains, and where every kind of XML data ends up in a PDF |
-| [`docs/PDF-ACCEPTANCE.md`](docs/PDF-ACCEPTANCE.md) | the criteria every PDF is held to – by the build itself and by the release gate – and the decisions behind them |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | the shape of the Rust side: the layers, which way they depend, where the PDF is built from the document model and written by the export, and where the Tauri adapter attaches |
-| [`docs/FONTS.md`](docs/FONTS.md) | the fonts the PDFs are set in and the inventory draws with, their licences and their digests |
-| [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) | the agreed desktop stack, what the Rust core still owes it, and what the removal of the React application took with it |
-| [`docs/PROJECT-SPEC.ru.md`](docs/PROJECT-SPEC.ru.md) | the normative specification of the desktop stack — every component pinned, with a status, and the rules a change is accepted under (in Russian) |
-| [`PERFORMANCE.md`](PERFORMANCE.md) | measured numbers, baselines, and the rules for changing them |
-| [`cli/fixtures/xml/MANIFEST.md`](cli/fixtures/xml/MANIFEST.md) | every XML fixture, with a SHA-256 and what it is for |
+| [`docs/TESTING.md`](docs/TESTING.md) | профили тестов – быстрый, стандартный, полный корпус, нагрузка, выдержка – и точная команда каждого |
+| [`docs/XML-CONTRACT.md`](docs/XML-CONTRACT.md) | что с корпусом можно делать, что нужно сохранить, что в корпусе измеримо есть и куда в PDF попадает каждый вид данных XML |
+| [`docs/PDF-ACCEPTANCE.md`](docs/PDF-ACCEPTANCE.md) | критерии, которым каждый PDF держат сама сборка и заслон выпуска, и решения, стоящие за ними |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | устройство стороны Rust: слои, в какую сторону они зависят, где PDF строится из модели документа и записывается экспортом и где подключается адаптер Tauri |
+| [`docs/FONTS.md`](docs/FONTS.md) | шрифты, которыми набираются PDF и рисует опись, их лицензии и суммы |
+| [`docs/FRONTEND-CONTRACT.md`](docs/FRONTEND-CONTRACT.md) | согласованный стек настольного приложения, что ядро на Rust ему еще должно и что унесло с собой удаление приложения на React |
+| [`docs/PROJECT-SPEC.ru.md`](docs/PROJECT-SPEC.ru.md) | нормативная спецификация стека настольного приложения – каждый компонент закреплен и имеет статус – и правила, по которым принимается изменение |
+| [`PERFORMANCE.md`](PERFORMANCE.md) | измеренные числа, точки отсчета и правила, по которым их меняют |
+| [`cli/fixtures/xml/MANIFEST.md`](cli/fixtures/xml/MANIFEST.md) | каждая XML-фикстура с суммой SHA-256 и назначением |
 
-## Performance and reliability
+## Производительность и надежность
 
-Measured numbers, and the rules for changing them, are in [`PERFORMANCE.md`](PERFORMANCE.md).
+Измеренные числа и правила их изменения собраны в [`PERFORMANCE.md`](PERFORMANCE.md).
 
-## License
+## Лицензия
 
-MIT — [`LICENSE`](LICENSE), and declared in [`cli/Cargo.toml`](cli/Cargo.toml) and [`src-tauri/Cargo.toml`](src-tauri/Cargo.toml).
+MIT – [`LICENSE`](LICENSE), объявлена в [`cli/Cargo.toml`](cli/Cargo.toml) и [`src-tauri/Cargo.toml`](src-tauri/Cargo.toml).
 
-**One file is not MIT and is not ours to relicense.** [`cli/resources/fonts/UllikummiA.ttf`](cli/resources/fonts/UllikummiA.ttf) is copyright © 2007 Sylvie Vanséveren, distributed under the terms of the Hethitologie-Portal Mainz, which are quoted verbatim beside it in [`UllikummiA-TERMS.txt`](cli/resources/fonts/UllikummiA-TERMS.txt): it may not be modified, distributed in modified form, or distributed commercially, and it may be used for academic and research purposes, in scientific publications and in scholarly websites. It is here unmodified so this repository can be deployed on another machine without a download; [`docs/FONTS.md`](docs/FONTS.md) records the reasoning and the digests.
+**Один файл не под MIT, и не нам его перелицензировать.** [`cli/resources/fonts/UllikummiA.ttf`](cli/resources/fonts/UllikummiA.ttf) – © 2007 Sylvie Vanséveren, распространяется на условиях Hethitologie-Portal Mainz, которые дословно приведены рядом, в [`UllikummiA-TERMS.txt`](cli/resources/fonts/UllikummiA-TERMS.txt): его нельзя изменять, распространять в измененном виде или распространять в коммерческих целях, и его можно использовать для академических и исследовательских целей, в научных публикациях и на научных сайтах. Он лежит здесь неизмененным, чтобы репозиторий можно было развернуть на другой машине без загрузки. Доводы и суммы записаны в [`docs/FONTS.md`](docs/FONTS.md).
 
 > Fonts created by Sylvie Vanséveren, available on the Hethitologie Portal Mainz
+
+Перевод: «Шрифты созданы Сильви Вансеверен, доступны на портале Hethitologie Portal Mainz».

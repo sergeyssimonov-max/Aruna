@@ -28,8 +28,8 @@ function manifestVersion(relative: string): string {
 
 /** The paragraph that tells a reader which release to download. */
 function currentReleaseParagraph(markdown: string): string {
-  const paragraphs = markdown.split(/\n\s*\n/).filter((p) => p.includes('current release'))
-  expect(paragraphs, 'README no longer names a current release').toHaveLength(1)
+  const paragraphs = markdown.split(/\n\s*\n/).filter((p) => p.includes('действующий выпуск'))
+  expect(paragraphs, 'README больше не называет действующий выпуск').toHaveLength(1)
   return paragraphs[0]
 }
 

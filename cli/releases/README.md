@@ -1,56 +1,55 @@
-# Aruna — macOS releases only
+# Aruna – только выпуски для macOS
 
-Build output lands here and is **not committed** — with one exception, taken
-deliberately on 2026-09-06 by the owner's decision and widened on 2026-09-23:
-**the published image of every reference release is kept here as well as on
-the Releases page**, each under its own version number.
+Сюда попадает результат сборки, и в репозиторий он **не коммитится**. Исключение
+одно, принятое сознательно 2026-09-06 решением владельца и расширенное
+2026-09-23: **опубликованный образ каждого опорного выпуска хранится здесь, а не
+только на странице Releases**, каждый под своим номером версии.
 
-The exception is narrow, and the rule around it is what keeps it from going
-stale. What is committed is the file downloaded back from the release, not the
-one the build left behind, and it is verified against the digest recorded in
-`.github/reference-release.json` before it goes in. Each image lives here as
-`Aruna_<version>-macos-universal.dmg`, beside the release's own checksum file,
-kept verbatim as `Aruna_<version>-SHA256SUMS.txt`. The commit that records a new
-reference adds its pair; it no longer removes the previous one, because since
-2026-09-23 a new release no longer retires the reference before it. An image
-that stops being a reference leaves with its entry in the reference record.
-Everything else a build produces is still ignored, including a stray
-`Aruna-macos-universal.dmg` without a version: that copy went stale the moment
-the next build ran, which is why the rule exists.
+Исключение узкое, и не дает ему устареть правило вокруг него. Коммитится файл,
+скачанный обратно с выпуска, а не тот, что оставила сборка, и перед этим он
+сверяется с суммой, записанной в `.github/reference-release.json`. Каждый образ
+лежит здесь как `Aruna_<version>-macos-universal.dmg`, рядом с собственным
+файлом сумм выпуска, сохраненным дословно как `Aruna_<version>-SHA256SUMS.txt`.
+Коммит, который записывает новый опорный выпуск, добавляет его пару. Прежнюю
+он больше не удаляет, потому что с 2026-09-23 новый выпуск больше не снимает
+опорный перед собой. Образ, который перестает быть опорным, уходит вместе со
+своей записью в реестре опорных. Все прочее, что дает сборка, по-прежнему
+игнорируется, в том числе случайный `Aruna-macos-universal.dmg` без версии:
+такая копия устаревала в тот момент, когда запускалась следующая сборка, и
+поэтому правило и существует.
 
-| Committed | Release | Digest of the image |
+| В репозитории | Выпуск | Сумма образа |
 |---|---|---|
-| `Aruna_2.6.3-macos-universal.dmg` | v2.6.3, current | `e3137106d3af0354e318096d075b8bb01838e50750b13067df9df0d7250952c9` |
+| `Aruna_2.6.3-macos-universal.dmg` | v2.6.3, действующий | `e3137106d3af0354e318096d075b8bb01838e50750b13067df9df0d7250952c9` |
 | `Aruna_2.5.11-macos-universal.dmg` | v2.5.11 | `cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410` |
 
-The references v1.0.5 and v1.0.9 predate the rule; their images are on the
-Releases page only.
+Опорные v1.0.5 и v1.0.9 старше правила, их образы есть только на странице
+Releases.
 
-v2.6.0 was withdrawn on 2026-09-26, when v2.6.1 took its place: its pair left
-the tree with its entry in the reference record, as the rule above says.
-v2.6.1 and v2.6.2 stopped being references on 2026-10-08, by the owner's
-decision of 2026-10-06 that v2.6.3 is the reference and v2.5.11 the one before
-it: their pairs left the same way. Their tags and releases stay.
+v2.6.0 снят 2026-09-26, когда его место занял v2.6.1: его пара ушла из дерева
+вместе с его записью в реестре опорных, как велит правило выше. v2.6.1 и v2.6.2
+перестали быть опорными 2026-10-08 по решению владельца от 2026-10-06, что
+опорный – v2.6.3, а предыдущий – v2.5.11: их пары ушли так же. Их теги и
+выпуски остаются.
 
-The checksum files name the image as the release publishes it,
-`Aruna-macos-universal.dmg`, so `shasum -c` works on a download from the
-Releases page, not on the copies here. To check a copy here, compare
-`shasum -a 256 Aruna_<version>-macos-universal.dmg` with the line in its
-`Aruna_<version>-SHA256SUMS.txt`.
+Файлы сумм называют образ так, как его публикует выпуск,
+`Aruna-macos-universal.dmg`, поэтому `shasum -c` работает на файле, скачанном
+со страницы Releases, а не на копиях здесь. Чтобы проверить копию здесь,
+сравните вывод `shasum -a 256 Aruna_<version>-macos-universal.dmg` со строкой
+в ее `Aruna_<version>-SHA256SUMS.txt`.
 
-Download them from [Releases](https://github.com/sergeyssimonov-max/Aruna/releases):
+Скачать их можно на странице [Releases](https://github.com/sergeyssimonov-max/Aruna/releases):
 
-| File | Description |
+| Файл | Что это |
 |------|-------------|
-| **Aruna-macos-universal.dmg** | UDIF disk image with `Aruna.app` (Universal: Apple Silicon + Intel) |
-| **SHA256SUMS** | Checksums — verify with `shasum -a 256 -c SHA256SUMS` |
+| **Aruna-macos-universal.dmg** | образ диска UDIF с `Aruna.app` (Universal: Apple Silicon + Intel) |
+| **SHA256SUMS** | контрольные суммы, проверка – `shasum -a 256 -c SHA256SUMS` |
 
-> Linux binaries are **not** published.
+> Бинарники для Linux **не** публикуются.
 
-## Build (macOS 13+)
+## Сборка (macOS 13+)
 
-The image is built by Tauri, not by a script of this crate. From the root of
-the repository:
+Образ собирает Tauri, а не скрипт этого крейта. Из корня репозитория:
 
 ```bash
 pnpm build   # scripts/build-release.sh → tauri build --target universal-apple-darwin
@@ -58,13 +57,13 @@ pnpm build   # scripts/build-release.sh → tauri build --target universal-apple
 #   target/universal-apple-darwin/release/bundle/dmg/Aruna_<version>_universal.dmg
 ```
 
-The wrapper refuses to build unless Node matches `.node-version` and the
-selected Xcode is 15.2 (pick it with `DEVELOPER_DIR` or `xcode-select`), so the
-binary is the same as the one CI builds. The release job renames the image
-to `Aruna-macos-universal.dmg` and writes `SHA256SUMS` beside it.
-`cli/scripts/make_release.sh` is no longer part of the release.
+Обертка отказывается собирать, если Node не совпадает с `.node-version` и
+выбранный Xcode не 15.2 (выбрать его можно через `DEVELOPER_DIR` или
+`xcode-select`), поэтому бинарник тот же, что собирает CI. Задание выпуска
+переименовывает образ в `Aruna-macos-universal.dmg` и кладет рядом
+`SHA256SUMS`. `cli/scripts/make_release.sh` в выпуске больше не участвует.
 
-Or CI:
+Или через CI:
 
 ```bash
 gh workflow run release-dmg.yml
@@ -72,4 +71,4 @@ gh workflow run release-dmg.yml
 git tag v<version> && git push origin v<version>   # the tag must match version in cli/Cargo.toml
 ```
 
-See [docs/AUTO_DMG.md](../docs/AUTO_DMG.md).
+Подробнее – в [docs/AUTO_DMG.md](../docs/AUTO_DMG.md).
