@@ -229,7 +229,7 @@ thing jsdom cannot answer for.
 | test | what it holds |
 |---|---|
 | `tests/font-stack.test.ts` | the cuneiform stack in `src/inventory/canonical.css` and `src/app.css` name the same faces, in the same order |
-| `tests/readme-links.test.ts` | every link in the девять documents resolves – the seven of before and, since 2026-10-20, `cli/releases/README.md` and `frontend/README.md` |
+| `tests/readme-links.test.ts` | every link in the nine documents resolves – the seven of before and, since 2026-10-20, `cli/releases/README.md` and `frontend/README.md` |
 | `tests/release-version.test.ts` | the release the README calls current is the version `cli/Cargo.toml` declares — CI holds the tag to the manifest, this holds the sentence a reader acts on; the paragraph is found by its link to `/releases/latest`, not by its words, since 2026-10-20 |
 | `tests/docs-typography.test.ts` | the four README files and every `.github/release-notes/vX.Y.Z.md` keep the Russian typography of CLAUDE.md outside code – no em dash, no `ё`, no comma before a dash, a non-breaking space before `%` and after `№` – and are Cyrillic at all; every reference release has its page file |
 | `tests/one-frontend-stack.test.ts` | React is in no manifest, no lock file, no source file and no artifact — and the stack is Svelte without SvelteKit |
