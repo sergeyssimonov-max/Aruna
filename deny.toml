@@ -133,16 +133,6 @@ unmaintained = "workspace"
 # Removed when citationberg releases on quick-xml >= 0.41 and that reaches this
 # tree; reviewed at every Typst release.
 #
-# **A second, for one week.** The owner's decision of 2026-10-15 (task
-# «rustls-interim-ignore») excepts four advisories in rustls 0.23.45, which
-# arrives through ureq 2.12.1: RUSTSEC-2026-0346 to -0349. All four are fixed
-# in rustls 0.23.46, too young to take before 2026-10-21 09:54 UTC
-# (specification 5.1), and none applies to the configuration ureq builds –
-# no custom session store, no ECH, no `brotli` feature, no post-quantum group
-# in the ring provider. The proof with every file and line is in
-# `.cargo/audit.toml`; the guard is cli/tests/rustls_interim_guard.rs, which
-# fails after 2026-10-22. Removed by the task «rustls-0.23.46».
-#
 # **A third, until the fixes mature.** The owner's decision of 2026-10-21
 # (task «webpki-interim-ignore») excepts two advisories about trusting a
 # certificate path through distrusted emSign intermediates: RUSTSEC-2026-0381
@@ -159,10 +149,6 @@ unmaintained = "workspace"
 ignore = [
     { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.38.4 via typst-library -> hayagriva -> citationberg: CSL parsing unreachable from this crate (owner's decisions 2026-09-27 and 2026-09-30, spec 5.1; proof in .cargo/audit.toml; guard cli/tests/quick_xml_guard.rs); remove when citationberg is on quick-xml >= 0.41" },
     { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.38.4 via typst-library -> hayagriva -> citationberg: CSL parsing unreachable from this crate (owner's decisions 2026-09-27 and 2026-09-30, spec 5.1; proof in .cargo/audit.toml; guard cli/tests/quick_xml_guard.rs); remove when citationberg is on quick-xml >= 0.41" },
-    { id = "RUSTSEC-2026-0346", reason = "rustls 0.23.45 via ureq 2.12.1: no custom ClientSessionStore, values never formatted (owner's decision 2026-10-15; proof in .cargo/audit.toml; guard cli/tests/rustls_interim_guard.rs); временно до 2026-10-22, rustls 0.23.46 созревает 2026-10-21 09:54 UTC, правило 5.1" },
-    { id = "RUSTSEC-2026-0347", reason = "rustls 0.23.45 via ureq 2.12.1: ECH never enabled, ech_mode stays None (owner's decision 2026-10-15; proof in .cargo/audit.toml; guard cli/tests/rustls_interim_guard.rs); временно до 2026-10-22, rustls 0.23.46 созревает 2026-10-21 09:54 UTC, правило 5.1" },
-    { id = "RUSTSEC-2026-0348", reason = "rustls 0.23.45 via ureq 2.12.1: the brotli feature of rustls is not enabled (owner's decision 2026-10-15; proof in .cargo/audit.toml; guard cli/tests/rustls_interim_guard.rs); временно до 2026-10-22, rustls 0.23.46 созревает 2026-10-21 09:54 UTC, правило 5.1" },
-    { id = "RUSTSEC-2026-0349", reason = "rustls 0.23.45 via ureq 2.12.1: ring provider offers no post-quantum group, nothing to downgrade (owner's decision 2026-10-15; proof in .cargo/audit.toml; guard cli/tests/rustls_interim_guard.rs); временно до 2026-10-22, rustls 0.23.46 созревает 2026-10-21 09:54 UTC, правило 5.1" },
     { id = "RUSTSEC-2026-0381", reason = "webpki-roots 1.0.9 (and the 0.26.11 shim) via ureq 2.12.1: the only TLS is ureq's to zenodo.org, the archive is held to ZENODO_ZIP_MD5 and refused on a mismatch, so a forged path ends in a refused download (owner's decision 2026-10-21; proof in .cargo/audit.toml; guard cli/tests/webpki_interim_guard.rs); временно до 2026-10-28, webpki-roots 1.0.10 созревает 2026-10-26 20:11 UTC, rustls-webpki 0.103.16 – 2026-10-27 08:58 UTC, правило 5.1; снимает задание tls-trust" },
     { id = "RUSTSEC-2026-0382", reason = "rustls-webpki 0.103.15 via rustls 0.23.45 and ureq 2.12.1: the only TLS is ureq's to zenodo.org, the archive is held to ZENODO_ZIP_MD5 and refused on a mismatch, so a forged path ends in a refused download (owner's decision 2026-10-21; proof in .cargo/audit.toml; guard cli/tests/webpki_interim_guard.rs); временно до 2026-10-28, webpki-roots 1.0.10 созревает 2026-10-26 20:11 UTC, rustls-webpki 0.103.16 – 2026-10-27 08:58 UTC, правило 5.1; снимает задание tls-trust" },
 ]
