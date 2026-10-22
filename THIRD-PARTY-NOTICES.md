@@ -927,16 +927,16 @@ Packages: 1437 – crates 746, npm 691. Distinct licence texts: 682. Requires re
 | @types/ws | 8.18.1 | npm | MIT | T3 |
 | @types/yargs-parser | 21.0.3 | npm | MIT | T3 |
 | @types/yargs | 17.0.35 | npm | MIT | T3 |
-| @typescript-eslint/eslint-plugin | 8.70.1 | npm | MIT | T32 |
-| @typescript-eslint/parser | 8.70.1 | npm | MIT | T32 |
-| @typescript-eslint/project-service | 8.70.1 | npm | MIT | T104 |
-| @typescript-eslint/scope-manager | 8.70.1 | npm | MIT | T32 |
-| @typescript-eslint/tsconfig-utils | 8.70.1 | npm | MIT | T104 |
-| @typescript-eslint/type-utils | 8.70.1 | npm | MIT | T656 |
-| @typescript-eslint/types | 8.70.1 | npm | MIT | T32 |
-| @typescript-eslint/typescript-estree | 8.70.1 | npm | MIT | T32 |
-| @typescript-eslint/utils | 8.70.1 | npm | MIT | T32 |
-| @typescript-eslint/visitor-keys | 8.70.1 | npm | MIT | T32 |
+| @typescript-eslint/eslint-plugin | 8.71.2 | npm | MIT | T32 |
+| @typescript-eslint/parser | 8.71.2 | npm | MIT | T32 |
+| @typescript-eslint/project-service | 8.71.2 | npm | MIT | T104 |
+| @typescript-eslint/scope-manager | 8.71.2 | npm | MIT | T32 |
+| @typescript-eslint/tsconfig-utils | 8.71.2 | npm | MIT | T104 |
+| @typescript-eslint/type-utils | 8.71.2 | npm | MIT | T656 |
+| @typescript-eslint/types | 8.71.2 | npm | MIT | T32 |
+| @typescript-eslint/typescript-estree | 8.71.2 | npm | MIT | T32 |
+| @typescript-eslint/utils | 8.71.2 | npm | MIT | T32 |
+| @typescript-eslint/visitor-keys | 8.71.2 | npm | MIT | T32 |
 | @vitest/coverage-v8 | 5.0.3 | npm | MIT | T42 |
 | @vitest/istanbul-lib-coverage | 1.0.2 | npm | MIT | T148 |
 | @vitest/istanbul-lib-report | 1.0.2 | npm | MIT | T148 |
@@ -1392,7 +1392,7 @@ Packages: 1437 – crates 746, npm 691. Distinct licence texts: 682. Requires re
 | type-fest | 3.13.1 | npm | (MIT OR CC0-1.0) | requires review |
 | type-fest | 4.26.0 | npm | (MIT OR CC0-1.0) | requires review |
 | type-fest | 4.41.0 | npm | (MIT OR CC0-1.0) | T162, T4 |
-| typescript-eslint | 8.70.1 | npm | MIT | T32 |
+| typescript-eslint | 8.71.2 | npm | MIT | T32 |
 | typescript | 6.0.3 | npm | Apache-2.0 | T525 |
 | undici-types | 6.21.0 | npm | MIT | T66 |
 | undici | 6.28.1 | npm | MIT | T66 |
@@ -4346,7 +4346,7 @@ limitations under the License.
 
 ### T32
 
-SHA-256 `2eb5c7a0bba9deb77a98c81bf6b9d3fb1c67118eebf968b6b1a787b3f8928ee0`. Used by: @typescript-eslint/eslint-plugin 8.70.1 (LICENSE), @typescript-eslint/parser 8.70.1 (LICENSE), @typescript-eslint/scope-manager 8.70.1 (LICENSE), @typescript-eslint/types 8.70.1 (LICENSE), @typescript-eslint/typescript-estree 8.70.1 (LICENSE), @typescript-eslint/utils 8.70.1 (LICENSE), @typescript-eslint/visitor-keys 8.70.1 (LICENSE), typescript-eslint 8.70.1 (LICENSE).
+SHA-256 `2eb5c7a0bba9deb77a98c81bf6b9d3fb1c67118eebf968b6b1a787b3f8928ee0`. Used by: @typescript-eslint/eslint-plugin 8.71.2 (LICENSE), @typescript-eslint/parser 8.71.2 (LICENSE), @typescript-eslint/scope-manager 8.71.2 (LICENSE), @typescript-eslint/types 8.71.2 (LICENSE), @typescript-eslint/typescript-estree 8.71.2 (LICENSE), @typescript-eslint/utils 8.71.2 (LICENSE), @typescript-eslint/visitor-keys 8.71.2 (LICENSE), typescript-eslint 8.71.2 (LICENSE).
 
 ```text
 MIT License
@@ -8288,7 +8288,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T104
 
-SHA-256 `053a75a14b7508a897466b65e12797201a06b0e9b5066d1223da72cac99601b5`. Used by: @typescript-eslint/project-service 8.70.1 (LICENSE), @typescript-eslint/tsconfig-utils 8.70.1 (LICENSE).
+SHA-256 `053a75a14b7508a897466b65e12797201a06b0e9b5066d1223da72cac99601b5`. Used by: @typescript-eslint/project-service 8.71.2 (LICENSE), @typescript-eslint/tsconfig-utils 8.71.2 (LICENSE).
 
 ```text
 MIT License
@@ -40810,7 +40810,7 @@ SOFTWARE.
 
 ### T656
 
-SHA-256 `f3c51ace7f159b21566d72535e84ff354505ae7ffdca835dac81fcdafbf9e879`. Used by: @typescript-eslint/type-utils 8.70.1 (LICENSE).
+SHA-256 `f3c51ace7f159b21566d72535e84ff354505ae7ffdca835dac81fcdafbf9e879`. Used by: @typescript-eslint/type-utils 8.71.2 (LICENSE).
 
 ```text
 MIT License
