@@ -16,7 +16,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires review: 163.
+Packages: 1435 – crates 746, npm 689. Distinct licence texts: 682. Requires review: 163.
 
 ## Packages
 
@@ -75,8 +75,8 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | bs58 | 0.5.1 | crate | MIT/Apache-2.0 | T1, T329 |
 | bumpalo | 3.20.3 | crate | MIT OR Apache-2.0 | T1, T396 |
 | by_address | 1.2.1 | crate | MIT OR Apache-2.0 | T1, T607 |
-| bytemuck | 1.25.2 | crate | Zlib OR Apache-2.0 OR MIT | T101, T161, T89 |
-| bytemuck_derive | 1.12.1 | crate | Zlib OR Apache-2.0 OR MIT | T101, T161, T89 |
+| bytemuck | 1.25.2 | crate | Zlib OR Apache-2.0 OR MIT | T101, T161, T88 |
+| bytemuck_derive | 1.12.1 | crate | Zlib OR Apache-2.0 OR MIT | T101, T161, T88 |
 | byteorder | 1.5.0 | crate | Unlicense OR MIT | T21, T23, T18 |
 | byteorder-lite | 0.1.0 | crate | Unlicense OR MIT | T23, T18 |
 | bytes | 1.12.1 | crate | MIT | T340 |
@@ -135,9 +135,9 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | csv | 1.4.0 | crate | Unlicense/MIT | T21, T23, T18 |
 | csv-core | 0.1.13 | crate | Unlicense/MIT | T21, T23, T18 |
 | ctor | 1.0.13 | crate | Apache-2.0 OR MIT | T530, T564 |
-| darling | 0.23.0 | crate | MIT | T92 |
-| darling_core | 0.23.0 | crate | MIT | T92 |
-| darling_macro | 0.23.0 | crate | MIT | T92 |
+| darling | 0.23.0 | crate | MIT | T91 |
+| darling_core | 0.23.0 | crate | MIT | T91 |
+| darling_macro | 0.23.0 | crate | MIT | T91 |
 | data-url | 0.3.2 | crate | MIT OR Apache-2.0 | T1, T68 |
 | dbus | 0.9.12 | crate | Apache-2.0/MIT | T132, T184 |
 | defmt | 1.1.1 | crate | MIT OR Apache-2.0 | T40, T122 |
@@ -148,10 +148,10 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | derive_more-impl | 2.1.1 | crate | MIT | T152 |
 | digest | 0.10.7 | crate | MIT OR Apache-2.0 | T11, T508 |
 | digest | 0.11.3 | crate | MIT OR Apache-2.0 | T11, T541 |
-| dirs | 5.0.1 | crate | MIT OR Apache-2.0 | T73, T59 |
-| dirs | 7.0.0 | crate | MIT OR Apache-2.0 | T73, T59 |
-| dirs-sys | 0.4.1 | crate | MIT OR Apache-2.0 | T73, T59 |
-| dirs-sys | 0.5.0 | crate | MIT OR Apache-2.0 | T73, T59 |
+| dirs | 5.0.1 | crate | MIT OR Apache-2.0 | T72, T59 |
+| dirs | 7.0.0 | crate | MIT OR Apache-2.0 | T72, T59 |
+| dirs-sys | 0.4.1 | crate | MIT OR Apache-2.0 | T72, T59 |
+| dirs-sys | 0.5.0 | crate | MIT OR Apache-2.0 | T72, T59 |
 | dispatch2 | 0.3.1 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
 | displaydoc | 0.2.7 | crate | MIT OR Apache-2.0 | T1, T2 |
 | dlopen2 | 0.8.2 | crate | MIT | requires review |
@@ -164,7 +164,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | dyn-clone | 1.0.20 | crate | MIT OR Apache-2.0 | T6, T2 |
 | ecb | 0.2.1 | crate | MIT OR Apache-2.0 | T11, T654 |
 | ecow | 0.2.6 | crate | MIT OR Apache-2.0 | T6, T24 |
-| either | 1.18.0 | crate | MIT OR Apache-2.0 | T1, T85 |
+| either | 1.18.0 | crate | MIT OR Apache-2.0 | T1, T84 |
 | embed-resource | 3.0.11 | crate | MIT | T243 |
 | embed_plist | 1.2.2 | crate | MIT OR Apache-2.0 | T20, T608 |
 | encoding_rs | 0.8.42 | crate | (Apache-2.0 OR MIT) AND BSD-3-Clause | T228, T20, T47, T456 |
@@ -182,7 +182,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | event-listener-strategy | 0.5.4 | crate | Apache-2.0 OR MIT | T1, T2 |
 | fancy-regex | 0.16.2 | crate | MIT | T601, T317 |
 | fastrand | 2.5.0 | crate | Apache-2.0 OR MIT | T1, T2 |
-| fdeflate | 0.3.7 | crate | MIT OR Apache-2.0 | T10, T97 |
+| fdeflate | 0.3.7 | crate | MIT OR Apache-2.0 | T10, T96 |
 | fearless_simd | 0.4.1 | crate | Apache-2.0 OR MIT | T27, T56 |
 | fern | 0.7.1 | crate | MIT | T387 |
 | field-offset | 0.3.6 | crate | MIT OR Apache-2.0 | T27, T506 |
@@ -193,10 +193,10 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | foldhash | 0.2.0 | crate | Zlib | T543 |
 | font-types | 0.11.3 | crate | MIT OR Apache-2.0 | T65, T62 |
 | fontconfig-parser | 0.5.8 | crate | MIT | T250 |
-| fontdb | 0.23.0 | crate | MIT | T84 |
-| foreign-types | 0.5.0 | crate | MIT/Apache-2.0 | T12, T78 |
-| foreign-types-macros | 0.2.4 | crate | MIT/Apache-2.0 | T12, T78 |
-| foreign-types-shared | 0.3.1 | crate | MIT/Apache-2.0 | T12, T78 |
+| fontdb | 0.23.0 | crate | MIT | T83 |
+| foreign-types | 0.5.0 | crate | MIT/Apache-2.0 | T12, T77 |
+| foreign-types-macros | 0.2.4 | crate | MIT/Apache-2.0 | T12, T77 |
+| foreign-types-shared | 0.3.1 | crate | MIT/Apache-2.0 | T12, T77 |
 | form_urlencoded | 1.2.2 | crate | MIT OR Apache-2.0 | T1, T255 |
 | futures-channel | 0.3.34 | crate | MIT OR Apache-2.0 | T31, T35 |
 | futures-core | 0.3.34 | crate | MIT OR Apache-2.0 | T31, T35 |
@@ -255,7 +255,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | heck | 0.5.0 | crate | MIT OR Apache-2.0 | T1, T39 |
 | hermit-abi | 0.5.2 | crate | MIT OR Apache-2.0 | T1, T2 |
 | hex | 0.4.3 | crate | MIT OR Apache-2.0 | T12, T666 |
-| html5ever | 0.39.0 | crate | MIT OR Apache-2.0 | T1, T90 |
+| html5ever | 0.39.0 | crate | MIT OR Apache-2.0 | T1, T89 |
 | http | 1.5.0 | crate | MIT OR Apache-2.0 | T470, T614 |
 | http-body | 1.1.0 | crate | MIT | T118 |
 | http-body-util | 0.1.5 | crate | MIT | T118 |
@@ -287,8 +287,8 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | ident_case | 1.0.1 | crate | MIT/Apache-2.0 | T24 |
 | idna | 1.1.0 | crate | MIT OR Apache-2.0 | T1, T68 |
 | idna_adapter | 1.2.2 | crate | Apache-2.0 OR MIT | T1, T468 |
-| image | 0.25.10 | crate | MIT OR Apache-2.0 | T10, T97 |
-| image-webp | 0.2.4 | crate | MIT OR Apache-2.0 | T10, T97 |
+| image | 0.25.10 | crate | MIT OR Apache-2.0 | T10, T96 |
+| image-webp | 0.2.4 | crate | MIT OR Apache-2.0 | T10, T96 |
 | imagesize | 0.14.0 | crate | MIT | T332 |
 | indexmap | 1.9.3 | crate | Apache-2.0 OR MIT | T1, T192 |
 | indexmap | 2.14.2 | crate | Apache-2.0 OR MIT | T1, T192 |
@@ -301,7 +301,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | is-wsl | 0.4.0 | crate | MIT | T145 |
 | itoa | 1.0.18 | crate | MIT OR Apache-2.0 | T6, T2 |
 | javascriptcore-rs | 1.1.2 | crate | MIT | T363 |
-| javascriptcore-rs-sys | 1.1.1 | crate | MIT | T87 |
+| javascriptcore-rs-sys | 1.1.1 | crate | MIT | T86 |
 | jiff | 0.2.35 | crate | Unlicense OR MIT | T21, T23, T18 |
 | jiff-core | 0.1.0 | crate | Unlicense OR MIT | T21, T23, T18 |
 | jiff-static | 0.2.35 | crate | Unlicense OR MIT | T21, T23, T18 |
@@ -312,7 +312,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | jni-sys | 0.4.1 | crate | MIT OR Apache-2.0 | T12, T116 |
 | jni-sys-macros | 0.4.1 | crate | MIT OR Apache-2.0 | requires review |
 | js-sys | 0.3.104 | crate | MIT OR Apache-2.0 | T1, T17 |
-| json-patch | 4.2.0 | crate | MIT/Apache-2.0 | T95, T464 |
+| json-patch | 4.2.0 | crate | MIT/Apache-2.0 | T94, T464 |
 | jsonptr | 0.7.1 | crate | MIT OR Apache-2.0 | T289, T286 |
 | kamadak-exif | 0.6.1 | crate | BSD-2-Clause | T238 |
 | keyboard-types | 0.8.3 | crate | MIT OR Apache-2.0 | T43, T300 |
@@ -334,7 +334,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | lock_api | 0.4.14 | crate | MIT OR Apache-2.0 | T1, T70 |
 | log | 0.4.34 | crate | MIT OR Apache-2.0 | T1, T30 |
 | lopdf | 0.45.0 | crate | MIT | T294 |
-| markup5ever | 0.39.0 | crate | MIT OR Apache-2.0 | T1, T90 |
+| markup5ever | 0.39.0 | crate | MIT OR Apache-2.0 | T1, T89 |
 | matchit | 0.8.4 | crate | MIT AND BSD-3-Clause | T618, T234 |
 | md-5 | 0.11.0 | crate | MIT OR Apache-2.0 | T11, T150 |
 | memchr | 2.8.3 | crate | Unlicense OR MIT | T21, T23, T18 |
@@ -344,7 +344,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | miniz_oxide | 0.8.9 | crate | MIT OR Zlib OR Apache-2.0 | T129, T10, T149, T106 |
 | miniz_oxide | 0.9.1 | crate | MIT OR Zlib OR Apache-2.0 | T129, T10, T149, T106 |
 | mio | 1.2.2 | crate | MIT | T220 |
-| moxcms | 0.8.1 | crate | BSD-3-Clause OR Apache-2.0 | T93, T76 |
+| moxcms | 0.8.1 | crate | BSD-3-Clause OR Apache-2.0 | T92, T75 |
 | muda | 0.20.0 | crate | Apache-2.0 OR MIT | T1, T123, T560 |
 | multiversion_no_op | 1.0.0 | crate | Apache-2.0 OR MIT | T595, T20, T47 |
 | mutate_once | 0.1.2 | crate | BSD-2-Clause | T225 |
@@ -386,9 +386,9 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | open | 5.4.2 | crate | MIT | T631 |
 | option-ext | 0.2.0 | crate | MPL-2.0 | T399 |
 | ordered-stream | 0.2.0 | crate | MIT OR Apache-2.0 | T1, T2 |
-| palette | 0.7.7 | crate | MIT OR Apache-2.0 | T1, T96 |
-| palette_derive | 0.7.7 | crate | MIT OR Apache-2.0 | T1, T96 |
-| palette_math | 0.7.7 | crate | MIT OR Apache-2.0 | T1, T96 |
+| palette | 0.7.7 | crate | MIT OR Apache-2.0 | T1, T95 |
+| palette_derive | 0.7.7 | crate | MIT OR Apache-2.0 | T1, T95 |
+| palette_math | 0.7.7 | crate | MIT OR Apache-2.0 | T1, T95 |
 | pango | 0.18.3 | crate | MIT | T22, T7 |
 | pango-sys | 0.18.0 | crate | MIT | T7 |
 | parking | 2.2.1 | crate | Apache-2.0 OR MIT | T1, T2, T500 |
@@ -403,7 +403,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | phf_generator | 0.13.1 | crate | MIT | T44 |
 | phf_macros | 0.13.1 | crate | MIT | T44 |
 | phf_shared | 0.13.1 | crate | MIT | T44 |
-| pic-scale | 0.7.12 | crate | BSD-3-Clause OR Apache-2.0 | T93, T76 |
+| pic-scale | 0.7.12 | crate | BSD-3-Clause OR Apache-2.0 | T92, T75 |
 | pico-args | 0.5.0 | crate | MIT | T662 |
 | pin-project-lite | 0.2.17 | crate | Apache-2.0 OR MIT | T10, T2 |
 | piper | 0.2.5 | crate | MIT OR Apache-2.0 | T1, T2 |
@@ -428,7 +428,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | proc-macro-hack | 0.5.20+deprecated | crate | MIT OR Apache-2.0 | T1, T599 |
 | proc-macro2 | 1.0.107 | crate | MIT OR Apache-2.0 | T6, T2 |
 | psm | 0.1.32 | crate | MIT OR Apache-2.0 | T494, T320 |
-| pxfm | 0.1.30 | crate | BSD-3-Clause OR Apache-2.0 | T93, T76 |
+| pxfm | 0.1.30 | crate | BSD-3-Clause OR Apache-2.0 | T92, T75 |
 | quick-error | 2.0.1 | crate | MIT/Apache-2.0 | T12, T214 |
 | quick-xml | 0.38.4 | crate | MIT | T374 |
 | quick-xml | 0.42.0 | crate | MIT | T650 |
@@ -490,8 +490,8 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | serde_spanned | 0.6.9 | crate | MIT OR Apache-2.0 | T12, T25 |
 | serde_spanned | 1.1.1 | crate | MIT OR Apache-2.0 | T12, T25 |
 | serde_urlencoded | 0.7.1 | crate | MIT/Apache-2.0 | T6, T561 |
-| serde_with | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T85 |
-| serde_with_macros | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T85 |
+| serde_with | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T84 |
+| serde_with_macros | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T84 |
 | serde_yaml | 0.9.34+deprecated | crate | MIT OR Apache-2.0 | T6, T2 |
 | serialize-to-javascript | 0.1.2 | crate | MIT OR Apache-2.0 | T9, T187 |
 | serialize-to-javascript-impl | 0.1.2 | crate | MIT OR Apache-2.0 | T9, T187 |
@@ -511,8 +511,8 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | smallvec | 1.16.2 | crate | MIT OR Apache-2.0 | T1, T222 |
 | socket2 | 0.6.5 | crate | MIT OR Apache-2.0 | T1, T17 |
 | softbuffer | 0.4.8 | crate | MIT OR Apache-2.0 | T520, T211 |
-| soup3 | 0.5.0 | crate | MIT | T87 |
-| soup3-sys | 0.5.0 | crate | MIT | T87 |
+| soup3 | 0.5.0 | crate | MIT | T86 |
+| soup3-sys | 0.5.0 | crate | MIT | T86 |
 | specta | 2.0.0-rc.25 | crate | MIT | requires review |
 | specta-macros | 2.0.0-rc.25 | crate | MIT | requires review |
 | specta-serde | 0.0.12 | crate | MIT | requires review |
@@ -570,13 +570,13 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | thiserror | 2.0.21 | crate | MIT OR Apache-2.0 | T6, T2 |
 | thiserror-impl | 1.0.69 | crate | MIT OR Apache-2.0 | T6, T2 |
 | thiserror-impl | 2.0.21 | crate | MIT OR Apache-2.0 | T6, T2 |
-| time | 0.3.55 | crate | MIT OR Apache-2.0 | T10, T75 |
-| time-core | 0.1.9 | crate | MIT OR Apache-2.0 | T10, T75 |
-| time-macros | 0.2.32 | crate | MIT OR Apache-2.0 | T10, T75 |
+| time | 0.3.55 | crate | MIT OR Apache-2.0 | T10, T74 |
+| time-core | 0.1.9 | crate | MIT OR Apache-2.0 | T10, T74 |
+| time-macros | 0.2.32 | crate | MIT OR Apache-2.0 | T10, T74 |
 | tiny-skia | 0.12.0 | crate | BSD-3-Clause | T142 |
 | tiny-skia-path | 0.12.0 | crate | BSD-3-Clause | T142 |
 | tinystr | 0.8.4 | crate | Unicode-3.0 | T8 |
-| tinyvec | 1.13.3 | crate | Zlib OR Apache-2.0 OR MIT | T20, T679, T89 |
+| tinyvec | 1.13.3 | crate | Zlib OR Apache-2.0 OR MIT | T20, T679, T88 |
 | tokio | 1.53.3 | crate | MIT | T119 |
 | tokio-macros | 2.7.2 | crate | MIT | T224 |
 | tokio-util | 0.7.19 | crate | MIT | T119 |
@@ -589,13 +589,13 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | toml_edit | 0.25.13+spec-1.1.0 | crate | MIT OR Apache-2.0 | T12, T25 |
 | toml_parser | 1.1.3+spec-1.1.0 | crate | MIT OR Apache-2.0 | T12, T25 |
 | toml_writer | 1.1.2+spec-1.1.0 | crate | MIT OR Apache-2.0 | T12, T25 |
-| tower | 0.5.3 | crate | MIT | T82 |
+| tower | 0.5.3 | crate | MIT | T81 |
 | tower-http | 0.6.11 | crate | MIT | T356 |
-| tower-layer | 0.3.3 | crate | MIT | T82 |
-| tower-service | 0.3.3 | crate | MIT | T82 |
-| tracing | 0.1.44 | crate | MIT | T91 |
-| tracing-attributes | 0.1.31 | crate | MIT | T91 |
-| tracing-core | 0.1.36 | crate | MIT | T91 |
+| tower-layer | 0.3.3 | crate | MIT | T81 |
+| tower-service | 0.3.3 | crate | MIT | T81 |
+| tracing | 0.1.44 | crate | MIT | T90 |
+| tracing-attributes | 0.1.31 | crate | MIT | T90 |
+| tracing-core | 0.1.36 | crate | MIT | T90 |
 | tray-icon | 0.25.1 | crate | MIT OR Apache-2.0 | T1, T123, T410 |
 | try-lock | 0.2.5 | crate | MIT | T580 |
 | ttf-parser | 0.25.1 | crate | MIT OR Apache-2.0 | T1, T195 |
@@ -623,14 +623,14 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | unic-langid-macros | 0.9.6 | crate | MIT OR Apache-2.0 | T1, T2 |
 | unic-langid-macros-impl | 0.9.6 | crate | MIT OR Apache-2.0 | T1, T2 |
 | unicode-bidi | 0.3.18 | crate | MIT OR Apache-2.0 | T252, T643, T1, T39 |
-| unicode-bidi-mirroring | 0.4.0 | crate | MIT/Apache-2.0 | T1, T84 |
-| unicode-ccc | 0.4.0 | crate | MIT/Apache-2.0 | T1, T84 |
+| unicode-bidi-mirroring | 0.4.0 | crate | MIT/Apache-2.0 | T1, T83 |
+| unicode-ccc | 0.4.0 | crate | MIT/Apache-2.0 | T1, T83 |
 | unicode-ident | 1.0.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T6, T2, T667 |
 | unicode-math-class | 0.1.0 | crate | MIT OR Apache-2.0 | T6, T24 |
-| unicode-normalization | 0.1.25 | crate | MIT OR Apache-2.0 | T74, T1, T39 |
-| unicode-properties | 0.1.4 | crate | MIT/Apache-2.0 | T74, T1, T39 |
+| unicode-normalization | 0.1.25 | crate | MIT OR Apache-2.0 | T73, T1, T39 |
+| unicode-properties | 0.1.4 | crate | MIT/Apache-2.0 | T73, T1, T39 |
 | unicode-script | 0.5.8 | crate | MIT OR Apache-2.0 | T442, T439 |
-| unicode-segmentation | 1.13.3 | crate | MIT OR Apache-2.0 | T74, T1, T39 |
+| unicode-segmentation | 1.13.3 | crate | MIT OR Apache-2.0 | T73, T1, T39 |
 | unicode-vo | 0.1.0 | crate | MIT/Apache-2.0 | T1, T107 |
 | unsafe-libyaml | 0.2.11 | crate | MIT | T2 |
 | unscanny | 0.1.0 | crate | MIT OR Apache-2.0 | T6, T24 |
@@ -642,9 +642,9 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | utf16_iter | 1.0.5 | crate | Apache-2.0 OR MIT | T556, T20, T47 |
 | utf8_iter | 1.0.4 | crate | Apache-2.0 OR MIT | T572, T20, T47 |
 | uuid | 1.27.0 | crate | Apache-2.0 OR MIT | T1, T333 |
-| vello_common | 0.0.8 | crate | Apache-2.0 OR MIT | T27, T94 |
-| vello_common | 0.0.9 | crate | Apache-2.0 OR MIT | T27, T94 |
-| vello_cpu | 0.0.8 | crate | Apache-2.0 OR MIT | T27, T94 |
+| vello_common | 0.0.8 | crate | Apache-2.0 OR MIT | T27, T93 |
+| vello_common | 0.0.9 | crate | Apache-2.0 OR MIT | T27, T93 |
+| vello_cpu | 0.0.8 | crate | Apache-2.0 OR MIT | T27, T93 |
 | version-compare | 0.2.1 | crate | MIT | T590 |
 | version_check | 0.9.5 | crate | MIT/Apache-2.0 | T1, T555 |
 | vswhom | 0.1.0 | crate | MIT | T166 |
@@ -666,7 +666,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | wasmparser | 0.239.0 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | requires review |
 | web-sys | 0.3.104 | crate | MIT OR Apache-2.0 | T1, T17 |
 | web-time | 1.1.0 | crate | MIT OR Apache-2.0 | T364, T657 |
-| web_atoms | 0.2.6 | crate | MIT OR Apache-2.0 | T1, T90 |
+| web_atoms | 0.2.6 | crate | MIT OR Apache-2.0 | T1, T89 |
 | webkit2gtk | 2.0.2 | crate | MIT | T322 |
 | webkit2gtk-sys | 2.0.2 | crate | MIT | T279 |
 | webpki-roots | 0.26.11 | crate | CDLA-Permissive-2.0 | T186 |
@@ -676,7 +676,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | webview2-com-sys | 0.39.1 | crate | MIT | requires review |
 | weezl | 0.1.12 | crate | MIT OR Apache-2.0 | T43, T134 |
 | weezl | 0.2.1 | crate | MIT OR Apache-2.0 | T43, T134 |
-| winapi | 0.3.9 | crate | MIT/Apache-2.0 | T95, T589 |
+| winapi | 0.3.9 | crate | MIT/Apache-2.0 | T94, T589 |
 | winapi-i686-pc-windows-gnu | 0.4.0 | crate | MIT/Apache-2.0 | requires review |
 | winapi-util | 0.1.11 | crate | Unlicense OR MIT | T21, T172, T18 |
 | winapi-x86_64-pc-windows-gnu | 0.4.0 | crate | MIT/Apache-2.0 | requires review |
@@ -782,11 +782,11 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | @cacheable/memory | 2.2.0 | npm | MIT | T48 |
 | @cacheable/utils | 2.5.0 | npm | MIT | T48 |
 | @csstools/color-helpers | 6.1.2 | npm | MIT-0 | T156 |
-| @csstools/css-calc | 3.4.3 | npm | MIT | T72 |
-| @csstools/css-color-parser | 4.2.6 | npm | MIT | T72 |
-| @csstools/css-parser-algorithms | 4.0.2 | npm | MIT | T72 |
+| @csstools/css-calc | 3.4.3 | npm | MIT | T71 |
+| @csstools/css-color-parser | 4.2.6 | npm | MIT | T71 |
+| @csstools/css-parser-algorithms | 4.0.2 | npm | MIT | T71 |
 | @csstools/css-syntax-patches-for-csstree | 1.1.15 | npm | MIT-0 | T156 |
-| @csstools/css-tokenizer | 4.0.2 | npm | MIT | T72 |
+| @csstools/css-tokenizer | 4.0.2 | npm | MIT | T71 |
 | @esbuild/aix-ppc64 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/android-arm64 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/android-arm | 0.28.2 | npm | not declared | requires review |
@@ -981,13 +981,13 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | archiver-utils | 5.0.2 | npm | MIT | T514 |
 | archiver | 7.0.1 | npm | MIT | T509 |
 | argparse | 2.0.1 | npm | Python-2.0 | T617 |
-| aria-query | 5.3.0 | npm | Apache-2.0 | T98 |
-| aria-query | 5.3.1 | npm | Apache-2.0 | T98 |
+| aria-query | 5.3.0 | npm | Apache-2.0 | T97 |
+| aria-query | 5.3.1 | npm | Apache-2.0 | T97 |
 | assertion-error | 2.0.1 | npm | MIT | T257 |
 | ast-v8-to-istanbul | 1.0.7 | npm | MIT | T433 |
 | async-exit-hook | 2.0.1 | npm | MIT | T416 |
 | async | 3.2.6 | npm | MIT | T605 |
-| axobject-query | 4.1.0 | npm | Apache-2.0 | T98 |
+| axobject-query | 4.1.0 | npm | Apache-2.0 | T97 |
 | b4a | 1.8.1 | npm | Apache-2.0 | T9 |
 | balanced-match | 1.0.2 | npm | MIT | T519 |
 | balanced-match | 4.0.4 | npm | MIT | T598 |
@@ -1003,7 +1003,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | brace-expansion | 1.1.21 | npm | MIT | T140 |
 | brace-expansion | 2.1.7 | npm | MIT | T140 |
 | brace-expansion | 5.0.12 | npm | MIT | T504 |
-| braces | 3.0.3 | npm | MIT | T79 |
+| braces | 3.0.3 | npm | MIT | T78 |
 | browser-stdout | 1.3.1 | npm | ISC | T678 |
 | buffer-crc32 | 0.2.13 | npm | MIT | T231 |
 | buffer-crc32 | 1.0.0 | npm | MIT | T616 |
@@ -1029,12 +1029,12 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | color-name | 1.1.4 | npm | MIT | T569 |
 | commander | 14.0.3 | npm | MIT | T102 |
 | commander | 9.5.0 | npm | MIT | T102 |
-| compress-commons | 6.0.2 | npm | MIT | T86 |
+| compress-commons | 6.0.2 | npm | MIT | T85 |
 | concat-map | 0.0.1 | npm | MIT | T131 |
 | convert-source-map | 2.0.0 | npm | MIT | T251 |
 | core-util-is | 1.0.3 | npm | MIT | T306 |
 | crc-32 | 1.2.2 | npm | Apache-2.0 | T575 |
-| crc32-stream | 6.0.0 | npm | MIT | T86 |
+| crc32-stream | 6.0.0 | npm | MIT | T85 |
 | create-wdio | 9.31.6 | npm | MIT | T14 |
 | cross-spawn | 7.0.6 | npm | MIT | T534 |
 | css-select | 5.2.2 | npm | BSD-2-Clause | T28 |
@@ -1055,7 +1055,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | deepmerge | 4.3.1 | npm | MIT | T413 |
 | defaults | 1.0.4 | npm | MIT | T680 |
 | dequal | 2.0.3 | npm | MIT | T125 |
-| detect-libc | 2.1.2 | npm | Apache-2.0 | T95 |
+| detect-libc | 2.1.2 | npm | Apache-2.0 | T94 |
 | devalue | 5.9.4 | npm | MIT | T627 |
 | diff | 5.2.2 | npm | BSD-3-Clause | T193 |
 | diff | 8.0.4 | npm | BSD-3-Clause | T193 |
@@ -1092,7 +1092,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | eslint-visitor-keys | 3.4.3 | npm | Apache-2.0 | T99 |
 | eslint-visitor-keys | 4.2.1 | npm | Apache-2.0 | T99 |
 | eslint-visitor-keys | 5.0.1 | npm | Apache-2.0 | T99 |
-| eslint | 10.12.0 | npm | MIT | T128 |
+| eslint | 10.13.0 | npm | MIT | T128 |
 | esm-env | 1.2.2 | npm | MIT | T414 |
 | espree | 10.4.0 | npm | BSD-2-Clause | T120 |
 | espree | 11.2.0 | npm | BSD-2-Clause | T120 |
@@ -1110,8 +1110,8 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | expect-type | 1.4.0 | npm | Apache-2.0 | T440 |
 | expect-webdriverio | 6.1.0 | npm | MIT | T532 |
 | expect | 30.4.1 | npm | MIT | T19 |
-| fast-deep-equal | 2.0.1 | npm | MIT | T88 |
-| fast-deep-equal | 3.1.3 | npm | MIT | T88 |
+| fast-deep-equal | 2.0.1 | npm | MIT | T87 |
+| fast-deep-equal | 3.1.3 | npm | MIT | T87 |
 | fast-fifo | 1.3.2 | npm | MIT | T130 |
 | fast-json-stable-stringify | 2.1.0 | npm | MIT | T528 |
 | fast-levenshtein | 2.0.6 | npm | MIT | T485 |
@@ -1120,7 +1120,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | figures | 6.1.0 | npm | MIT | T4 |
 | file-entry-cache | 11.1.5 | npm | MIT | T48 |
 | filelist | 1.0.6 | npm | Apache-2.0 | requires review |
-| fill-range | 7.1.1 | npm | MIT | T79 |
+| fill-range | 7.1.1 | npm | MIT | T78 |
 | find-up-simple | 1.0.1 | npm | MIT | T4 |
 | find-up | 5.0.0 | npm | MIT | T4 |
 | find-up | 6.3.0 | npm | MIT | T4 |
@@ -1145,8 +1145,8 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | has-flag | 4.0.0 | npm | MIT | T13 |
 | hashery | 1.5.1 | npm | MIT | T293 |
 | he | 1.2.0 | npm | MIT | T33 |
-| hookified | 1.15.1 | npm | MIT | T81 |
-| hookified | 2.2.0 | npm | MIT | T81 |
+| hookified | 1.15.1 | npm | MIT | T80 |
+| hookified | 2.2.0 | npm | MIT | T80 |
 | hosted-git-info | 7.0.2 | npm | ISC | T168 |
 | hosted-git-info | 8.1.0 | npm | ISC | T168 |
 | html-encoding-sniffer | 7.0.0 | npm | MIT | T49 |
@@ -1172,7 +1172,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | is-extglob | 2.1.1 | npm | MIT | T146 |
 | is-fullwidth-code-point | 3.0.0 | npm | MIT | T13 |
 | is-glob | 4.0.3 | npm | MIT | T349 |
-| is-number | 7.0.0 | npm | MIT | T79 |
+| is-number | 7.0.0 | npm | MIT | T78 |
 | is-plain-obj | 2.1.0 | npm | MIT | T13 |
 | is-plain-obj | 4.1.0 | npm | MIT | T4 |
 | is-potential-custom-element-name | 1.0.1 | npm | MIT | T33 |
@@ -1198,7 +1198,7 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | js-yaml | 4.3.2 | npm | MIT | T517 |
 | jsdom | 30.1.3 | npm | MIT | T269 |
 | json-parse-even-better-errors | 3.0.2 | npm | MIT | T357 |
-| json-schema-traverse | 0.4.1 | npm | MIT | T88 |
+| json-schema-traverse | 0.4.1 | npm | MIT | T87 |
 | json-stable-stringify-without-jsonify | 1.0.1 | npm | MIT | T131 |
 | json5 | 2.2.3 | npm | MIT | T362 |
 | jszip | 3.10.1 | npm | (MIT OR GPL-3.0-or-later) | T367 |
@@ -1298,16 +1298,16 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | prelude-ls | 1.2.1 | npm | MIT | T69 |
 | prettier-plugin-svelte | 4.1.1 | npm | MIT | T436 |
 | prettier | 3.9.10 | npm | MIT | T542 |
-| pretty-format | 27.5.1 | npm | MIT | T83 |
+| pretty-format | 27.5.1 | npm | MIT | T82 |
 | pretty-format | 30.4.1 | npm | MIT | T19 |
 | pretty-ms | 9.3.0 | npm | MIT | T4 |
 | process-nextick-args | 2.0.1 | npm | MIT | T641 |
 | process | 0.11.10 | npm | MIT | T371 |
 | punycode | 2.3.1 | npm | MIT | T33 |
-| qified | 0.10.1 | npm | MIT | T81 |
+| qified | 0.10.1 | npm | MIT | T80 |
 | query-selector-shadow-dom | 1.0.1 | npm | MIT | T582 |
-| react-is | 17.0.2 | npm | MIT | T83 |
-| react-is | 18.3.1 | npm | MIT | T83 |
+| react-is | 17.0.2 | npm | MIT | T82 |
+| react-is | 18.3.1 | npm | MIT | T82 |
 | react-is | 19.2.8 | npm | MIT | T606 |
 | read-pkg-up | 10.1.0 | npm | MIT | T4 |
 | read-pkg | 8.1.0 | npm | MIT | T4 |
@@ -1373,12 +1373,11 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | tar-stream | 3.2.0 | npm | MIT | T324 |
 | teex | 1.0.1 | npm | MIT | T404 |
 | text-decoder | 1.2.7 | npm | Apache-2.0 | T9 |
-| tinybench | 6.2.2 | npm | MIT | T71 |
+| tinybench | 6.2.2 | npm | MIT | T98 |
 | tinyexec | 1.3.1 | npm | MIT | T669 |
 | tinyglobby | 0.2.17 | npm | MIT | T264 |
-| tinyrainbow | 2.0.0 | npm | MIT | T71 |
-| tinyrainbow | 3.1.1 | npm | MIT | T71 |
-| tinyrainbow | 3.2.0 | npm | MIT | T71 |
+| tinyrainbow | 2.0.0 | npm | MIT | T98 |
+| tinyrainbow | 3.2.0 | npm | MIT | T98 |
 | tldts-core | 7.4.10 | npm | MIT | T170 |
 | tldts | 7.4.10 | npm | MIT | T170 |
 | to-regex-range | 5.0.1 | npm | MIT | T634 |
@@ -1432,20 +1431,20 @@ Packages: 1436 – crates 746, npm 690. Distinct licence texts: 682. Requires re
 | y18n | 5.0.8 | npm | ISC | T253 |
 | yaml | 1.10.3 | npm | ISC | T227 |
 | yaml | 2.9.1 | npm | ISC | T377 |
-| yargs-parser | 20.2.9 | npm | ISC | T80 |
-| yargs-parser | 21.1.1 | npm | ISC | T80 |
-| yargs-parser | 22.0.0 | npm | ISC | T80 |
+| yargs-parser | 20.2.9 | npm | ISC | T79 |
+| yargs-parser | 21.1.1 | npm | ISC | T79 |
+| yargs-parser | 22.0.0 | npm | ISC | T79 |
 | yargs-unparser | 2.0.0 | npm | MIT | T296 |
-| yargs | 16.2.2 | npm | MIT | T77 |
-| yargs | 17.7.3 | npm | MIT | T77 |
-| yargs | 18.1.0 | npm | MIT | T77 |
+| yargs | 16.2.2 | npm | MIT | T76 |
+| yargs | 17.7.3 | npm | MIT | T76 |
+| yargs | 18.1.0 | npm | MIT | T76 |
 | yauzl | 2.10.0 | npm | MIT | T548 |
 | yocto-queue | 0.1.0 | npm | MIT | T4 |
 | yocto-queue | 1.2.2 | npm | MIT | T4 |
 | yoctocolors-cjs | 2.1.3 | npm | MIT | T4 |
 | yoctocolors | 2.2.0 | npm | MIT | T4 |
 | zimmerframe | 1.1.4 | npm | MIT | T382 |
-| zip-stream | 6.0.1 | npm | MIT | T86 |
+| zip-stream | 6.0.1 | npm | MIT | T85 |
 | @tauri-apps/cli-darwin-arm64 | 2.12.3 | npm (root) | Apache-2.0 OR MIT | requires review |
 | @tauri-apps/cli-darwin-x64 | 2.12.3 | npm (root) | not declared | requires review |
 | @tauri-apps/cli-linux-arm-gnueabihf | 2.12.3 | npm (root) | not declared | requires review |
@@ -6456,34 +6455,6 @@ DEALINGS IN THE SOFTWARE.
 
 ### T71
 
-SHA-256 `cebc084d54e6dd99e53292ddb4bc1cdb63d9bfcd9ce438fe3aa6eb106d79e2ea`. Used by: tinybench 6.2.2 (LICENSE), tinyrainbow 2.0.0 (LICENCE), tinyrainbow 3.1.1 (LICENCE), tinyrainbow 3.2.0 (LICENCE).
-
-```text
-MIT License
-
-Copyright (c) 2022 Tinylibs
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-### T72
-
 SHA-256 `d00d032f517721b45c56c70c46bf904ebb71ad313df4d4db7722266b38069665`. Used by: @csstools/css-calc 3.4.3 (LICENSE.md), @csstools/css-color-parser 4.2.6 (LICENSE.md), @csstools/css-parser-algorithms 4.0.2 (LICENSE.md), @csstools/css-tokenizer 4.0.2 (LICENSE.md).
 
 ```text
@@ -6509,7 +6480,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T73
+### T72
 
 SHA-256 `d3174ad63e721d4c9dccb8ad4320848992d314369bc46319720b5802c9153fe9`. Used by: dirs 5.0.1 (LICENSE-APACHE), dirs 7.0.0 (LICENSE-APACHE), dirs-sys 0.4.1 (LICENSE-APACHE), dirs-sys 0.5.0 (LICENSE-APACHE).
 
@@ -6690,7 +6661,7 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
    of your accepting any such warranty or additional liability.
 ```
 
-### T74
+### T73
 
 SHA-256 `23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d`. Used by: unicode-normalization 0.1.25 (COPYRIGHT), unicode-properties 0.1.4 (COPYRIGHT), unicode-segmentation 1.13.3 (COPYRIGHT).
 
@@ -6704,7 +6675,7 @@ notice may not be copied, modified, or distributed except
 according to those terms.
 ```
 
-### T75
+### T74
 
 SHA-256 `2537228d9a1b44a5dc595241349cae7090b326c8de165aaf89bfddef4a00d0fc`. Used by: time 0.3.55 (LICENSE-MIT), time-core 0.1.9 (LICENSE-MIT), time-macros 0.2.32 (LICENSE-MIT).
 
@@ -6730,7 +6701,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T76
+### T75
 
 SHA-256 `2aa92cada6431e75615e3fe6cb1a9082c98f777d48ae1c087c0da0e37f7b8bff`. Used by: moxcms 0.8.1 (LICENSE.md), pic-scale 0.7.12 (LICENSE.md), pxfm 0.1.30 (LICENSE.md).
 
@@ -6763,7 +6734,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### T77
+### T76
 
 SHA-256 `2f1a503bfab84b3ba7393627308b3274501e459e3b5185bbb56bbf16cb1602d4`. Used by: yargs 16.2.2 (LICENSE), yargs 17.7.3 (LICENSE), yargs 18.1.0 (LICENSE).
 
@@ -6791,7 +6762,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T78
+### T77
 
 SHA-256 `333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734`. Used by: foreign-types 0.5.0 (LICENSE-MIT), foreign-types-macros 0.2.4 (LICENSE-MIT), foreign-types-shared 0.3.1 (LICENSE-MIT).
 
@@ -6817,7 +6788,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T79
+### T78
 
 SHA-256 `35bdd8a44339719441900fb50fbefc5e2dca1ca662cbaed7a687de842c8b70f2`. Used by: braces 3.0.3 (LICENSE), fill-range 7.1.1 (LICENSE), is-number 7.0.0 (LICENSE).
 
@@ -6845,7 +6816,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### T80
+### T79
 
 SHA-256 `365496ca1f56da40b23c9815fc40fa9005847b2f8f8fd1c1a4929ef25ec8cd1d`. Used by: yargs-parser 20.2.9 (LICENSE.txt), yargs-parser 21.1.1 (LICENSE.txt), yargs-parser 22.0.0 (LICENSE.txt).
 
@@ -6866,7 +6837,7 @@ WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
 ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### T81
+### T80
 
 SHA-256 `3902e57e73412bd91ba81a47fa2cef45e1729c152c835114c1692cc5e685ddbe`. Used by: hookified 1.15.1 (LICENSE), hookified 2.2.0 (LICENSE), qified 0.10.1 (LICENSE).
 
@@ -6892,7 +6863,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T82
+### T81
 
 SHA-256 `4249c8e6c5ebb85f97c77e6457c6fafc1066406eb8f1ef61e796fbdc5ff18482`. Used by: tower 0.5.3 (LICENSE), tower-layer 0.3.3 (LICENSE), tower-service 0.3.3 (LICENSE).
 
@@ -6924,7 +6895,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T83
+### T82
 
 SHA-256 `52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85`. Used by: pretty-format 27.5.1 (LICENSE), react-is 17.0.2 (LICENSE), react-is 18.3.1 (LICENSE).
 
@@ -6952,7 +6923,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T84
+### T83
 
 SHA-256 `59a1fdac3bd550043599bd159fd70f09a1108c2b09e3751d39b11e1ff8e51f00`. Used by: fontdb 0.23.0 (LICENSE), unicode-bidi-mirroring 0.4.0 (LICENSE-MIT), unicode-ccc 0.4.0 (LICENSE-MIT).
 
@@ -6980,7 +6951,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T85
+### T84
 
 SHA-256 `7576269ea71f767b99297934c0b2367532690f8c4badc695edf8e04ab6a1e545`. Used by: either 1.18.0 (LICENSE-MIT), serde_with 3.22.0 (LICENSE-MIT), serde_with_macros 3.22.0 (LICENSE-MIT).
 
@@ -7012,7 +6983,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T86
+### T85
 
 SHA-256 `79bad9f51738814f83251ae89460326b2ff2ea19ff5f71ab8f7636b2e17bb231`. Used by: compress-commons 6.0.2 (LICENSE), crc32-stream 6.0.0 (LICENSE), zip-stream 6.0.1 (LICENSE).
 
@@ -7041,7 +7012,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### T87
+### T86
 
 SHA-256 `7ade43ec5e1a5e43000aa871d290dff4c0e9e2e16b7f6bea2ecf091e3d056d31`. Used by: javascriptcore-rs-sys 1.1.1 (LICENSE), soup3 0.5.0 (LICENSE), soup3-sys 0.5.0 (LICENSE).
 
@@ -7070,7 +7041,7 @@ SOFTWARE.
 
 ```
 
-### T88
+### T87
 
 SHA-256 `7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a`. Used by: fast-deep-equal 2.0.1 (LICENSE), fast-deep-equal 3.1.3 (LICENSE), json-schema-traverse 0.4.1 (LICENSE).
 
@@ -7098,7 +7069,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T89
+### T88
 
 SHA-256 `84b34dd7608f7fb9b17bd588a6bf392bf7de504e2716f024a77d89f1b145a151`. Used by: bytemuck 1.25.2 (LICENSE-ZLIB), bytemuck_derive 1.12.1 (LICENSE-ZLIB), tinyvec 1.13.3 (LICENSE-ZLIB.md).
 
@@ -7116,7 +7087,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 ```
 
-### T90
+### T89
 
 SHA-256 `86dd7f026f916daf7511e39951ad8ea8cf55a8db67ae64060dacf829761c18f3`. Used by: html5ever 0.39.0 (LICENSE-MIT), markup5ever 0.39.0 (LICENSE-MIT), web_atoms 0.2.6 (LICENSE-MIT).
 
@@ -7148,7 +7119,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T91
+### T90
 
 SHA-256 `898b1ae9821e98daf8964c8d6c7f61641f5f5aa78ad500020771c0939ee0dea1`. Used by: tracing 0.1.44 (LICENSE), tracing-attributes 0.1.31 (LICENSE), tracing-core 0.1.36 (LICENSE).
 
@@ -7180,7 +7151,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T92
+### T91
 
 SHA-256 `8ea93490d74a5a1b1af3ff71d786271b3f1e5f0bea79ac16e02ec533cef040d6`. Used by: darling 0.23.0 (LICENSE), darling_core 0.23.0 (LICENSE), darling_macro 0.23.0 (LICENSE).
 
@@ -7208,7 +7179,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### T93
+### T92
 
 SHA-256 `90bf2d659c43045111b65c733ab2a6d4cbcb422a098368c8c58a9ba3db4ed0c5`. Used by: moxcms 0.8.1 (LICENSE-APACHE.md), pic-scale 0.7.12 (LICENSE-APACHE.md), pxfm 0.1.30 (LICENSE-APACHE.md).
 
@@ -7416,7 +7387,7 @@ SHA-256 `90bf2d659c43045111b65c733ab2a6d4cbcb422a098368c8c58a9ba3db4ed0c5`. Used
    limitations under the License.
 ```
 
-### T94
+### T93
 
 SHA-256 `adf157330f722fe7cfd5964a2a6974eff851b718228c6735724a11706e6f4dec`. Used by: vello_common 0.0.8 (LICENSE-MIT), vello_common 0.0.9 (LICENSE-MIT), vello_cpu 0.0.8 (LICENSE-MIT).
 
@@ -7448,7 +7419,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T95
+### T94
 
 SHA-256 `b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1`. Used by: json-patch 4.2.0 (LICENSE-APACHE), winapi 0.3.9 (LICENSE-APACHE), detect-libc 2.1.2 (LICENSE).
 
@@ -7656,7 +7627,7 @@ SHA-256 `b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1`. Used
    limitations under the License.
 ```
 
-### T96
+### T95
 
 SHA-256 `be1313a4b07ab509c80083966cdd209a7d81d75cd57fcea24441fc9041ccf184`. Used by: palette 0.7.7 (LICENSE-MIT), palette_derive 0.7.7 (LICENSE-MIT), palette_math 0.7.7 (LICENSE_MIT).
 
@@ -7685,7 +7656,7 @@ SOFTWARE.
 
 ```
 
-### T97
+### T96
 
 SHA-256 `c77a4cf9da729987d0fe7ccd811e3bd27393914ddf3d23467c18cc22954513b3`. Used by: fdeflate 0.3.7 (LICENSE-MIT), image 0.25.10 (LICENSE-MIT), image-webp 0.2.4 (LICENSE-MIT).
 
@@ -7717,7 +7688,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### T98
+### T97
 
 SHA-256 `c8df456c7ccba74b959087dff494d4ac2a12dfb0400c08b46b2494a08a000567`. Used by: aria-query 5.3.0 (LICENSE), aria-query 5.3.1 (LICENSE), axobject-query 4.1.0 (LICENSE).
 
@@ -7923,6 +7894,34 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+```
+
+### T98
+
+SHA-256 `cebc084d54e6dd99e53292ddb4bc1cdb63d9bfcd9ce438fe3aa6eb106d79e2ea`. Used by: tinybench 6.2.2 (LICENSE), tinyrainbow 2.0.0 (LICENCE), tinyrainbow 3.2.0 (LICENCE).
+
+```text
+MIT License
+
+Copyright (c) 2022 Tinylibs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### T99
@@ -9185,7 +9184,7 @@ END OF TERMS AND CONDITIONS
 
 ### T128
 
-SHA-256 `3b6be04f862a077a4b97929dbf247299360824d9365f8603c263769303ace18c`. Used by: @eslint/js 10.0.1 (LICENSE), eslint 10.12.0 (LICENSE).
+SHA-256 `3b6be04f862a077a4b97929dbf247299360824d9365f8603c263769303ace18c`. Used by: @eslint/js 10.0.1 (LICENSE), eslint 10.13.0 (LICENSE).
 
 ```text
 Copyright OpenJS Foundation and other contributors, <www.openjsf.org>
