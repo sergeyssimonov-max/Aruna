@@ -20,21 +20,18 @@
 //! out, so completing in under two is evidence that none was attempted.
 
 mod support;
+use support::fixtures;
 
 use aruna::document::{Document, Kind, Refusal, Undecided};
 use aruna::export::{self, normalize_into, verify, PACKAGE};
 use aruna::parse::{looks_like_manuscript, parse_manuscript, HEADER_READ_LIMIT};
 use std::borrow::Cow;
 use std::io::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tempfile::tempdir;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
-
-fn fixtures() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/xml")
-}
 
 fn hostile(name: &str) -> Vec<u8> {
     std::fs::read(fixtures().join("hostile").join(name))

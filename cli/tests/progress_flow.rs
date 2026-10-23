@@ -29,7 +29,7 @@ use aruna::progress::{Event, Progress};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use support::{archive, manuscript, mixed_archive};
+use support::{archive, files_under, manuscript, mixed_archive};
 use tempfile::tempdir;
 
 /// One event, reduced to what this file asserts on: which stage, and the
@@ -533,24 +533,6 @@ fn the_write_pass_ticks_are_a_fraction_that_only_grows() {
         Some((built.documents, built.documents)),
         "the run did not end on the whole: {ticks:?}"
     );
-}
-
-/// Every file under `root`, relative to it, sorted.
-fn files_under(root: &Path) -> Vec<std::path::PathBuf> {
-    let mut out = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        for entry in std::fs::read_dir(&dir).expect("read_dir").flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else {
-                out.push(path.strip_prefix(root).expect("under root").to_path_buf());
-            }
-        }
-    }
-    out.sort();
-    out
 }
 
 /// **A sink that listens changes nothing about what is built.**

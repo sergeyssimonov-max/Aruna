@@ -30,7 +30,7 @@ mod support;
 use aruna::export::{self, PACKAGE};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use support::{manuscript, mixed_archive};
+use support::{files_under, manuscript, mixed_archive};
 use tempfile::{tempdir, TempDir};
 
 /// What the destination holds besides the package.
@@ -50,24 +50,6 @@ fn beside(dir: &Path) -> Vec<String> {
         .collect();
     names.sort();
     names
-}
-
-/// Every file under `root`, relative to it.
-fn files(root: &Path) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        for entry in std::fs::read_dir(&dir).expect("read_dir").flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else {
-                out.push(path.strip_prefix(root).expect("under root").to_path_buf());
-            }
-        }
-    }
-    out.sort();
-    out
 }
 
 /// A staging directory as a run killed long ago left it.
@@ -143,7 +125,7 @@ fn a_staging_directory_from_a_killed_run_does_not_stop_the_next_one() {
         beside(&destination)
     );
     assert!(
-        !files(&destination.join(PACKAGE)).contains(&PathBuf::from("stray.txt")),
+        !files_under(&destination.join(PACKAGE)).contains(&PathBuf::from("stray.txt")),
         "a file from the killed run's staging directory was published"
     );
 }
@@ -262,7 +244,7 @@ fn a_destination_holding_every_kind_of_leftover_still_builds() {
         "the destination still holds {:?}",
         beside(&destination)
     );
-    let published = files(&destination.join(PACKAGE));
+    let published = files_under(&destination.join(PACKAGE));
     for stray in ["half.xml", "older.xml"] {
         assert!(
             !published.contains(&PathBuf::from(stray)),
@@ -311,11 +293,11 @@ fn a_build_that_recovered_produces_the_package_a_clean_one_would() {
 
     let (a, b) = (clean.join(PACKAGE), messy.join(PACKAGE));
     assert_eq!(
-        files(&a),
-        files(&b),
+        files_under(&a),
+        files_under(&b),
         "the two packages hold different files"
     );
-    for relative in files(&a) {
+    for relative in files_under(&a) {
         assert_eq!(
             std::fs::read(a.join(&relative)).expect("clean"),
             std::fs::read(b.join(&relative)).expect("recovered"),
@@ -471,7 +453,7 @@ fn recovering_once_is_enough_and_running_again_changes_nothing() {
         &aruna::job::Job::unattended(),
     )
     .expect("recovers");
-    let after_recovery = files(&destination.join(PACKAGE));
+    let after_recovery = files_under(&destination.join(PACKAGE));
 
     export::build(
         &zip,
@@ -483,7 +465,7 @@ fn recovering_once_is_enough_and_running_again_changes_nothing() {
     .expect("and again");
     assert_eq!(
         after_recovery,
-        files(&destination.join(PACKAGE)),
+        files_under(&destination.join(PACKAGE)),
         "a second run after a recovery produced a different package"
     );
     assert!(

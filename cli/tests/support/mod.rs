@@ -687,3 +687,116 @@ pub fn open_descriptors() -> usize {
         .map(|entries| entries.count())
         .unwrap_or(0)
 }
+
+// ---------------------------------------------------------------------------
+// Helpers more than one test binary had written for itself (refactor-post-deps R4)
+// ---------------------------------------------------------------------------
+
+pub fn fixtures() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/xml")
+}
+
+/// An archive of `n` manuscripts, spread over a few groups.
+pub fn corpus(dir: &Path, n: usize) -> PathBuf {
+    let entries: Vec<(String, String)> = (0..n)
+        .map(|i| {
+            (
+                format!("root/CTH {}_XML_HFR/doc {i}.xml", i % 5),
+                manuscript(&format!("KBo {i}"), "FB", "2017-03-28"),
+            )
+        })
+        .collect();
+    let borrowed: Vec<(&str, String)> = entries
+        .iter()
+        .map(|(path, body)| (path.as_str(), body.clone()))
+        .collect();
+    archive(&dir.join("corpus.zip"), &borrowed)
+}
+
+/// Everything under `root`, relative to it.
+pub fn files(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                out.push(path.strip_prefix(root).expect("under root").to_path_buf());
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Every file under `root`, relative to it.
+pub fn files_under(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("read_dir").flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                out.push(path.strip_prefix(root).expect("under root").to_path_buf());
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Каноническая форма документа по `xmllint --c14n`, или `None`, если документ
+/// разборщику не дался.
+pub fn canonical(bytes: &[u8], at: &Path) -> Option<Vec<u8>> {
+    std::fs::write(at, bytes).expect("write");
+    let out = std::process::Command::new("xmllint")
+        .arg("--nonet")
+        .arg("--c14n")
+        .arg(at)
+        .output()
+        .expect("run xmllint");
+    out.status.success().then_some(out.stdout)
+}
+
+/// Строки канонической формы без тех инструкций, которые нормализации
+/// разрешено снимать.
+///
+/// C14N выбрасывает объявление XML и **сохраняет** инструкции обработки вне
+/// корневого элемента, поэтому снятая ссылка на таблицу стилей видна в
+/// канонической форме исходника и отсутствует в форме пакетной копии. Это не
+/// расхождение деревьев, а ровно тот разрешенный список, который держит
+/// `verify::compare`; чтобы структурный критерий говорил о структуре, список
+/// снимается с обеих сторон одинаково.
+pub fn without_dropped(canonical: &[u8]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(canonical);
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text.as_ref();
+    while let Some(at) = rest.find("<?") {
+        let (before, tail) = rest.split_at(at);
+        out.push_str(before);
+        let Some(end) = tail.find("?>") else {
+            rest = tail;
+            break;
+        };
+        let pi = &tail[2..end];
+        let target = pi.split([' ', '\t', '\r', '\n']).next().unwrap_or(pi);
+        if !aruna::export::verify::is_dropped(target.as_bytes()) {
+            out.push_str(&tail[..end + 2]);
+        }
+        rest = &tail[end + 2..];
+    }
+    out.push_str(rest);
+    // Перевод строки, оставшийся от снятой инструкции. C14N ставит каждую
+    // инструкцию верхнего уровня на свою строку, и снятие самой инструкции
+    // оставляет её перевод; пробел между инструкциями пролога разрешенный
+    // список называет отдельным правилом (`REFLOW prologue whitespace`), так
+    // что расхождением он быть не может.
+    out.trim_start().as_bytes().to_vec()
+}

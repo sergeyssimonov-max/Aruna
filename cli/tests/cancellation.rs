@@ -29,7 +29,7 @@ use aruna::progress::{Event, Progress};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use support::{archive, manuscript};
+use support::{corpus, files};
 use tempfile::{tempdir, TempDir};
 
 /// A sink that cancels the run when it hears a stage it was told to wait for.
@@ -79,23 +79,6 @@ impl Progress for CancelAt {
     }
 }
 
-/// An archive of `n` manuscripts, spread over a few groups.
-fn corpus(dir: &Path, n: usize) -> PathBuf {
-    let entries: Vec<(String, String)> = (0..n)
-        .map(|i| {
-            (
-                format!("root/CTH {}_XML_HFR/doc {i}.xml", i % 5),
-                manuscript(&format!("KBo {i}"), "FB", "2017-03-28"),
-            )
-        })
-        .collect();
-    let borrowed: Vec<(&str, String)> = entries
-        .iter()
-        .map(|(path, body)| (path.as_str(), body.clone()))
-        .collect();
-    archive(&dir.join("corpus.zip"), &borrowed)
-}
-
 /// A destination, and the archive to build into it.
 fn scene(documents: usize) -> (TempDir, PathBuf, PathBuf) {
     let dir = tempdir().expect("tempdir");
@@ -103,27 +86,6 @@ fn scene(documents: usize) -> (TempDir, PathBuf, PathBuf) {
     let destination = dir.path().join("out");
     std::fs::create_dir(&destination).expect("destination");
     (dir, zip, destination)
-}
-
-/// Everything under `root`, relative to it.
-fn files(root: &Path) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else {
-                out.push(path.strip_prefix(root).expect("under root").to_path_buf());
-            }
-        }
-    }
-    out.sort();
-    out
 }
 
 // ---------------------------------------------------------------------------

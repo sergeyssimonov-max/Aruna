@@ -17,11 +17,9 @@
 use aruna::export::{normalize_into, verify};
 use aruna::parse::{is_manuscript_xml, looks_like_manuscript, parse_manuscript, HEADER_READ_LIMIT};
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
 
-fn fixtures() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/xml")
-}
+mod support;
+use support::{canonical, fixtures, without_dropped};
 
 /// Every fixture, as (relative name, bytes).
 fn all() -> Vec<(String, Vec<u8>)> {
@@ -326,55 +324,6 @@ fn a_missing_instrument_is_told_from_a_present_one() {
     // `--version` отвечает успехом. Не `sh`: на конвейере это `dash`, а он
     // `--version` не знает и отвечает отказом.
     assert!(have("cargo"), "a present program was not found");
-}
-
-/// Каноническая форма документа по `xmllint --c14n`, или `None`, если документ
-/// разборщику не дался.
-fn canonical(bytes: &[u8], at: &Path) -> Option<Vec<u8>> {
-    std::fs::write(at, bytes).expect("write");
-    let out = std::process::Command::new("xmllint")
-        .arg("--nonet")
-        .arg("--c14n")
-        .arg(at)
-        .output()
-        .expect("run xmllint");
-    out.status.success().then_some(out.stdout)
-}
-
-/// Строки канонической формы без тех инструкций, которые нормализации
-/// разрешено снимать.
-///
-/// C14N выбрасывает объявление XML и **сохраняет** инструкции обработки вне
-/// корневого элемента, поэтому снятая ссылка на таблицу стилей видна в
-/// канонической форме исходника и отсутствует в форме пакетной копии. Это не
-/// расхождение деревьев, а ровно тот разрешенный список, который держит
-/// `verify::compare`; чтобы структурный критерий говорил о структуре, список
-/// снимается с обеих сторон одинаково.
-fn without_dropped(canonical: &[u8]) -> Vec<u8> {
-    let text = String::from_utf8_lossy(canonical);
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text.as_ref();
-    while let Some(at) = rest.find("<?") {
-        let (before, tail) = rest.split_at(at);
-        out.push_str(before);
-        let Some(end) = tail.find("?>") else {
-            rest = tail;
-            break;
-        };
-        let pi = &tail[2..end];
-        let target = pi.split([' ', '\t', '\r', '\n']).next().unwrap_or(pi);
-        if !verify::is_dropped(target.as_bytes()) {
-            out.push_str(&tail[..end + 2]);
-        }
-        rest = &tail[end + 2..];
-    }
-    out.push_str(rest);
-    // Перевод строки, оставшийся от снятой инструкции. C14N ставит каждую
-    // инструкцию верхнего уровня на свою строку, и снятие самой инструкции
-    // оставляет её перевод; пробел между инструкциями пролога разрешенный
-    // список называет отдельным правилом (`REFLOW prologue whitespace`), так
-    // что расхождением он быть не может.
-    out.trim_start().as_bytes().to_vec()
 }
 
 /// **Структурный критерий рядом с текстовым: нормализация не меняет дерева.**

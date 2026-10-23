@@ -27,6 +27,7 @@ use std::io::Read as _;
 
 mod support;
 use support::required_corpus as required;
+use support::{canonical, without_dropped};
 
 /// What TLHdig Beta 0.3 holds.
 const DOCUMENTS: usize = 23_936;
@@ -497,13 +498,13 @@ fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
         if verify::compare(&source, &out).is_err() {
             continue;
         }
-        let Some(before) = canonical_form(&source, &src) else {
+        let Some(before) = canonical(&source, &src) else {
             refused += 1;
             continue;
         };
-        let after = canonical_form(&out, &dst)
+        let after = canonical(&out, &dst)
             .unwrap_or_else(|| panic!("{name}: пакетная копия перестала разбираться"));
-        if without_dropped_pis(&before) == without_dropped_pis(&after) {
+        if without_dropped(&before) == without_dropped(&after) {
             same += 1;
         } else if differing.len() < 5 {
             differing.push(name);
@@ -577,40 +578,4 @@ fn no_entry_name_is_read_through_a_foreign_code_page() {
             .any(|name| name.ends_with("/Mu\u{308}nchen 5.xml")),
         "`München 5.xml` в NFD не найден среди {seen:#?}"
     );
-}
-
-/// Каноническая форма по `xmllint --c14n`, или `None` — документ ей не дался.
-fn canonical_form(bytes: &[u8], at: &std::path::Path) -> Option<Vec<u8>> {
-    std::fs::write(at, bytes).expect("write");
-    let out = std::process::Command::new("xmllint")
-        .arg("--nonet")
-        .arg("--c14n")
-        .arg(at)
-        .output()
-        .expect("run xmllint");
-    out.status.success().then_some(out.stdout)
-}
-
-/// Каноническая форма без инструкций, которые нормализации разрешено снимать,
-/// и без оставшегося от них пробела.
-fn without_dropped_pis(canonical: &[u8]) -> Vec<u8> {
-    let text = String::from_utf8_lossy(canonical);
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text.as_ref();
-    while let Some(at) = rest.find("<?") {
-        let (before, tail) = rest.split_at(at);
-        out.push_str(before);
-        let Some(end) = tail.find("?>") else {
-            rest = tail;
-            break;
-        };
-        let pi = &tail[2..end];
-        let target = pi.split([' ', '\t', '\r', '\n']).next().unwrap_or(pi);
-        if !verify::is_dropped(target.as_bytes()) {
-            out.push_str(&tail[..end + 2]);
-        }
-        rest = &tail[end + 2..];
-    }
-    out.push_str(rest);
-    out.trim_start().as_bytes().to_vec()
 }
