@@ -467,7 +467,7 @@ Packages: 1435 – crates 746, npm 689. Distinct licence texts: 682. Requires re
 | rustix | 1.1.5 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | T310, T1, T37, T2 |
 | rustls | 0.23.46 | crate | Apache-2.0 OR ISC OR MIT | T1, T445, T419 |
 | rustls-pki-types | 1.15.1 | crate | MIT OR Apache-2.0 | T341, T481 |
-| rustls-webpki | 0.103.15 | crate | ISC | T376 |
+| rustls-webpki | 0.103.16 | crate | ISC | T376 |
 | rustversion | 1.0.23 | crate | MIT OR Apache-2.0 | T6, T2 |
 | rustybuzz | 0.20.1 | crate | MIT | T315 |
 | ryu | 1.0.23 | crate | Apache-2.0 OR BSL-1.0 | T6, T583 |
@@ -670,7 +670,7 @@ Packages: 1435 – crates 746, npm 689. Distinct licence texts: 682. Requires re
 | webkit2gtk | 2.0.2 | crate | MIT | T322 |
 | webkit2gtk-sys | 2.0.2 | crate | MIT | T279 |
 | webpki-roots | 0.26.11 | crate | CDLA-Permissive-2.0 | T186 |
-| webpki-roots | 1.0.9 | crate | CDLA-Permissive-2.0 | T186 |
+| webpki-roots | 1.0.10 | crate | CDLA-Permissive-2.0 | T186 |
 | webview2-com | 0.39.1 | crate | MIT | requires review |
 | webview2-com-macros | 0.8.1 | crate | MIT | requires review |
 | webview2-com-sys | 0.39.1 | crate | MIT | requires review |
@@ -12153,7 +12153,7 @@ SOFTWARE.
 
 ### T186
 
-SHA-256 `e271993808fec50ab29350b39539cdec611a9103f827e0aa26d61da70e2d33f8`. Used by: webpki-roots 0.26.11 (LICENSE), webpki-roots 1.0.9 (LICENSE).
+SHA-256 `e271993808fec50ab29350b39539cdec611a9103f827e0aa26d61da70e2d33f8`. Used by: webpki-roots 0.26.11 (LICENSE), webpki-roots 1.0.10 (LICENSE).
 
 ```text
 # Community Data License Agreement - Permissive - Version 2.0
@@ -21947,7 +21947,7 @@ THE SOFTWARE.
 
 ### T376
 
-SHA-256 `5b698ca13897be3afdb7174256fa1574f8c6892b8bea1a66dd6469d3fe27885a`. Used by: rustls-webpki 0.103.15 (LICENSE).
+SHA-256 `5b698ca13897be3afdb7174256fa1574f8c6892b8bea1a66dd6469d3fe27885a`. Used by: rustls-webpki 0.103.16 (LICENSE).
 
 ```text
 Except as otherwise noted, this project is licensed under the following

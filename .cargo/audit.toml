@@ -67,43 +67,6 @@
 #
 # Removed with the Typst release that drops each one; reviewed at every Typst
 # release, as the two advisories above are.
-#
-# **Two advisories about distrusted emSign intermediates, excepted until their
-# fixes mature** – owner's decision of 2026-10-21 (task «webpki-interim-ignore»),
-# the second departure from the rule that a task brings no new exception.
-# RUSTSEC-2026-0381 (webpki-roots, published 2026-10-19) and RUSTSEC-2026-0382
-# (rustls-webpki, published 2026-10-20): both let a certificate path through
-# emSign intermediates whose private keys are now known be trusted. The fixes
-# are webpki-roots 1.0.10 (2026-10-19 20:11 UTC, mature from 2026-10-26
-# 20:11 UTC) and rustls-webpki 0.103.16 (2026-10-20 08:58 UTC, mature from
-# 2026-10-27 08:58 UTC), specification 5.1. Valid through 2026-10-28 inclusive
-# (UTC); the task «tls-trust» removes both entries here, in deny.toml and the
-# guard. Note: cargo audit matches RUSTSEC-2026-0381 on the webpki-roots 0.26.11
-# shim as well (patched is ">= 1.0.10"), so 1.0.10 under the shim does not by
-# itself clear it.
-#
-# Who depends on them: rustls-webpki 0.103.15 ← rustls 0.23.45 ← ureq 2.12.1
-# ← aruna (cli/Cargo.toml:22); webpki-roots 1.0.9 ← webpki-roots 0.26.11 (the
-# shim) and ureq 2.12.1. Cargo.lock has no other dependant of either, and no
-# manifest of the workspace names reqwest, hyper, curl or native-tls; the
-# reqwest 0.13.4 Tauri brings is built without TLS.
-#
-# What a forged path could reach: the hosts are zenodo.org
-# (cli/src/download.rs:14, cli/src/zenodo.rs:49) and where they redirect;
-# hethport.net only from the maintainer's example. The archive is held to
-# ZENODO_ZIP_MD5 (cli/src/download.rs:43) and refused on a mismatch
-# (ArunaError::ChecksumMismatch, cli/src/download.rs:709), so a substituted
-# archive is not read. The record's API answer is advisory
-# (cli/src/zenodo.rs:86): the pinned digest stays the authority. A forged
-# certificate therefore ends in a refused download, not in a package built
-# from someone else's bytes.
-#
-# Guard: cli/tests/webpki_interim_guard.rs – fails if either is missing from
-# either file or another one appears, if the digest or its refusal leaves
-# download.rs, if a manifest names another HTTP or TLS stack, if another crate
-# comes to depend on either, if the sources stop naming zenodo.org, if a crate
-# is at its fix everywhere in the lock while its exception stands, and after
-# 2026-10-28.
 [advisories]
 ignore = [
     "RUSTSEC-2026-0194",
@@ -112,7 +75,4 @@ ignore = [
     "RUSTSEC-2024-0320",
     "RUSTSEC-2026-0206",
     "RUSTSEC-2026-0192",
-    # временно до 2026-10-28, webpki-roots 1.0.10 созревает 2026-10-26 20:11 UTC, rustls-webpki 0.103.16 – 2026-10-27 08:58 UTC, правило 5.1
-    "RUSTSEC-2026-0381",
-    "RUSTSEC-2026-0382",
 ]
