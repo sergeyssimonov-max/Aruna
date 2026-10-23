@@ -16,8 +16,8 @@ export default defineConfig({
   // in its own words was a second description of one table.
   server: { fs: { allow: ['..'] } },
   test: {
-    // Off by default in 5.0.3, and named anyway: 5.0.4 turns the on-disk
-    // module cache on by default and serves stale transforms (vitest #11575).
+    // On by default since 5.0.4, the pinned 5.0.5 included, and the on-disk
+    // module cache serves stale transforms (vitest #11575, open on 2026-10-23).
     // A release gate must not depend on what a previous run left on disk.
     fsModuleCache: false,
     projects: [
