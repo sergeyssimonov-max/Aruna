@@ -3,7 +3,7 @@
 What exists, how to run it, and what each profile is for.
 
 The suite is **759 tests** as of 2026-10-21, counted after the task «rustls-0.23.46»: 713 in the
-console crate – 26 integration binaries plus the library and the binary's own
+console crate – 25 integration binaries plus the library and the binary's own
 tests – and 46 in the desktop shell. The crates were joined into one workspace on 2026-08-30, so
 `cargo nextest run` from the repository root runs both, and `-p aruna` narrows it
 back to the console crate. It needs no network, and it runs **749**: ten are
@@ -210,11 +210,11 @@ pnpm format:check
 pnpm test:unit      # 261
 ```
 
-`vitest` runs two projects, 18 files. **`component`** is jsdom: the 43 tests of
+`vitest` runs two projects, 18 files. **`component`** is jsdom: the 45 tests of
 `src/inventory/filter.test.ts`, which drive the search box and the fold controls
 against a document built out of the artifacts the crate compiles in —
 `document.html` and the row fragments beside it, filled the way `html.rs` fills
-them, so the fixture cannot drift from the page — and the 67 tests
+them, so the fixture cannot drift from the page — and the 80 tests
 of `src/App.test.ts`, which render the window against a mocked `invoke`. The
 second file arrived on 2026-08-30 with the screen it tests: before that the
 window held a prototype nobody intended to keep, so a jsdom test of its markup
