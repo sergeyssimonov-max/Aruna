@@ -14,7 +14,7 @@ package built from it (the three corpus `cancelling` tests and
 `markup::every_name_of_a_real_package_reaches_the_window_byte_for_byte`),
 and the shell's `regenerate_the_bindings`, which
 is not a check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **207 `vitest` tests** in
+Beside it, and in a language of its own, are the **261 `vitest` tests** in
 `frontend/` — see *Frontend* below — and the six end-to-end scenarios of
 `frontend/e2e/smoke.e2e.ts`, run against the real window by `pnpm test:e2e`. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
@@ -207,10 +207,10 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 192
+pnpm test:unit      # 261
 ```
 
-`vitest` runs two projects, 17 files. **`component`** is jsdom: the 43 tests of
+`vitest` runs two projects, 18 files. **`component`** is jsdom: the 43 tests of
 `src/inventory/filter.test.ts`, which drive the search box and the fold controls
 against a document built out of the artifacts the crate compiles in —
 `document.html` and the row fragments beside it, filled the way `html.rs` fills
