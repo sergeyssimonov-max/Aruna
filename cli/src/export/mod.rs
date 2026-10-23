@@ -372,10 +372,10 @@ impl PdfCount {
 /// directory it was renamed from.
 ///
 /// `job` hears each stage begin and is asked, between documents, whether to
-/// keep going. The build is six seconds and four stages with nothing in
-/// between them, which is exactly long enough for a window to look frozen —
-/// and long enough that a person who changed their mind should not have to
-/// wait it out.
+/// keep going. The build is about two minutes (122 s on the whole corpus on
+/// 2026-10-23, 113 s of it the PDF phase), which is long enough for a window
+/// to look frozen — and long enough that a person who changed their mind
+/// should not have to wait it out.
 ///
 /// A cancelled build publishes nothing. The work happens in a staging
 /// directory that removes itself unless it is published, so stopping leaves
@@ -660,8 +660,8 @@ fn publish(
     // **Второй раз, и уже под замком.** Первая проверка стоит в начале сборки,
     // за шесть секунд до этой строки: между ними чужой процесс успевает
     // положить в назначение что угодно, и первая проверка о том уже ничего не
-    // говорит. Здесь она стоит ровно там, где начинается необратимое, — после
-    // захвата блокировки и до переименования, — так что между проверкой и
+    // говорит. Здесь она стоит ровно там, где начинается необратимое – после
+    // захвата блокировки и до переименования – так что между проверкой и
     // публикацией не может вклиниться другой прогон Aruna.
     validate::check_destination(&final_root)?;
 
@@ -1207,7 +1207,7 @@ mod tests {
     ///
     /// Свойство порядка, а не поведения: при удачном прогоне обе расстановки
     /// дают один и тот же пакет, и поймать разницу можно лишь отказом проверки
-    /// в окне между переименованием и снятием — окне, которого у теста извне
+    /// в окне между переименованием и снятием – окне, которого у теста извне
     /// нет. Поэтому порядок держится чтением исходника, как у стража границы
     /// модели (`document::tests::the_model_names_no_output_format`).
     ///

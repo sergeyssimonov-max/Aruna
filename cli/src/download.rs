@@ -1693,7 +1693,7 @@ mod tests {
             "the transfer never said it had arrived: {ticks:?}"
         );
         // И ровно один раз: тело пришло внутри одного промежутка, так что
-        // остаток — единственное, что о нём сказано.
+        // остаток – единственное, что о нем сказано.
         assert_eq!(ticks.len(), 1, "the whole was reported twice: {ticks:?}");
     }
 
