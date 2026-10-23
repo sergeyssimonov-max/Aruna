@@ -47,7 +47,7 @@ const APP_SVELTE = text('../src/App.svelte')
 
 describe('the package manager is pnpm, pinned, and alone', () => {
   it('is pinned by the root manifest, which corepack reads', () => {
-    expect(ROOT_PKG.packageManager).toMatch(/^pnpm@11\.25\.0(\+|$)/)
+    expect(ROOT_PKG.packageManager).toMatch(/^pnpm@11\.28\.6(\+|$)/)
   })
 
   it('leaves no trace of npm as a project manager', () => {
