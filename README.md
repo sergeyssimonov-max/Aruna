@@ -241,7 +241,7 @@ git tag v2.0.1 && git push origin v2.0.1   # → GitHub Release with DMG
 
 ## Выпуски
 
-**[v2.6.3](https://github.com/sergeyssimonov-max/Aruna/releases/latest) –
+**[v3.0.0](https://github.com/sergeyssimonov-max/Aruna/releases/latest) –
 действующий выпуск, тот, который нужно скачивать.** Именно его `Releases`
 помечает как *Latest*, и это единственная версия, которую проект просит
 ставить.
