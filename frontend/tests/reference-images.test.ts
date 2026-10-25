@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -106,5 +114,51 @@ describe('reference images', () => {
       { encoding: 'utf8' },
     )
     expect(last.trim()).toBe('v3.0.0')
+  })
+})
+
+/**
+ * The references the tree keeps a copy of (part3-6): v3.0.0, v2.6.3 and
+ * v2.5.11, with the digests of `Aruna-macos-universal.dmg` on GitHub, read
+ * 2026-10-25. Compared by name: a copy that comes or goes without its own
+ * change here fails, and so does a record that names another digest.
+ */
+const REFERENCES: Record<string, string> = {
+  'v2.5.11': 'cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410',
+  'v2.6.3': V263,
+  'v3.0.0': 'fcb9df42f00d21d65214bee26b85ea136110f2360126a5b5f30f76e548c4da6e',
+}
+
+describe('the references kept in cli/releases/', () => {
+  it('are exactly v2.5.11, v2.6.3 and v3.0.0, each with its checksum file', () => {
+    const names = readdirSync(join(ROOT, 'cli', 'releases'))
+      .filter((name) => name.startsWith('Aruna_'))
+      .sort()
+    const expected = Object.keys(REFERENCES)
+      .map((tag) => tag.slice(1))
+      .flatMap((v) => [`Aruna_${v}-SHA256SUMS.txt`, `Aruna_${v}-macos-universal.dmg`])
+      .sort()
+    expect(names).toEqual(expected)
+  })
+
+  for (const [tag, digest] of Object.entries(REFERENCES)) {
+    it(`hold on ${tag}: the copy is the record and the release asset`, () => {
+      const run = gate('--root', ROOT, '--tag', tag, '--github-digest', `sha256:${digest}`)
+      expect(run.stderr).toBe('')
+      expect(run.status).toBe(0)
+      expect(run.stdout).toContain(`the last published tag is ${tag}`)
+    })
+  }
+
+  it('are in the record with the digests GitHub publishes', () => {
+    const record = JSON.parse(
+      readFileSync(join(ROOT, '.github', 'reference-release.json'), 'utf8'),
+    ) as { references: { tag: string; dmg_sha256: string }[] }
+    const kept = Object.fromEntries(
+      record.references
+        .filter(({ tag }) => tag in REFERENCES)
+        .map(({ tag, dmg_sha256 }) => [tag, dmg_sha256]),
+    )
+    expect(kept).toEqual(REFERENCES)
   })
 })

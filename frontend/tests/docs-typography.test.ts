@@ -102,4 +102,20 @@ describe('.github/release-notes', () => {
       .filter((name) => !NOTE_FILES.includes(name))
     expect(missing).toEqual([])
   })
+
+  /**
+   * A page goes on the release as it is, so a label of the draft – `{DMG_SHA256}`,
+   * `{REFERENCE_DECISION – …}` – must not reach it. Code is not taken out here:
+   * the labels stood in backticks.
+   */
+  it('has no unfilled {LABEL} left from a draft', () => {
+    const labels = NOTE_FILES.flatMap((name) =>
+      readFileSync(at(`${NOTES}${name}`), 'utf8')
+        .split('\n')
+        .flatMap((text, index) =>
+          /\{[A-Z][A-Z0-9_]*/.test(text) ? [`${name}:${index + 1}: ${text.trim()}`] : [],
+        ),
+    )
+    expect(labels).toEqual([])
+  })
 })
