@@ -2,7 +2,7 @@
 name = "aruna"
 version = "3.0.0"
 edition = "2021"
-description = "Aruna — generates a Scandinavian-style HTML inventory of TLHdig (Zenodo) Hittite cuneiform transliterations"
+description = "Aruna generates a lightweight HTML inventory design of TLHdig (Zenodo) Hittite cuneiform transliterations."
 authors = ["Sergey Simonov"]
 license = "MIT"
 repository = "https://github.com/sergeyssimonov-max/Aruna"

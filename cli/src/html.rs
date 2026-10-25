@@ -1,4 +1,4 @@
-//! Scandinavian-style HTML inventory generation.
+//! Lightweight HTML inventory generation.
 //!
 //! Rows are grouped by CTH catalogue number (tablet family); fragments of the
 //! same text (e.g. all CTH 547) render under one section heading.
