@@ -1485,11 +1485,13 @@ mod opening {
 fn corpus_fixture() -> Option<std::path::PathBuf> {
     let zip = std::env::var_os("ARUNA_ZIP")
         .or_else(|| std::env::var_os("ARUNA_FIXTURE_ZIP"))
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip")
-        });
+        .map_or_else(
+            || {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip")
+            },
+            std::path::PathBuf::from,
+        );
     if zip.is_file() {
         return Some(zip);
     }
