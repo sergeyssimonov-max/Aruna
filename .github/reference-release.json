@@ -11,8 +11,10 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Four references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, v2.5.11 is the previous",
-    "reference, and v2.6.3 is the current one, published on 2026-10-08. A release",
+    "Five references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, v2.5.11 and v2.6.3 are",
+    "the previous references, and v3.0.0 is the current one, published on 2026-10-25, the",
+    "first with a PDF for each document. v2.6.3 and v2.5.11 stay beside it by the owner's",
+    "decision of 2026-10-24 (part3-6): the references are v3.0.0, v2.6.3 and v2.5.11. A release",
     "cannot record itself — the commit it names is the commit that carries it, and no file",
     "can contain its own hash — so each entry here is added by the commit after the release",
     "it describes.",
@@ -64,7 +66,14 @@
       "commit": "7d21bc4f35846987427858d9f7890669158ce98c",
       "published": "2026-10-08T12:11:22Z",
       "dmg_sha256": "e3137106d3af0354e318096d075b8bb01838e50750b13067df9df0d7250952c9",
-      "why": "The current release, the last without PDFs. The conversion to PDF is in the core and off everywhere by default: the window asks for none, the console builds them only with ARUNA_PDF=on. The inventory's search finds a CTH group by its catalogue title and folds diacritics in every field; a build on HFS+ no longer refuses names the disk keeps in another Unicode form; THIRD-PARTY-NOTICES.md ships in the application. The package it builds without PDFs hashes to 3a9d93fc…693a over 23 941 files, with PDFs (ARUNA_PDF=on) to a8100765…65b8 over 47 654. The application the runner built, 3b608042…2ac5, is byte-for-byte the one the owner's machine built from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 113–143."
+      "why": "The release before v3.0.0, the last without PDFs. The conversion to PDF is in the core and off everywhere by default: the window asks for none, the console builds them only with ARUNA_PDF=on. The inventory's search finds a CTH group by its catalogue title and folds diacritics in every field; a build on HFS+ no longer refuses names the disk keeps in another Unicode form; THIRD-PARTY-NOTICES.md ships in the application. The package it builds without PDFs hashes to 3a9d93fc…693a over 23 941 files, with PDFs (ARUNA_PDF=on) to a8100765…65b8 over 47 654. The application the runner built, 3b608042…2ac5, is byte-for-byte the one the owner's machine built from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 113–143."
+    },
+    {
+      "tag": "v3.0.0",
+      "commit": "bb18e84bc3d6aed9f675ca227235fa9e435aa48b",
+      "published": "2026-10-25T10:04:49Z",
+      "dmg_sha256": "fcb9df42f00d21d65214bee26b85ea136110f2360126a5b5f30f76e548c4da6e",
+      "why": "The current release, the first with a PDF for each document: 23 713 PDFs for 23 936 documents of TLHdig Beta 0.3, built on every run with no mode without them; the 223 the document model does not read keep their XML, and the manifest names the reason for each. The inventory has one link per document, to its PDF or, without one, to its XML. The seven fonts and their licence texts ship inside Aruna.app, and a build that finds one missing or changed stops before it starts. The manifest is schema 3, with a run block. The package it builds hashes to 4b8f5107…c89f over 47 654 files; against the package of v2.6.3's code with PDFs, 005435da…8983, it differs in manifest.json (run.id and run.aruna) and the 23 713 PDFs, whose text and page counts are equal. The application the runner built, 9e4b158f…ac30, is byte-for-byte the one the owner's machine built twice from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 144–168."
     }
   ]
 }
