@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn a_closing_tag_inside_a_comment_closes_nothing() {
-        let h = br#"<note>keep<!-- </note> -->all</note>"#;
+        let h = br"<note>keep<!-- </note> -->all</note>";
         assert_eq!(tag_text(h, b"note").unwrap(), b"keep<!-- </note> -->all");
     }
 
@@ -658,7 +658,7 @@ mod tests {
     /// rather than resume on the next `<` they see.
     #[test]
     fn an_unterminated_comment_swallows_the_rest() {
-        let h = br#"<a/><!-- <b/>"#;
+        let h = br"<a/><!-- <b/>";
         let mut seen = Vec::new();
         for_each_start_tag(h, |local, _| {
             seen.push(String::from_utf8_lossy(local).into_owned());

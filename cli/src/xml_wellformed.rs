@@ -728,7 +728,7 @@ mod tests {
     /// documents would put 23 730 entries in the manifest and mean nothing.
     #[test]
     fn a_well_formed_document_has_no_finding() {
-        let good = br#"<AOxml><AOHeader><docID>KBo 1.1</docID></AOHeader><body><text><w>nu</w></text></body></AOxml>"#;
+        let good = br"<AOxml><AOHeader><docID>KBo 1.1</docID></AOHeader><body><text><w>nu</w></text></body></AOxml>";
         assert_eq!(classify(good), None);
     }
 
@@ -759,19 +759,16 @@ mod tests {
                 Reason::AttributeGivenTwice,
                 r#"<a><w c="1" c="2">nu</w></a>"#,
             ),
-            (Reason::ElementNeverClosed, r#"<a><t><w>nu</t></a>"#),
+            (Reason::ElementNeverClosed, r"<a><t><w>nu</t></a>"),
             (
                 Reason::CrossingElements,
-                r#"<a><w><g>nu</w><w>ta</g></w></a>"#,
+                r"<a><w><g>nu</w><w>ta</g></w></a>",
             ),
-            (
-                Reason::DuplicateEndTag,
-                r#"<a><t><w>nu</w><g/></w></t></a>"#,
-            ),
-            (Reason::NoSuchElement, r#"<a><t>nu</q></t></a>"#),
+            (Reason::DuplicateEndTag, r"<a><t><w>nu</w><g/></w></t></a>"),
+            (Reason::NoSuchElement, r"<a><t>nu</q></t></a>"),
             (
                 Reason::MismatchedEndTagName,
-                r#"<a><AO:TxtPubl>KBo 1.1</TxtPubl></a>"#,
+                r"<a><AO:TxtPubl>KBo 1.1</TxtPubl></a>",
             ),
         ];
         for (want, xml) in cases {
@@ -965,10 +962,10 @@ mod tests {
     #[test]
     fn a_document_with_neither_defect_says_so() {
         for xml in [
-            r#"<AOxml><AO:TxtPubl>KBo 1.1</AO:TxtPubl></AOxml>"#,
+            r"<AOxml><AO:TxtPubl>KBo 1.1</AO:TxtPubl></AOxml>",
             r#"<a><w trans="a&lt;b">x</w></a>"#,
             r#"<a><!-- a<b and AO:- --><w c="1"/></a>"#,
-            r#"<a><![CDATA[a<b AO:-]]></a>"#,
+            r"<a><![CDATA[a<b AO:-]]></a>",
             r#"<a><?xml-stylesheet href="a<b"?><w/></a>"#,
         ] {
             assert_eq!(beyond_the_parser(xml.as_bytes()), None, "для {xml}");
@@ -978,7 +975,7 @@ mod tests {
     /// An end tag is held to the same rule as the start tag.
     #[test]
     fn a_colon_without_a_local_name_is_found_on_an_end_tag_too() {
-        let xml = r#"<a><AO:italic>x</AO:-italic></a>"#;
+        let xml = r"<a><AO:italic>x</AO:-italic></a>";
         assert_eq!(
             beyond_the_parser(xml.as_bytes()).map(|b| b.limit),
             Some(Limit::ColonWithoutLocalName)

@@ -37,7 +37,7 @@ use crate::parse::{group_label, ManuscriptRecord};
 /// moved twice and both copies were live at once, for an inventory that is
 /// already in memory and already the right length.
 pub fn sort_records(records: &mut [ManuscriptRecord]) {
-    sort_by_display_order(records, |record| record)
+    sort_by_display_order(records, |record| record);
 }
 
 /// The same order, over anything that carries a record.

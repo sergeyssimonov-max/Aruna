@@ -289,7 +289,7 @@ fn against_disk(expected: &HashSet<PathBuf>, on_disk: &HashSet<PathBuf>) -> Agai
     let by_key = |paths: &mut dyn Iterator<Item = &PathBuf>| {
         let mut map: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
         for path in paths {
-            map.entry(key(path)).or_default().push(path.to_path_buf());
+            map.entry(key(path)).or_default().push(path.clone());
         }
         for list in map.values_mut() {
             list.sort();

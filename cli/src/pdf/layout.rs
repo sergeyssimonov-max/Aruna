@@ -295,7 +295,7 @@ pub fn json(fonts: &Fonts, page: &Page, template: &str, credit: bool) -> Result<
                 match piece {
                     Piece::Text(t) => items.extend(runs_items(fonts, t)?),
                     Piece::Note(c) => {
-                        items.push(format!("{{\"k\":\"n\",\"r\":{}}}", runs_json(fonts, c)?))
+                        items.push(format!("{{\"k\":\"n\",\"r\":{}}}", runs_json(fonts, c)?));
                     }
                     Piece::Tab => items.push("{\"k\":\"tab\"}".to_string()),
                 }

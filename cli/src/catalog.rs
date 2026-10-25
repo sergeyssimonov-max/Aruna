@@ -144,7 +144,7 @@ mod tests {
         ManuscriptRecord {
             title: sigla.to_string(),
             sigla: sigla.into(),
-            cth: cth.map(|s| s.to_string()),
+            cth: cth.map(std::string::ToString::to_string),
             cth_num: cth
                 .and_then(crate::parse::parse_cth_num)
                 .unwrap_or(u32::MAX),

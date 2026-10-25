@@ -515,7 +515,7 @@ mod tests {
         ManuscriptRecord {
             title,
             sigla: sigla.into(),
-            cth: cth.map(|s| s.to_string()),
+            cth: cth.map(std::string::ToString::to_string),
             cth_num,
             authorship: auth.into(),
             year: year.into(),

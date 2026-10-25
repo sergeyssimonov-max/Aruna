@@ -382,10 +382,7 @@ fn strip_tags(s: &str, keep_sup: bool) -> String {
     let mut rest = s;
     while let Some(open) = rest.find('<') {
         out.push_str(&rest[..open]);
-        let tag_end = rest[open..]
-            .find('>')
-            .map(|e| open + e + 1)
-            .unwrap_or(rest.len());
+        let tag_end = rest[open..].find('>').map_or(rest.len(), |e| open + e + 1);
         let tag = &rest[open..tag_end];
         if keep_sup {
             let name = tag

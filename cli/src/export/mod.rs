@@ -1076,8 +1076,10 @@ fn folder_twin_of(
     let (path, first) = made
         .iter()
         .find(|(folder, _)| held.is_some() && identity(folder) == held)
-        .map(|(folder, first)| (folder.clone(), first.clone()))
-        .unwrap_or_else(|| (parent.to_path_buf(), "(unknown)".to_string()));
+        .map_or_else(
+            || (parent.to_path_buf(), "(unknown)".to_string()),
+            |(folder, first)| (folder.clone(), first.clone()),
+        );
     let name = |path: &Path| {
         path.file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -1119,8 +1121,10 @@ fn twin_of(
                 .map(|meta| (meta.dev(), meta.ino()))
                 == held
         })
-        .map(|(fragment, _)| fragment.source.clone())
-        .unwrap_or_else(|| "(unknown)".to_string());
+        .map_or_else(
+            || "(unknown)".to_string(),
+            |(fragment, _)| fragment.source.clone(),
+        );
     let fragment = placed
         .iter()
         .find(|placement| placement.relative == relative)

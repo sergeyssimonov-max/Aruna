@@ -1186,9 +1186,9 @@ mod tests {
             // One of the three is not well-formed, so the section under test is
             // not the empty case.
             let bytes: &[u8] = if i == 1 {
-                br#"<a><t><w>nu</t></a>"#
+                br"<a><t><w>nu</t></a>"
             } else {
-                br#"<a><t><w>nu</w></t></a>"#
+                br"<a><t><w>nu</w></t></a>"
             };
             xml.examine(&place.relative, bytes);
         }
@@ -1504,9 +1504,9 @@ mod tests {
         let mut xml = XmlReport::default();
         for (i, place) in placed.iter().enumerate() {
             let bytes: &[u8] = if i == 1 {
-                br#"<a><t><w>nu</t></a>"#
+                br"<a><t><w>nu</t></a>"
             } else {
-                br#"<a><t><w>nu</w></t></a>"#
+                br"<a><t><w>nu</w></t></a>"
             };
             xml.examine(&place.relative, bytes);
         }
@@ -1544,10 +1544,10 @@ mod tests {
         let mut xml = XmlReport::default();
         for (i, place) in placed.iter().enumerate() {
             let bytes: &[u8] = match i {
-                0 => br#"<a><t><w>nu</t></a>"#,
+                0 => br"<a><t><w>nu</t></a>",
                 1 => br#"<a><w trans="a<b">nu</w></a>"#,
-                2 => br#"<a><AO:-italic>nu</AO:-italic></a>"#,
-                _ => br#"<a><t><w>nu</w></t></a>"#,
+                2 => br"<a><AO:-italic>nu</AO:-italic></a>",
+                _ => br"<a><t><w>nu</w></t></a>",
             };
             xml.examine(&place.relative, bytes);
         }

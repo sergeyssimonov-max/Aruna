@@ -294,8 +294,7 @@ fn retry_delay(attempt: u32, err: &ArunaError) -> Duration {
 fn spread() -> f64 {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|since| since.subsec_nanos())
-        .unwrap_or(0);
+        .map_or(0, |since| since.subsec_nanos());
     f64::from(nanos) / 1_000_000_000.0
 }
 
@@ -2279,7 +2278,7 @@ mod tests {
         let later = cancel.clone();
         let heads = Arc::clone(&server.heads);
         std::thread::spawn(move || {
-            while heads.lock().map(|seen| seen.is_empty()).unwrap_or(false) {
+            while heads.lock().is_ok_and(|seen| seen.is_empty()) {
                 std::thread::sleep(Duration::from_millis(5));
             }
             std::thread::sleep(Duration::from_millis(200));
@@ -2410,7 +2409,7 @@ mod tests {
         assert!(!dest.exists(), "destination must not be created on failure");
         let leftovers: Vec<_> = std::fs::read_dir(dir.path())
             .expect("read_dir")
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .map(|e| e.file_name())
             .collect();
         assert!(leftovers.is_empty(), "scratch left behind: {leftovers:?}");

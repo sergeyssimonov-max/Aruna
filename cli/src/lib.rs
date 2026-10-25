@@ -319,8 +319,7 @@ fn announce_release(job: &Job<'_>, releases: ReleaseLookup) {
             // client both name the URL, and this is an aside on the way to a
             // download that is about to report its own failures properly.
             let cause = std::error::Error::source(&err)
-                .map(|source| source.to_string())
-                .unwrap_or_else(|| err.to_string());
+                .map_or_else(|| err.to_string(), std::string::ToString::to_string);
             job.report(Event::ZenodoUnreachable { cause: &cause });
         }
     }
@@ -343,8 +342,7 @@ fn work_dir_for_process() -> PathBuf {
 fn format_now_utc() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_secs());
     // Manual YYYY-MM-DD HH:MM:SS UTC from unix seconds (civil algorithm).
     let (y, m, d, hh, mm, ss) = civil_from_unix(secs);
     format!("{y:04}-{m:02}-{d:02} {hh:02}:{mm:02}:{ss:02} UTC")

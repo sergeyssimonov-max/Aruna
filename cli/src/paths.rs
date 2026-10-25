@@ -392,7 +392,7 @@ mod tests {
 
         let names: Vec<_> = std::fs::read_dir(dir.path())
             .unwrap()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .map(|e| e.file_name())
             .collect();
         assert_eq!(names.len(), 1, "unexpected leftovers: {names:?}");

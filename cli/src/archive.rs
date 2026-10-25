@@ -762,7 +762,7 @@ mod tests {
         );
         let recs = parse_zip(&zip_path, &Job::unattended()).unwrap();
         assert_eq!(recs.len(), 2);
-        assert!(recs[0].title.contains("A") || recs[1].title.contains("A"));
+        assert!(recs[0].title.contains('A') || recs[1].title.contains('A'));
     }
 
     #[test]

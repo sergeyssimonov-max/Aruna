@@ -307,7 +307,7 @@ fn year_from_date_value(raw: &str) -> Option<String> {
     let t = raw.trim();
     if t.len() >= 4 && t.as_bytes()[0].is_ascii_digit() {
         let y = &t.as_bytes()[..4];
-        if y.iter().all(|c| c.is_ascii_digit()) {
+        if y.iter().all(u8::is_ascii_digit) {
             let n: u32 = utf8(y).parse().ok()?;
             if (1900..=2100).contains(&n) {
                 return Some(utf8(y).to_string());

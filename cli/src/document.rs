@@ -893,7 +893,7 @@ mod tests {
     /// What the document does not carry, the model does not carry.
     #[test]
     fn absence_is_absence() {
-        let document = read(r#"<a><w>nu</w></a>"#);
+        let document = read(r"<a><w>nu</w></a>");
         assert_eq!(document.declaration(), None);
         let w = element(&document, 1);
         assert!(w.attributes.is_empty());

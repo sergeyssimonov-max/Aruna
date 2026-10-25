@@ -148,7 +148,7 @@ fn encode_uri_component(segment: &str) -> String {
     for byte in segment.as_bytes() {
         match byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(*byte as char)
+                out.push(*byte as char);
             }
             other => push_percent(&mut out, *other),
         }

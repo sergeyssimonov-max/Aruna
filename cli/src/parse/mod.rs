@@ -357,8 +357,8 @@ mod tests {
     #[test]
     fn a_join_mark_where_the_siglum_belongs_is_refused() {
         // `CTH 413_XML_BESRIT/KBo 51.34.xml`, which published `€1}`.
-        let with_txtpubl = r#"<AOxml><AOHeader><docID>€1}</docID></AOHeader>
-<AO:Manuscripts><AO:TxtPubl>KBo 51.34</AO:TxtPubl></AO:Manuscripts></AOxml>"#;
+        let with_txtpubl = r"<AOxml><AOHeader><docID>€1}</docID></AOHeader>
+<AO:Manuscripts><AO:TxtPubl>KBo 51.34</AO:TxtPubl></AO:Manuscripts></AOxml>";
         assert_eq!(
             parse_manuscript("CTH 413_XML_BESRIT/KBo 51.34.xml", with_txtpubl).sigla,
             "KBo 51.34"
@@ -366,7 +366,7 @@ mod tests {
 
         // `CTH 757_XML_BESRIT/KUB 54.65+.xml`, which has no TxtPubl at all and
         // published `€7}` — the file name was right there.
-        let bare = r#"<AOxml><AOHeader><docID>€7}</docID></AOHeader></AOxml>"#;
+        let bare = r"<AOxml><AOHeader><docID>€7}</docID></AOHeader></AOxml>";
         assert_eq!(
             parse_manuscript("CTH 757_XML_BESRIT/KUB 54.65+.xml", bare).sigla,
             "KUB 54.65+"
@@ -377,14 +377,14 @@ mod tests {
     /// join marks a manuscript list carries are trimmed as they always were.
     #[test]
     fn an_ordinary_siglum_is_untouched_by_the_join_mark_rule() {
-        let xml = r#"<AOxml><AOHeader><docID>KBo 17.86+</docID></AOHeader></AOxml>"#;
+        let xml = r"<AOxml><AOHeader><docID>KBo 17.86+</docID></AOHeader></AOxml>";
         assert_eq!(
             parse_manuscript("CTH 786_XML_HFR/x.xml", xml).sigla,
             "KBo 17.86+"
         );
 
-        let joined = r#"<AOxml><AOHeader><docID></docID></AOHeader>
-<AO:Manuscripts><AO:TxtPubl>KBo 17.86 {€1}+KBo 15.62 {€2}</AO:TxtPubl></AO:Manuscripts></AOxml>"#;
+        let joined = r"<AOxml><AOHeader><docID></docID></AOHeader>
+<AO:Manuscripts><AO:TxtPubl>KBo 17.86 {€1}+KBo 15.62 {€2}</AO:TxtPubl></AO:Manuscripts></AOxml>";
         assert_eq!(
             parse_manuscript("CTH 786_XML_HFR/x.xml", joined).sigla,
             "KBo 17.86"
@@ -395,14 +395,14 @@ mod tests {
     /// tag anywhere reports the missing-value dash rather than empty text.
     #[test]
     fn inventory_number_prefers_the_header_and_tolerates_absence() {
-        let in_header = r#"<AOxml><AOHeader><docID>X</docID><InvNr>Bo 1234</InvNr></AOHeader>
-<AO:Manuscripts><AO:InvNr>VAT 9999</AO:InvNr></AO:Manuscripts></AOxml>"#;
+        let in_header = r"<AOxml><AOHeader><docID>X</docID><InvNr>Bo 1234</InvNr></AOHeader>
+<AO:Manuscripts><AO:InvNr>VAT 9999</AO:InvNr></AO:Manuscripts></AOxml>";
         assert_eq!(
             parse_manuscript("CTH 1_XML/X.xml", in_header).inv,
             "Bo 1234"
         );
 
-        let absent = r#"<AOxml><AOHeader><docID>X</docID></AOHeader><body>t</body></AOxml>"#;
+        let absent = r"<AOxml><AOHeader><docID>X</docID></AOHeader><body>t</body></AOxml>";
         assert_eq!(parse_manuscript("CTH 1_XML/X.xml", absent).inv, MISSING);
     }
 
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn missing_fields_become_dash() {
-        let xml = r#"<root><note>nothing useful</note></root>"#;
+        let xml = r"<root><note>nothing useful</note></root>";
         let r = parse_manuscript("orphan/unknown.xml", xml);
         assert_eq!(r.title, "unknown");
         assert_eq!(r.authorship, MISSING);
@@ -634,26 +634,26 @@ mod tests {
     #[test]
     fn the_inventory_number_prefers_its_spelling_over_its_position() {
         // `inv` comes first in the document; `InvNr` still wins.
-        let ordered = r#"<AOxml><AOHeader><docID>X</docID></AOHeader>
-<body><inv>early</inv><InvNr>VAT 7479</InvNr></body></AOxml>"#;
+        let ordered = r"<AOxml><AOHeader><docID>X</docID></AOHeader>
+<body><inv>early</inv><InvNr>VAT 7479</InvNr></body></AOxml>";
         assert_eq!(parse_manuscript("CTH 1_XML/X.xml", ordered).inv, "VAT 7479");
 
         // An empty preferred element passes the turn to the next spelling.
-        let empty_first = r#"<AOxml><AOHeader><docID>X</docID></AOHeader>
-<body><InvNr>   </InvNr><inv>Bo 1234</inv></body></AOxml>"#;
+        let empty_first = r"<AOxml><AOHeader><docID>X</docID></AOHeader>
+<body><InvNr>   </InvNr><inv>Bo 1234</inv></body></AOxml>";
         assert_eq!(
             parse_manuscript("CTH 1_XML/X.xml", empty_first).inv,
             "Bo 1234"
         );
 
         // Only the first element of a spelling is consulted, as before.
-        let repeated = r#"<AOxml><AOHeader><docID>X</docID></AOHeader>
-<body><InvNr>first</InvNr><InvNr>second</InvNr></body></AOxml>"#;
+        let repeated = r"<AOxml><AOHeader><docID>X</docID></AOHeader>
+<body><InvNr>first</InvNr><InvNr>second</InvNr></body></AOxml>";
         assert_eq!(parse_manuscript("CTH 1_XML/X.xml", repeated).inv, "first");
 
         // The spelling is matched without regard to case, which is why `invNr`
         // is no longer searched for separately.
-        let cased = r#"<AOxml><AOHeader><docID>X</docID><invNR>Bo 99</invNR></AOHeader></AOxml>"#;
+        let cased = r"<AOxml><AOHeader><docID>X</docID><invNR>Bo 99</invNR></AOHeader></AOxml>";
         assert_eq!(parse_manuscript("CTH 1_XML/X.xml", cased).inv, "Bo 99");
     }
 }

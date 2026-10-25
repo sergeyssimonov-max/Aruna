@@ -340,8 +340,10 @@ pub fn scan_page(doc: &Document, page: ObjectId) -> Result<PageScan, PdfError> {
     let media = page_dict
         .get(b"MediaBox")
         .and_then(|o| o.as_array())
-        .map(|a| a.iter().map(number).collect::<Vec<_>>())
-        .unwrap_or_else(|_| vec![0.0, 0.0, 595.28, 841.89]);
+        .map_or_else(
+            |_| vec![0.0, 0.0, 595.28, 841.89],
+            |a| a.iter().map(number).collect::<Vec<_>>(),
+        );
     scan.width = media.get(2).copied().unwrap_or(0.0);
     scan.height = media.get(3).copied().unwrap_or(0.0);
 
@@ -407,7 +409,7 @@ impl Walk {
                     .iter()
                     .filter(|o| !matches!(o, Object::Name(_)))
                     .map(number)
-                    .collect()
+                    .collect();
             }
             "BT" | "Tm" | "Td" | "TD" | "T*" | "TL" | "Tc" | "Tz" | "Ts" | "Tf" => {
                 self.text_operator(op.operator.as_str(), a);

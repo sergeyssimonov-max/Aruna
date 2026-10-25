@@ -259,6 +259,7 @@ pub struct Stderr;
 
 impl Progress for Stderr {
     fn report(&self, event: Event<'_>) {
+        use std::io::Write as _;
         if event.is_tick() {
             return;
         }
@@ -266,7 +267,6 @@ impl Progress for Stderr {
         // – `aruna 2>&-`, a terminal that went away – would then stop the
         // build at its first line of progress. A line nobody can read is lost,
         // and the work goes on.
-        use std::io::Write as _;
         let _ = writeln!(std::io::stderr(), "{event}");
     }
 }
