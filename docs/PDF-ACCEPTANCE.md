@@ -461,9 +461,9 @@ fails).
 
 ---
 
-## 6. The Scandinavian minimal style, as tokens
+## 6. The lightweight design, as tokens
 
-"Scandinavian minimalism" is not a checkable requirement. These are:
+"A lightweight design" is not a checkable requirement. These are:
 
 - light neutral ground, restrained black-to-grey palette
 - at most one accent colour, and only if something actually needs one
