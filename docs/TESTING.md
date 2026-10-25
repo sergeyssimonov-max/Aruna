@@ -14,7 +14,7 @@ package built from it (the three corpus `cancelling` tests and
 `markup::every_name_of_a_real_package_reaches_the_window_byte_for_byte`),
 and the shell's `regenerate_the_bindings`, which
 is not a check but the way `frontend/src/bindings.ts` is refreshed.
-Beside it, and in a language of its own, are the **261 `vitest` tests** in
+Beside it, and in a language of its own, are the **267 `vitest` tests** in
 `frontend/` — see *Frontend* below — and the six end-to-end scenarios of
 `frontend/e2e/smoke.e2e.ts`, run against the real window by `pnpm test:e2e`. Retries are deliberately absent from
 `.config/nextest.toml`: a flaky test is a defect to find, not a wait to sit out.
@@ -207,7 +207,7 @@ cd frontend
 pnpm check          # svelte-check over the app, tsc over the configs and node tests, tsc over the E2E contour
 pnpm lint
 pnpm format:check
-pnpm test:unit      # 261
+pnpm test:unit      # 267
 ```
 
 `vitest` runs two projects, 18 files. **`component`** is jsdom: the 45 tests of
@@ -223,8 +223,8 @@ promises — both counts, the path they were asked for, the error text in place 
 the counts when the command refuses, and the click counter — while
 `e2e/smoke.e2e.ts` holds the same button in the real WKWebView, which is the one
 thing jsdom cannot answer for.
-**`node`** holds the tests that read the repository rather than a DOM, 136 in
-16 files (counted on 2026-10-20 at `87e1b28`; 82 in 15 before the three documentation tests of readme-ru):
+**`node`** holds the tests that read the repository rather than a DOM, 142 in
+16 files (counted on 2026-10-25 at `0ae213c`; 136 before the six tests of the GHSA-m5mm guard, 82 in 15 before the three documentation tests of readme-ru):
 
 | test | what it holds |
 |---|---|
@@ -240,7 +240,7 @@ thing jsdom cannot answer for.
 | `tests/failure-texts.test.ts` | every failure code `app::Failure::of` can send has a Russian sentence in the window, the failures the shell raises itself are Russian too, and all of them keep the project's typography — the guard that stops a new core code reaching the reader in English |
 | `tests/ipc-shape.test.ts` | the sample `src-tauri/stats-sample.json` is what Rust serialises, and empty places arrive as `null` rather than as missing fields |
 | `tests/column-order.test.ts` | the column the narrow screen hides by its number in `screen.css` is the editor's column of `COLUMNS` in `cli/src/html.rs` |
-| `tests/audit-exception.test.ts` | the one `pnpm audit` exception, GHSA-vfj7-8cjw-p6xm, still covers braces 3.0.3 reached by its one chain, and nothing else |
+| `tests/audit-exception.test.ts` | the `pnpm audit` exceptions are exactly two: GHSA-vfj7-8cjw-p6xm still covers braces 3.0.3 reached by its one chain; GHSA-m5mm-p8h7-m29v (serialize-javascript) is still needed and before 2026-10-31T00:00Z, undici stays at or past 6.29.1 and 7.30.1, and neither package is in the built dist |
 | `tests/third-party-notices.test.ts` | `THIRD-PARTY-NOTICES.md` names every package of the three lock files once, and nothing else |
 | `tests/reference-images.test.ts` | the gate of tree cleanliness on the reference images in `cli/releases/`, run on inputs of its own |
 | `tests/e2e-isolation.test.ts` | the E2E contour's guard against the real `~/Library`, shown on a `Library` and a temporary directory of its own |
