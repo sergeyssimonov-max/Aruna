@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs'
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { build } from 'vite'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The one audit exception covers exactly the path it was granted for.
+ * The audit exceptions are exactly two, and each covers what it was granted for.
+ *
+ * GHSA-vfj7-8cjw-p6xm is held to its path (below); GHSA-m5mm-p8h7-m29v to its
+ * date, its version and the dist (at the end of the file).
  *
  * `pnpm-workspace.yaml` excepts GHSA-vfj7-8cjw-p6xm (braces, owner's decision
  * of 2026-10-03): braces comes only with the window tests, through
@@ -18,6 +24,28 @@ import { describe, expect, it } from 'vitest'
 const FRONTEND = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const GHSA = 'GHSA-vfj7-8cjw-p6xm'
+
+const M5MM = 'GHSA-m5mm-p8h7-m29v'
+
+/** Fixed by the undici raise of 2026-10-24 and so never to be excepted again. */
+const RAISED = ['GHSA-xjj6-f33q-929c', 'GHSA-4qv8-2p9j-2685', 'GHSA-f72v-6w45-q472']
+
+const workspace = () => readFileSync(join(FRONTEND, 'pnpm-workspace.yaml'), 'utf8')
+const lockfile = () => readFileSync(join(FRONTEND, 'pnpm-lock.yaml'), 'utf8')
+
+/** Every GHSA the workspace names: `audit.ignore` is the only place one goes. */
+function ignored(text: string): string[] {
+  return [...text.matchAll(/GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}/g)].map((m) => m[0])
+}
+
+describe('the audit exceptions', () => {
+  it('are exactly GHSA-vfj7 and GHSA-m5mm, through audit.ignore', () => {
+    const text = workspace()
+    expect(new Set(ignored(text))).toEqual(new Set([GHSA, M5MM]))
+    for (const id of RAISED) expect(ignored(text)).not.toContain(id)
+    expect(text).not.toMatch(/auditConfig|ignoreGhsas|ignoreCves/)
+  })
+})
 
 /** Each link of the excepted chain: the package, and the one allowed to depend on it. */
 const CHAIN: [RegExp, RegExp][] = [
@@ -93,16 +121,9 @@ function outOfReason(lock: string): string | null {
 }
 
 describe(`the audit exception ${GHSA}`, () => {
-  it('is the only one, and braces is still reached by its chain alone', () => {
-    const workspace = readFileSync(join(FRONTEND, 'pnpm-workspace.yaml'), 'utf8')
-    const ignored = [...workspace.matchAll(/GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}/g)].map(
-      (m) => m[0],
-    )
-    expect(new Set(ignored)).toEqual(new Set([GHSA]))
-    expect(workspace).not.toMatch(/auditConfig|ignoreGhsas|ignoreCves/)
-
-    const lock = readFileSync(join(FRONTEND, 'pnpm-lock.yaml'), 'utf8')
-    expect(outOfReason(lock)).toBeNull()
+  it('is still reached by its chain alone', () => {
+    expect(ignored(workspace())).toContain(GHSA)
+    expect(outOfReason(lockfile())).toBeNull()
   })
 
   it('would fail on another path, another version, or no braces', () => {
@@ -145,5 +166,179 @@ describe(`the audit exception ${GHSA}`, () => {
 
     const imported = `importers:\n\n  .:\n    devDependencies:\n      mocha:\n        specifier: 10.8.2\n\n${chain}`
     expect(outOfReason(imported)).toMatch(/names mocha: itself/)
+  })
+})
+
+/**
+ * GHSA-m5mm-p8h7-m29v (serialize-javascript below 7.1.3, owner's decision of
+ * 2026-10-24) is excepted for a week: the fix, 7.1.3, was replaced by 7.1.4
+ * within a day, and neither is old enough to take (specification 5.1). The
+ * package comes with the window tests – @wdio/mocha-framework > mocha 10 – and
+ * is held at 7.0.5 by an override. The same day undici was raised past the
+ * three advisories it carried, and this keeps both facts true: the exception
+ * goes on its date or as soon as it is not needed, undici does not slide back,
+ * and neither package's code is in what ships.
+ */
+
+/** The exception is gone by then, whatever the lockfile says. */
+const M5MM_DUE = '2026-10-31T00:00:00Z'
+
+/** The first fixed serialize-javascript. */
+const M5MM_FIXED: Version = [7, 1, 3]
+
+/** The undici each line was raised to on 2026-10-24; the line 8 one is not affected. */
+const UNDICI_FLOOR: Record<number, Version> = { 6: [6, 29, 1], 7: [7, 30, 1] }
+
+type Version = [number, number, number]
+
+/** Every version of `name` the lockfile's packages section resolves. */
+function resolved(lock: string, name: string): Version[] {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const found = new Map<string, Version>()
+  for (const line of section(lock, 'packages')) {
+    const m = new RegExp(`^ {2}'?${escaped}@(\\d+)\\.(\\d+)\\.(\\d+)'?:$`).exec(line)
+    if (m) found.set(`${m[1]}.${m[2]}.${m[3]}`, [Number(m[1]), Number(m[2]), Number(m[3])])
+  }
+  return [...found.values()]
+}
+
+function atOrPast(version: Version, fix: Version): boolean {
+  for (let i = 0; i < 3; i++) {
+    if (version[i] !== fix[i]) return version[i] > fix[i]
+  }
+  return true
+}
+
+/** Why GHSA-m5mm has to go, or `null` while it is still needed and in date. */
+function m5mmOutOfReason(now: Date, lock: string): string | null {
+  if (now.getTime() >= Date.parse(M5MM_DUE)) {
+    return `срок исключения ${M5MM} истек: ${M5MM_DUE}, now ${now.toISOString()}`
+  }
+  const versions = resolved(lock, 'serialize-javascript')
+  if (versions.length === 0) {
+    return `the lockfile resolves no serialize-javascript: снять исключение ${M5MM}`
+  }
+  if (versions.every((v) => atOrPast(v, M5MM_FIXED))) {
+    return `every serialize-javascript is at or past 7.1.3 (${versions.map((v) => v.join('.')).join(', ')}): снять исключение ${M5MM}`
+  }
+  return null
+}
+
+/** The undici below the floor of its line, or `null` when every one is at or past it. */
+function undiciBelowFloor(lock: string): string | null {
+  const low = resolved(lock, 'undici').filter(
+    (v) => UNDICI_FLOOR[v[0]] && !atOrPast(v, UNDICI_FLOOR[v[0]]),
+  )
+  return low.length === 0
+    ? null
+    : `undici below its raise of 2026-10-24: ${low.map((v) => v.join('.')).join(', ')}`
+}
+
+/**
+ * A string each package carries verbatim and no other code is likely to: the
+ * error code undici's `lib/core/errors.js` defines, and the placeholder
+ * serialize-javascript's `index.js` builds its output around. A minifier
+ * renames identifiers but keeps string literals, so if either package were
+ * bundled its string would be in the output.
+ */
+const MARKERS: { pkg: string; file: string; marker: string }[] = [
+  { pkg: 'undici', file: 'lib/core/errors.js', marker: 'UND_ERR_CONNECT_TIMEOUT' },
+  { pkg: 'serialize-javascript', file: 'index.js', marker: '@__(F|R|D|M|S|A|U|I|B|L)-' },
+]
+
+/** The markers found in a set of built files: none, while nothing of either package ships. */
+function shipped(files: Record<string, string>): string[] {
+  const found: string[] = []
+  for (const [name, text] of Object.entries(files)) {
+    for (const { pkg, marker } of MARKERS) {
+      if (text.includes(marker)) found.push(`${pkg} in ${name}`)
+    }
+  }
+  return found
+}
+
+/** Every file of the window's dist, as `pnpm build` makes it, built into a directory of its own. */
+async function builtDist(): Promise<Record<string, string>> {
+  const out = await mkdtemp(join(tmpdir(), 'aruna-dist-'))
+  try {
+    await build({
+      root: FRONTEND,
+      configFile: join(FRONTEND, 'vite.config.ts'),
+      logLevel: 'silent',
+      build: { outDir: out, emptyOutDir: true },
+    })
+    const files: Record<string, string> = {}
+    for (const entry of await readdir(out, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue
+      const path = join(entry.parentPath, entry.name)
+      files[path.slice(out.length + 1)] = await readFile(path, 'utf8')
+    }
+    return files
+  } finally {
+    await rm(out, { recursive: true, force: true })
+  }
+}
+
+/** The installed copy of each package the lockfile resolves, as `node_modules/.pnpm` lays it out. */
+function installed(lock: string, pkg: string): string[] {
+  return resolved(lock, pkg).map((v) =>
+    join(FRONTEND, 'node_modules', '.pnpm', `${pkg}@${v.join('.')}`, 'node_modules', pkg),
+  )
+}
+
+describe(`the audit exception ${M5MM}`, () => {
+  it('is still needed and in date', () => {
+    expect(ignored(workspace())).toContain(M5MM)
+    expect(m5mmOutOfReason(new Date(), lockfile())).toBeNull()
+  })
+
+  it('stands beside an undici that stays raised', () => {
+    expect(undiciBelowFloor(lockfile())).toBeNull()
+  })
+
+  it('covers code that does not ship', { timeout: 120_000 }, async () => {
+    const files = await builtDist()
+    expect(Object.keys(files)).toContain('index.html')
+    expect(shipped(files)).toEqual([])
+  })
+
+  /** A marker that is not in its own package would find nothing anywhere. */
+  it('looks for strings each package really carries', () => {
+    const lock = lockfile()
+    for (const { pkg, file, marker } of MARKERS) {
+      const copies = installed(lock, pkg)
+      expect(copies.length, pkg).toBeGreaterThan(0)
+      for (const dir of copies) {
+        expect(readFileSync(join(dir, file), 'utf8'), `${dir}/${file}`).toContain(marker)
+      }
+    }
+  })
+
+  it('would fail on the due date, once it is not needed, on an undici slid back, and on a bundled package', () => {
+    const before = new Date('2026-10-30T23:59:59Z')
+    const due = new Date(M5MM_DUE)
+    const lock = (sj: string, u6 = '6.29.1', u7 = '7.30.1') =>
+      `packages:\n\n  serialize-javascript@${sj}:\n  undici@${u6}:\n  undici@${u7}:\n  undici@8.12.2:\n\nsnapshots:\n`
+
+    expect(m5mmOutOfReason(before, lock('7.0.5'))).toBeNull()
+    expect(m5mmOutOfReason(due, lock('7.0.5'))).toMatch(/срок исключения GHSA-m5mm-p8h7-m29v истек/)
+    expect(m5mmOutOfReason(before, lock('7.1.3'))).toMatch(/снять исключение GHSA-m5mm-p8h7-m29v/)
+    expect(m5mmOutOfReason(before, lock('7.1.4'))).toMatch(/снять исключение GHSA-m5mm-p8h7-m29v/)
+    expect(m5mmOutOfReason(before, 'packages:\n\n  undici@6.29.1:\n')).toMatch(/снять исключение/)
+
+    expect(undiciBelowFloor(lock('7.0.5'))).toBeNull()
+    expect(undiciBelowFloor(lock('7.0.5', '6.29.1', '7.29.1'))).toMatch(/7\.29\.1/)
+    expect(undiciBelowFloor(lock('7.0.5', '6.28.1', '7.30.1'))).toMatch(/6\.28\.1/)
+
+    expect(shipped({ 'assets/index.js': 'const e="UND_ERR_CONNECT_TIMEOUT"' })).toEqual([
+      'undici in assets/index.js',
+    ])
+    expect(shipped({ 'assets/a.js': "'\"@__(F|R|D|M|S|A|U|I|B|L)-'" })).toEqual([
+      'serialize-javascript in assets/a.js',
+    ])
+
+    const vfj7Only = 'audit:\n  ignore:\n    - GHSA-vfj7-8cjw-p6xm\n'
+    expect(new Set(ignored(vfj7Only))).not.toEqual(new Set([GHSA, M5MM]))
+    expect(ignored(`${vfj7Only}    - ${RAISED[0]}\n`)).toContain(RAISED[0])
   })
 })
