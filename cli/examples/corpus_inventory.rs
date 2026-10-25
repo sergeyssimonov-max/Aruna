@@ -157,7 +157,7 @@ fn shape_of(bytes: &[u8], code_points: &mut HashMap<u32, usize>) -> Shape {
         let inner = &tag[1..tag.len().saturating_sub(if self_closing { 2 } else { 1 })];
         let name_end = inner
             .iter()
-            .position(|c| c.is_ascii_whitespace())
+            .position(u8::is_ascii_whitespace)
             .unwrap_or(inner.len());
         let qname = &inner[..name_end];
         let attrs = &inner[name_end..];
@@ -458,10 +458,7 @@ fn main() {
             .entry(base.to_lowercase())
             .or_default()
             .insert(base.clone());
-        let siglum_series: String = base
-            .chars()
-            .take_while(|c| c.is_ascii_alphabetic())
-            .collect();
+        let siglum_series: String = base.chars().take_while(char::is_ascii_alphabetic).collect();
         *series
             .entry(if siglum_series.is_empty() {
                 "<none>".into()
@@ -535,7 +532,7 @@ fn main() {
         "  documents that do not balance:       {unbalanced_total} (first {} shown)",
         unbalanced.len()
     );
-    for (name, why) in unbalanced.iter() {
+    for (name, why) in &unbalanced {
         println!("    {name}: {why}");
     }
     println!();

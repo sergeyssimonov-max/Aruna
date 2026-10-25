@@ -289,8 +289,7 @@ fn have(tool: &str) -> bool {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .is_ok_and(|s| s.success())
 }
 
 /// Есть ли инструмент сверки, и если нет – можно ли на этом остановиться.

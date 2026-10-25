@@ -348,8 +348,8 @@ fn the_reader_refuses_the_documents_a_broken_catalog_would_produce() {
         r#"{"s":"unterminated}"#,        // ends inside a string
         "{\"s\":\"raw \u{1} control\"}", // the escaping's whole job, undone
         r#"{"s":"\q"}"#,                 // an escape no writer produces
-        r#"{v:2}"#,                      // an unquoted key
-        r#""#,                           // nothing at all
+        r"{v:2}",                        // an unquoted key
+        r"",                             // nothing at all
     ] {
         assert!(
             Json::parse(bad).is_err(),

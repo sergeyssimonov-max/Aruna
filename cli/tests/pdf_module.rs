@@ -146,16 +146,15 @@ fn a_tab_is_a_shift_and_not_a_character() {
     let c = assert_whole(&page, &r);
     let scan = &scan_pdf(&r.pdf).expect("pages")[0];
     let at = |t: &str| {
-        scan.glyphs
-            .iter()
-            .find(|g| g.text == t)
-            .map(|g| g.x0 - MARGIN)
-            .unwrap_or_else(|| {
+        scan.glyphs.iter().find(|g| g.text == t).map_or_else(
+            || {
                 panic!(
                     "{t:?} is not among {:?}",
                     scan.glyphs.iter().map(|g| &g.text).collect::<Vec<_>>()
                 )
-            })
+            },
+            |g| g.x0 - MARGIN,
+        )
     };
     let shift = at("-");
     let expected = 5.0 * pdf::TAB_EM * 10.0;
@@ -205,7 +204,7 @@ fn the_file_carries_no_date_and_builds_the_same_twice() {
     let info = doc
         .trailer
         .get(b"Info")
-        .and_then(|o| o.as_reference())
+        .and_then(lopdf::Object::as_reference)
         .and_then(|id| doc.get_dictionary(id))
         .expect("an Info dictionary");
     let field = |k: &[u8]| {
@@ -325,14 +324,13 @@ fn structure(pdf: &[u8]) -> String {
     if let Ok(info) = doc
         .trailer
         .get(b"Info")
-        .and_then(|o| o.as_reference())
+        .and_then(lopdf::Object::as_reference)
         .and_then(|id| doc.get_dictionary(id))
     {
-        for (k, v) in info.iter() {
+        for (k, v) in info {
             let v = v
                 .as_str()
-                .map(aruna::pdf::post::decode_text_string)
-                .unwrap_or_else(|_| format!("{v:?}"));
+                .map_or_else(|_| format!("{v:?}"), aruna::pdf::post::decode_text_string);
             // The version moves with every release and is checked apart.
             let v = v.replace(env!("CARGO_PKG_VERSION"), "{version}");
             let _ = writeln!(out, "info {}: {v}", String::from_utf8_lossy(k));

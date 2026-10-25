@@ -69,8 +69,7 @@ fn sips_present() -> bool {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
+        .is_ok_and(|s| s.success());
     if !here {
         assert!(
             std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
@@ -93,8 +92,7 @@ fn rasterise(pdf: &Path, png: &Path) -> bool {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .is_ok_and(|s| s.success())
         && png.is_file()
 }
 

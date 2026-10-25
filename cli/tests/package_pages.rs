@@ -592,7 +592,7 @@ fn the_manifest_says_about_fonts_what_the_package_holds() {
         .iter()
         .filter_map(|f| f.file_name().and_then(|n| n.to_str()))
         .filter(|n| n.ends_with(".ttf"))
-        .map(|n| n.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
 
     assert_eq!(

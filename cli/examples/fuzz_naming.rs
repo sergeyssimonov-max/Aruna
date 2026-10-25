@@ -3,7 +3,7 @@ use aruna::export::naming::{href, output_path, path_component, pdf_path, percent
 
 fn main() {
     let seeds: Vec<String> = vec![
-        "".into(),
+        String::new(),
         ".".into(),
         "..".into(),
         "...".into(),

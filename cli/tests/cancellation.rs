@@ -106,7 +106,7 @@ fn break_first_entry(zip: &Path) {
     let name_len = u16::from_le_bytes([bytes[26], bytes[27]]) as usize;
     let extra_len = u16::from_le_bytes([bytes[28], bytes[29]]) as usize;
     let data = 30 + name_len + extra_len;
-    for byte in bytes[data..data + 16].iter_mut() {
+    for byte in &mut bytes[data..data + 16] {
         *byte ^= 0xff;
     }
     std::fs::write(zip, &bytes).expect("write archive");

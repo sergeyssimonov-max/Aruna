@@ -687,7 +687,7 @@ fn a_run_killed_mid_build_leaves_nothing_after_the_next_one() {
                 p.file_name()
                     .and_then(|n| n.to_str())
                     .is_some_and(|n| n.starts_with(&staging_prefix) && !n.ends_with(".owner"))
-                    && fs::read_dir(p).map(|d| d.count() >= 10).unwrap_or(false)
+                    && fs::read_dir(p).is_ok_and(|d| d.count() >= 10)
             });
         if let Some(path) = found {
             break path;
@@ -852,7 +852,7 @@ fn repeated_runs_do_not_accumulate_anything() {
             "after run {run} the Downloads folder holds more than the package"
         );
         assert!(leftovers(&sandbox.downloads()).is_empty(), "run {run}");
-        let cached = fs::read_dir(&cache).map(|d| d.count()).unwrap_or(0);
+        let cached = fs::read_dir(&cache).map_or(0, std::iter::Iterator::count);
         assert!(
             cached <= 1,
             "after run {run} the cache holds {cached} entries"

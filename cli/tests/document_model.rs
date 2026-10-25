@@ -682,7 +682,7 @@ fn the_whole_corpus_reads_the_same_twice_and_refuses_what_the_manifest_names() {
 
     let mut second: Vec<(String, String)> = Vec::with_capacity(DOCUMENTS);
     each_document(&path, |name, bytes| {
-        second.push((name.to_string(), outcome(bytes)))
+        second.push((name.to_string(), outcome(bytes)));
     });
 
     assert_eq!(admitted, DOCUMENTS);
@@ -759,7 +759,7 @@ fn the_whole_corpus_reads_the_same_twice_and_refuses_what_the_manifest_names() {
 /// refusal the classifier also makes, as `invalid-encoding`.
 #[test]
 fn what_is_not_the_models_to_read_is_refused_and_never_a_panic() {
-    let body = r#"<AOxml><AOHeader><docID>KBo 1.1</docID></AOHeader><text>ok</text></AOxml>"#;
+    let body = r"<AOxml><AOHeader><docID>KBo 1.1</docID></AOHeader><text>ok</text></AOxml>";
     let utf16 = |bom: [u8; 2], little: bool| {
         let mut bytes = bom.to_vec();
         let text = format!(r#"<?xml version="1.0" encoding="UTF-16"?>{body}"#);
@@ -812,7 +812,7 @@ fn what_is_not_the_models_to_read_is_refused_and_never_a_panic() {
                 assert!(
                     classified,
                     "{what}: not UTF-8 to the model, fine to the classifier"
-                )
+                );
             }
             Refusal::Unexplained { .. } => {
                 panic!("{what}: the parser refused and nothing explains it: {refusal}")

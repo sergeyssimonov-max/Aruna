@@ -104,7 +104,7 @@ fn malformed_xml_variants() {
         ("only path", ""),
         (
             "broken attrs",
-            r#"<AOHeader><docID>Y</docID><uebern editor=FB date=2017/></AOHeader>"#,
+            r"<AOHeader><docID>Y</docID><uebern editor=FB date=2017/></AOHeader>",
         ),
     ];
     for (label, xml) in cases {

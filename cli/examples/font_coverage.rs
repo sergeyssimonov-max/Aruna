@@ -642,11 +642,10 @@ fn report(used: &BTreeSet<u32>, coverage: &Coverage) {
             // What the reader sees instead. A last-resort font contributes a
             // box meaning "nothing can draw this", which is worth knowing and
             // must never be read as the character having been drawn.
-            let marked = coverage
-                .indicator
-                .get(cp)
-                .map(|by| format!("  → shown as a placeholder by {}", by.join(", ")))
-                .unwrap_or_else(|| "  → nothing at all: blank or tofu".to_string());
+            let marked = coverage.indicator.get(cp).map_or_else(
+                || "  → nothing at all: blank or tofu".to_string(),
+                |by| format!("  → shown as a placeholder by {}", by.join(", ")),
+            );
             println!("  U+{cp:04X}{marked}");
         }
     }
@@ -707,7 +706,7 @@ fn verify_environment(fonts: &[Font], families: &[String]) -> bool {
             // exist to end: the corpus rendering correctly because of what
             // Apple shipped, which proves nothing about the next machine.
             Some(font) if font.shipped() => {
-                println!("  {family:24} {}  repository", font.name())
+                println!("  {family:24} {}  repository", font.name());
             }
             Some(font) => {
                 missing = true;

@@ -463,8 +463,7 @@ fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
-        .map(|s| !s.success())
-        .unwrap_or(true)
+        .map_or(true, |s| !s.success())
     {
         eprintln!("xmllint отсутствует — проверка пропущена");
         return;

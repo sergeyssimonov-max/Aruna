@@ -170,7 +170,9 @@ static CACHE_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// Run `f` with the cache directory pointed at `dir`, and put the environment
 /// back afterwards whatever happens.
 fn with_cache_dir<T>(dir: &std::path::Path, f: impl FnOnce() -> T) -> T {
-    let _guard = CACHE_ENV.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = CACHE_ENV
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let previous = std::env::var_os(cache::CACHE_DIR_ENV);
     std::env::set_var(cache::CACHE_DIR_ENV, dir);
 
@@ -191,7 +193,9 @@ static TEMP_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// Run `f` with the process temporary directory pointed at `dir`, and put the
 /// environment back afterwards whatever happens.
 fn with_temp_dir<T>(dir: &std::path::Path, f: impl FnOnce() -> T) -> T {
-    let _guard = TEMP_ENV.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = TEMP_ENV
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let previous = std::env::var_os("TMPDIR");
     std::env::set_var("TMPDIR", dir);
 

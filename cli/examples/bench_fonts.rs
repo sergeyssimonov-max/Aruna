@@ -41,7 +41,7 @@ fn main() {
         "documents: {}  code points: {}  ({:.1} MB of text)",
         texts.len(),
         chars,
-        texts.iter().map(|t| t.len()).sum::<usize>() as f64 / 1e6
+        texts.iter().map(std::string::String::len).sum::<usize>() as f64 / 1e6
     );
 
     for round in 0..3 {

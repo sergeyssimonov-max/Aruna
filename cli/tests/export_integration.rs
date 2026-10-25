@@ -48,8 +48,8 @@ fn write_archive(path: &Path) {
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     let mut add = |name: &str, body: &str| {
-        zip.start_file(name, options).expect("start");
         use std::io::Write as _;
+        zip.start_file(name, options).expect("start");
         zip.write_all(body.as_bytes()).expect("write");
     };
 

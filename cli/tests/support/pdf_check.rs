@@ -257,7 +257,10 @@ fn mcr(d: &Dictionary, page: Option<ObjectId>) -> (Option<ObjectId>, i64) {
         .ok()
         .and_then(|o| o.as_reference().ok())
         .or(page);
-    (pg, d.get(b"MCID").and_then(|o| o.as_i64()).unwrap_or(-1))
+    (
+        pg,
+        d.get(b"MCID").and_then(lopdf::Object::as_i64).unwrap_or(-1),
+    )
 }
 
 impl Walk<'_> {
@@ -277,8 +280,10 @@ impl Walk<'_> {
             .get(b"S")
             .and_then(|o| o.as_name())
             .or_else(|_| dict.get(b"Type").and_then(|o| o.as_name()))
-            .map(|n| String::from_utf8_lossy(n).into_owned())
-            .unwrap_or_else(|_| "Unknown".into());
+            .map_or_else(
+                |_| "Unknown".into(),
+                |n| String::from_utf8_lossy(n).into_owned(),
+            );
         let page = dict
             .get(b"Pg")
             .ok()
@@ -309,7 +314,7 @@ impl Walk<'_> {
                 .and_then(|o| o.as_name())
                 .map(|n| String::from_utf8_lossy(n).into_owned())
                 .unwrap_or_default();
-            for (k, v) in a.iter() {
+            for (k, v) in a {
                 if k.as_slice() == b"O" {
                     continue;
                 }

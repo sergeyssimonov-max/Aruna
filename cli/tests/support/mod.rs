@@ -683,9 +683,7 @@ impl Drop for Origin {
 /// one itself, which is why the number is only ever compared with another
 /// reading taken the same way.
 pub fn open_descriptors() -> usize {
-    std::fs::read_dir("/dev/fd")
-        .map(|entries| entries.count())
-        .unwrap_or(0)
+    std::fs::read_dir("/dev/fd").map_or(0, std::iter::Iterator::count)
 }
 
 // ---------------------------------------------------------------------------

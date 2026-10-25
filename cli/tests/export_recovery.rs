@@ -489,6 +489,7 @@ fn recovering_once_is_enough_and_running_again_changes_nothing() {
 /// a hung one dies with the test process.
 #[test]
 fn a_pipe_where_a_marker_belongs_does_not_hold_the_build() {
+    use std::os::unix::fs::FileTypeExt as _;
     let (_dir, zip, destination) = published();
 
     let staging = destination.join(format!(".{PACKAGE}.build.999999.1"));
@@ -524,7 +525,6 @@ fn a_pipe_where_a_marker_belongs_does_not_hold_the_build() {
         staging.is_dir(),
         "a directory whose run cannot be asked about was removed"
     );
-    use std::os::unix::fs::FileTypeExt as _;
     assert!(
         std::fs::symlink_metadata(&marker)
             .expect("the pipe")
