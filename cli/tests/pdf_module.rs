@@ -44,6 +44,7 @@ fn assert_whole(page: &Page, r: &Rendered) -> Checked {
     let c = check(&r.pdf).expect("the reader reads it");
     assert!(c.outside.is_empty(), "outside the margin: {:?}", c.outside);
     assert_eq!(c.notdef, 0, "a blank glyph");
+    assert!(c.markup.is_empty(), "markup in the text: {:?}", c.markup);
     assert!(
         c.credit_ok(),
         "credit {:?}, UllikummiA {}",
@@ -399,4 +400,106 @@ fn a_spoiled_label_or_a_lost_to_unicode_fails_the_reader() {
     assert_ne!(count(&spoil_label(&r.pdf).expect("a label")), 2);
     assert_eq!(count(&drop_label_to_unicode(&r.pdf).expect("a layer")), 0);
     assert_eq!(count(&drop_label_names(&r.pdf).expect("a layer")), 0);
+}
+
+/// Every rule of what a page shows of the markup (`XML-CONTRACT.md` §4) in
+/// one document, with a note long enough to cross the foot of the page: the
+/// PDF passes every check, the new one too – no markup and no entity as
+/// letters – and its text has what the rules put there.
+#[test]
+fn the_markup_of_body_notes_and_cu_is_set_and_never_printed() {
+    let markup = "&lt;P_f_Footnote&gt;eins &lt;SP_f_AO_3a_Hittite&gt;ku-e-da&lt;/SP_f_AO_3a_Hittite&gt; \
+                  &lt;del_in/&gt;x&lt;del_fin/&gt; Pecchioli &amp;amp; Polvani&lt;/P_f_Footnote&gt;\
+                  &lt;P_f_Footnote&gt;zwei \u{2329}sGr\u{232A}GAL\u{2329}/sGr\u{232A} ku-\u{2329}e\u{232A}-da&lt;/P_f_Footnote&gt;";
+    let long = "lang ".repeat(400);
+    let mut body = String::new();
+    for i in 1..=46 {
+        body.push_str(&format!("<lb lnr=\"Vs. {i}\" cu=\"\u{12000}&lt;w/&gt;\u{1202D}\"/> <w><del_in/>ZAG<corr c=\"?\"/>-ni<del_fin/></w>"));
+    }
+    body.push_str(&format!(
+        "<note c=\"{markup}\"/><note c=\"{long}\"/> <w>wa<subscr c=\"a\"/>-a kán<materlect c=\"an\"/> ú-<surpl c=\"te\"/> \
+         <ras_in/>nu<ras_fin/> <ras_in/><ras_fin/> <add_in/>NINDA<add_fin/> <gap c=\"(Rasur)\"/> <wsep c=\"\u{12039}\"/></w>\
+         <QUOT_HurInHit_in/><w>ku-un-zi-ip</w><QUOT_HurInHit_fin/><parsep/><AO:ParagrNr c=\"Kolophon\"/>\
+         <gap t=\"line\" c=\"Text bricht ab\"/>"
+    ));
+    let xml = doc(&body).replace(
+        "<AOxml ",
+        "<AOxml xmlns:AO=\"http://hethiter.net/ns/AO/1.0\" ",
+    );
+    let (page, r) = build(&xml, "KBo 0.1");
+    let c = assert_whole(&page, &r);
+    assert!(
+        c.pages > 1,
+        "the long note crosses the page: {} page",
+        c.pages
+    );
+    let text: String = c.stream.iter().collect();
+    for shown in [
+        "Vs.46[ZAG?-ni]",
+        "einsku-e-da[x]Pecchioli&Polvani",
+        "zweiGALku-\u{2329}e\u{232A}-da",
+        "waa-akánanú-\u{2329}\u{2329}te\u{232A}\u{232A}",
+        "\u{27E6}nu\u{27E7}(Rasur)\u{2329}NINDA\u{232A}(Rasur)\u{12039}ku-un-zi-ip",
+        "KolophonTextbrichtab",
+    ] {
+        assert!(text.contains(shown), "{shown} not in {text}");
+    }
+}
+
+/// A note in a PDF built the way 3.0.1 built it – its `c` set as a string –
+/// fails the new criterion: the criterion has teeth.
+#[test]
+fn a_note_printed_as_a_string_fails_the_criterion() {
+    let printed = "<P_f_Footnote>eins &amp; zwei</P_f_Footnote>";
+    assert!(!markup_in(printed).is_empty());
+    assert!(
+        !markup_in("a \u{2329}SP_f_AO_3a_-LIT\u{232A}Haas\u{2329}/SP_f_AO_3a_-LIT\u{232A}")
+            .is_empty()
+    );
+    // An emendation and the signs of the edition are not markup.
+    assert!(markup_in(
+        "ku-\u{2329}e\u{232A}-da \u{2329}\u{2329}x\u{232A}\u{232A} [a] \u{2E22}b\u{2E23} 1 < 2 > 0"
+    )
+    .is_empty());
+}
+
+/// The documents of the corpus behind each rule of what a page shows of the
+/// markup – crossed tags (`KBo 20.82`), paragraphs that joined words
+/// (`KBo 30.1+`), an entity (`KBo 3.7`), a join (`KBo 26.64+`), a repeated
+/// siglum and a gap (`KBo 28.24`), a tag cut short in `cu` (`CHDS 7.200`),
+/// markup between angle brackets (`KBo 2.9+`), a letter lowered on the last
+/// line of a page (`KBo 53.129`), markup in the value of `corr`
+/// (`KBo 1.1+`) – pass every check, the criterion of no markup in the text
+/// among them.
+#[test]
+#[ignore = "needs the corpus archive: ARUNA_ZIP"]
+fn the_markup_samples_of_the_corpus_pass_every_check() {
+    for (group, name) in [
+        ("CTH 434", "KBo 20.82"),
+        ("CTH 477", "KBo 30.1+"),
+        ("CTH 321", "KBo 3.7"),
+        ("CTH 345", "KBo 26.64+"),
+        ("CTH 216", "KBo 28.24"),
+        ("CTH 470", "CHDS 7.200"),
+        ("CTH 716", "KBo 2.9+"),
+        ("CTH 626", "KBo 53.129"),
+        ("CTH 51", "KBo 1.1+"),
+    ] {
+        let (entry, bytes) = corpus_document(&format!("/{name}.xml"))
+            .unwrap_or_else(|| panic!("{name} is in the archive named by ARUNA_ZIP"));
+        let d = Document::read(&bytes).unwrap_or_else(|e| panic!("{entry}: {e}"));
+        let page = Page::of(&d, group, name);
+        let r = pdf::render(&d, group, name, &format!("{group}/{name}.pdf"), fonts())
+            .unwrap_or_else(|e| panic!("{entry}: {e}"));
+        let c = assert_whole(&page, &r);
+        let text: String = c.stream.iter().collect();
+        let want = match name {
+            "KBo 30.1+" => "KBo30.1+ABoT1.17",
+            "KBo 3.7" => "Pecchioli&Polvani",
+            "KBo 26.64+" => "KBo26.64+KUB33.87+KUB36.12",
+            "KBo 28.24" => "Vs.22′(Rasur)a-na",
+            _ => "",
+        };
+        assert!(text.contains(want), "{name}: {want} not in the text");
+    }
 }

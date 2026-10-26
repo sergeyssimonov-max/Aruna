@@ -140,6 +140,9 @@ pub struct Checked {
     pub raw: String,
     /// Letters of a label (`U+` followed by hex) the reader extracted.
     pub label_letters: usize,
+    /// Markup or an entity shown as letters, in the text or the metadata
+    /// (`PDF-ACCEPTANCE.md` §2, "No markup in the text").
+    pub markup: Vec<String>,
 }
 
 impl Checked {
@@ -210,6 +213,73 @@ pub fn check(pdf: &[u8]) -> Result<Checked, String> {
                 .is_some_and(|c| c.is_ascii_hexdigit())
         })
         .count();
+    let pages_text: String = pages
+        .iter()
+        .map(|p| format!("{}\n{}\n", p.text, p.raw_text))
+        .collect();
+    out.markup = markup_in(&pages_text);
+    out.markup.extend(markup_in(&metadata(pdf)?));
+    Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// No markup in the text
+// ---------------------------------------------------------------------------
+
+/// Where a text shows markup or an entity as letters, each with what follows
+/// it: `<`, `/`?, a letter or `_`, then anything up to a `>` (the owner's
+/// pattern `</?[A-Za-z_][A-Za-z0-9_.:-]*[^>]*/?>`); the literals `&lt;`,
+/// `&gt;`, `&amp;` and `&#`; and `〈`, `/`?, a name of the corpus's markup
+/// (`aruna::pdf::markup::VOCABULARY`), then anything up to `〉` with no `〈`
+/// between.
+pub fn markup_in(text: &str) -> Vec<String> {
+    let show = |at: usize| text[at..].chars().take(40).collect::<String>();
+    let mut out = Vec::new();
+    for (at, _) in text.match_indices('<') {
+        let after = &text[at + 1..];
+        let name = after.strip_prefix('/').unwrap_or(after);
+        if name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') && name.contains('>') {
+            out.push(show(at));
+        }
+    }
+    for literal in ["&lt;", "&gt;", "&amp;", "&#"] {
+        for (at, _) in text.match_indices(literal) {
+            out.push(show(at));
+        }
+    }
+    for (at, _) in text.match_indices('\u{2329}') {
+        let after = &text[at + '\u{2329}'.len_utf8()..];
+        let inner = after.strip_prefix('/').unwrap_or(after);
+        let end = inner
+            .find(|c: char| c.is_whitespace() || matches!(c, '/' | '\u{2329}' | '\u{232A}'))
+            .unwrap_or(inner.len());
+        let closed = inner
+            .find(['\u{2329}', '\u{232A}'])
+            .is_some_and(|e| inner[e..].starts_with('\u{232A}'));
+        if closed && aruna::pdf::markup::VOCABULARY.contains(&&inner[..end]) {
+            out.push(show(at));
+        }
+    }
+    out
+}
+
+/// Every string of the document information dictionary, decoded.
+pub fn metadata(pdf: &[u8]) -> Result<String, String> {
+    let doc = Document::load_mem(pdf).map_err(|e| e.to_string())?;
+    let mut out = String::new();
+    if let Ok(info) = doc
+        .trailer
+        .get(b"Info")
+        .and_then(Object::as_reference)
+        .and_then(|id| doc.get_dictionary(id))
+    {
+        for (_, v) in info {
+            if let Ok(s) = v.as_str() {
+                out.push_str(&decode_text_string(s));
+                out.push('\n');
+            }
+        }
+    }
     Ok(out)
 }
 

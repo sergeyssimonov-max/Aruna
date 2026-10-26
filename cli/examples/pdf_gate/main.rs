@@ -20,7 +20,8 @@
 //! `--pdfkit`), wrappers only where a cluster repeats, the credit where the
 //! decision puts it, the tag tree equal to the model's – by string, and with
 //! `--c14n` by `xmllint --c14n` – with the four negative controls, the text in
-//! logical order equal to the source and the stream's code points the same.
+//! logical order equal to the source and the stream's code points the same,
+//! and no markup and no entity as letters in the text or the metadata.
 
 #[path = "../../tests/support/pdf_check.rs"]
 mod pdf_check;
@@ -232,6 +233,7 @@ struct Tally {
     outside: Vec<String>,
     trimmed_spaces: usize,
     notdef: Vec<String>,
+    markup: Vec<String>,
     credit: Vec<String>,
     credits: usize,
     composition: Vec<String>,
@@ -305,6 +307,9 @@ fn check_package(package: &Path, fonts: &Path, c14n: bool, pdfkit: bool) -> bool
         t.trimmed_spaces += c.trimmed_spaces;
         if c.notdef > 0 {
             t.notdef.push(file.clone());
+        }
+        if let Some(m) = c.markup.first() {
+            t.markup.push(format!("{file}: {m}"));
         }
         if !c.credit_ok() || c.ullikummi_embedded != credit {
             t.credit.push(format!("{file}: {:?}", c.credit_pages));
@@ -651,6 +656,7 @@ fn report(t: &Tally, c14n: bool, pdfkit: bool) -> bool {
         t.trimmed_spaces
     );
     ok &= row("blank glyphs (code 0 in TJ)", &t.notdef);
+    ok &= row("markup or an entity in the text or the metadata", &t.markup);
     ok &= row("credit not where the decision puts it", &t.credit);
     println!("| files with the credit | {} |", t.credits);
     ok &= row("stream code points not the source's", &t.composition);
