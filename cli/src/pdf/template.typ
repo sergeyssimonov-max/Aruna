@@ -8,7 +8,9 @@
 //   file name, the siglum                 heading, level 2                  H2
 //   a run between parsep markers          a one-column grid of one cell     Div > Div
 //   a line at lb, and its cu              par                               P
+//   corr, materlect / subscr              super / sub                       (none)
 //   note, by its c, at its anchor         footnote without a number         Note
+//     a paragraph of the note             a line, linebreak between         (none)
 //   a code point no face draws            a label, an image                 Figure
 //   text:tab                              h(2em), space and not a character
 //
@@ -41,7 +43,14 @@
 }
 #set footnote(numbering: n => [])
 #set footnote.entry(separator: line(length: 25%, stroke: 0.4pt))
-#let piece(r) = if r.k == "n" { footnote(runs(r.r)) } else if r.k == "tab" { h(2em) } else { runs((r,)) }
+// Raised and lowered as HPMxml.css sets corr, materlect (80 %, super) and
+// subscr (90 %, bottom): a box shifted off the baseline – its frame counts
+// in the line's height, so a lowered letter on the last line stays inside
+// the margin – and no super() or sub(), which tag a Span.
+#let inline(r) = if r.k == "sup" { box(baseline: -0.35em, text(size: 0.8em, runs(r.r))) } else if r.k == "sub" { box(baseline: 0.2em, text(size: 0.9em, runs(r.r))) } else { runs((r,)) }
+#let piece(r) = if r.k == "n" {
+  footnote(r.p.map(p => p.map(inline).join()).join(linebreak()))
+} else if r.k == "tab" { h(2em) } else { inline(r) }
 #heading(level: 1, runs(d.head))
 #heading(level: 2, runs(d.name))
 #for s in d.sections {

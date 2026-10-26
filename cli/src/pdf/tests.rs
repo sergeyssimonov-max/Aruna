@@ -162,7 +162,7 @@ mod layout_rules {
             sections(&d),
             [vec![vec![
                 Piece::Text("a ".into()),
-                Piece::Note("n 1".into()),
+                Piece::Note(vec![vec![Piece::Text("n 1".into())]]),
                 Piece::Text(" b ".into()),
                 Piece::Tab,
                 Piece::Text("c".into()),

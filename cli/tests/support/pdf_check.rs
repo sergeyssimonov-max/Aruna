@@ -546,11 +546,21 @@ pub fn expected_tree(fonts: &Fonts, page: &Page, credit: bool) -> String {
             out.push_str("<P>");
             for p in line {
                 match p {
-                    Piece::Text(t) => runs_into(fonts, t, &mut out, &mut buf),
-                    Piece::Note(c) => {
+                    Piece::Text(t) | Piece::Sup(t) | Piece::Sub(t) => {
+                        runs_into(fonts, t, &mut out, &mut buf);
+                    }
+                    Piece::Note(paragraphs) => {
                         text(&mut out, &mut buf);
                         out.push_str("<Lbl><Link></Link></Lbl><Note><Lbl><Link></Link></Lbl>");
-                        runs_into(fonts, c, &mut out, &mut buf);
+                        // The linebreak between paragraphs gives the tree
+                        // no character.
+                        for paragraph in paragraphs {
+                            for p in paragraph {
+                                if let Piece::Text(t) | Piece::Sup(t) | Piece::Sub(t) = p {
+                                    runs_into(fonts, t, &mut out, &mut buf);
+                                }
+                            }
+                        }
                         text(&mut out, &mut buf);
                         out.push_str("</Note>");
                     }

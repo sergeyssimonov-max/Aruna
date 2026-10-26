@@ -3,28 +3,50 @@
 //! without producing a PDF.
 //!
 //! Sections between `parsep` and `parsep_dbl` markers, lines at `lb` (its
-//! `cu` a line of its own), a note by its `c` at its anchor, `text:tab` a
-//! shift and never a character. Comments, instructions and every other
-//! attribute are not set (owner's decision of 2026-09-30 on comments,
-//! `XML-CONTRACT.md` §5 question 3). Whitespace inside a line is layout, not
-//! text: runs of it become one space, trimmed at the line's ends.
+//! `cu` a line of its own, its `lnr` at the head of the next), a note by its
+//! `c` at its anchor, `text:tab` a shift and never a character. A note's `c`
+//! and a line's `cu` are markup, read as the body is ([`super::markup`]),
+//! and every rule below holds in all three (`XML-CONTRACT.md` §4, "What a
+//! page shows"). Comments and instructions are not set (owner's decision of
+//! 2026-09-30, §5 question 3). Whitespace inside a line is layout, not text:
+//! runs of it become one space, trimmed at the line's ends.
 
 use crate::cth_titles::{title_text, Catalog, Match};
-use crate::document::{Document, Kind};
+use crate::document::Document;
 // Text reaches the template as JSON data, never as markup.
 use crate::json::json_string;
 
 use super::fonts::{Fonts, CREDITED};
+use super::markup::{self, Event, Tag};
 use super::PdfError;
 
 /// A stretch of a line.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Piece {
     Text(String),
-    /// A note, by its `c`, at its anchor.
-    Note(String),
+    /// Raised: the sign of `corr`, the letters of `materlect` (`HPMxml.css`).
+    Sup(String),
+    /// Lowered: the letter of `subscr` (`HPMxml.css`).
+    Sub(String),
+    /// A note at its anchor: its paragraphs, each of text, `Sup` and `Sub`.
+    Note(Vec<Vec<Piece>>),
     /// `text:tab` of OpenDocument: a shift of fixed width.
     Tab,
+}
+
+impl Piece {
+    /// The text this piece sets, in order.
+    fn texts<'a>(&'a self, out: &mut Vec<&'a str>) {
+        match self {
+            Piece::Text(t) | Piece::Sup(t) | Piece::Sub(t) => out.push(t),
+            Piece::Note(paragraphs) => {
+                for p in paragraphs.iter().flatten() {
+                    p.texts(out);
+                }
+            }
+            Piece::Tab => {}
+        }
+    }
 }
 
 /// A section: lines of pieces.
@@ -54,18 +76,11 @@ impl Page {
     /// Every stretch of text the page sets, in page order: heading, name,
     /// then each line's text and notes.
     pub fn texts(&self) -> impl Iterator<Item = &str> {
-        let body = self
-            .sections
-            .iter()
-            .flatten()
-            .flatten()
-            .filter_map(|p| match p {
-                Piece::Text(t) | Piece::Note(t) => Some(t.as_str()),
-                Piece::Tab => None,
-            });
-        [self.head.as_str(), self.name.as_str()]
-            .into_iter()
-            .chain(body)
+        let mut out = vec![self.head.as_str(), self.name.as_str()];
+        for p in self.sections.iter().flatten().flatten() {
+            p.texts(&mut out);
+        }
+        out.into_iter()
     }
 
     /// Whether any face of the stack that draws this page is UllikummiA:
@@ -139,50 +154,285 @@ fn edges(t: &str) -> String {
 
 /// The sections of a document, in document order.
 pub fn sections(doc: &Document<'_>) -> Vec<Section> {
-    let mut out: Vec<Section> = vec![vec![Vec::new()]];
-    for node in doc.nodes() {
-        // `out` is never empty and neither is its last section: both are
-        // pushed with a first member.
-        let Some(section) = out.last_mut() else { break };
-        match &node.kind {
-            Kind::Element(e) if e.name.local == "lb" => {
-                section.push(Vec::new());
-                if let Some(cu) = e.attributes.iter().find(|a| a.name.local == "cu") {
-                    section.push(vec![Piece::Text(cu.value.to_string())]);
-                    section.push(Vec::new());
+    let events = markup::events(doc);
+    let doc_id = events.iter().find_map(|e| match e {
+        Event::Start(t) if t.local == "docID" => Some(t.sole_text.as_deref().unwrap_or("").trim()),
+        _ => None,
+    });
+    let mut b = Builder::new(Where::Body, doc_id);
+    for e in &events {
+        b.event(e);
+    }
+    b.sections()
+}
+
+/// Where the markup stands: the rules of the body's structure (`lb`,
+/// `parsep`, `note`, the heading's sigla, `text:tab`) hold in the body only;
+/// a paragraph of a note ends at the end of its `P_f_…` element.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Where {
+    Body,
+    Note,
+    Cu,
+    /// The value a rule shows of an attribute: `c` of `corr`, `gap`, ….
+    Value,
+}
+
+/// A stretch of a line while the document is read: a piece, or the opening
+/// of an erasure whose sign is known only at its end.
+enum Item {
+    Piece(Piece),
+    /// The `n`-th `ras_in`: `⟦`, or `(Rasur)` when nothing stands before its
+    /// `ras_fin`.
+    Erasure(usize),
+}
+
+/// The rules of display (`XML-CONTRACT.md` §4, "What a page shows"), applied
+/// to one stream of events.
+struct Builder<'d> {
+    place: Where,
+    doc_id: Option<&'d str>,
+    sections: Vec<Vec<Vec<Item>>>,
+    /// Non-whitespace code points set so far: what tells an empty erasure.
+    visible: usize,
+    /// Open erasures: their number, and `visible` when they opened.
+    erasures: Vec<(usize, usize)>,
+    /// For each erasure, whether nothing stood inside it.
+    empty: Vec<bool>,
+    /// Inside an `AO:TxtPubl` that repeats the `docID`: its text not set.
+    skip: usize,
+}
+
+impl<'d> Builder<'d> {
+    fn new(place: Where, doc_id: Option<&'d str>) -> Self {
+        Builder {
+            place,
+            doc_id,
+            sections: vec![vec![Vec::new()]],
+            visible: 0,
+            erasures: Vec::new(),
+            empty: Vec::new(),
+            skip: 0,
+        }
+    }
+
+    fn line(&mut self) {
+        if let Some(s) = self.sections.last_mut() {
+            s.push(Vec::new());
+        }
+    }
+
+    fn item(&mut self, item: Item) {
+        if let Some(line) = self.sections.last_mut().and_then(|s| s.last_mut()) {
+            line.push(item);
+        }
+    }
+
+    fn text(&mut self, t: &str) {
+        self.visible += t.chars().filter(|c| !is_space(*c)).count();
+        match self
+            .sections
+            .last_mut()
+            .and_then(|s| s.last_mut())
+            .and_then(|l| l.last_mut())
+        {
+            Some(Item::Piece(Piece::Text(s))) => s.push_str(t),
+            _ => self.item(Item::Piece(Piece::Text(t.to_string()))),
+        }
+    }
+
+    fn raised(&mut self, t: &str, sub: bool) {
+        if t.is_empty() {
+            return;
+        }
+        self.visible += t.chars().filter(|c| !is_space(*c)).count();
+        let t = t.to_string();
+        self.item(Item::Piece(if sub { Piece::Sub(t) } else { Piece::Sup(t) }));
+    }
+
+    /// The text an attribute's value shows: the value as it is, or, when it
+    /// carries markup, what the rules make of it, read apart from the line.
+    fn value(&self, v: &str) -> String {
+        if !v.contains(['<', '&', '\u{2329}']) {
+            return v.to_string();
+        }
+        let mut b = Builder::new(Where::Value, self.doc_id);
+        b.fragment(v, Where::Value);
+        let sections = b.sections();
+        let mut out = Vec::new();
+        for p in sections.iter().flatten().flatten() {
+            p.texts(&mut out);
+        }
+        out.join(" ")
+    }
+
+    /// Markup carried as text, read where `place` says, into this builder.
+    fn fragment(&mut self, s: &str, place: Where) {
+        let outer = std::mem::replace(&mut self.place, place);
+        for e in &markup::fragment(s) {
+            self.event(e);
+        }
+        self.place = outer;
+    }
+
+    fn event(&mut self, e: &Event<'_>) {
+        match e {
+            Event::Text(t) if self.skip == 0 => self.text(t),
+            Event::Text(_) => {}
+            Event::End(name) => {
+                if name == "TxtPubl" && self.skip > 0 {
+                    self.skip -= 1;
+                }
+                if self.place == Where::Note && name.starts_with("P_f_") {
+                    self.line();
                 }
             }
-            Kind::Element(e)
-                if e.name.local == "tab" && e.name.prefix.as_deref() == Some("text") =>
-            {
-                push(section, Piece::Tab);
-            }
-            Kind::Element(e) if e.name.local == "parsep" || e.name.local == "parsep_dbl" => {
-                out.push(vec![Vec::new()]);
-            }
-            Kind::Element(e) if e.name.local == "note" => {
-                if let Some(c) = e.attributes.iter().find(|a| a.name.local == "c") {
-                    push(section, Piece::Note(c.value.to_string()));
+            Event::Start(tag) => self.start(tag),
+        }
+    }
+
+    fn start(&mut self, tag: &Tag<'_>) {
+        // What `c` shows is markup too, read on its own (`KBo 1.1+`:
+        // `corr c="<ras_in/>"`).
+        let raw = tag.attribute("c");
+        let value = match tag.local.as_ref() {
+            "note" => None,
+            _ => raw.map(|c| self.value(c)),
+        };
+        let c = value.as_deref();
+        let body = self.place == Where::Body;
+        match tag.local.as_ref() {
+            "TxtPubl" if body && tag.prefix.as_deref() == Some("AO") => {
+                // Owner's decision header: a publication equal to the docID
+                // is not repeated under the heading.
+                if tag
+                    .sole_text
+                    .as_deref()
+                    .map(str::trim)
+                    .is_some_and(|t| Some(t) == self.doc_id)
+                {
+                    self.skip += 1;
                 }
             }
-            Kind::Text(t) => match section.last_mut().and_then(|l| l.last_mut()) {
-                Some(Piece::Text(s)) => s.push_str(t),
-                _ => push(section, Piece::Text(t.to_string())),
+            "lb" if body => {
+                self.line();
+                if let Some(cu) = tag.attribute("cu") {
+                    self.fragment(cu, Where::Cu);
+                    self.line();
+                }
+                // `lb:after { content: " " attr(lnr) " " }` (HPMxml.css).
+                // Its value is markup where it carries it (`KUB 30.24+`).
+                if let Some(lnr) = tag.attribute("lnr").map(|n| self.value(n)) {
+                    if !lnr.is_empty() {
+                        self.text(&format!("{lnr} "));
+                    }
+                }
+            }
+            "tab" if body && tag.prefix.as_deref() == Some("text") => {
+                self.item(Item::Piece(Piece::Tab));
+            }
+            "parsep" | "parsep_dbl" if body => self.sections.push(vec![Vec::new()]),
+            "note" if body => {
+                if let Some(c) = raw {
+                    let mut note = Builder::new(Where::Note, self.doc_id);
+                    note.fragment(c, Where::Note);
+                    let paragraphs: Vec<Vec<Piece>> =
+                        note.sections().into_iter().flatten().collect();
+                    if !paragraphs.is_empty() {
+                        self.item(Item::Piece(Piece::Note(paragraphs)));
+                    }
+                }
+            }
+            // HPMxml.css: del_in::before "[", del_fin::after "]",
+            // laes_in::before "⸢", laes_fin::after "⸣"; owner's decision C5.
+            "del_in" => self.text("["),
+            "del_fin" => self.text("]"),
+            "laes_in" => self.text("\u{2E22}"),
+            "laes_fin" => self.text("\u{2E23}"),
+            "add_in" => self.text("\u{2329}"),
+            "add_fin" => self.text("\u{232A}"),
+            "corr" | "materlect" => self.raised(c.unwrap_or(""), false),
+            "subscr" => self.raised(c.unwrap_or(""), true),
+            "surpl" => {
+                if let Some(c) = c {
+                    self.text(&format!("\u{2329}\u{2329}{c}\u{232A}\u{232A}"));
+                }
+            }
+            // Owner's decisions of 2026-10-27, C1, C2, C3 and C7.
+            "wsep" => self.text(c.unwrap_or("")),
+            "gap" if tag.attribute("t") == Some("line") => {
+                self.line();
+                self.text(c.unwrap_or(""));
+                self.line();
+            }
+            "gap" => self.text(c.unwrap_or("")),
+            "ParagrNr" => {
+                self.line();
+                self.text(c.unwrap_or(""));
+                self.line();
+            }
+            "DirectJoin" => self.text(" + "),
+            "InDirectJoin" => self.text(" (+) "),
+            // C4: an erasure in ⟦ ⟧, an empty one as (Rasur).
+            "ras_in" => {
+                let n = self.empty.len();
+                self.empty.push(false);
+                self.visible += 1;
+                self.item(Item::Erasure(n));
+                self.erasures.push((n, self.visible));
+            }
+            "ras_fin" => match self.erasures.pop() {
+                Some((n, seen)) if seen == self.visible => {
+                    if let Some(e) = self.empty.get_mut(n) {
+                        *e = true;
+                    }
+                }
+                _ => self.text("\u{27E7}"),
             },
+            "ras_X" => self.text("(Rasur)"),
+            // Every other tag – QUOT_HurInHit (C6), the wrappers of a note,
+            // a name no rule knows – is not set; what it holds is.
             _ => {}
         }
     }
-    out.into_iter()
-        .map(|section| section.into_iter().filter_map(tidy).collect::<Section>())
-        .filter(|s| !s.is_empty())
-        .collect()
+
+    /// The sections, erasures resolved and whitespace settled.
+    fn sections(self) -> Vec<Section> {
+        let empty = self.empty;
+        self.sections
+            .into_iter()
+            .map(|section| {
+                section
+                    .into_iter()
+                    .filter_map(|line| tidy(resolve(line, &empty)))
+                    .collect::<Section>()
+            })
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
 }
 
-fn push(section: &mut Section, piece: Piece) {
-    match section.last_mut() {
-        Some(line) => line.push(piece),
-        None => section.push(vec![piece]),
+/// A line's items as pieces: each erasure its sign, neighbouring text joined.
+fn resolve(line: Vec<Item>, empty: &[bool]) -> Vec<Piece> {
+    let mut out: Vec<Piece> = Vec::with_capacity(line.len());
+    for item in line {
+        let piece = match item {
+            Item::Piece(p) => p,
+            Item::Erasure(n) => Piece::Text(
+                if empty.get(n).copied().unwrap_or(false) {
+                    "(Rasur)"
+                } else {
+                    "\u{27E6}"
+                }
+                .to_string(),
+            ),
+        };
+        match (out.last_mut(), piece) {
+            (Some(Piece::Text(s)), Piece::Text(t)) => s.push_str(&t),
+            (_, p) => out.push(p),
+        }
     }
+    out
 }
 
 /// One line with its whitespace settled: text to one space at the edges,
@@ -193,8 +443,9 @@ fn tidy(line: Vec<Piece>) -> Option<Vec<Piece>> {
         .into_iter()
         .map(|p| match p {
             Piece::Text(t) => Piece::Text(edges(&t)),
-            Piece::Note(c) => Piece::Note(one_space(&c)),
-            Piece::Tab => Piece::Tab,
+            Piece::Sup(t) => Piece::Sup(one_space(&t)),
+            Piece::Sub(t) => Piece::Sub(one_space(&t)),
+            other => other,
         })
         .collect();
     if let Some(Piece::Text(t)) = l.first_mut() {
@@ -203,7 +454,7 @@ fn tidy(line: Vec<Piece>) -> Option<Vec<Piece>> {
     if let Some(Piece::Text(t)) = l.last_mut() {
         *t = t.trim_end().to_string();
     }
-    l.retain(|p| !matches!(p, Piece::Text(t) | Piece::Note(t) if t.is_empty()));
+    l.retain(|p| !matches!(p, Piece::Text(t) | Piece::Sup(t) | Piece::Sub(t) if t.is_empty()));
     while l.last() == Some(&Piece::Tab) {
         l.pop();
     }
@@ -284,23 +535,38 @@ fn runs_json(fonts: &Fonts, text: &str) -> Result<String, PdfError> {
     Ok(format!("[{}]", runs_items(fonts, text)?.join(",")))
 }
 
+/// The pieces of a line as JSON items, without the brackets.
+fn line_items(fonts: &Fonts, line: &[Piece]) -> Result<Vec<String>, PdfError> {
+    let mut items = Vec::new();
+    for piece in line {
+        match piece {
+            Piece::Text(t) => items.extend(runs_items(fonts, t)?),
+            Piece::Sup(t) => {
+                items.push(format!("{{\"k\":\"sup\",\"r\":{}}}", runs_json(fonts, t)?))
+            }
+            Piece::Sub(t) => {
+                items.push(format!("{{\"k\":\"sub\",\"r\":{}}}", runs_json(fonts, t)?))
+            }
+            Piece::Note(paragraphs) => {
+                let p = paragraphs
+                    .iter()
+                    .map(|l| Ok(format!("[{}]", line_items(fonts, l)?.join(","))))
+                    .collect::<Result<Vec<_>, PdfError>>()?;
+                items.push(format!("{{\"k\":\"n\",\"p\":[{}]}}", p.join(",")));
+            }
+            Piece::Tab => items.push("{\"k\":\"tab\"}".to_string()),
+        }
+    }
+    Ok(items)
+}
+
 /// The data of the template, `/doc.json`.
 pub fn json(fonts: &Fonts, page: &Page, template: &str, credit: bool) -> Result<String, PdfError> {
     let mut sections = Vec::with_capacity(page.sections.len());
     for section in &page.sections {
         let mut lines = Vec::with_capacity(section.len());
         for line in section {
-            let mut items = Vec::new();
-            for piece in line {
-                match piece {
-                    Piece::Text(t) => items.extend(runs_items(fonts, t)?),
-                    Piece::Note(c) => {
-                        items.push(format!("{{\"k\":\"n\",\"r\":{}}}", runs_json(fonts, c)?));
-                    }
-                    Piece::Tab => items.push("{\"k\":\"tab\"}".to_string()),
-                }
-            }
-            lines.push(format!("[{}]", items.join(",")));
+            lines.push(format!("[{}]", line_items(fonts, line)?.join(",")));
         }
         sections.push(format!("[{}]", lines.join(",")));
     }

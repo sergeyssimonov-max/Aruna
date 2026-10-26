@@ -27,6 +27,7 @@
 pub mod fonts;
 pub mod label;
 pub mod layout;
+pub mod markup;
 pub mod post;
 pub mod world;
 
@@ -237,5 +238,7 @@ fn post_labels(labels: &[u32], fonts: &Fonts) -> Result<Vec<post::Label>, PdfErr
         .collect()
 }
 
+#[cfg(test)]
+mod markup_tests;
 #[cfg(test)]
 mod tests;
