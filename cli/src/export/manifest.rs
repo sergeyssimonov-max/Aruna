@@ -1297,7 +1297,7 @@ mod tests {
     fn the_head_names_the_run_and_what_it_is_made_of() {
         let version = env!("CARGO_PKG_VERSION");
         let expected = format!(
-            "  \"run\": {{\n    \"id\": \"{}\",\n    \"aruna\": \"{version}\",\n    \"template\": \"aruna-pdf-template 1\"\n  }},\n",
+            "  \"run\": {{\n    \"id\": \"{}\",\n    \"aruna\": \"{version}\",\n    \"template\": \"aruna-pdf-template 2\"\n  }},\n",
             run_id("abc123", version, crate::pdf::TEMPLATE_VERSION)
         );
         assert!(manifest().contains(&expected), "{}", manifest());

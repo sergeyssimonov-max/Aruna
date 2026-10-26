@@ -120,7 +120,7 @@ fn every_pdf_lies_beside_its_document_and_the_package_names_it() {
         manifest.contains("\"pdf\": { \"refused\": \"the document model: "),
         "{manifest}"
     );
-    assert!(manifest.contains("\"template\": \"aruna-pdf-template 1\""));
+    assert!(manifest.contains("\"template\": \"aruna-pdf-template 2\""));
     let inventory =
         String::from_utf8_lossy(&b[&PathBuf::from(format!("{PACKAGE}.html"))]).into_owned();
     // Was: a second link at the PDF after the name, and no link at the refused one's

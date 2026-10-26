@@ -45,7 +45,7 @@ pub const TEMPLATE: &str = include_str!("template.typ");
 
 /// The version of the template, written into every PDF as its keywords. Raised
 /// with every change of `template.typ` that changes what a page shows.
-pub const TEMPLATE_VERSION: &str = "aruna-pdf-template 1";
+pub const TEMPLATE_VERSION: &str = "aruna-pdf-template 2";
 
 /// The checks of nearly no cost every built PDF has passed, under the keys
 /// the manifest gives them (`XML-CONTRACT.md` §4, owner's decisions 1 and 2 of
