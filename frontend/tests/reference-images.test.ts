@@ -118,19 +118,20 @@ describe('reference images', () => {
 })
 
 /**
- * The references the tree keeps a copy of (part3-6): v3.0.0, v2.6.3 and
- * v2.5.11, with the digests of `Aruna-macos-universal.dmg` on GitHub, read
- * 2026-10-25. Compared by name: a copy that comes or goes without its own
- * change here fails, and so does a record that names another digest.
+ * The references the tree keeps a copy of (part3-6, release-3.0.1): v3.0.1,
+ * v2.6.3 and v2.5.11, with the digests of `Aruna-macos-universal.dmg` on
+ * GitHub, read 2026-10-26; v3.0.0 left that day, replaced by v3.0.1.
+ * Compared by name: a copy that comes or goes without its own change here
+ * fails, and so does a record that names another digest.
  */
 const REFERENCES: Record<string, string> = {
   'v2.5.11': 'cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410',
   'v2.6.3': V263,
-  'v3.0.0': 'fcb9df42f00d21d65214bee26b85ea136110f2360126a5b5f30f76e548c4da6e',
+  'v3.0.1': '60f6db453b4dd35f08efbbe3b20587e7ebac0840fa8877bbb3438f9396196561',
 }
 
 describe('the references kept in cli/releases/', () => {
-  it('are exactly v2.5.11, v2.6.3 and v3.0.0, each with its checksum file', () => {
+  it('are exactly v2.5.11, v2.6.3 and v3.0.1, each with its checksum file', () => {
     const names = readdirSync(join(ROOT, 'cli', 'releases'))
       .filter((name) => name.startsWith('Aruna_'))
       .sort()
