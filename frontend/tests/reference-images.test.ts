@@ -18,7 +18,9 @@ import { afterEach, describe, expect, it } from 'vitest'
  * layer 1; owner's decision of 2026-10-11, variant (B)): every pair in
  * `cli/releases/` agrees with its checksum file and the reference record, and
  * the last published tag has its copy there, equal to the record and to the
- * digest of the release asset on GitHub.
+ * digest of the release asset on GitHub. Since 2026-10-26 (release-3.0.1,
+ * variant В) the table of `cli/releases/README.md` is guarded too: one row per
+ * image in the tree, no row without one, each with the record's tag and digest.
  *
  * `scripts/reference-images.mjs` is run as the gate runs it, with the tag and
  * GitHub's digest given as inputs: nothing here asks git or the network, so it
@@ -38,8 +40,20 @@ afterEach(() => {
   for (const dir of temporary.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-/** A tree with the record and the checksum file of 2.6.3, and `image` as its copy. */
-function tree(image: string | null): string {
+/** The row of the README table for 2.6.3, as `cli/releases/README.md` writes it. */
+const ROW_263 = `| \`Aruna_2.6.3-macos-universal.dmg\` | v2.6.3 | \`${V263}\` |`
+
+/** A README of `cli/releases/` whose table has `rows`. */
+const readme = (...rows: string[]) =>
+  ['# Aruna', '', '| В репозитории | Выпуск | Сумма образа |', '|---|---|---|', ...rows, ''].join(
+    '\n',
+  )
+
+/**
+ * A tree with the record and the checksum file of 2.6.3, `image` as its copy,
+ * and `table` as `cli/releases/README.md`.
+ */
+function tree(image: string | null, table: string = readme(ROW_263)): string {
   const root = mkdtempSync(join(tmpdir(), 'aruna-reference-images-'))
   temporary.push(root)
   mkdirSync(join(root, '.github'))
@@ -54,8 +68,88 @@ function tree(image: string | null): string {
   )
   if (image !== null)
     writeFileSync(join(root, 'cli', 'releases', 'Aruna_2.6.3-macos-universal.dmg'), image)
+  writeFileSync(join(root, 'cli', 'releases', 'README.md'), table)
   return root
 }
+
+/** A tree that holds on v2.6.3 – the real image of 2.6.3 – with `table` as its README. */
+function heldTree(table: string): string {
+  const root = tree(null, table)
+  copyFileSync(
+    join(ROOT, 'cli', 'releases', 'Aruna_2.6.3-macos-universal.dmg'),
+    join(root, 'cli', 'releases', 'Aruna_2.6.3-macos-universal.dmg'),
+  )
+  return root
+}
+
+describe('the table of cli/releases/README.md', () => {
+  const check = (table: string) =>
+    gate('--root', heldTree(table), '--tag', 'v2.6.3', '--github-digest', V263)
+
+  it('holds with one row per image, carrying the record', () => {
+    const run = check(readme(ROW_263))
+    expect(run.stderr).toBe('')
+    expect(run.status).toBe(0)
+  })
+
+  it('fails on a row for an image that is not in the tree', () => {
+    const run = check(
+      readme(ROW_263, `| \`Aruna_3.0.0-macos-universal.dmg\` | v3.0.0 | \`${'f'.repeat(64)}\` |`),
+    )
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain(
+      'cli/releases/README.md has a row for Aruna_3.0.0-macos-universal.dmg, and there is no such image in cli/releases/',
+    )
+  })
+
+  it('fails when an image in the tree has no row', () => {
+    const run = check(readme())
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain(
+      'Aruna_2.6.3-macos-universal.dmg is in cli/releases/, and cli/releases/README.md has no row for it',
+    )
+  })
+
+  it('fails on a row whose checksum is not the record', () => {
+    const other = '0'.repeat(64)
+    const run = check(readme(`| \`Aruna_2.6.3-macos-universal.dmg\` | v2.6.3 | \`${other}\` |`))
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain(
+      `cli/releases/README.md gives Aruna_2.6.3-macos-universal.dmg as ${other}, the reference record says ${V263}`,
+    )
+  })
+
+  it('fails on a row that names another release, or no checksum', () => {
+    const run = check(readme('| `Aruna_2.6.3-macos-universal.dmg` | v2.6.2 | – |'))
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain('names the release v2.6.2, not v2.6.3')
+    expect(run.stderr).toContain('gives no SHA-256: –')
+  })
+
+  it('fails on two rows for one image', () => {
+    const run = check(readme(ROW_263, ROW_263))
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain(
+      'cli/releases/README.md has two rows for Aruna_2.6.3-macos-universal.dmg',
+    )
+  })
+
+  it('fails on a row for an image the record does not know', () => {
+    const run = check(
+      readme(ROW_263, `| \`Aruna_9.9.9-macos-universal.dmg\` | v9.9.9 | \`${V263}\` |`),
+    )
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain('the reference record has no v9.9.9')
+  })
+
+  it('fails when the README is missing', () => {
+    const root = heldTree('')
+    rmSync(join(root, 'cli', 'releases', 'README.md'))
+    const run = gate('--root', root, '--tag', 'v2.6.3', '--github-digest', V263)
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain('cli/releases/README.md is missing')
+  })
+})
 
 describe('reference images', () => {
   it('hold on v2.6.3: the copy in the tree is the record and the release asset', () => {

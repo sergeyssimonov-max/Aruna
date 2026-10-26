@@ -6,13 +6,22 @@
 //   node scripts/reference-images.mjs --check --github-digest <sha256>
 //   node scripts/reference-images.mjs --check --tag v2.6.3 --root <dir>
 //
-// Two things, both offline.
+// Three things, all offline.
 //
 // Every pair. Each `Aruna_<version>-macos-universal.dmg` in cli/releases/ has
 // its `Aruna_<version>-SHA256SUMS.txt` beside it, and the image's SHA-256 is
 // the line of that file and the `dmg_sha256` of the entry `v<version>` in
 // .github/reference-release.json. No image without an entry, no checksum file
 // without its image.
+//
+// The table of cli/releases/README.md. Owner's decision of 2026-10-26
+// (release-3.0.1, variant В): its rows are exactly the images in
+// cli/releases/, one row each, and a row names its image, the tag of the
+// record entry for it and that entry's `dmg_sha256`. A row is a line of the
+// table whose first cell is an image name in backticks; the references older
+// than the rule, v1.0.5 and v1.0.9, have an entry and no copy, and so no row.
+// The README stood unguarded until then: a row for a removed image, or no row
+// for a present one, passed every check.
 //
 // The last published tag. Owner's decision of 2026-10-11, variant (B) of the
 // question the task pre-3.0.0-hardening put: the rule of 6.7 stays – the image
@@ -42,6 +51,10 @@ import { fileURLToPath } from "node:url";
 const IMAGE = /^Aruna_(\d+\.\d+\.\d+)-macos-universal\.dmg$/;
 const SUMS = /^Aruna_(\d+\.\d+\.\d+)-SHA256SUMS\.txt$/;
 const HEX = /^[0-9a-f]{64}$/;
+/** A row of the table in cli/releases/README.md: image, release, checksum. */
+const ROW =
+  /^\|\s*`(Aruna_[^`]*-macos-universal\.dmg)`\s*\|([^|]*)\|([^|]*)\|\s*$/;
+const README = "cli/releases/README.md";
 /** The name the release publishes its image under, and its checksum file names. */
 const PUBLISHED = "Aruna-macos-universal.dmg";
 
@@ -76,6 +89,7 @@ export function problems(root, tag, github) {
   const entries = new Map(record.references.map((r) => [r.tag, r]));
   const dir = join(root, "cli", "releases");
   const names = readdirSync(dir);
+  out.push(...tableProblems(root, names, entries));
 
   for (const name of names) {
     const sums = SUMS.exec(name);
@@ -132,6 +146,65 @@ export function problems(root, tag, github) {
     out.push(
       `the release asset of ${tag} on GitHub is ${published}, the reference record says ${entry.dmg_sha256}`,
     );
+  }
+  return out;
+}
+
+/**
+ * Everything wrong with the table of cli/releases/README.md against the
+ * images in `names` and the record `entries`, as sentences.
+ */
+function tableProblems(root, names, entries) {
+  const path = join(root, "cli", "releases", "README.md");
+  if (!existsSync(path)) return [`${README} is missing`];
+  const out = [];
+  const images = names.filter((name) => IMAGE.test(name));
+  const rows = new Map();
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const row = ROW.exec(line);
+    if (!row) continue;
+    const [, name, release, sum] = row;
+    if (rows.has(name)) {
+      out.push(`${README} has two rows for ${name}`);
+      continue;
+    }
+    rows.set(name, true);
+    const v = IMAGE.exec(name)?.[1];
+    if (!v) {
+      out.push(`${README} has a row for ${name}, which is not an image name`);
+      continue;
+    }
+    if (!images.includes(name)) {
+      out.push(
+        `${README} has a row for ${name}, and there is no such image in cli/releases/`,
+      );
+    }
+    const named = /^\s*(v\d+\.\d+\.\d+)\b/.exec(release)?.[1];
+    if (named !== `v${v}`) {
+      out.push(
+        `${README}: the row for ${name} names the release ${release.trim() || "(none)"}, not v${v}`,
+      );
+    }
+    const digest = /^\s*`([0-9a-f]{64})`\s*$/.exec(sum)?.[1];
+    const entry = entries.get(`v${v}`);
+    if (!digest) {
+      out.push(
+        `${README}: the row for ${name} gives no SHA-256: ${sum.trim()}`,
+      );
+    } else if (!entry) {
+      out.push(
+        `${README} has a row for ${name}, and the reference record has no v${v}`,
+      );
+    } else if (digest !== entry.dmg_sha256) {
+      out.push(
+        `${README} gives ${name} as ${digest}, the reference record says ${entry.dmg_sha256}`,
+      );
+    }
+  }
+  for (const name of images) {
+    if (!rows.has(name)) {
+      out.push(`${name} is in cli/releases/, and ${README} has no row for it`);
+    }
   }
   return out;
 }
