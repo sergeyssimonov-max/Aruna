@@ -88,6 +88,12 @@ marked below.
 Corrected 2026-09-30, second entry: §0, the dependency list and the claim
 that nothing consumes the document model. A correction of fact.
 
+Amended 2026-10-27: §2, a criterion and a principle, on the measurement of
+2026-10-26 (the task markup-leak-fix): the 3.0.1 package showed the markup
+of the corpus as letters in 3 135 of its 23 713 PDFs – the `c` of notes and
+the `cu` of lines printed as strings – and passed every check, because the
+expected text of §2 was built by the very model it checked. Marked below.
+
 **Where this file ends and the specification begins.** `PROJECT-SPEC.ru.md`
 §6.9 lists checks for the PDF contour and says it takes effect with the first
 PDF. This file is the contract; that section is the pre-commit set that will
@@ -339,6 +345,39 @@ Per document:
 - special characters unsubstituted — no `?`, no `□`, no dropped diacritic
 - every construct in the XML → PDF map of `XML-CONTRACT.md` reaching the place
   that table says it goes
+
+**Amended 2026-10-27: no markup in the text.** No PDF shows markup or an
+entity as letters, in its text or in its metadata. A text shows markup where
+it has `<`, an optional `/`, a letter or `_`, and further on a `>` – the
+pattern `</?[A-Za-z_][A-Za-z0-9_.:-]*[^>]*/?>`; the literals `&lt;`, `&gt;`,
+`&amp;`, `&#`; or `〈` (U+2329), an optional `/`, a name of the corpus's markup
+and further on `〉` (U+232A). The names are `VOCABULARY` of
+`cli/src/pdf/markup.rs`, 90 of them: 84 measured in the notes and 4 in `cu`
+on 2026-10-26, 4 added by the owner on 2026-10-27. The same brackets around
+anything else are text – the corpus writes emendations so, `ku-〈e〉-da`.
+`check` reads every PDF of a package for it, in the text with ActualText and
+without, and in the document information dictionary – the row "markup or an
+entity in the text or the metadata" of `pdf_gate` – and so does every test
+that puts a PDF to the gate's checks. It is part of `check --c14n --pdfkit`
+and of the release gate (`PROJECT-SPEC.ru.md` 6.8) for good. Measured on
+2026-10-27 on the 3.0.1 package, by PDFKit and by `pdftotext` alike: 3 135
+PDFs fail it, 3 102 by `<…>` or an entity, 33 by the bracketed form alone.
+PDFKit gives U+2329 and U+232A as U+3008 and U+3009, so a scan of its text
+takes both pairs for one.
+
+**Amended 2026-10-27: the expected text is not built by the model it checks.**
+The defect above passed every check of this section because its semantic
+manifest – `Page::texts()` – comes from the layout model, so a note printed as
+a string was the expected text as well. A text criterion is evidence only
+against an expectation built apart from the code under test: from the source
+XML, by another parser, under rules written down before the code. The
+paragraph "A further reason …" above asked for that and was not acted on. The
+checks against the model stay – they prove the PDF is what the model says –
+but they say nothing about whether the model is right, and no report presents
+them as if they did. For markup-leak-fix the independent expectation was a
+program of its own outside the repository, Python and expat over the archive,
+its rules recorded before the fix; keeping such a program in the repository as
+a standing tool is proposed, not done.
 
 ## 3. Visual correctness
 

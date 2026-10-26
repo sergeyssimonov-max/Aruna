@@ -20,6 +20,11 @@ and the heading of §5 – by the owner's decision of 2026-10-06 on authenticity
 (option 2), and to state that the converter exists. Written on 2026-10-08.
 Marked below.
 
+Amended 2026-10-27: §4, two rows of the table and the new part "What a page
+shows" – by the measurement of 2026-10-26 (the task markup-leak-fix: the
+markup of notes and `cu` printed as letters, the signs of the edition lost)
+and the owner's decisions of 2026-10-26 and 2026-10-27. Marked below.
+
 ---
 
 ## 1. The source is not ours to change
@@ -355,7 +360,7 @@ same comparison runs with every test run).
 |---|---|---|---|
 | root `AOxml` | 23 936 | `Document::root` | document frame |
 | element tree | 4.88 M elements | `Kind::Element`, in document order | layout structure |
-| attributes | 6.37 M | `Element::attributes`, in the order written; the scan still reads 7 named fields | metadata block; editorial attributes visible |
+| attributes | 6.37 M | `Element::attributes`, in the order written; the scan still reads 7 named fields | metadata block; editorial attributes visible — *amended 2026-10-27:* the attributes a rule of "What a page shows" names; no other is shown |
 | namespaces | 8, everywhere | `Element::namespaces` as declared; `Name::namespace` resolved | qualified names resolved before layout ~~; ODF `table:` renders as a table~~ — amended 2026-09-30: no ODF table markup occurs (§2) |
 | `text:tab` | 63 docs, 212 | an element without children, in place | a shift of the line, never a table cell — owner's decision 2026-09-30 (§5 question 5) |
 | mixed content | 23 616 docs | `Kind::Text` between elements, whitespace kept | **inline runs must stay inline** — the single largest layout risk |
@@ -370,7 +375,7 @@ same comparison runs with every test run).
 | processing instructions | 8 423 docs | `Kind::Instruction`, in place | the stylesheet PI is dropped by rule; any other PI goes to the appendix |
 | XML declaration | 442 docs | `Document::declaration`, `None` when absent | not shown; recorded in the manifest |
 | ids | 600 duplicated | attributes as written; no uniqueness assumed | anchors; duplicates cannot be resolved by id alone and need the document path as well |
-| unknown elements | possible | an element like any other — the model has no vocabulary to be unknown to | **must be visible in the appendix, never silently dropped** |
+| unknown elements | possible | an element like any other — the model has no vocabulary to be unknown to | **must be visible in the appendix, never silently dropped** — *amended 2026-10-27:* what it holds is shown and the tag is not ("What a page shows"); there is no appendix |
 | CDATA | 0 today | text, joined with its neighbours | text, as written |
 | entity references beyond the five predefined | 0 today | the document is refused: no policy yet | expansion is a decision, recorded when made |
 | DTD | 0 today | the document is refused: nothing fetched | not fetched, ever |
@@ -396,6 +401,79 @@ is what showed it; measured over the archive that day.
 - **`AO:InvNr` is in 2 774 documents**, not "most".
 - **`parlbk` occurs nowhere.** The section markers of this corpus are `parsep`
   (72 989) and `parsep_dbl` (3 126).
+
+### What a page shows
+
+*Added 2026-10-27*, by the task markup-leak-fix and the owner's decisions of
+2026-10-26 and 2026-10-27. Until then a page showed the text nodes of a
+document and nothing else: the markup of a note was printed as letters, and
+the signs of the edition the corpus writes as empty elements and attributes
+were lost (`ZAG?-ni` printed `ZAG-ni`). The rules below are applied by
+`cli/src/pdf/layout.rs` to one stream of events that `cli/src/pdf/markup.rs`
+makes of the body, of notes and of `cu`, so a tag shows the same in all
+three.
+
+**Notes and `cu` are markup.** The corpus writes the text of a note in the
+attribute `c` of an empty `note`, and a line of cuneiform in the `cu` of `lb`,
+the markup inside escaped: on TLHdig Beta 0.3, 3 086 documents have markup or
+an entity in a note and 84 in `cu`. Both are read by the parser of the
+documents, as a fragment inside a root that binds `AO:` and `text:`. A
+fragment that parser will not read – crossed tags, as in `CTH 434/KBo 20.82`,
+a tag cut short – goes to a lenient reader: a tag is `<`, a name, anything but
+`<` up to `>`, and everything else is text. Neither drops text, and neither
+fails the document. The one tag cut short with a sign inside it,
+`<wsepc="𒀹"/>` in the `cu` of `CTH 470/CHDS 7.200`, is a tag to that reader,
+and its sign is not shown.
+
+The corpus writes the same markup between `〈` and `〉` (U+2329, U+232A) as
+well, in 216 documents. There a name of `VOCABULARY` (`markup.rs`; 84 names
+measured in notes, 4 in `cu`, 4 added by the owner) is a tag; anything else
+between the brackets is text, an emendation: `ku-〈e〉-da`.
+
+**The value a rule shows is markup too** where it carries it – 56 values of
+`c` of `gap`, `materlect` and `corr` on TLHdig Beta 0.3, `corr c="<ras_in/>"`
+in `CTH 51/KBo 1.1+`. It is read on its own, apart from its line, and what
+the rules make of it stands where the rule puts the value.
+
+**The source of the signs.** This contract was silent on them. The rules come
+from `HPMxml.css`, the stylesheet every document of the archive names in its
+`xml-stylesheet` instruction (184 copies in the archive, byte for byte the
+same, SHA-256 `f3b95c0c…`): how the portal itself shows a document. Where the
+stylesheet is silent too, the owner decided (2026-10-27, C1–C7).
+
+| construct | shown | source |
+|---|---|---|
+| a text node | its text | §4 above |
+| `AO:TxtPubl` whose text is the `docID` | nothing | owner, 2026-10-26 (header) |
+| `AO:DirectJoin` / `AO:InDirectJoin` | ` + ` / ` (+) ` | owner, 2026-10-27 (C3) |
+| `lb` | a new line | §4 above |
+| `cu` of `lb` | a line of its own, read as markup | owner, 2026-10-26 (notes) |
+| `lnr` of `lb` | at the head of the next line, a space after it | `HPMxml.css` `lb:after`; owner, 2026-10-27 |
+| `parsep`, `parsep_dbl` | a new section | §4 above |
+| `AO:ParagrNr`, its `c` | a line of its own | owner, 2026-10-27 (C2) |
+| `note`, its `c` | a footnote at its anchor, read as markup | owner, 2026-10-26 (notes) |
+| the end of `P_f_…` in a note | a line break | owner, 2026-10-27 (paragraphs) |
+| `del_in` / `del_fin` | `[` / `]` | `HPMxml.css` |
+| `laes_in` / `laes_fin` | `⸢` / `⸣` | `HPMxml.css` |
+| `corr`, its `c` | raised, 80 % | `HPMxml.css` `corr[…]:after` |
+| `materlect`, its `c` | raised, 80 % | `HPMxml.css` `materlect::after` |
+| `subscr`, its `c` | lowered, 90 % | `HPMxml.css` `subscr`; owner, 2026-10-27 |
+| `surpl`, its `c` | `〈〈` value `〉〉` | `HPMxml.css` `surpl:before` |
+| `gap`, its `c` | in the line; with `t="line"` a line of its own | owner, 2026-10-27 (C1) |
+| `ras_in` … `ras_fin` | `⟦` … `⟧`; with nothing shown between, `(Rasur)`; one left open or closed alone, its bracket | owner, 2026-10-27 (C4) |
+| `ras_X` | `(Rasur)` | C4, read for a mark with nothing inside |
+| `add_in` / `add_fin` | `〈` / `〉` | owner, 2026-10-27 (C5) |
+| `QUOT_HurInHit_in` / `_fin` | nothing; the words between as always | owner, 2026-10-27 (C6) |
+| `wsep`, its `c` | the sign | owner, 2026-10-27 (C7) |
+| `text:tab` | a shift, no character | §5 question 5 |
+| any other element, a wrapper of a note, a name no rule knows | nothing; what it holds is shown | owner, 2026-10-26 (q1-2) |
+| an entity in a value read as markup | its character | §4 above |
+| comments, processing instructions | nothing | §5 question 3 |
+
+The determinative `d` stays in the line, unraised, though `HPMxml.css`
+raises it: the body is set without type styles, and a note as the body
+(owner, 2026-10-26). Hurrian quotations wait for their own decision, with the
+language of the PDF (`PROJECT-SPEC.ru.md` 7.3).
 
 ### Authenticity: the original beside the PDF
 
