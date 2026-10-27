@@ -180,9 +180,14 @@ pub fn unknown_names(doc: &Document<'_>) -> BTreeMap<String, usize> {
     b.unknown
 }
 
+/// The mark between the sections of a value read as markup: U+001D, which
+/// XML 1.0 does not allow in a document, so no text of one carries it.
+const SECTION: char = '\u{1D}';
+
 /// Where the markup stands: the rules of the body's structure (`lb`,
-/// `parsep`, `note`, the heading's sigla, `text:tab`) hold in the body only;
-/// a paragraph of a note ends at the end of its `P_f_…` element.
+/// `parsep`, `note`, the heading's sigla, `text:tab`) hold in the body only,
+/// but for `parsep` in a value the page shows; a paragraph of a note ends at
+/// the end of its `P_f_…` element.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Where {
     Body,
@@ -263,12 +268,13 @@ impl<'d> Builder<'d> {
             return;
         }
         self.visible += t.chars().filter(|c| !is_space(*c)).count();
-        let t = t.to_string();
+        let t = t.replace(SECTION, " ");
         self.item(Item::Piece(if sub { Piece::Sub(t) } else { Piece::Sup(t) }));
     }
 
     /// The text an attribute's value shows: the value as it is, or, when it
-    /// carries markup, what the rules make of it, read apart from the line.
+    /// carries markup, what the rules make of it, read apart from the line,
+    /// its sections apart by [`SECTION`].
     fn value(&mut self, v: &str) -> String {
         if !v.contains(['<', '&', '\u{2329}']) {
             return v.to_string();
@@ -276,12 +282,34 @@ impl<'d> Builder<'d> {
         let mut b = Builder::new(Where::Value, self.doc_id);
         b.fragment(v, Where::Value);
         self.count_unknown(std::mem::take(&mut b.unknown));
-        let sections = b.sections();
-        let mut out = Vec::new();
-        for p in sections.iter().flatten().flatten() {
-            p.texts(&mut out);
+        // Every section kept, an empty one too: its border is what shows.
+        let empty = std::mem::take(&mut b.empty);
+        b.sections
+            .into_iter()
+            .map(|section| {
+                let mut words: Vec<String> = Vec::new();
+                for line in section.into_iter().filter_map(|l| tidy(resolve(l, &empty))) {
+                    for p in &line {
+                        let mut t = Vec::new();
+                        p.texts(&mut t);
+                        words.extend(t.into_iter().map(str::to_string));
+                    }
+                }
+                words.join(" ")
+            })
+            .collect::<Vec<_>>()
+            .join(&SECTION.to_string())
+    }
+
+    /// A value set in the line, a `parsep` inside it a new section, as in the
+    /// body (owner's decision of 2026-10-27, `CTH 456/KUB 39.52+`).
+    fn shown(&mut self, v: &str) {
+        for (i, part) in v.split(SECTION).enumerate() {
+            if i > 0 {
+                self.sections.push(vec![Vec::new()]);
+            }
+            self.text(part);
         }
-        out.join(" ")
     }
 
     /// Markup carried as text, read where `place` says, into this builder.
@@ -364,14 +392,16 @@ impl<'d> Builder<'d> {
                 // Its value is markup where it carries it (`KUB 30.24+`).
                 if let Some(lnr) = tag.attribute("lnr").map(|n| self.value(n)) {
                     if !lnr.is_empty() {
-                        self.text(&format!("{lnr} "));
+                        self.shown(&format!("{lnr} "));
                     }
                 }
             }
             "tab" if body && tag.prefix.as_deref() == Some("text") => {
                 self.item(Item::Piece(Piece::Tab));
             }
-            "parsep" | "parsep_dbl" if body => self.sections.push(vec![Vec::new()]),
+            "parsep" | "parsep_dbl" if body || self.place == Where::Value => {
+                self.sections.push(vec![Vec::new()]);
+            }
             "note" if body => {
                 if let Some(c) = raw {
                     let mut note = Builder::new(Where::Note, self.doc_id);
@@ -396,20 +426,20 @@ impl<'d> Builder<'d> {
             "subscr" => self.raised(c.unwrap_or(""), true),
             "surpl" => {
                 if let Some(c) = c {
-                    self.text(&format!("\u{2329}\u{2329}{c}\u{232A}\u{232A}"));
+                    self.shown(&format!("\u{2329}\u{2329}{c}\u{232A}\u{232A}"));
                 }
             }
             // Owner's decisions of 2026-10-27, C1, C2, C3 and C7.
-            "wsep" => self.text(c.unwrap_or("")),
+            "wsep" => self.shown(c.unwrap_or("")),
             "gap" if tag.attribute("t") == Some("line") => {
                 self.line();
-                self.text(c.unwrap_or(""));
+                self.shown(c.unwrap_or(""));
                 self.line();
             }
-            "gap" => self.text(c.unwrap_or("")),
+            "gap" => self.shown(c.unwrap_or("")),
             "ParagrNr" => {
                 self.line();
-                self.text(c.unwrap_or(""));
+                self.shown(c.unwrap_or(""));
                 self.line();
             }
             "DirectJoin" => self.text(" + "),

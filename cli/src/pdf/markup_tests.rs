@@ -463,3 +463,18 @@ fn names_no_rule_knows_outside_the_body_are_counted_and_the_body_s_are_not() {
         ]
     );
 }
+
+#[test]
+fn a_parsep_inside_a_value_is_a_new_section_as_in_the_body() {
+    // `CTH 456/KUB 39.52+`: `gap c="</w> <parsep/> <w>"` (owner's decision
+    // of 2026-10-27).
+    let in_body = shown("<lb/>a <parsep/> b");
+    let in_value = shown("<lb/>a <gap c=\"&lt;/w&gt; &lt;parsep/&gt; &lt;w&gt;\"/> b");
+    assert_eq!(in_body, "KBo 0.1\na\n\nb");
+    assert_eq!(in_value, in_body);
+    let xml = format!(
+        "<AOxml {NS}><body><text><lb/>a <gap c=\"&lt;/w&gt; &lt;parsep/&gt; &lt;w&gt;\"/> b</text></body></AOxml>"
+    );
+    let d = Document::read(xml.as_bytes()).unwrap_or_else(|e| panic!("{e}"));
+    assert!(super::layout::unknown_names(&d).is_empty());
+}
