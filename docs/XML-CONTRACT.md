@@ -421,9 +421,20 @@ documents, as a fragment inside a root that binds `AO:` and `text:`. A
 fragment that parser will not read – crossed tags, as in `CTH 434/KBo 20.82`,
 a tag cut short – goes to a lenient reader: a tag is `<`, a name, anything but
 `<` up to `>`, and everything else is text. Neither drops text, and neither
-fails the document. The one tag cut short with a sign inside it,
-`<wsepc="𒀹"/>` in the `cu` of `CTH 470/CHDS 7.200`, is a tag to that reader,
-and its sign is not shown.
+fails the document. A tag whose name has what is not a name in it – the
+one in the corpus is `<wsepc="𒀹"/>` in the `cu` of `CTH 470/CHDS 7.200`,
+which the parser of the documents, not checking names, takes for an element
+named `wsepc="𒀹"` – is named by its run of name characters, and what
+follows stands as text in its place, less `=`, quotes, `/` and whitespace:
+the sign `𒀹` is shown (owner's decision of 2026-10-27, a rule for every
+document, no exception for one).
+
+`check` lists, as a warning and not a failure, every document whose notes,
+`cu` or shown values carry a tag name that no rule and no name of
+`VOCABULARY` knows, with the names and their counts (owner's decision of
+2026-10-27). On TLHdig Beta 0.3 it lists one: `CTH 456/KUB 39.52+`, whose
+`gap c="</w> <parsep/> <w>"` carries `parsep`, a structural tag of the body
+that has no rule inside a value.
 
 The corpus writes the same markup between `〈` and `〉` (U+2329, U+232A) as
 well, in 216 documents. There a name of `VOCABULARY` (`markup.rs`; 84 names

@@ -362,6 +362,10 @@ that puts a PDF to the gate's checks. It is part of `check --c14n --pdfkit`
 and of the release gate (`PROJECT-SPEC.ru.md` 6.8) for good. Measured on
 2026-10-27 on the 3.0.1 package, by PDFKit and by `pdftotext` alike: 3 135
 PDFs fail it, 3 102 by `<…>` or an entity, 33 by the bracketed form alone.
+Beside it `check` lists, as a warning that does not fail the verdict, the
+documents whose markup carries a tag name no rule and no name of the
+vocabulary knows – a name of the future that the page drops while keeping
+what it holds (owner's decision of 2026-10-27).
 PDFKit gives U+2329 and U+232A as U+3008 and U+3009, so a scan of its text
 takes both pairs for one.
 
