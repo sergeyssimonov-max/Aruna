@@ -492,7 +492,8 @@ check is the checks (a)–(d) the export runs on every PDF (specification
 `"passed"`: a failure of any of them is a broken invariant and stops the
 build, so a manifest with a failed check is never written. The full semantic
 check of §2 stays with the tests and the release gate; the limit of the PDF
-phase, 135 s, is unchanged. Where it is not safe to go on – a broken invariant of
+phase, 135 s, is unchanged (145 s since 2026-10-27, by the owner's decision of
+that day). Where it is not safe to go on – a broken invariant of
 this program: a label without its place, the credit not where it belongs –
 the build stops and names the document and the invariant; that, and not the
 refusal of a document, is what decision 11 makes a stop.

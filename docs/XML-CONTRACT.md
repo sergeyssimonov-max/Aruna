@@ -432,9 +432,10 @@ document, no exception for one).
 `check` lists, as a warning and not a failure, every document whose notes,
 `cu` or shown values carry a tag name that no rule and no name of
 `VOCABULARY` knows, with the names and their counts (owner's decision of
-2026-10-27). On TLHdig Beta 0.3 it lists one: `CTH 456/KUB 39.52+`, whose
-`gap c="</w> <parsep/> <w>"` carries `parsep`, a structural tag of the body
-that has no rule inside a value.
+2026-10-27). On TLHdig Beta 0.3 it listed one: `CTH 456/KUB 39.52+`, whose
+`gap c="</w> <parsep/> <w>"` carries `parsep`. Since the owner's decision of
+2026-10-27 a `parsep` inside a value the page shows starts a new section, as
+in the body, and the list is empty.
 
 The corpus writes the same markup between `〈` and `〉` (U+2329, U+232A) as
 well, in 216 documents. There a name of `VOCABULARY` (`markup.rs`; 84 names
@@ -460,7 +461,7 @@ stylesheet is silent too, the owner decided (2026-10-27, C1–C7).
 | `lb` | a new line | §4 above |
 | `cu` of `lb` | a line of its own, read as markup | owner, 2026-10-26 (notes) |
 | `lnr` of `lb` | at the head of the next line, a space after it | `HPMxml.css` `lb:after`; owner, 2026-10-27 |
-| `parsep`, `parsep_dbl` | a new section | §4 above |
+| `parsep`, `parsep_dbl` | a new section; inside a value the page shows too (owner, 2026-10-27) | §4 above |
 | `AO:ParagrNr`, its `c` | a line of its own | owner, 2026-10-27 (C2) |
 | `note`, its `c` | a footnote at its anchor, read as markup | owner, 2026-10-26 (notes) |
 | the end of `P_f_…` in a note | a line break | owner, 2026-10-27 (paragraphs) |
@@ -607,7 +608,8 @@ manifest carries for the PDF at all; the code did, and this is it, schema 3.
   PDFs has none at all. The semantic completeness of `PDF-ACCEPTANCE.md` §2 –
   the code points of the text, the tag tree and the logical text against the
   model – is not this check: it runs in the tests and at the release gate,
-  and the limit of the PDF phase, 135 s, does not change.
+  and the limit of the PDF phase, 135 s, does not change (145 s since
+  2026-10-27, by the owner's decision of that day).
 
 ~~**The outcome of the completeness check is not written yet.** The owner's
 decision of 2026-10-08 places it in the entry of each document with a PDF, and
