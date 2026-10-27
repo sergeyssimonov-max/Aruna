@@ -13,7 +13,7 @@
 //! ```
 //!
 //! `series` is the time guard: the PDF phase of five builds of the whole set,
-//! each its own process, the median against 135 s (4.10) – and the five
+//! each its own process, the median against 145 s (4.10) – and the five
 //! packages must be one package, byte for byte. `check` reads a built package
 //! the way `PDF-ACCEPTANCE.md` asks: nothing outside the margin, no blank
 //! glyph, the labels' code points for this project's reader (and PDFKit's with
@@ -40,8 +40,9 @@ use aruna::progress::{Event, Progress};
 use pdf_check::*;
 
 /// The product's limit on the PDF phase of the whole set, in seconds (4.10):
-/// 135 s by the owner's decision of 2026-10-02, 125 s before it.
-const LIMIT: f64 = 135.0;
+/// 145 s by the owner's decision of 2026-10-27, 135 s from 2026-10-02, 125 s
+/// before that.
+const LIMIT: f64 = 145.0;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
