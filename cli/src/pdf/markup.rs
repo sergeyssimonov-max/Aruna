@@ -341,8 +341,10 @@ fn lenient_tag(s: &str) -> Option<(usize, Event<'static>, bool)> {
         return None;
     }
     let inner = &body[..end];
+    // The name runs to whitespace or `/`, as the parser of the documents
+    // reads it: `<wsepc="𒀹"/>` is named `wsepc="𒀹"` by both.
     let name_end = inner
-        .find(|c: char| c.is_whitespace() || matches!(c, '/' | '=' | '"'))
+        .find(|c: char| c.is_whitespace() || c == '/')
         .unwrap_or(inner.len());
     let qualified = &inner[..name_end];
     let (prefix, local) = match qualified.split_once(':') {
@@ -364,6 +366,11 @@ fn lenient_tag(s: &str) -> Option<(usize, Event<'static>, bool)> {
     Some((len, event, closed && !close))
 }
 
+/// A character of a name: a letter, a digit, `_`, `-`, `.` or `:`.
+pub fn is_name_char(c: char) -> bool {
+    c.is_alphanumeric() || matches!(c, '_' | ':' | '.' | '-')
+}
+
 /// The run of name characters at the end of `s`: the name of an attribute
 /// written with something before it – `<wsep !!c=" 𒑱 !!"/>`
 /// (`CTH 670/KP24_467C_PL2_SF65`) has a `c`.
@@ -371,7 +378,7 @@ fn name_at_end(s: &str) -> &str {
     let start = s
         .char_indices()
         .rev()
-        .find(|(_, c)| !(c.is_alphanumeric() || matches!(c, '_' | ':' | '.' | '-')))
+        .find(|(_, c)| !is_name_char(*c))
         .map_or(0, |(i, c)| i + c.len_utf8());
     &s[start..]
 }

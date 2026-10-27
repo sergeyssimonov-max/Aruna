@@ -11,6 +11,8 @@
 //! 2026-09-30, §5 question 3). Whitespace inside a line is layout, not text:
 //! runs of it become one space, trimmed at the line's ends.
 
+use std::collections::BTreeMap;
+
 use crate::cth_titles::{title_text, Catalog, Match};
 use crate::document::Document;
 // Text reaches the template as JSON data, never as markup.
@@ -166,6 +168,18 @@ pub fn sections(doc: &Document<'_>) -> Vec<Section> {
     b.sections()
 }
 
+/// The names of tags in a note, a line's `cu` or a value a page shows that
+/// no rule knows and the vocabulary does not name, with how often each
+/// stands: what `check` lists as a warning (owner's decision of 2026-10-27).
+pub fn unknown_names(doc: &Document<'_>) -> BTreeMap<String, usize> {
+    let events = markup::events(doc);
+    let mut b = Builder::new(Where::Body, None);
+    for e in &events {
+        b.event(e);
+    }
+    b.unknown
+}
+
 /// Where the markup stands: the rules of the body's structure (`lb`,
 /// `parsep`, `note`, the heading's sigla, `text:tab`) hold in the body only;
 /// a paragraph of a note ends at the end of its `P_f_…` element.
@@ -201,6 +215,8 @@ struct Builder<'d> {
     empty: Vec<bool>,
     /// Inside an `AO:TxtPubl` that repeats the `docID`: its text not set.
     skip: usize,
+    /// Names of markup outside the body no rule knows, and their counts.
+    unknown: BTreeMap<String, usize>,
 }
 
 impl<'d> Builder<'d> {
@@ -213,6 +229,7 @@ impl<'d> Builder<'d> {
             erasures: Vec::new(),
             empty: Vec::new(),
             skip: 0,
+            unknown: BTreeMap::new(),
         }
     }
 
@@ -252,12 +269,13 @@ impl<'d> Builder<'d> {
 
     /// The text an attribute's value shows: the value as it is, or, when it
     /// carries markup, what the rules make of it, read apart from the line.
-    fn value(&self, v: &str) -> String {
+    fn value(&mut self, v: &str) -> String {
         if !v.contains(['<', '&', '\u{2329}']) {
             return v.to_string();
         }
         let mut b = Builder::new(Where::Value, self.doc_id);
         b.fragment(v, Where::Value);
+        self.count_unknown(std::mem::take(&mut b.unknown));
         let sections = b.sections();
         let mut out = Vec::new();
         for p in sections.iter().flatten().flatten() {
@@ -291,17 +309,39 @@ impl<'d> Builder<'d> {
         }
     }
 
+    fn count_unknown(&mut self, names: BTreeMap<String, usize>) {
+        for (k, n) in names {
+            *self.unknown.entry(k).or_insert(0) += n;
+        }
+    }
+
     fn start(&mut self, tag: &Tag<'_>) {
+        // A name with what is not a name in it – `<wsepc="𒀹"/>` in the `cu`
+        // of `CTH 470/CHDS 7.200`: the name is its run of name characters,
+        // and what follows stands as text in the tag's place, less `=`,
+        // quotes, `/` and whitespace (owner's decision of 2026-10-27).
+        let name_end = tag
+            .local
+            .find(|c: char| !markup::is_name_char(c))
+            .unwrap_or(tag.local.len());
+        let name = &tag.local[..name_end];
+        if name_end < tag.local.len() {
+            let rest: String = tag.local[name_end..]
+                .chars()
+                .filter(|c| !matches!(c, '=' | '"' | '\'' | '/') && !c.is_whitespace())
+                .collect();
+            self.text(&rest);
+        }
         // What `c` shows is markup too, read on its own (`KBo 1.1+`:
         // `corr c="<ras_in/>"`).
         let raw = tag.attribute("c");
-        let value = match tag.local.as_ref() {
+        let value = match name {
             "note" => None,
             _ => raw.map(|c| self.value(c)),
         };
         let c = value.as_deref();
         let body = self.place == Where::Body;
-        match tag.local.as_ref() {
+        match name {
             "TxtPubl" if body && tag.prefix.as_deref() == Some("AO") => {
                 // Owner's decision header: a publication equal to the docID
                 // is not repeated under the heading.
@@ -336,6 +376,7 @@ impl<'d> Builder<'d> {
                 if let Some(c) = raw {
                     let mut note = Builder::new(Where::Note, self.doc_id);
                     note.fragment(c, Where::Note);
+                    self.count_unknown(std::mem::take(&mut note.unknown));
                     let paragraphs: Vec<Vec<Piece>> =
                         note.sections().into_iter().flatten().collect();
                     if !paragraphs.is_empty() {
@@ -391,8 +432,19 @@ impl<'d> Builder<'d> {
             },
             "ras_X" => self.text("(Rasur)"),
             // Every other tag – QUOT_HurInHit (C6), the wrappers of a note,
-            // a name no rule knows – is not set; what it holds is.
-            _ => {}
+            // a name no rule knows – is not set; what it holds is. Outside
+            // the body a name the vocabulary does not name is counted.
+            _ => {
+                if !body {
+                    let qualified = match tag.prefix.as_deref() {
+                        Some(p) => format!("{p}:{}", tag.local),
+                        None => tag.local.to_string(),
+                    };
+                    if !markup::VOCABULARY.contains(&qualified.as_str()) {
+                        *self.unknown.entry(qualified).or_insert(0) += 1;
+                    }
+                }
+            }
         }
     }
 

@@ -433,3 +433,33 @@ fn a_note_with_nothing_to_show_is_no_note() {
     assert_eq!(shown("<lb/>a<note c=\"  \"/> b"), "KBo 0.1\na b");
     assert_eq!(in_note("<P_f_Footnote> </P_f_Footnote>"), "KBo 0.1");
 }
+
+#[test]
+fn a_sign_written_into_a_tag_s_name_is_kept() {
+    // `CTH 470/CHDS 7.200`: `<wsepc="𒀹"/>` in `cu`, read by the parser of
+    // the documents; the same cut by a `<` is read leniently.
+    assert_eq!(
+        shown("<lb cu=\"&lt;wsepc=&quot;𒀹&quot;/&gt;𒉿𒅈\"/>a"),
+        "KBo 0.1\n𒀹𒉿𒅈\na"
+    );
+    assert_eq!(in_note("x<wsepc=\"𒀹\"/>y<z"), "KBo 0.1\n{note: x𒀹y<z}");
+}
+
+#[test]
+fn names_no_rule_knows_outside_the_body_are_counted_and_the_body_s_are_not() {
+    let xml = format!(
+        "<AOxml {NS}><body><text><lb cu=\"&lt;frei/&gt;𒀀\"/><neu>a</neu>{}{}</text></body></AOxml>",
+        note("<neu>x</neu><d>y</d><neu/><AO:LIT>z</AO:LIT><wsepc=\"𒀹\"/>"),
+        "<corr c=\"&lt;anders/&gt;?\"/>"
+    );
+    let d = Document::read(xml.as_bytes()).unwrap_or_else(|e| panic!("{e}"));
+    let unknown = super::layout::unknown_names(&d);
+    assert_eq!(
+        unknown.into_iter().collect::<Vec<_>>(),
+        [
+            ("anders".to_string(), 1),
+            ("frei".to_string(), 1),
+            ("neu".to_string(), 2)
+        ]
+    );
+}

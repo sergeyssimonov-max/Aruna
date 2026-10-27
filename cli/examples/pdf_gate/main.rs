@@ -234,6 +234,9 @@ struct Tally {
     trimmed_spaces: usize,
     notdef: Vec<String>,
     markup: Vec<String>,
+    /// Documents whose notes, `cu` or shown values carry a tag name no rule
+    /// and no name of the vocabulary knows: a warning, not a failure.
+    unknown_names: Vec<String>,
     credit: Vec<String>,
     credits: usize,
     composition: Vec<String>,
@@ -293,6 +296,12 @@ fn check_package(package: &Path, fonts: &Path, c14n: bool, pdfkit: bool) -> bool
         t.pdfs += 1;
         let group = file.split('/').next().unwrap_or_default();
         let page = Page::of(&doc, group, siglum);
+        let unknown = aruna::pdf::layout::unknown_names(&doc);
+        if !unknown.is_empty() {
+            let names: Vec<String> = unknown.iter().map(|(k, n)| format!("{k} ×{n}")).collect();
+            t.unknown_names
+                .push(format!("{file}: {}", names.join(", ")));
+        }
         let c = match check(&pdf) {
             Ok(c) => c,
             Err(e) => {
@@ -657,6 +666,14 @@ fn report(t: &Tally, c14n: bool, pdfkit: bool) -> bool {
     );
     ok &= row("blank glyphs (code 0 in TJ)", &t.notdef);
     ok &= row("markup or an entity in the text or the metadata", &t.markup);
+    // A warning: listed, never failing the verdict.
+    let _ = row(
+        "warning, not a failure: tag names no rule and no name of the vocabulary knows",
+        &t.unknown_names,
+    );
+    for line in &t.unknown_names {
+        println!("| warning | {line} |");
+    }
     ok &= row("credit not where the decision puts it", &t.credit);
     println!("| files with the credit | {} |", t.credits);
     ok &= row("stream code points not the source's", &t.composition);
