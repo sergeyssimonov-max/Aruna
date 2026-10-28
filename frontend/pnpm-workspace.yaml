@@ -33,7 +33,22 @@ overrides:
 # Guard: tests/audit-exception.test.ts fails from 2026-10-31T00:00Z, as soon as
 # every serialize-javascript in pnpm-lock.yaml is at or past 7.1.3, and if
 # either package's code turns up in the built dist.
+#
+# GHSA-gcqx-w48m-w2h4 – deepmerge 4.2.0 to 4.3.1, prototype poisoning of the
+# objects mergeObject() returns; low, published after the gate's audit of
+# 2026-10-27, no fixed release. Excepted until 2026-11-30T00:00Z by the owner's
+# decision of 2026-10-28 (release-3.0.2): a build dependency only, it does not
+# ship – @sveltejs/vite-plugin-svelte > deepmerge 4.3.1, called by the plugin in
+# Node while Vite builds; neither dist nor the 3.0.2 image carries its code (its
+# name is in THIRD-PARTY-NOTICES.md, which lists every package, and that is a
+# notice, not code). Removed by its own commit as soon as either holds: a fixed
+# deepmerge is released and old enough to take, or the plugin leaves it.
+# Guard: tests/audit-exception.test.ts fails from 2026-11-30T00:00Z, as soon as
+# no deepmerge in pnpm-lock.yaml is in 4.2.0 to 4.3.1, if anything but
+# @sveltejs/vite-plugin-svelte depends on it, and if its code turns up in the
+# built dist.
 audit:
   ignore:
     - GHSA-vfj7-8cjw-p6xm
     - GHSA-m5mm-p8h7-m29v
+    - GHSA-gcqx-w48m-w2h4

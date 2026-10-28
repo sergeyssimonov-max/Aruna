@@ -7,10 +7,11 @@ import { build } from 'vite'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The audit exceptions are exactly two, and each covers what it was granted for.
+ * The audit exceptions are exactly three, and each covers what it was granted for.
  *
  * GHSA-vfj7-8cjw-p6xm is held to its path (below); GHSA-m5mm-p8h7-m29v to its
- * date, its version and the dist (at the end of the file).
+ * date, its version and the dist; GHSA-gcqx-w48m-w2h4 to its date, its
+ * versions, its path and the dist (both at the end of the file).
  *
  * `pnpm-workspace.yaml` excepts GHSA-vfj7-8cjw-p6xm (braces, owner's decision
  * of 2026-10-03): braces comes only with the window tests, through
@@ -27,6 +28,8 @@ const GHSA = 'GHSA-vfj7-8cjw-p6xm'
 
 const M5MM = 'GHSA-m5mm-p8h7-m29v'
 
+const GCQX = 'GHSA-gcqx-w48m-w2h4'
+
 /** Fixed by the undici raise of 2026-10-24 and so never to be excepted again. */
 const RAISED = ['GHSA-xjj6-f33q-929c', 'GHSA-4qv8-2p9j-2685', 'GHSA-f72v-6w45-q472']
 
@@ -39,9 +42,9 @@ function ignored(text: string): string[] {
 }
 
 describe('the audit exceptions', () => {
-  it('are exactly GHSA-vfj7 and GHSA-m5mm, through audit.ignore', () => {
+  it('are exactly GHSA-vfj7, GHSA-m5mm and GHSA-gcqx, through audit.ignore', () => {
     const text = workspace()
-    expect(new Set(ignored(text))).toEqual(new Set([GHSA, M5MM]))
+    expect(new Set(ignored(text))).toEqual(new Set([GHSA, M5MM, GCQX]))
     for (const id of RAISED) expect(ignored(text)).not.toContain(id)
     expect(text).not.toMatch(/auditConfig|ignoreGhsas|ignoreCves/)
   })
@@ -338,7 +341,99 @@ describe(`the audit exception ${M5MM}`, () => {
     ])
 
     const vfj7Only = 'audit:\n  ignore:\n    - GHSA-vfj7-8cjw-p6xm\n'
-    expect(new Set(ignored(vfj7Only))).not.toEqual(new Set([GHSA, M5MM]))
+    expect(new Set(ignored(vfj7Only))).not.toEqual(new Set([GHSA, M5MM, GCQX]))
     expect(ignored(`${vfj7Only}    - ${RAISED[0]}\n`)).toContain(RAISED[0])
+  })
+})
+
+/**
+ * GHSA-gcqx-w48m-w2h4 (deepmerge 4.2.0 to 4.3.1, owner's decision of
+ * 2026-10-28, release-3.0.2) is excepted for a month: no fixed deepmerge
+ * exists. It comes with the build only – @sveltejs/vite-plugin-svelte calls it
+ * in Node while Vite builds – and none of its code is in the dist. This keeps
+ * all three true: the exception goes on its date or as soon as it is not
+ * needed, nothing else depends on deepmerge, and its code does not ship.
+ */
+
+/** The exception is gone by then, whatever the lockfile says. */
+const GCQX_DUE = '2026-11-30T00:00:00Z'
+
+/** The versions the advisory names. */
+const GCQX_FROM: Version = [4, 2, 0]
+const GCQX_TO: Version = [4, 3, 1]
+
+/** The one package allowed to depend on deepmerge. */
+const GCQX_BY = /^@sveltejs\/vite-plugin-svelte@/
+
+/**
+ * A property deepmerge reads off its options – `options.isMergeableObject` – in
+ * `dist/cjs.js`, the file its `main` names. A minifier renames identifiers but
+ * keeps property names, so bundled deepmerge would carry it.
+ */
+const GCQX_MARKER = { pkg: 'deepmerge', file: 'dist/cjs.js', marker: 'isMergeableObject' }
+
+/** Why GHSA-gcqx has to go, or `null` while it is still needed, in date and on its path. */
+function gcqxOutOfReason(now: Date, lock: string): string | null {
+  if (now.getTime() >= Date.parse(GCQX_DUE)) {
+    return `срок исключения ${GCQX} истек: ${GCQX_DUE}, now ${now.toISOString()}`
+  }
+  const affected = resolved(lock, 'deepmerge').filter(
+    (v) => atOrPast(v, GCQX_FROM) && atOrPast(GCQX_TO, v),
+  )
+  if (affected.length === 0) {
+    return `the lockfile resolves no deepmerge in 4.2.0 to 4.3.1: снять исключение ${GCQX}`
+  }
+  const stray = dependents(snapshots(lock), /^deepmerge@/).filter((by) => !GCQX_BY.test(by))
+  if (stray.length > 0) {
+    return `deepmerge is reached by ${stray.join(', ')}: ${GCQX} covers only @sveltejs/vite-plugin-svelte`
+  }
+  if (section(lock, 'importers').some((line) => /^ {6}'?deepmerge'?:$/.test(line))) {
+    return `the project names deepmerge itself: ${GCQX} covers a build dependency only`
+  }
+  return null
+}
+
+describe(`the audit exception ${GCQX}`, () => {
+  it('is still needed, in date and on its path', () => {
+    expect(ignored(workspace())).toContain(GCQX)
+    expect(gcqxOutOfReason(new Date(), lockfile())).toBeNull()
+  })
+
+  it('covers code that does not ship', { timeout: 120_000 }, async () => {
+    const files = await builtDist()
+    expect(Object.keys(files)).toContain('index.html')
+    const found = Object.entries(files)
+      .filter(([, text]) => text.includes(GCQX_MARKER.marker))
+      .map(([name]) => name)
+    expect(found).toEqual([])
+  })
+
+  /** A marker that is not in its own package would find nothing anywhere. */
+  it('looks for a string deepmerge really carries', () => {
+    const copies = installed(lockfile(), GCQX_MARKER.pkg)
+    expect(copies.length).toBeGreaterThan(0)
+    for (const dir of copies) {
+      expect(readFileSync(join(dir, GCQX_MARKER.file), 'utf8')).toContain(GCQX_MARKER.marker)
+    }
+  })
+
+  it('would fail on the due date, once it is not needed, on another path, and when named directly', () => {
+    const before = new Date('2026-11-29T23:59:59Z')
+    const due = new Date(GCQX_DUE)
+    const lock = (version: string, by = "'@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.0.0)'") =>
+      `packages:\n\n  deepmerge@${version}:\n\nsnapshots:\n\n  ${by}:\n    dependencies:\n      deepmerge: ${version}\n`
+
+    expect(gcqxOutOfReason(before, lock('4.3.1'))).toBeNull()
+    expect(gcqxOutOfReason(before, lock('4.2.0'))).toBeNull()
+    expect(gcqxOutOfReason(due, lock('4.3.1'))).toMatch(/срок исключения GHSA-gcqx-w48m-w2h4 истек/)
+    expect(gcqxOutOfReason(new Date('2026-10-01T00:00:00Z'), lock('4.3.1'))).toBeNull()
+    expect(gcqxOutOfReason(before, lock('4.3.2'))).toMatch(/снять исключение GHSA-gcqx-w48m-w2h4/)
+    expect(gcqxOutOfReason(before, lock('4.1.9'))).toMatch(/снять исключение/)
+    expect(gcqxOutOfReason(before, 'packages:\n\n  undici@6.29.1:\n')).toMatch(/снять исключение/)
+    expect(gcqxOutOfReason(before, lock('4.3.1', 'cosmiconfig@9.0.0'))).toMatch(
+      /is reached by cosmiconfig@9\.0\.0/,
+    )
+    const imported = `importers:\n\n  .:\n    devDependencies:\n      deepmerge:\n        specifier: 4.3.1\n\n${lock('4.3.1')}`
+    expect(gcqxOutOfReason(before, imported)).toMatch(/names deepmerge itself/)
   })
 })
