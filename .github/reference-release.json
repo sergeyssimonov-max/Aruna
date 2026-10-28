@@ -12,9 +12,15 @@
     "is actually made of, and they live here.",
     "",
     "Five references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, v2.5.11 and v2.6.3 are",
-    "the previous references, and v3.0.1 is the current one, published on 2026-10-26, a",
-    "service build with the behaviour of v3.0.0. v2.6.3 and v2.5.11 stay beside it by the",
-    "owner's decision of 2026-10-24 (part3-6): the references are v3.0.1, v2.6.3 and v2.5.11.",
+    "the previous references, and v3.0.2 is the current one, published on 2026-10-28, the",
+    "first with the full text of editorial notes and the signs of the edition. v2.6.3 and",
+    "v2.5.11 stay beside it by the owner's decision of 2026-10-24 (part3-6): the references",
+    "are v3.0.2, v2.6.3 and v2.5.11.",
+    "",
+    "v3.0.1, a service build with the behaviour of v3.0.0, was published on 2026-10-26 and left",
+    "the list on 2026-10-28 by the owner's decision (release-3.0.2): v3.0.2 takes its place as",
+    "the reference of the third version. Its release and image were deleted; its tag stays,",
+    "and the ruleset still protects it. Its entry is in the history of this file.",
     "",
     "v3.0.0, the first release with a PDF for each document, was published on 2026-10-25 and",
     "left the list on 2026-10-26 by the owner's decision (release-3.0.1): v3.0.1 takes its place",
@@ -76,11 +82,11 @@
       "why": "The release before v3.0.0, the last without PDFs. The conversion to PDF is in the core and off everywhere by default: the window asks for none, the console builds them only with ARUNA_PDF=on. The inventory's search finds a CTH group by its catalogue title and folds diacritics in every field; a build on HFS+ no longer refuses names the disk keeps in another Unicode form; THIRD-PARTY-NOTICES.md ships in the application. The package it builds without PDFs hashes to 3a9d93fc…693a over 23 941 files, with PDFs (ARUNA_PDF=on) to a8100765…65b8 over 47 654. The application the runner built, 3b608042…2ac5, is byte-for-byte the one the owner's machine built from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 113–143."
     },
     {
-      "tag": "v3.0.1",
-      "commit": "d1c9f2186f97df764f7769f5794c26c95ed91d73",
-      "published": "2026-10-26T05:30:21Z",
-      "dmg_sha256": "60f6db453b4dd35f08efbbe3b20587e7ebac0840fa8877bbb3438f9396196561",
-      "why": "The current release, a service build of v3.0.0's behaviour from the code after it: the same window, inventory, PDFs and build time, built with Rust 1.97.1, Node 22.23.3 and typescript-eslint 8.71.2. Between the two only the crate description, the shell's comment typography, mechanical clippy::pedantic edits and the pages of earlier releases changed. The package it builds hashes to f5cf1c24…c109 over 47 654 files; against the package of v3.0.0, 4b8f5107…c89f, it differs in manifest.json (run.id and run.aruna) and the 23 713 PDFs, whose text and page counts are equal. The application the runner built, 062b62a3…b07feb, is byte-for-byte the one the owner's machine built twice from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 172–173."
+      "tag": "v3.0.2",
+      "commit": "c1c48b478e30635fe5c6839d498de19f0ecb049a",
+      "published": "2026-10-28T07:32:24Z",
+      "dmg_sha256": "8e091d885996b5f97c555fd5687d5536b3de35981aee80f1e4e7ade3fcd4f334",
+      "why": "The current release, the first whose PDFs show a document by the rules of the portal rather than its markup: editorial notes in full, the line of cuneiform read by the same parser as the text, the line number at the head of each line, the signs of the edition by HPMxml.css and, where it is silent, by the owner's decisions, the join signs in the header. The package it builds hashes to 37193d2a…acea over 47 654 files; against the package of v3.0.1, f5cf1c24…c109, its XML, inventory and other files are equal and it differs in manifest.json (run and pdfs.template) and the 23 713 PDFs, now 36 500 pages against 35 534. No PDF shows markup or an entity in its text or its document information; the text of 23 695 is equal to an expectation built from the source XML apart from the code, and the other 18 are read by the gate's own reader. The median PDF phase is 126.4 s against a limit of 145 s. The application the runner built, 0867ecde…c45b, is byte-for-byte the one the owner's machine built twice from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 174–177."
     }
   ]
 }
