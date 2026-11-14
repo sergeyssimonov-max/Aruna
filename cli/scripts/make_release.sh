@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Build macOS Universal Binary .app + UDIF DMG.
-# Must run on macOS 13+ (local or GitHub Actions macos-14).
+# Must run on macOS 13+: locally, or in the release workflow on the owner's Mac.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "error: macOS-only release. Use GitHub Actions (macos-14) or a Mac." >&2
+  echo "error: macOS-only release. Run it on a Mac, or start the release workflow:" >&2
   echo "  gh workflow run release-dmg.yml" >&2
   echo "  # or: git tag v1.0.0 && git push origin v1.0.0" >&2
   exit 1
