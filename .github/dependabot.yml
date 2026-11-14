@@ -39,10 +39,10 @@ updates:
       interval: monthly
     open-pull-requests-limit: 0
 
+  # One workspace, one Cargo.lock at the root since 2026-08-30: `/cli` and
+  # `/src-tauri` have no lock file of their own, and jobs pointed there failed.
   - package-ecosystem: cargo
-    directories:
-      - "/cli"
-      - "/src-tauri"
+    directory: "/"
     schedule:
       interval: monthly
     open-pull-requests-limit: 0
