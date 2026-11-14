@@ -760,7 +760,7 @@ Packages: 1434 – crates 746, npm 688. Distinct licence texts: 682. Requires re
 | zerotrie | 0.2.5 | crate | Unicode-3.0 | T8 |
 | zerovec | 0.11.8 | crate | Unicode-3.0 | T8 |
 | zerovec-derive | 0.11.6 | crate | Unicode-3.0 | T8 |
-| zip | 9.0.1 | crate | MIT | T368 |
+| zip | 9.0.5 | crate | MIT | T368 |
 | zlib-rs | 0.6.8 | crate | Zlib | T633 |
 | zmij | 1.0.23 | crate | MIT | T2 |
 | zune-core | 0.5.3 | crate | MIT OR Apache-2.0 OR Zlib | T9, T176, T175 |
