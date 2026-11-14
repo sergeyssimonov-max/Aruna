@@ -11,7 +11,7 @@
 
 ## Требования
 
-- macOS 13+ (локально) **или** GitHub Actions runner `macos-14`
+- macOS 13+: локально **или** в конвейере, где задание выпуска с 14.11.2026 идет на Mac владельца, подключенном как self-hosted runner (образ `macos-14` снят с хостинга GitHub)
 - Xcode 15.2 (выбрать через `DEVELOPER_DIR` или `xcode-select`) – с другим обертка сборки откажется
 - Node той версии, что в `.node-version`, и pnpm
 - Rust targets: `aarch64-apple-darwin`, `x86_64-apple-darwin`
