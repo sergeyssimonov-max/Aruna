@@ -1335,7 +1335,7 @@ Packages: 1434 – crates 746, npm 688. Distinct licence texts: 682. Requires re
 | saxes | 6.0.0 | npm | ISC | requires review |
 | semver | 7.8.5 | npm | ISC | T34 |
 | serialize-error | 12.0.0 | npm | MIT | T4 |
-| serialize-javascript | 7.0.5 | npm | BSD-3-Clause | T597 |
+| serialize-javascript | 7.1.4 | npm | BSD-3-Clause | T597 |
 | setimmediate | 1.0.5 | npm | MIT | T574 |
 | shebang-command | 2.0.0 | npm | MIT | T405 |
 | shebang-regex | 3.0.0 | npm | MIT | T13 |
