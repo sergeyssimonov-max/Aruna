@@ -260,9 +260,17 @@ jobs:
   # This comment used to say the opposite, and promised the job would join
   # `macos`'s `needs` when the first Tauri command existed. Two exist —
   # `corpus_location` and `corpus_stats` — so the promise came due.
+  #
+  # **The image is `macos-15` since 2026-11-14.** GitHub retired the hosted
+  # `macos-14` image for Apple Silicon (actions/runner-images#15227): the job was
+  # cancelled in its first second with "The configuration
+  # 'macos-14-arm64-us-default' is not supported". This job never selected an
+  # Xcode — it lints and tests the shell and ships nothing — so it stays on a
+  # hosted image, where a pull request's code does not run on the owner's
+  # machine. The binary that ships is built by `macos` below, with Xcode 15.2.
   desktop:
     name: Check + clippy (src-tauri)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -526,15 +534,25 @@ jobs:
     # client script — green release, wrong artifact.
     needs: [check, corpus, frontend, desktop]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    runs-on: macos-14
-    # Xcode 15.2, not the image's default. The release has to be the binary the
-    # owner's machine builds from the same commit, and that machine is macOS 13,
-    # where 15.2 is the newest Xcode there is. With the default (15.4 on
-    # 2026-09-22) the linker and the SDK differ and so does every byte after
-    # them. `scripts/build-release.sh` refuses any other Xcode, so an image that
-    # drops 15.2 fails this job instead of quietly shipping a different binary.
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_15.2.app/Contents/Developer
+    # The owner's Mac, registered as a self-hosted runner (owner's decision of
+    # 2026-11-14). The release has to be the binary the owner's machine builds
+    # from the same commit, and that machine is macOS 13, where Xcode 15.2 is
+    # the newest there is. The hosted `macos-14` image, the last one that
+    # carried 15.2, is retired; `macos-15` starts at Xcode 16.0.
+    #
+    # No `DEVELOPER_DIR` here: the path `/Applications/Xcode_15.2.app` belonged
+    # to the hosted image. The machine's own `xcode-select` decides, and
+    # `scripts/build-release.sh` refuses anything but Xcode 15.2 (15C500b) with
+    # SDK 14.2, so a wrong selection fails this job instead of quietly shipping
+    # a different binary.
+    #
+    # Only a tag or a manual run reaches this job, and both need write access to
+    # the repository. That condition is in this file, though, and the repository
+    # is public: a pull request from a fork can rewrite the file and point any
+    # job at this runner. What stops it is a repository setting, not anything
+    # here — Settings → Actions → General → "Require approval for all external
+    # contributors" — and reading a fork's diff of `.github/` before approving.
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       # The build number that needed full history is gone with the script that
       # computed it: Tauri takes both `CFBundleShortVersionString` and
@@ -588,16 +606,34 @@ jobs:
           esac
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
+      # `rustup toolchain install` by hand, not `dtolnay/rust-toolchain` as in
+      # the jobs above. The action goes on to run `rustup default <channel>`,
+      # which on a hosted image changes nothing that outlives the job and on
+      # this machine would change the owner's default toolchain for every other
+      # project on it. Here the toolchain is already installed and this is a
+      # no-op that proves it; `--profile minimal` removes nothing from one that
+      # exists.
+      #
+      # rustup is expected on the machine and is not installed from here. A
+      # runner started as a service does not read the shell profile, so
+      # `~/.cargo/bin` is added to the path for this step and the ones after it.
       - name: Install Rust (universal targets)
-        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable branch, pinned
-        with:
-          toolchain: ${{ steps.toolchain.outputs.channel }}
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+        env:
+          CHANNEL: ${{ steps.toolchain.outputs.channel }}
+        run: |
+          set -euo pipefail
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.cargo/bin:$PATH"
+          command -v rustup >/dev/null || { echo "::error::rustup is not installed on this runner"; exit 1; }
+          rustup toolchain install "$CHANNEL" --profile minimal \
+            --target aarch64-apple-darwin --target x86_64-apple-darwin --no-self-update
+          rustc +"$CHANNEL" --version --verbose
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-        with:
-          workspaces: . -> target
+      # No `Swatinem/rust-cache` in this job. The runner keeps `~/.cargo` between
+      # runs by itself, and the action's cleanup deletes from `~/.cargo/bin`
+      # every file that was there before it ran (its README says so and names
+      # self-hosted runners) — on a machine that is not thrown away after the
+      # job that is rustup's own proxies.
 
       # `pnpm build` in the root is `tauri build --target universal-apple-darwin`
       # — the same command a developer runs, so what CI publishes is what the
