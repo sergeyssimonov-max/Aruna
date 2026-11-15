@@ -81,14 +81,11 @@ impl Md5 {
             self.filled = 0;
         }
 
-        let mut chunks = data.chunks_exact(BLOCK);
-        for chunk in &mut chunks {
-            let mut block = [0u8; BLOCK];
-            block.copy_from_slice(chunk);
-            self.compress(&block);
+        let (chunks, rest) = data.as_chunks::<BLOCK>();
+        for chunk in chunks {
+            self.compress(chunk);
         }
 
-        let rest = chunks.remainder();
         self.block[..rest.len()].copy_from_slice(rest);
         self.filled = rest.len();
     }
@@ -138,8 +135,8 @@ impl Md5 {
     /// the step number below, which is why this is one loop rather than four.
     fn compress(&mut self, block: &[u8; BLOCK]) {
         let mut m = [0u32; 16];
-        for (word, bytes) in m.iter_mut().zip(block.chunks_exact(4)) {
-            *word = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        for (word, bytes) in m.iter_mut().zip(block.as_chunks::<4>().0) {
+            *word = u32::from_le_bytes(*bytes);
         }
 
         let [mut a, mut b, mut c, mut d] = self.state;
