@@ -572,6 +572,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Keep the whole job awake, including artifact upload and action post-steps.
+      # A build-only assertion ends too early: Idle Sleep interrupted the runner
+      # after a successful upload on 2026-11-15. Runner.Worker exists for this job;
+      # caffeinate releases its assertions when that process exits.
+      - name: Keep the Mac awake for this job
+        run: |
+          set -euo pipefail
+          task_runner_pid=$PPID
+          while [ "$task_runner_pid" -gt 1 ]; do
+            task_runner_command=$(ps -p "$task_runner_pid" -o comm=)
+            case "$task_runner_command" in
+              */Runner.Worker|Runner.Worker) break ;;
+            esac
+            task_runner_pid=$(ps -p "$task_runner_pid" -o ppid= | tr -d '[:space:]')
+          done
+          test "${task_runner_pid:-0}" -gt 1 || { echo "::error::Runner.Worker parent not found"; exit 1; }
+          caffeinate -dimsu -w "$task_runner_pid" >/dev/null 2>&1 </dev/null &
+          task_awake_pid=$!
+          kill -0 "$task_awake_pid"
+          echo "Keeping awake until Runner.Worker $task_runner_pid exits (caffeinate $task_awake_pid)."
+
       # The frontend is inside the bundle now, so this job needs the Node half
       # of the stack that the `frontend` job above has always had. Same pins,
       # same source of the pnpm version — `packageManager` in the root manifest.
