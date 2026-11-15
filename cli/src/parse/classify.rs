@@ -47,10 +47,7 @@ pub fn is_manuscript_xml(path: &str) -> bool {
         .and_then(|s| s.to_str())
         .unwrap_or("");
     let nb = name.as_bytes();
-    if nb.len() >= 8 && nb[nb.len() - 8..].eq_ignore_ascii_case(b".css.xml") {
-        return false;
-    }
-    true
+    !(nb.len() >= 8 && nb[nb.len() - 8..].eq_ignore_ascii_case(b".css.xml"))
 }
 
 /// Whether an entry's *content* is a TLHdig manuscript.
@@ -174,7 +171,7 @@ mod tests {
             "<html><!-- <AOxml> was here --><body>no</body></html>",
             "<html><body><![CDATA[<AOHeader>]]></body></html>",
             "<html><body data-note=\"<docID>\">no</body></html>",
-            "<html><body>&lt;AOxml&gt;</body></html>",
+            "<html><body><AOxml></body></html>",
         ] {
             assert!(
                 !looks_like_manuscript(mentioned),
