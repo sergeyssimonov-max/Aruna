@@ -1,5 +1,5 @@
 (function() {
-	//#region src/inventory/filter.ts
+	// src/inventory/filter.ts
 	/**
 	* The inventory's client script: the search box and the fold controls.
 	*
@@ -205,8 +205,7 @@
 		});
 		render();
 	}
-	//#endregion
-	//#region src/inventory/main.ts
+	// src/inventory/main.ts
 	/**
 	* The entry Vite bundles into the exported inventory.
 	*
@@ -215,5 +214,4 @@
 	* part that assumes it is running in the page.
 	*/
 	attachInventoryFilter(document);
-	//#endregion
 })();
