@@ -4,6 +4,12 @@
 // ресурсов и состояние. До этого его звала только ветка `e2e`.
 use tauri::Manager;
 
+// E2E installs WDIO's logger instead. Keep the normal app's dependency without
+// registering a second logger, and tell Cargo's unused-dependency lint that
+// its absence from this feature's runtime path is intentional.
+#[cfg(feature = "e2e")]
+use tauri_plugin_log as _;
+
 mod read;
 use read::{is_link, named_package, read_stats, read_xml_summary};
 use read::{CorpusStats, XmlSummary};

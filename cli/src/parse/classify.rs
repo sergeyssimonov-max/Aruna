@@ -171,7 +171,7 @@ mod tests {
             "<html><!-- <AOxml> was here --><body>no</body></html>",
             "<html><body><![CDATA[<AOHeader>]]></body></html>",
             "<html><body data-note=\"<docID>\">no</body></html>",
-            "<html><body><AOxml></body></html>",
+            "<html><body>&lt;AOxml&gt;</body></html>",
         ] {
             assert!(
                 !looks_like_manuscript(mentioned),
@@ -183,6 +183,15 @@ mod tests {
             looks_like_manuscript("<AO:AOxml xmlns:AO=\"x\"><AO:docID>1</AO:docID></AO:AOxml>"),
             "a namespace prefix is stripped here as it is everywhere else"
         );
+    }
+
+    /// The content gate recognizes markers; full XML validation is a later
+    /// step. Rejecting unbalanced input here would silently drop manuscripts
+    /// that the corpus deliberately preserves and reports as malformed.
+    #[test]
+    fn a_real_marker_is_not_an_escaped_mention_even_in_malformed_xml() {
+        assert!(looks_like_manuscript("<html><body><AOxml></body></html>"));
+        assert!(looks_like_manuscript("<AOxml><AOHeader><docID>X"));
     }
 
     /// The marker has to be found in the window the reader actually holds, not

@@ -482,6 +482,12 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      # A green frontend job must include the advisory policy. Bounded,
+      # documented development-only exceptions are guarded by the unit suite.
+      - name: Dependency audit (strict)
+        working-directory: frontend
+        run: pnpm run audit:strict
+
       - name: Check
         working-directory: frontend
         run: pnpm check
@@ -565,6 +571,27 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+
+      # Keep the whole job awake, including artifact upload and action post-steps.
+      # A build-only assertion ends too early: Idle Sleep interrupted the runner
+      # after a successful upload on 2026-11-15. Runner.Worker exists for this job;
+      # caffeinate releases its assertions when that process exits.
+      - name: Keep the Mac awake for this job
+        run: |
+          set -euo pipefail
+          task_runner_pid=$PPID
+          while [ "$task_runner_pid" -gt 1 ]; do
+            task_runner_command=$(ps -p "$task_runner_pid" -o comm=)
+            case "$task_runner_command" in
+              */Runner.Worker|Runner.Worker) break ;;
+            esac
+            task_runner_pid=$(ps -p "$task_runner_pid" -o ppid= | tr -d '[:space:]')
+          done
+          test "${task_runner_pid:-0}" -gt 1 || { echo "::error::Runner.Worker parent not found"; exit 1; }
+          caffeinate -dimsu -w "$task_runner_pid" >/dev/null 2>&1 </dev/null &
+          task_awake_pid=$!
+          kill -0 "$task_awake_pid"
+          echo "Keeping awake until Runner.Worker $task_runner_pid exits (caffeinate $task_awake_pid)."
 
       # The frontend is inside the bundle now, so this job needs the Node half
       # of the stack that the `frontend` job above has always had. Same pins,

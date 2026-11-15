@@ -335,6 +335,12 @@ describe('the window is granted what it calls and nothing more', () => {
 })
 
 describe('the end-to-end contour cannot reach a release build', () => {
+  // Match the registration statement and its own guard, not an import or an
+  // unrelated cfg elsewhere in the file. E2E intentionally imports the normal
+  // logger as `_` for Cargo without installing it.
+  const guardedLogRegistration =
+    /#\[cfg\(not\(feature = "e2e"\)\)\]\s*if cfg!\(debug_assertions\)\s*\{\s*app\.handle\(\)\.plugin\(\s*tauri_plugin_log::Builder\b/
+
   /**
    * Four independent gates, and the point of checking all four is that any one
    * of them alone would be a convention rather than a guarantee.
@@ -404,10 +410,22 @@ describe('the end-to-end contour cannot reach a release build', () => {
   })
 
   it('does not register the log plugin under the e2e feature', () => {
-    const logLine = TAURI_LIB.indexOf('tauri_plugin_log')
-    expect(logLine, 'the log plugin is gone entirely').toBeGreaterThan(-1)
-    const guard = TAURI_LIB.lastIndexOf('#[cfg(not(feature = "e2e"))]', logLine)
-    expect(guard, 'the log plugin is not behind the not(e2e) guard').toBeGreaterThan(-1)
+    const registrations = [...TAURI_LIB.matchAll(/tauri_plugin_log::Builder\b/g)]
+    expect(registrations, 'there must be exactly one normal logger registration').toHaveLength(1)
+    expect(TAURI_LIB, 'the logger registration needs its own not(e2e) guard').toMatch(
+      guardedLogRegistration,
+    )
+  })
+
+  it('rejects a missing or reversed logger guard even when other cfg guards remain', () => {
+    for (const replacement of ['', '#[cfg(feature = "e2e")]']) {
+      const changed = TAURI_LIB.replace(guardedLogRegistration, (registration) =>
+        registration.replace('#[cfg(not(feature = "e2e"))]', replacement),
+      )
+      expect(changed, 'the negative control must change the registration').not.toBe(TAURI_LIB)
+      expect(changed).toContain('#[cfg(not(feature = "e2e"))]')
+      expect(changed).not.toMatch(guardedLogRegistration)
+    }
   })
 })
 
@@ -425,8 +443,12 @@ describe('the E2E runner is the one the specification chose', () => {
   it('builds the application through the Tauri CLI, with the feature and the variable', () => {
     const script = FRONTEND_PKG.scripts['test:e2e']
     expect(script).toContain('VITE_E2E=1')
-    expect(script).toContain('cargo tauri build')
+    // pnpm scripts resolve the locally pinned CLI. A global cargo-tauri can
+    // silently lag behind the CLI used for the release.
+    expect(script).toContain('VITE_E2E=1 tauri build')
+    expect(script).not.toContain('cargo tauri')
     expect(script).toContain('--features e2e')
+    expect(script).toContain('-- --locked')
     expect(script).toContain('wdio run wdio.conf.ts')
   })
 })

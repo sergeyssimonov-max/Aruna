@@ -34,7 +34,27 @@ overrides:
 # no deepmerge in pnpm-lock.yaml is in 4.2.0 to 4.3.1, if anything but
 # @sveltejs/vite-plugin-svelte depends on it, and if its code turns up in the
 # built dist.
+#
+# GHSA-3g3m-2fjr-6pw4 (glob 10.5.0) and GHSA-g3hv-75wg-m249 (minimatch
+# 9.0.9/10.2.6): temporary development-tool exceptions for the conservative
+# 3.1.0 transition, reviewed 2026-11-15, expiring 2026-11-30T00:00Z.
+# These versions are NOT patched. @wdio/config uses synchronous glob without
+# an AbortSignal, on the fixed specs in wdio.conf.ts. archiver-utils also uses
+# synchronous glob; webdriverio's uploadFile uses append, and our tests do not
+# call it. Lint consumers use minimatch's default optimization level 1; glob
+# uses level 2, but only repository-controlled test patterns reach it. Neither
+# package ships in the window or the exported inventory, and corpus/user input
+# does not enter these Node tools. There is no compatible fixed dependency set:
+# WDIO 9 still requires glob 10; its Tauri service requires WDIO 9; the stable
+# typescript-eslint release still requires minimatch 10. Forcing minimatch 11
+# under glob 10 changes its RegExp-based matching contract.
+# Guards in tests/audit-exception.test.ts hold the expiry, exact affected
+# versions and parents, development-only roots, call sites and shipped bundles.
+# Remove or reassess on any drift, or when supported fixes become available.
+# Evidence and follow-up: ../docs/DEPENDENCY-REVIEW-3.1.0.md.
 audit:
   ignore:
     - GHSA-vfj7-8cjw-p6xm
     - GHSA-gcqx-w48m-w2h4
+    - GHSA-3g3m-2fjr-6pw4
+    - GHSA-g3hv-75wg-m249

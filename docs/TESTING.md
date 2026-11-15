@@ -2,6 +2,14 @@
 
 What exists, how to run it, and what each profile is for.
 
+For the current development and release commands, follow [AGENTS.md](../AGENTS.md).
+The dated counts and timings below describe earlier measurements; the
+[3.1.0 acceptance report](CODEX-TRANSITION-3.1.0.md) records the current suite,
+coverage, corpus, native E2E and release artifacts. Run snapshot checks with
+`INSTA_UPDATE=no`; dependency-resolving Cargo commands use `--locked`.
+From the repository root, native E2E is `pnpm --dir frontend test:e2e` and the
+universal release is `pnpm build --locked`. Both use the pinned local Tauri CLI.
+
 The suite is **760 tests** as of 2026-10-25, counted at `6ff7dfb` (the same as after the task «tls-trust» on 2026-10-24): 714 in the
 console crate – 25 integration binaries plus the library and the binary's own
 tests – and 46 in the desktop shell. The crates were joined into one workspace on 2026-08-30, so
@@ -41,8 +49,8 @@ Formatting, compilation, and everything that does not touch the corpus archive.
 ```sh
 cd cli
 cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 699
+cargo clippy --locked --all-targets -- -D warnings
+cargo nextest run --locked --profile ci -E 'not binary(corpus) and not binary(document_model)'   # 699
 ```
 
 ### Standard — about 25 s
@@ -53,10 +61,10 @@ doctests `nextest` does not run.
 ```sh
 cd cli
 cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo clippy --all-targets --features bench -- -D warnings
-cargo nextest run --profile ci
-cargo test --doc
+cargo clippy --locked --all-targets -- -D warnings
+cargo clippy --locked --all-targets --features bench -- -D warnings
+cargo nextest run --locked --profile ci
+cargo test --locked --doc
 ```
 
 ### Full corpus — about 15 s, needs the 71 MiB archive
@@ -66,11 +74,11 @@ to make its absence a failure, which is what CI does after downloading it.
 
 ```sh
 cd cli
-ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(corpus)'   # 5
-ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --profile ci -E 'binary(document_model)'   # 5, 30 s, needs xsltproc
-cargo nextest run --profile ci -E 'binary(document_model)' --run-ignored ignored-only   # the whole corpus against xsltproc, 67 s
-cargo run --release --example corpus_inventory -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
-cargo run --release --example verify_normalization -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
+ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --locked --profile ci -E 'binary(corpus)'   # 5
+ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --locked --profile ci -E 'binary(document_model)'   # 5, 30 s, needs xsltproc
+cargo nextest run --locked --profile ci -E 'binary(document_model)' --run-ignored ignored-only   # the whole corpus against xsltproc, 67 s
+cargo run --locked --release --example corpus_inventory -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
+cargo run --locked --release --example verify_normalization -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 shasum -a 256 fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 ```
 
@@ -86,12 +94,12 @@ swapped for a different one between the two passes the build makes over it.
 
 ```sh
 cd cli
-cargo nextest run --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 28
-cargo nextest run --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 13
-cargo run --release --example fuzz_naming
-cargo run --release --example fuzz_pipeline   # 200 000 documents
-cargo run --release --example fuzz_layers     # 300 000 inputs
-cargo run --release --example fuzz_xml        # 200 000 inputs
+cargo nextest run --locked --profile ci -E 'binary(xml_hostile) + binary(export_hostile)'   # 28
+cargo nextest run --locked --profile ci -E 'binary(export_recovery) + binary(cache_concurrency)'  # 13
+cargo run --locked --release --example fuzz_naming
+cargo run --locked --release --example fuzz_pipeline   # 200 000 documents
+cargo run --locked --release --example fuzz_layers     # 300 000 inputs
+cargo run --locked --release --example fuzz_xml        # 200 000 inputs
 ```
 
 ### Soak — minutes, run by hand
@@ -152,7 +160,7 @@ whole corpus. Two builds of the same archive, walked and compared byte for byte.
 
 ```sh
 cd cli
-cargo run --release --example determinism -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
+cargo run --locked --release --example determinism -- fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 ```
 
 Observed on 2026-09-18: 23 940 files each time, 0 present in one build and not
@@ -368,14 +376,14 @@ a threshold on a busy laptop is a false alarm, not a defect.
 
 ```sh
 cd cli
-cargo run --release --example bench_parse   -- fixtures/…zip   # read, parse, sort, render
-cargo run --release --example bench_export  -- fixtures/…zip   # place, inventory, normalise, build
-cargo run --release --example bench_digest  -- fixtures/…zip   # MD5 from memory and from disk
-cargo run --release --example bench_order   -- fixtures/…zip   # the sort alone
-cargo run --release --example bench_fonts   -- fixtures/…zip   # the Unicode block scan
-cargo run --release --features bench --example bench_fields -- fixtures/…zip
-cargo run --release --example determinism   -- fixtures/…zip   # two builds, compared
-cargo run --release --example font_coverage -- fixtures/…zip   # every cmap on the machine
+cargo run --locked --release --example bench_parse   -- fixtures/…zip   # read, parse, sort, render
+cargo run --locked --release --example bench_export  -- fixtures/…zip   # place, inventory, normalise, build
+cargo run --locked --release --example bench_digest  -- fixtures/…zip   # MD5 from memory and from disk
+cargo run --locked --release --example bench_order   -- fixtures/…zip   # the sort alone
+cargo run --locked --release --example bench_fonts   -- fixtures/…zip   # the Unicode block scan
+cargo run --locked --release --features bench --example bench_fields -- fixtures/…zip
+cargo run --locked --release --example determinism   -- fixtures/…zip   # two builds, compared
+cargo run --locked --release --example font_coverage -- fixtures/…zip   # every cmap on the machine
 ```
 
 `font_coverage` is the one of these that can fail meaningfully rather than

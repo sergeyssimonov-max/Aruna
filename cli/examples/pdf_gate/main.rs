@@ -23,8 +23,10 @@
 //! logical order equal to the source and the stream's code points the same,
 //! and no markup and no entity as letters in the text or the metadata.
 
+mod canonical_output;
 #[path = "../../tests/support/pdf_check.rs"]
 mod pdf_check;
+mod pdfkit_output;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -395,9 +397,16 @@ fn check_tree(
         let stem = trees.join(t.pdfs.to_string());
         std::fs::write(stem.with_extension("want.xml"), &want).expect("scratch");
         std::fs::write(stem.with_extension("got.xml"), &got.xml).expect("scratch");
-        if canonical(&stem.with_extension("want.xml")) != canonical(&stem.with_extension("got.xml"))
-        {
-            t.c14n.push(file.to_string());
+        let comparison = canonical(&stem.with_extension("want.xml")).and_then(|want| {
+            let got = canonical(&stem.with_extension("got.xml"))?;
+            if want == got {
+                Ok(())
+            } else {
+                Err("canonical XML differs".into())
+            }
+        });
+        if let Err(error) = comparison {
+            t.c14n.push(format!("{file}: {error}"));
         }
     }
 }
@@ -468,6 +477,13 @@ fn report_pdfkit(t: &Tally) -> bool {
         t.pdfkit_label_docs
     );
     let mut ok = row("labels at PDFKit", &t.pdfkit);
+    if t.pdfkit_label_docs != t.label_docs {
+        println!(
+            "| PDFKit coverage | {} opened, {} expected: NOT MET |",
+            t.pdfkit_label_docs, t.label_docs
+        );
+        ok = false;
+    }
     for line in &t.pdfkit_teeth {
         println!("| PDFKit teeth | {line} |");
         ok &= line.ends_with("caught");
@@ -486,14 +502,16 @@ fn report_pdfkit(t: &Tally) -> bool {
     ok
 }
 
-fn canonical(path: &Path) -> Vec<u8> {
-    Command::new("xmllint")
+fn canonical(path: &Path) -> Result<Vec<u8>, String> {
+    let output = Command::new("xmllint")
         .arg("--nonet")
         .arg("--c14n")
         .arg(path)
         .output()
-        .map(|o| o.stdout)
-        .unwrap_or_default()
+        .map_err(|e| format!("xmllint could not run for {}: {e}", path.display()))?;
+    canonical_output::checked_bytes(&output)
+        .map(<[u8]>::to_vec)
+        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Whether one line of the PDFKit reader gives every label's code point as
@@ -514,6 +532,15 @@ fn pdfkit_agrees(line: &str, want: &BTreeMap<u32, usize>) -> bool {
         .collect();
     let letters: usize = fields.get(4).and_then(|n| n.parse().ok()).unwrap_or(1);
     letters == 0 && want.iter().all(|(cp, n)| found.get(cp) == Some(n))
+}
+
+fn read_pdfkit(bin: &Path, paths: &[&Path]) -> Result<Vec<String>, String> {
+    let output = Command::new(bin)
+        .args(paths)
+        .output()
+        .map_err(|e| format!("PDFKit reader could not run: {e}"))?;
+    pdfkit_output::checked_rows(&output, paths)
+        .map(|rows| rows.into_iter().map(String::from).collect())
 }
 
 fn run_pdfkit(label_pdfs: &[(PathBuf, BTreeMap<u32, usize>)], t: &mut Tally) {
@@ -543,11 +570,13 @@ fn run_pdfkit(label_pdfs: &[(PathBuf, BTreeMap<u32, usize>)], t: &mut Tally) {
             let probe = bin.with_extension(format!("{}.pdf", what.replace(' ', "-")));
             let caught = spoiled.is_ok_and(|bytes| {
                 std::fs::write(&probe, bytes).expect("scratch");
-                let out = Command::new(&bin)
-                    .arg(&probe)
-                    .output()
-                    .expect("the reader runs");
-                !pdfkit_agrees(&String::from_utf8_lossy(&out.stdout), want)
+                match read_pdfkit(&bin, &[&probe]) {
+                    Ok(rows) => !pdfkit_agrees(&rows[0], want),
+                    Err(e) => {
+                        t.pdfkit.push(format!("{what}: {e}"));
+                        false
+                    }
+                }
             });
             let _ = std::fs::remove_file(&probe);
             t.pdfkit_teeth.push(format!(
@@ -560,21 +589,23 @@ fn run_pdfkit(label_pdfs: &[(PathBuf, BTreeMap<u32, usize>)], t: &mut Tally) {
         let probe = bin.with_extension("lost-ToUnicode.pdf");
         if let Ok(bytes) = drop_label_to_unicode(&pdf) {
             std::fs::write(&probe, bytes).expect("scratch");
-            let out = Command::new(&bin)
-                .arg(&probe)
-                .output()
-                .expect("the reader runs");
-            t.pdfkit_names = Some(pdfkit_agrees(&String::from_utf8_lossy(&out.stdout), want));
+            match read_pdfkit(&bin, &[&probe]) {
+                Ok(rows) => t.pdfkit_names = Some(pdfkit_agrees(&rows[0], want)),
+                Err(e) => t.pdfkit.push(format!("ToUnicode-only probe: {e}")),
+            }
             let _ = std::fs::remove_file(&probe);
         }
     }
     for chunk in label_pdfs.chunks(200) {
-        let out = Command::new(&bin)
-            .args(chunk.iter().map(|(p, _)| p))
-            .output()
-            .expect("the reader runs");
-        let text = String::from_utf8_lossy(&out.stdout).into_owned();
-        for ((path, want), line) in chunk.iter().zip(text.lines()) {
+        let paths: Vec<&Path> = chunk.iter().map(|(p, _)| p.as_path()).collect();
+        let rows = match read_pdfkit(&bin, &paths) {
+            Ok(rows) => rows,
+            Err(e) => {
+                t.pdfkit.push(e);
+                continue;
+            }
+        };
+        for ((path, want), line) in chunk.iter().zip(&rows) {
             if line.starts_with("OPENED") {
                 t.pdfkit_label_docs += 1;
             }

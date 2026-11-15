@@ -13,6 +13,8 @@
 // "requires review" and listed. The set of crates is Cargo.lock, which cargo
 // resolves with every feature of the workspace; the script checks it against
 // `cargo metadata --all-features` before it writes.
+// Both pnpm stores must contain installed locked packages. Otherwise an
+// uninstalled checkout could replace all npm licence texts with review rows.
 //
 // The coverage of the file – every locked package named, nothing else – is
 // held by frontend/tests/third-party-notices.test.ts, which reads only the
@@ -142,13 +144,23 @@ function metadataCrates() {
     .map((p) => `${p.name} ${p.version}`)
 }
 
+const npmLocks = [
+  [join(ROOT, 'frontend', 'pnpm-lock.yaml'), 'npm', 'pnpm --dir frontend install --frozen-lockfile'],
+  [join(ROOT, 'pnpm-lock.yaml'), 'npm (root)', 'pnpm install --frozen-lockfile'],
+]
+// Check before reading the registry or writing anything. Missing platform
+// packages are expected; an entire missing installation is not.
+for (const [lock, , install] of npmLocks) {
+  if (!npmPackages(lock).some(([name, version]) => npmDir(dirname(lock), name, version))) {
+    console.error(`third-party-notices: no installed locked npm packages in ${join(dirname(lock), 'node_modules', '.pnpm')}; run \`${install}\` before generating notices`)
+    process.exit(1)
+  }
+}
+
 const rows = []
 const texts = new Map()
 for (const [name, version] of crates()) rows.push({ eco: 'crate', name, version, ...crateFiles(name, version) })
-for (const [lock, label] of [
-  [join(ROOT, 'frontend', 'pnpm-lock.yaml'), 'npm'],
-  [join(ROOT, 'pnpm-lock.yaml'), 'npm (root)'],
-]) {
+for (const [lock, label] of npmLocks) {
   for (const [name, version] of npmPackages(lock)) rows.push({ eco: label, name, version, ...npmFiles(dirname(lock), name, version) })
 }
 

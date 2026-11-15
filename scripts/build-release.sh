@@ -38,6 +38,54 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd -P)
 cd "$root"
 
+# This is the production entry point. An inherited E2E environment or an
+# arbitrary Cargo/config override could otherwise put the WebDriver bridge in
+# the app we distribute. Development builds use `pnpm tauri build` directly.
+if [ -n "${VITE_E2E:-}" ] || [ -n "${TAURI_CONFIG:-}" ]; then
+  echo "build-release: VITE_E2E and TAURI_CONFIG must be unset for a release." >&2
+  exit 1
+fi
+# An empty process value takes precedence over Vite's ignored .env files and
+# keeps import.meta.env.VITE_E2E false even after a local E2E session.
+export VITE_E2E=
+
+tauri_args=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --ci|--no-bundle|--skip-stapling|--verbose|-v|-vv|-vvv|--help|-h|--version|-V)
+      tauri_args+=("$1")
+      shift
+      ;;
+    --bundles|-b)
+      tauri_args+=("$1")
+      shift
+      bundles=0
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          app|dmg|app,dmg|dmg,app) tauri_args+=("$1"); shift; bundles=$((bundles + 1)) ;;
+          *) break ;;
+        esac
+      done
+      if [ "$bundles" -eq 0 ]; then
+        echo "build-release: --bundles requires app, dmg, or both." >&2
+        exit 1
+      fi
+      ;;
+    --bundles=app|--bundles=dmg|--bundles=app,dmg|--bundles=dmg,app)
+      tauri_args+=("$1")
+      shift
+      ;;
+    --locked)
+      # Always supplied to Cargo below, after Tauri's `--` separator.
+      shift
+      ;;
+    *)
+      echo "build-release: unsupported release option '$1'; use pnpm tauri build for development options." >&2
+      exit 1
+      ;;
+  esac
+done
+
 # --- Apple's toolchain ------------------------------------------------------
 want_xcode="Xcode 15.2"
 want_build="Build version 15C500b"
@@ -84,4 +132,7 @@ CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$root=/aruna${sep}--remap-path-pref
 export CARGO_ENCODED_RUSTFLAGS
 
 echo "build-release: $want_xcode, SDK $sdk, Node $node, rustc $commit"
-exec tauri build --target universal-apple-darwin "$@"
+# --locked belongs to Cargo, not to Tauri's options. Keep it after the
+# separator so --bundles/--ci remain Tauri options and Cargo cannot rewrite the
+# release's dependency graph.
+exec tauri build --target universal-apple-darwin ${tauri_args[@]+"${tauri_args[@]}"} -- --locked

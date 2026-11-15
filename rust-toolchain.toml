@@ -1,81 +1,8 @@
-# The one place the Rust version is stated.
-#
-# Until now nothing pinned it: locally it was whatever rustup called `default`,
-# and in CI whatever `dtolnay/rust-toolchain@stable` resolved to on the day.
-# That is fine until a new stable lands a new lint, and then `clippy -D
-# warnings` fails on a push that changed nothing — on someone else's push, at
-# that. A pinned toolchain moves that failure to the commit that raises the pin,
-# where it can be read and dealt with.
-#
-# 1.100.0 is the version this project is developed on and the one every
-# measurement in PERFORMANCE.md was taken with. CI reads this file rather than
-# naming a version of its own, so the two cannot drift.
-#
-# **This is the only place a Rust version is named.** Both manifests used to
-# carry a `rust-version` as well, and neither was doing anything: that field
-# steers dependency resolution only under the MSRV-aware resolver, which is the
-# default for edition 2024 and these crates are edition 2021 — so all it did was
-# make a promise, to nobody, that nothing checked. `cli` claimed 1.86, which
-# happened to be true; `src-tauri` claimed 1.77.2, whose Cargo cannot so much as
-# parse the locked tree, and it went unnoticed for months.
-#
-# Neither is published to crates.io, so no downstream reads such a promise, and
-# rustup installs the version below before anything is built — nobody compiles
-# this with a different compiler. A dependency that needs something newer still
-# says so itself, by its own `rust-version`, which is where that error came from
-# when it was measured.
-#
-# Add one back the day this crate is published, and measure it then.
-#
-# `targets` is here for the same reason the channel is. A toolchain rustup
-# installs comes with the host target and nothing else, and targets are per
-# toolchain — so pinning the channel above quietly dropped
-# `x86_64-apple-darwin`, which had been added to whatever toolchain used to be
-# default. Nothing failed: CI names both targets itself when it installs the
-# compiler, so the release DMG kept coming out universal, and only `pnpm build`
-# on a developer's machine broke — with an error about a target the
-# specification lists as installed. Declaring them here means rustup installs
-# both before the first build, on any machine, and the next time the channel is
-# raised it does not have to be remembered.
-#
-# `rust-analyzer` is here for the same reason, added 2026-09-08. Until then the
-# project had no working language server at all: `~/.cargo/bin/rust-analyzer` is
-# a rustup shim, and inside this directory the shim reads this file and answers
-# `Unknown binary 'rust-analyzer' in official toolchain '1.100.0-…'`. A binary
-# did exist under the `stable` toolchain, and that it worked at all was a
-# coincidence — `stable` happens to be 1.100.0 today and stops being it when
-# the next release lands. The Claude Code plugin brings no binary of its own; its README
-# points at `rustup component add`.
-#
-# **This costs the contour nothing, and that took an experiment rather than an
-# argument.** rustup installs whatever this file names on the first `cargo` in
-# the directory, so a component listed here would be fetched by every CI job —
-# measured cold, 6.48 s and 40 MB unpacked. The workflow therefore sets
-# `RUSTUP_AUTO_INSTALL=0`, which stops rustup installing what it was not asked
-# for while still letting this file select the toolchain; an explicit
-# `rustup toolchain install`, which is what `dtolnay/rust-toolchain` runs, is
-# unaffected. Both halves were checked by running them, not by reading docs.
-#
-# The contour never read this file's components in any case: it greps out
-# `channel` with `sed` and names `clippy, rustfmt` itself. `targets` is the
-# standing precedent — declared here, provided separately by CI — and this is
-# the same shape. What CI needs, CI asks for; what a developer's machine needs
-# is stated here.
-#
-# `rust-src` joins them on 2026-09-09 by the owner's word, and it is the same
-# error one step further on. The specification called it installed, twice, and
-# it was not: `stable` has it, `stable` happens to be 1.100.0 today, and the
-# `default` profile that put it there applies to toolchains rustup installs on
-# its own — this one is named by this file with an explicit component list and
-# gets exactly what is written in it. Without the sources beside the compiler
-# they belong to, the language server added above cannot open a definition in
-# the standard library, which is most of what one is wanted for.
-#
-# Measured rather than estimated, on the machine that pays for it: declaring it
-# here made rustup fetch it on the next `cargo` in this directory — 5.4 s for
-# that invocation — and the toolchain went from 1237 MB to 1314 MB, the 77 MB
-# being `lib/rustlib/src`. Once, per toolchain. CI pays nothing, for the reason
-# in the paragraph above.
+# One exact compiler for local development, CI and release builds.
+# Keep both universal macOS targets installed when the pin changes.
+# rust-analyzer and rust-src support local editing; CI installs only the
+# components it uses and sets RUSTUP_AUTO_INSTALL=0 to avoid extra downloads.
+# Historical measurements in PERFORMANCE.md retain their original toolchains.
 [toolchain]
 channel = "1.100.0"
 components = ["rustfmt", "clippy", "rust-analyzer", "rust-src"]
