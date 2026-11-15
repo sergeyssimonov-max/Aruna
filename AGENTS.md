@@ -113,8 +113,9 @@ cargo deny check licenses bans sources
 `pnpm --dir frontend run audit:strict`), `cargo machete`, покрытие обоих
 контуров, тяжелые тесты настоящего корпуса, WebdriverIO внутри приложения,
 PDF-заслон, воспроизводимость universal-сборки и путь читателя из DMG.
-E2E-сборка использует `VITE_E2E=1` и
-`cargo tauri build --debug --no-bundle --features e2e -- --locked`; релизная –
+E2E-сборка запускается через `pnpm --dir frontend test:e2e`: локальный
+закрепленный CLI выполняет `VITE_E2E=1 tauri build --debug --no-bundle --features e2e -- --locked`.
+Глобальный `cargo-tauri` для нее не используется; релизная сборка –
 `pnpm build --locked`, без этих E2E-переключателей.
 
 Опорные теги и опубликованные артефакты не двигайте и не заменяйте новым
