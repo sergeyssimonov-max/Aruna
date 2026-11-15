@@ -443,8 +443,12 @@ describe('the E2E runner is the one the specification chose', () => {
   it('builds the application through the Tauri CLI, with the feature and the variable', () => {
     const script = FRONTEND_PKG.scripts['test:e2e']
     expect(script).toContain('VITE_E2E=1')
-    expect(script).toContain('cargo tauri build')
+    // pnpm scripts resolve the locally pinned CLI. A global cargo-tauri can
+    // silently lag behind the CLI used for the release.
+    expect(script).toContain('VITE_E2E=1 tauri build')
+    expect(script).not.toContain('cargo tauri')
     expect(script).toContain('--features e2e')
+    expect(script).toContain('-- --locked')
     expect(script).toContain('wdio run wdio.conf.ts')
   })
 })
