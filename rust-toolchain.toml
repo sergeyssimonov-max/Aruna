@@ -7,9 +7,9 @@
 # that. A pinned toolchain moves that failure to the commit that raises the pin,
 # where it can be read and dealt with.
 #
-# 1.97.1 is the version this project is developed on (confirmed 2026-08-23) and
-# the one every measurement in PERFORMANCE.md was taken with. CI reads this file
-# rather than naming a version of its own, so the two cannot drift.
+# 1.100.0 is the version this project is developed on and the one every
+# measurement in PERFORMANCE.md was taken with. CI reads this file rather than
+# naming a version of its own, so the two cannot drift.
 #
 # **This is the only place a Rust version is named.** Both manifests used to
 # carry a `rust-version` as well, and neither was doing anything: that field
@@ -41,10 +41,10 @@
 # `rust-analyzer` is here for the same reason, added 2026-09-08. Until then the
 # project had no working language server at all: `~/.cargo/bin/rust-analyzer` is
 # a rustup shim, and inside this directory the shim reads this file and answers
-# `Unknown binary 'rust-analyzer' in official toolchain '1.97.1-…'`. A binary
+# `Unknown binary 'rust-analyzer' in official toolchain '1.100.0-…'`. A binary
 # did exist under the `stable` toolchain, and that it worked at all was a
-# coincidence — `stable` happens to be 1.97.1 today and stops being it when
-# 1.98 lands. The Claude Code plugin brings no binary of its own; its README
+# coincidence — `stable` happens to be 1.100.0 today and stops being it when
+# the next release lands. The Claude Code plugin brings no binary of its own; its README
 # points at `rustup component add`.
 #
 # **This costs the contour nothing, and that took an experiment rather than an
@@ -64,7 +64,7 @@
 #
 # `rust-src` joins them on 2026-09-09 by the owner's word, and it is the same
 # error one step further on. The specification called it installed, twice, and
-# it was not: `stable` has it, `stable` happens to be 1.97.1 today, and the
+# it was not: `stable` has it, `stable` happens to be 1.100.0 today, and the
 # `default` profile that put it there applies to toolchains rustup installs on
 # its own — this one is named by this file with an explicit component list and
 # gets exactly what is written in it. Without the sources beside the compiler
@@ -77,6 +77,6 @@
 # being `lib/rustlib/src`. Once, per toolchain. CI pays nothing, for the reason
 # in the paragraph above.
 [toolchain]
-channel = "1.97.1"
+channel = "1.100.0"
 components = ["rustfmt", "clippy", "rust-analyzer", "rust-src"]
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
