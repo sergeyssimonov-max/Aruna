@@ -482,6 +482,12 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      # A green frontend job must include the advisory policy. Bounded,
+      # documented development-only exceptions are guarded by the unit suite.
+      - name: Dependency audit (strict)
+        working-directory: frontend
+        run: pnpm run audit:strict
+
       - name: Check
         working-directory: frontend
         run: pnpm check

@@ -1,13 +1,14 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { build } from 'vite'
+import { build, type Plugin } from 'vite'
 import { describe, expect, it } from 'vitest'
+import { ARTIFACTS, SCRIPT, inventoryBuild } from '../build/inventory.ts'
 
 /**
- * The audit exceptions are exactly two, and each covers what it was granted for.
+ * Each audit exception covers only its documented development path.
  *
  * GHSA-vfj7-8cjw-p6xm is held to its path (below); GHSA-gcqx-w48m-w2h4 to its
  * date, its versions, its path and the dist (at the end of the file).
@@ -29,6 +30,9 @@ const GHSA = 'GHSA-vfj7-8cjw-p6xm'
 const M5MM = 'GHSA-m5mm-p8h7-m29v'
 
 const GCQX = 'GHSA-gcqx-w48m-w2h4'
+const GLOB = 'GHSA-3g3m-2fjr-6pw4'
+const MINIMATCH = 'GHSA-g3hv-75wg-m249'
+const EXCEPTIONS = [GHSA, GCQX, GLOB, MINIMATCH]
 
 /** Fixed by the undici raise of 2026-10-24 and so never to be excepted again. */
 const RAISED = ['GHSA-xjj6-f33q-929c', 'GHSA-4qv8-2p9j-2685', 'GHSA-f72v-6w45-q472']
@@ -42,9 +46,9 @@ function ignored(text: string): string[] {
 }
 
 describe('the audit exceptions', () => {
-  it('are exactly GHSA-vfj7 and GHSA-gcqx, through audit.ignore', () => {
+  it('are exactly the four reviewed identifiers, through audit.ignore', () => {
     const text = workspace()
-    expect(new Set(ignored(text))).toEqual(new Set([GHSA, GCQX]))
+    expect(new Set(ignored(text))).toEqual(new Set(EXCEPTIONS))
     for (const id of [...RAISED, M5MM]) expect(ignored(text)).not.toContain(id)
     expect(text).not.toMatch(/auditConfig|ignoreGhsas|ignoreCves/)
   })
@@ -275,7 +279,7 @@ describe('the raised packages', () => {
     expect(undiciBelowFloor(lock('7.1.4', '6.28.1', '7.30.1'))).toMatch(/6\.28\.1/)
 
     const withM5mm = 'audit:\n  ignore:\n    - GHSA-vfj7-8cjw-p6xm\n    - GHSA-m5mm-p8h7-m29v\n'
-    expect(new Set(ignored(withM5mm))).not.toEqual(new Set([GHSA, GCQX]))
+    expect(new Set(ignored(withM5mm))).not.toEqual(new Set(EXCEPTIONS))
     expect(ignored(withM5mm)).toContain(M5MM)
   })
 })
@@ -369,5 +373,271 @@ describe(`the audit exception ${GCQX}`, () => {
     )
     const imported = `importers:\n\n  .:\n    devDependencies:\n      deepmerge:\n        specifier: 4.3.1\n\n${lock('4.3.1')}`
     expect(gcqxOutOfReason(before, imported)).toMatch(/names deepmerge itself/)
+  })
+})
+
+/**
+ * Temporary development-only acceptance, not a patched dependency claim.
+ * The code paths and upstream blockers are recorded in DEPENDENCY-REVIEW-3.1.0.md.
+ * Any change to the affected versions, their callers or their runtime reach
+ * requires another review even before the fixed expiry.
+ */
+const TOOLING_DUE = '2026-11-30T00:00:00Z'
+const TOOLING_EDGES: [string, string[]][] = [
+  ['glob@10.5.0', ['@wdio/config@9.31.9', 'archiver-utils@5.0.2']],
+  ['minimatch@9.0.9', ['glob@10.5.0']],
+  [
+    'minimatch@10.2.6',
+    [
+      '@eslint/config-array@0.23.5',
+      '@typescript-eslint/typescript-estree@8.72.1',
+      'eslint@10.14.0',
+    ],
+  ],
+]
+type Manifest = {
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+  optionalDependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+}
+const manifest = () => JSON.parse(readFileSync(join(FRONTEND, 'package.json'), 'utf8')) as Manifest
+
+function affectedTooling(pkg: string): boolean {
+  return TOOLING_EDGES.some(([target]) => pkg === target)
+}
+
+/** Whether a declared root can reach either reviewed vulnerable package. */
+function reachesTooling(graph: Map<string, string[]>, root: string): boolean {
+  const pending = [...graph.keys()].filter((key) => key.startsWith(root + '@'))
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const pkg = pending.pop()!
+    if (affectedTooling(pkg)) return true
+    if (visited.has(pkg)) continue
+    visited.add(pkg)
+    pending.push(...(graph.get(pkg) ?? []))
+  }
+  return false
+}
+
+function toolingOutOfReason(now: Date, lock: string, pkg: Manifest): string | null {
+  if (now.getTime() >= Date.parse(TOOLING_DUE)) return 'tooling exceptions expired: ' + TOOLING_DUE
+  const glob = resolved(lock, 'glob')
+    .filter((v) => atOrPast(v, [9, 0, 0]) && !atOrPast(v, [14, 0, 2]))
+    .map((v) => v.join('.'))
+    .sort()
+  const minimatch = resolved(lock, 'minimatch')
+    .filter((v) => atOrPast(v, [7, 0, 0]) && !atOrPast(v, [11, 0, 1]))
+    .map((v) => v.join('.'))
+    .sort()
+  if (JSON.stringify(glob) !== JSON.stringify(['10.5.0'])) return 'glob version changed or removed'
+  if (JSON.stringify(minimatch) !== JSON.stringify(['10.2.6', '9.0.9'])) {
+    return 'minimatch version changed or removed'
+  }
+  const graph = snapshots(lock)
+  for (const [target, expected] of TOOLING_EDGES) {
+    const parents = [...graph]
+      .filter(([, deps]) => deps.includes(target))
+      .map(([name]) => name)
+      .sort()
+    if (JSON.stringify(parents) !== JSON.stringify([...expected].sort())) {
+      return target + ' parent paths changed: ' + parents.join(', ')
+    }
+  }
+  for (const group of [
+    pkg.dependencies,
+    pkg.devDependencies,
+    pkg.optionalDependencies,
+    pkg.peerDependencies,
+  ]) {
+    if (group && ['glob', 'minimatch'].some((name) => name in group)) {
+      return 'glob/minimatch became a direct dependency'
+    }
+  }
+  for (const group of [pkg.dependencies, pkg.optionalDependencies, pkg.peerDependencies]) {
+    for (const root of Object.keys(group ?? {})) {
+      if (reachesTooling(graph, root)) return 'production dependency reaches tooling: ' + root
+    }
+  }
+  const developmentRoots = Object.keys(pkg.devDependencies ?? {}).filter((root) =>
+    reachesTooling(graph, root),
+  )
+  if (developmentRoots.length === 0) return 'no development root reaches the reviewed packages'
+  return null
+}
+
+/** Includes peer-qualified pnpm directories, which the unscoped marker helper does not need. */
+function packageCopies(name: string, version: string): string[] {
+  const store = join(FRONTEND, 'node_modules', '.pnpm')
+  const prefix = name.replace('/', '+') + '@' + version
+  const copies = readdirSync(store)
+    .filter((entry) => entry === prefix || entry.startsWith(prefix + '_'))
+    .map((entry) => join(store, entry, 'node_modules', name))
+  expect(copies.length, name + '@' + version + ' is installed').toBeGreaterThan(0)
+  return copies
+}
+
+/** Exact installed callers are part of the evidence, rather than inferred from package names. */
+function callerSources(name: string, version: string, file: string): string[] {
+  return packageCopies(name, version).map((dir) => readFileSync(join(dir, file), 'utf8'))
+}
+
+const TOOLING_MARKERS = [
+  { pkg: 'glob', version: '10.5.0', file: 'dist/esm/glob.js', marker: 'windowsPathsNoEscape' },
+  {
+    pkg: 'minimatch',
+    version: '9.0.9',
+    file: 'dist/commonjs/index.js',
+    marker: 'firstPhasePreProcess',
+  },
+  {
+    pkg: 'minimatch',
+    version: '10.2.6',
+    file: 'dist/commonjs/index.js',
+    marker: 'firstPhasePreProcess',
+  },
+]
+
+function shippedTooling(modules: string[], files: Record<string, string>): string[] {
+  return [
+    ...modules.filter((id) => /[/\\]node_modules[/\\](?:glob|minimatch)[/\\]/.test(id)),
+    ...Object.entries(files)
+      .filter(([, text]) => TOOLING_MARKERS.some(({ marker }) => text.includes(marker)))
+      .map(([name]) => name),
+  ]
+}
+
+/** Inspect the two actual outgoing bundles, including every inventory artifact. */
+async function toolingInBuild(kind: 'window' | 'inventory'): Promise<string[]> {
+  const out = await mkdtemp(join(tmpdir(), 'aruna-tooling-' + kind + '-'))
+  const modules = new Set<string>()
+  const inspect: Plugin = {
+    name: 'aruna-audit-shipped-modules',
+    generateBundle(_options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type === 'chunk') {
+          for (const id of chunk.moduleIds) modules.add(id)
+        }
+      }
+    },
+  }
+  try {
+    if (kind === 'inventory') {
+      const config = inventoryBuild(out)
+      await build({ ...config, plugins: [...(config.plugins ?? []), inspect] })
+    } else {
+      await build({
+        root: FRONTEND,
+        configFile: join(FRONTEND, 'vite.config.ts'),
+        mode: 'production',
+        logLevel: 'silent',
+        plugins: [inspect],
+        build: { outDir: out, emptyOutDir: true },
+      })
+    }
+    expect(modules.size, kind + ' bundle exposes its module graph').toBeGreaterThan(0)
+    const files: Record<string, string> = {}
+    for (const entry of await readdir(out, { recursive: true, withFileTypes: true })) {
+      if (entry.isFile()) {
+        const path = join(entry.parentPath, entry.name)
+        files[path.slice(out.length + 1)] = await readFile(path, 'utf8')
+      }
+    }
+    if (kind === 'inventory') {
+      expect(Object.keys(files).sort()).toEqual([...ARTIFACTS].sort())
+      expect(files[SCRIPT]).toBeTruthy()
+    } else {
+      expect(Object.keys(files)).toContain('index.html')
+    }
+    return shippedTooling([...modules], files)
+  } finally {
+    await rm(out, { recursive: true, force: true })
+  }
+}
+
+describe('the temporary glob and minimatch development exceptions', () => {
+  it('remain in date, at the reviewed versions and paths, with no runtime root', () => {
+    expect(ignored(workspace())).toEqual(expect.arrayContaining([GLOB, MINIMATCH]))
+    expect(toolingOutOfReason(new Date(), lockfile(), manifest())).toBeNull()
+  })
+
+  it('fails on expiry, version or parent drift, direct use and production reach', () => {
+    const lock = lockfile()
+    const pkg = manifest()
+    const before = new Date('2026-11-29T23:59:59Z')
+    expect(toolingOutOfReason(before, lock, pkg)).toBeNull()
+    expect(toolingOutOfReason(new Date(TOOLING_DUE), lock, pkg)).toMatch(/expired/)
+    expect(toolingOutOfReason(before, lock.replaceAll('glob@10.5.0', 'glob@10.5.1'), pkg)).toMatch(
+      /version changed/,
+    )
+    expect(
+      toolingOutOfReason(before, lock.replaceAll('minimatch@10.2.6', 'minimatch@11.0.5'), pkg),
+    ).toMatch(/version changed or removed/)
+    const extra = lock + '\n  unexpected@1.0.0:\n    dependencies:\n      glob: 10.5.0\n'
+    expect(toolingOutOfReason(before, extra, pkg)).toMatch(/parent paths changed/)
+    expect(
+      toolingOutOfReason(before, lock, { ...pkg, devDependencies: { glob: '10.5.0' } }),
+    ).toMatch(/direct dependency/)
+    for (const group of ['dependencies', 'optionalDependencies', 'peerDependencies'] as const) {
+      expect(
+        toolingOutOfReason(before, lock, {
+          ...pkg,
+          [group]: { ...pkg[group], '@wdio/cli': '9.31.9' },
+        }),
+      ).toMatch(/production dependency reaches tooling/)
+    }
+  })
+
+  it('keeps the reviewed synchronous glob call and repository-controlled test pattern', () => {
+    for (const text of callerSources('@wdio/config', '9.31.9', 'build/node/index.js')) {
+      expect(text).toContain('import { sync as globSync } from "glob"')
+      expect(text).toMatch(/globSync\(pattern, \{\s*cwd: rootDir,\s*matchBase: true\s*\}\)/)
+    }
+    for (const text of callerSources('archiver-utils', '5.0.2', 'file.js')) {
+      expect(text).toContain('return glob.sync(pattern, options)')
+    }
+    const config = readFileSync(join(FRONTEND, 'wdio.conf.ts'), 'utf8')
+    expect(config.match(/specs:\s*\[[^\]]*\]/g)).toEqual(["specs: ['./e2e/**/*.e2e.ts']"])
+    expect(config).not.toMatch(/\bexclude\s*:/)
+  })
+
+  it('keeps lint consumers below the vulnerable minimatch optimization level', () => {
+    for (const text of callerSources('eslint', '10.14.0', 'lib/eslint/eslint-helpers.js')) {
+      expect(text).toContain('const MINIMATCH_OPTIONS = { dot: true }')
+      expect(text).not.toContain('optimizationLevel')
+    }
+    for (const text of callerSources('@eslint/config-array', '0.23.5', 'dist/cjs/index.cjs')) {
+      expect(text).toMatch(/const MINIMATCH_OPTIONS = \{\s*\/\/ matchBase: true,\s*dot: true,\s*\}/)
+      expect(text).not.toContain('optimizationLevel')
+    }
+    for (const text of callerSources(
+      '@typescript-eslint/typescript-estree',
+      '8.72.1',
+      'dist/useProgramFromProjectService.js',
+    )) {
+      expect(text).toContain('(0, minimatch_1.minimatch)(filePath, pattern, { dot: true })')
+      expect(text).not.toContain('optimizationLevel')
+    }
+    for (const version of ['9.0.9', '10.2.6']) {
+      for (const text of callerSources('minimatch', version, 'dist/commonjs/index.js')) {
+        expect(text).toContain('const { optimizationLevel = 1 } = this.options')
+      }
+    }
+  })
+
+  it('checks markers present in the real packages and detects a shipped copy', () => {
+    for (const { pkg, version, file, marker } of TOOLING_MARKERS) {
+      for (const text of callerSources(pkg, version, file)) expect(text).toContain(marker)
+      expect(shippedTooling([], { 'injected.js': marker })).toEqual(['injected.js'])
+    }
+    const modules = ['/repo/node_modules/.pnpm/glob@10.5.0/node_modules/glob/dist/esm/glob.js']
+    expect(shippedTooling(modules, {})).toEqual(modules)
+    expect(shippedTooling(['/repo/src/app.ts'], { 'app.js': 'console.log(1)' })).toEqual([])
+  })
+
+  it('ships no glob or minimatch in either production bundle', { timeout: 120_000 }, async () => {
+    expect(await toolingInBuild('window')).toEqual([])
+    expect(await toolingInBuild('inventory')).toEqual([])
   })
 })
