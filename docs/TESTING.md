@@ -10,6 +10,22 @@ coverage, corpus, native E2E and release artifacts. Run snapshot checks with
 From the repository root, native E2E is `pnpm --dir frontend test:e2e` and the
 universal release is `pnpm build --locked`. Both use the pinned local Tauri CLI.
 
+Post-release dependency checks are recorded in
+[the 2026-11-16 report](DEPENDENCY-UPDATE-2026-11-16.md). To run the heavy
+checks without rewriting generated bindings, use an explicit filter from the
+repository root (set `--target` to either Apple Darwin architecture):
+
+```sh
+ARUNA_REQUIRE_FIXTURE=1 \
+ARUNA_ZIP="$PWD/cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip" \
+INSTA_UPDATE=no cargo nextest run --locked --workspace \
+  --run-ignored ignored-only -E 'not test(regenerate_the_bindings)' -j 1
+```
+
+The filter excludes the bindings generator, not a validation test. Serial
+execution keeps full-corpus PDF builds from competing with external XML tools;
+existing test timeouts and snapshot expectations remain in force.
+
 The suite is **760 tests** as of 2026-10-25, counted at `6ff7dfb` (the same as after the task «tls-trust» on 2026-10-24): 714 in the
 console crate – 25 integration binaries plus the library and the binary's own
 tests – and 46 in the desktop shell. The crates were joined into one workspace on 2026-08-30, so
