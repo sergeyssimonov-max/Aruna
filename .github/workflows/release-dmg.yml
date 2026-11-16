@@ -190,6 +190,9 @@ jobs:
       # manifests, the changelog, its own workflows and its manifest generator,
       # and its 0.9.148 checksums for `universal-apple-darwin` and
       # `x86_64-unknown-linux-gnu` match nextest's release files.
+      # On 2026-11-16, all three nextest steps moved to 0.9.151 with
+      # install-action v2.90.1. Its manifest hashes for macOS universal and
+      # Linux x86_64 GNU match the official 0.9.151 release checksums.
       #
       # `fallback: none` on every step of this action: a tool or version the
       # pinned manifest does not list fails the job instead of being fetched
@@ -197,9 +200,9 @@ jobs:
       # first run rather than warned about. It also keeps the GitHub token out
       # of the action's environment, which its README calls the best practice.
       - name: Install nextest
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
-          tool: cargo-nextest@0.9.148
+          tool: cargo-nextest@0.9.151
           fallback: none
 
       - name: Test (CLI)
@@ -308,9 +311,9 @@ jobs:
         run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: Install nextest
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
-          tool: cargo-nextest@0.9.148
+          tool: cargo-nextest@0.9.151
           fallback: none
 
       # Without `--all-features`, and that is the condition of the test running
@@ -425,9 +428,9 @@ jobs:
       # ARUNA_REQUIRE_FIXTURE exists to prevent, and it was set on a command
       # that never reached that file.
       - name: Install nextest
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
-          tool: cargo-nextest@0.9.148
+          tool: cargo-nextest@0.9.151
           fallback: none
 
       # nextest rather than `cargo test`, for the reason the `check` job gives
