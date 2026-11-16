@@ -27,7 +27,7 @@ use std::io::Read as _;
 
 mod support;
 use support::required_corpus as required;
-use support::{canonical, without_dropped};
+use support::{canonical, canonical_many, without_dropped};
 
 /// What TLHdig Beta 0.3 holds.
 const DOCUMENTS: usize = 23_936;
@@ -448,14 +448,14 @@ fn the_documents_beyond_this_parser_are_the_seventeen_xmllint_names() {
 /// остаются в пакете, и отсутствие у них канонической формы – свойство
 /// исходных данных.
 ///
-/// `#[ignore]`, потому что это 23 936 запусков внешней программы – минуты, а
+/// `#[ignore]`, потому что это независимая проверка всего корпуса – минуты, а
 /// не секунды. Включается:
 ///
 /// ```sh
 /// ARUNA_ZIP=cli/fixtures/…zip cargo nextest run --test corpus --run-ignored all
 /// ```
 #[test]
-#[ignore = "23 936 запусков xmllint: минуты; включается вручную"]
+#[ignore = "полный корпус через xmllint пакетами по 16 пар; включается вручную"]
 fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
     let Some(path) = required() else { return };
     if std::process::Command::new("xmllint")
@@ -465,19 +465,48 @@ fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
         .status()
         .map_or(true, |s| !s.success())
     {
+        assert!(
+            std::env::var_os("ARUNA_REQUIRE_FIXTURE").is_none(),
+            "ARUNA_REQUIRE_FIXTURE is set but xmllint is not installed"
+        );
         eprintln!("xmllint отсутствует — проверка пропущена");
         return;
     }
 
     let dir = tempfile::tempdir().expect("tempdir");
-    let src = dir.path().join("source.xml");
-    let dst = dir.path().join("normalised.xml");
+
     let file = std::fs::File::open(&path).expect("open");
     let mut zip = zip::ZipArchive::new(std::io::BufReader::with_capacity(1 << 18, file))
         .expect("read archive");
 
     let (mut same, mut refused) = (0usize, 0usize);
     let mut differing: Vec<String> = Vec::new();
+    type Pair = (String, Vec<u8>, Vec<u8>);
+    let mut batch: Vec<Pair> = Vec::with_capacity(16);
+    let mut compare_batch = |batch: &[Pair]| {
+        let inputs: Vec<_> = batch
+            .iter()
+            .flat_map(|(_, before, after)| [before.as_slice(), after.as_slice()])
+            .collect();
+        let forms = canonical_many(&inputs, dir.path());
+        assert_eq!(forms.len(), inputs.len());
+        let (pairs, remainder) = forms.as_chunks::<2>();
+        assert!(remainder.is_empty());
+        for ((name, _, _), pair) in batch.iter().zip(pairs) {
+            let Some(before) = &pair[0] else {
+                refused += 1;
+                continue;
+            };
+            let after = pair[1]
+                .as_ref()
+                .unwrap_or_else(|| panic!("{name}: пакетная копия перестала разбираться"));
+            if without_dropped(before) == without_dropped(after) {
+                same += 1;
+            } else if differing.len() < 5 {
+                differing.push(name.clone());
+            }
+        }
+    };
     let mut source = Vec::new();
     let mut out = Vec::new();
     for i in 0..zip.len() {
@@ -497,18 +526,13 @@ fn every_document_in_the_package_is_the_same_tree_as_in_the_archive() {
         if verify::compare(&source, &out).is_err() {
             continue;
         }
-        let Some(before) = canonical(&source, &src) else {
-            refused += 1;
-            continue;
-        };
-        let after = canonical(&out, &dst)
-            .unwrap_or_else(|| panic!("{name}: пакетная копия перестала разбираться"));
-        if without_dropped(&before) == without_dropped(&after) {
-            same += 1;
-        } else if differing.len() < 5 {
-            differing.push(name);
+        batch.push((name, source.clone(), out.clone()));
+        if batch.len() == 16 {
+            compare_batch(&batch);
+            batch.clear();
         }
     }
+    compare_batch(&batch);
 
     assert!(
         differing.is_empty(),
@@ -577,4 +601,36 @@ fn no_entry_name_is_read_through_a_foreign_code_page() {
             .any(|name| name.ends_with("/Mu\u{308}nchen 5.xml")),
         "`München 5.xml` в NFD не найден среди {seen:#?}"
     );
+}
+
+/// Batching must preserve the original oracle, including errors, processing
+/// instructions outside the root and a boundary-looking comment in the input.
+#[test]
+fn batched_c14n_is_identical_to_separate_oracles() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let single = dir.path().join("single.xml");
+    let cases: &[&[u8]] = &[
+        b"<?a before?><r a='1'>text</r><!--tail-->",
+        b"<!--head--><r a='2'>text</r><?b after?>",
+        b"<r xmlns='urn:test'><child /></r>",
+        "<r>текст</r>".as_bytes(),
+        b"<r><!--<aruna-c14n-boundary></aruna-c14n-boundary>--></r>",
+        b"<broken>",
+        b"<r/>",
+        b"<also-broken>",
+    ];
+    for batch in [
+        &cases[..0],
+        &cases[..1],
+        &cases[..2],
+        &cases[..4],
+        &cases[..5],
+        cases,
+    ] {
+        let expected: Vec<_> = batch
+            .iter()
+            .map(|bytes| canonical(bytes, &single))
+            .collect();
+        assert_eq!(canonical_many(batch, dir.path()), expected);
+    }
 }

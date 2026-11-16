@@ -763,6 +763,60 @@ pub fn canonical(bytes: &[u8], at: &Path) -> Option<Vec<u8>> {
     out.status.success().then_some(out.stdout)
 }
 
+pub const C14N_BOUNDARY: &[u8] = b"<aruna-c14n-boundary></aruna-c14n-boundary>";
+
+/// Run the independent oracle for a bounded batch, keeping each document's
+/// result separate. On any parse error or ambiguous boundary, use the original
+/// per-document oracle for the entire batch. No input or error is discarded.
+pub fn canonical_many(documents: &[&[u8]], directory: &Path) -> Vec<Option<Vec<u8>>> {
+    if documents.is_empty() {
+        return Vec::new();
+    }
+    let boundary = directory.join("boundary.xml");
+    std::fs::write(&boundary, C14N_BOUNDARY).expect("write boundary");
+    let paths: Vec<_> = documents
+        .iter()
+        .enumerate()
+        .map(|(i, bytes)| {
+            let path = directory.join(format!("document-{i}.xml"));
+            std::fs::write(&path, bytes).expect("write document");
+            path
+        })
+        .collect();
+    let mut command = std::process::Command::new("xmllint");
+    command.args(["--nonet", "--c14n"]);
+    for (i, path) in paths.iter().enumerate() {
+        if i != 0 {
+            command.arg(&boundary);
+        }
+        command.arg(path);
+    }
+    let out = command.output().expect("run batched xmllint");
+    if out.status.success() {
+        let positions: Vec<_> = out
+            .stdout
+            .windows(C14N_BOUNDARY.len())
+            .enumerate()
+            .filter_map(|(i, w)| (w == C14N_BOUNDARY).then_some(i))
+            .collect();
+        if positions.len() == documents.len() - 1 {
+            let mut start = 0;
+            let mut forms = Vec::with_capacity(documents.len());
+            for end in positions {
+                forms.push(Some(out.stdout[start..end].to_vec()));
+                start = end + C14N_BOUNDARY.len();
+            }
+            forms.push(Some(out.stdout[start..].to_vec()));
+            return forms;
+        }
+    }
+    documents
+        .iter()
+        .zip(paths)
+        .map(|(bytes, path)| canonical(bytes, &path))
+        .collect()
+}
+
 /// Строки канонической формы без тех инструкций, которые нормализации
 /// разрешено снимать.
 ///

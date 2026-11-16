@@ -233,6 +233,8 @@ fn comparable(listing: &str) -> Vec<String> {
     lines
 }
 
+const XSLT_BOUNDARY: &str = "ARUNA-XSLT-BOUNDARY\n";
+
 struct Xsltproc {
     dir: tempfile::TempDir,
 }
@@ -241,7 +243,47 @@ impl Xsltproc {
     fn new() -> Self {
         let dir = tempfile::tempdir().expect("tempdir");
         std::fs::write(dir.path().join("listing.xsl"), LISTING).expect("write the stylesheet");
+        let batched = LISTING.replace(
+            "<xsl:template match=\"/\">",
+            &format!("<xsl:template match=\"/\"><xsl:text>{XSLT_BOUNDARY}</xsl:text>"),
+        );
+        std::fs::write(dir.path().join("listing-batch.xsl"), batched)
+            .expect("write batch stylesheet");
         Xsltproc { dir }
+    }
+
+    /// One subprocess for a small group, with the same listing for each input.
+    /// Errors or a marker occurring in document content use the original oracle.
+    fn listings(&self, documents: &[&[u8]]) -> Vec<Option<String>> {
+        if documents.is_empty() {
+            return Vec::new();
+        }
+        let paths: Vec<_> = documents
+            .iter()
+            .enumerate()
+            .map(|(i, bytes)| {
+                let path = self.dir.path().join(format!("batch-{i}.xml"));
+                std::fs::write(&path, bytes).expect("write batch document");
+                path
+            })
+            .collect();
+        let out = Command::new("xsltproc")
+            .args(["--nonet", "--nowrite"])
+            .arg(self.dir.path().join("listing-batch.xsl"))
+            .args(paths)
+            .output()
+            .expect("run batched xsltproc");
+        if out.status.success() {
+            let text = String::from_utf8(out.stdout).expect("xsltproc wrote UTF-8");
+            let pieces: Vec<_> = text.split(XSLT_BOUNDARY).collect();
+            if pieces.len() == documents.len() + 1 && pieces[0].is_empty() {
+                return pieces[1..]
+                    .iter()
+                    .map(|text| Some((*text).to_owned()))
+                    .collect();
+            }
+        }
+        documents.iter().map(|bytes| self.listing(bytes)).collect()
     }
 
     /// The listing `xsltproc` gives, or `None` when libxml2 will not read the
@@ -447,7 +489,7 @@ fn the_model_says_what_xsltproc_says_for_the_valid_fixtures() {
 
 /// The same comparison over every document the model reads.
 #[test]
-#[ignore = "one xsltproc run per document: about a minute; run by hand"]
+#[ignore = "whole corpus against xsltproc in batches of 16; run by hand"]
 fn the_model_says_what_xsltproc_says_for_the_whole_corpus() {
     let Some(path) = required() else { return };
     if !xsltproc_present() {
@@ -456,28 +498,51 @@ fn the_model_says_what_xsltproc_says_for_the_whole_corpus() {
     let reference = Xsltproc::new();
     let (mut same, mut lines, mut refused) = (0usize, 0usize, 0usize);
     let mut differing: Vec<String> = Vec::new();
-    each_document(&path, |name, bytes| {
+    type Entry = (String, Vec<u8>, Vec<String>);
+    let mut batch: Vec<Entry> = Vec::with_capacity(16);
+    let mut compare_batch = |batch: &[Entry]| {
+        let inputs: Vec<_> = batch.iter().map(|(_, bytes, _)| bytes.as_slice()).collect();
+        let results = reference.listings(&inputs);
+        assert_eq!(results.len(), batch.len());
+        for ((name, _, model), result) in batch.iter().zip(results) {
+            let expected = result
+                .map(|listing| comparable(&listing))
+                .unwrap_or_default();
+            if *model == expected {
+                same += 1;
+                lines += model.len();
+            } else {
+                differing.push(format!("{name}: {}", first_difference(model, &expected)));
+            }
+        }
+    };
+    let admitted = each_document(&path, |name, bytes| {
         let Ok(document) = Document::read(bytes) else {
             refused += 1;
             return;
         };
-        let model = comparable(&listing(&document));
-        let expected = reference
-            .listing(bytes)
-            .map(|listing| comparable(&listing))
-            .unwrap_or_default();
-        if model == expected {
-            same += 1;
-            lines += model.len();
-        } else {
-            differing.push(format!("{name}: {}", first_difference(&model, &expected)));
+        batch.push((
+            name.to_owned(),
+            bytes.to_vec(),
+            comparable(&listing(&document)),
+        ));
+        if batch.len() == 16 {
+            compare_batch(&batch);
+            batch.clear();
         }
     });
+    compare_batch(&batch);
+    assert_eq!(admitted, DOCUMENTS);
     assert!(
         differing.is_empty(),
         "{} documents differ from xsltproc; first: {:#?}",
         differing.len(),
         &differing[..differing.len().min(10)]
+    );
+    assert_eq!(
+        same + refused,
+        admitted,
+        "every document must be accounted for"
     );
     eprintln!("whole corpus: {same} identical ({lines} lines), {refused} refused by the model");
 }
@@ -819,5 +884,35 @@ fn what_is_not_the_models_to_read_is_refused_and_never_a_panic() {
             }
             _ => {}
         }
+    }
+}
+
+#[test]
+fn batched_xslt_is_identical_to_separate_oracles() {
+    assert!(
+        xsltproc_present(),
+        "xsltproc is required for the oracle regression test"
+    );
+    let reference = Xsltproc::new();
+    let cases: &[&[u8]] = &[
+        b"<?a before?><r a='1'>text</r><!--tail-->",
+        b"<!--head--><r a='2'>text</r><?b after?>",
+        b"<r xmlns='urn:test'><child /></r>",
+        "<r>текст</r>".as_bytes(),
+        b"<r>ARUNA-XSLT-BOUNDARY\n</r>",
+        b"<broken>",
+        b"<r/>",
+        b"<also-broken>",
+    ];
+    for batch in [
+        &cases[..0],
+        &cases[..1],
+        &cases[..2],
+        &cases[..4],
+        &cases[..5],
+        cases,
+    ] {
+        let expected: Vec<_> = batch.iter().map(|bytes| reference.listing(bytes)).collect();
+        assert_eq!(reference.listings(batch), expected);
     }
 }

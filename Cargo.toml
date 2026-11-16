@@ -15,3 +15,16 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 1
+
+# Optimize only the explicit whole-corpus acceptance, not everyday tests.
+# Keep the test-only safety checks: optimization must not disable assertions
+# or overflow detection. Nextest deadlines remain unchanged.
+[profile.corpus]
+inherits = "test"
+opt-level = 3
+codegen-units = 1
+lto = "thin"
+debug = 0
+incremental = false
+debug-assertions = true
+overflow-checks = true

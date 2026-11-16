@@ -144,6 +144,12 @@ jobs:
       # is held to since before there was a CI file; nothing ran it, so the
       # document described work no machine did. It runs first because it is the
       # cheapest of the gates and the one most likely to be forgotten.
+      # The paired-C14N regression test must run against an independent parser.
+      - name: Install XML test oracle
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libxml2-utils xsltproc
+
       - name: Formatting (CLI)
         run: cargo fmt --manifest-path cli/Cargo.toml --check
 
@@ -346,6 +352,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install XML test oracle
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libxml2-utils xsltproc
 
       # The version comes from rust-toolchain.toml, which is the one place it is
       # stated; `@stable` used to mean "whatever landed this week", and a new
