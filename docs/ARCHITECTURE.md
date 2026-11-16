@@ -46,7 +46,7 @@ row is named by a lower one.
 
 | layer | modules | what it may not do |
 |---|---|---|
-| **adapter** | `main.rs` | — |
+| **adapter** | `main.rs`, `console` | — |
 | **application** | `app` | parse a command line, choose an exit code, print |
 | **presentation** | `presentation`, `style`, `html`, `export/inventory`, `pdf/{mod,layout,world,label,post,fonts}` | read the filesystem, parse XML |
 | **domain** | `parse`, `document`, `xml_wellformed`, `order`, `paths`, `catalog`, `json`, `cth_titles`, `fonts`, `md5`, `sha256`, `export/{naming,normalize,validate,verify,manifest,counts}` | know a renderer exists |
@@ -61,6 +61,13 @@ PDF phase, `pdf/` the renderer it calls – pure, a document in and bytes out,
 with `pdf/post` the one walk over a page's content stream that the product, the
 tests and the gate share. `console` is a module of the binary, not of the
 library: the Russian wording of the console.
+
+In the console adapter, `main.rs` selects exit codes, writes to stdout/stderr
+and supplies advice. `console` formats error headlines and causes, and keeps
+its phrase table and substitution helpers private. Translation uses the first
+matching template, preserves the captured data verbatim, and leaves an unknown
+phrase unchanged. The library's error types and their `Display` text are not
+translated; the desktop window has its own wording for its audience.
 
 `progress` and `job` sit beside the stack rather than in it: every layer may
 report through them, and they know nothing about what is being reported.
