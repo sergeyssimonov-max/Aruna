@@ -299,7 +299,7 @@ fn zip(err: &zip::result::ZipError) -> String {
 /// `{}` – место для данных: имени, пути, значения. Слева – текст ядра с
 /// `{}` на месте каждой подстановки, справа – русский с теми же местами в том
 /// же порядке.
-pub(crate) const PHRASES: &[(&str, &str)] = &[
+const PHRASES: &[(&str, &str)] = &[
     // export::verify – сверка нормализации
     (
         "the source declares encoding=\"{}\" and the canonical declaration says UTF-8; the bytes would be kept and their meaning changed",
@@ -484,33 +484,32 @@ pub(crate) const PHRASES: &[(&str, &str)] = &[
 ///
 /// Незнакомой в выпуске быть не должно – это держит тест ниже, – но и
 /// потерять текст отказа хуже, чем показать его по-английски.
-pub(crate) fn translated(text: &str) -> String {
+/// Выбирается первый подходящий шаблон: частные фразы идут раньше общих.
+fn translated(text: &str) -> String {
     PHRASES
         .iter()
-        .find_map(|(english, russian)| fill(russian, holes(english, text)?))
+        .find_map(|(english, russian)| fill(russian, capture_values(english, text)?))
         .unwrap_or_else(|| text.to_string())
 }
 
 /// Что стоит на местах `{}` шаблона `template` в тексте `text`, если текст
 /// сделан по этому шаблону.
-fn holes<'a>(template: &str, text: &'a str) -> Option<Vec<&'a str>> {
-    let parts: Vec<&str> = template.split("{}").collect();
-    let mut rest = text.strip_prefix(parts[0])?;
-    let mut found = Vec::new();
-    for (i, literal) in parts.iter().enumerate().skip(1) {
-        let last = i == parts.len() - 1;
-        let at = if last {
-            if !rest.ends_with(literal) {
-                return None;
-            }
-            rest.len() - literal.len()
+fn capture_values<'a>(template: &str, text: &'a str) -> Option<Vec<&'a str>> {
+    let mut literals = template.split("{}").peekable();
+    let mut remaining = text.strip_prefix(literals.next()?)?;
+    let mut values = Vec::new();
+    while let Some(literal) = literals.next() {
+        let (value, rest) = if literals.peek().is_none() {
+            // Последний литерал закреплен в конце фразы; его повторы внутри
+            // значения остаются данными.
+            (remaining.strip_suffix(literal)?, "")
         } else {
-            rest.find(literal)?
+            remaining.split_once(literal)?
         };
-        found.push(&rest[..at]);
-        rest = &rest[at + literal.len()..];
+        values.push(value);
+        remaining = rest;
     }
-    rest.is_empty().then_some(found)
+    remaining.is_empty().then_some(values)
 }
 
 /// `template` с подстановками `values` на местах `{}`, по порядку.
@@ -807,6 +806,44 @@ mod tests {
             "документ CTH 1/a.xml ссылается на файл, который не принадлежит ни одному документу: ./CTH%201/c.pdf"
         );
         assert_eq!(translated("никакой шаблон"), "никакой шаблон");
+    }
+
+    #[test]
+    fn a_translation_preserves_empty_unicode_and_separator_like_values() {
+        for (source, expected) in [
+            ("the package is missing ", "в пакете нет "),
+            (
+                "the package is missing CTH 1/𒀭-e\u{301}-{}.xml",
+                "в пакете нет CTH 1/𒀭-e\u{301}-{}.xml",
+            ),
+            (
+                "instruction <?…?> was dropped and is not on the permit list",
+                "инструкция <?…?> снята, а в списке разрешенных ее нет",
+            ),
+            (
+                "the manifest lists 3 distinct distinct pdf names for 4 documents",
+                "в манифесте 3 разных имен distinct pdf на 4 документов",
+            ),
+            (
+                "the manifest lists 3 distinct pdf names for 4 documents documents",
+                "в манифесте 3 разных имен pdf на 4 documents документов",
+            ),
+        ] {
+            assert_eq!(translated(source), expected, "for {source:?}");
+        }
+    }
+
+    #[test]
+    fn a_translation_requires_the_whole_phrase_to_match() {
+        assert_eq!(translated("an unnamed run"), "запуск без имени");
+        for source in [
+            "prefix an unnamed run",
+            "an unnamed run suffix",
+            "prefix the manifest lists 3 distinct pdf names for 4 documents",
+            "the manifest lists 3 distinct pdf names for 4 documents suffix",
+        ] {
+            assert_eq!(translated(source), source);
+        }
     }
 
     /// **Отказ прокси называется отказом прокси**, а не сетевым сбоем.
