@@ -17,7 +17,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires review: 143.
+Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires review: 143.
 
 ## Packages
 
@@ -793,6 +793,9 @@ Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires re
 | @csstools/css-parser-algorithms | 4.0.2 | npm | MIT | T71 |
 | @csstools/css-syntax-patches-for-csstree | 1.1.15 | npm | MIT-0 | T155 |
 | @csstools/css-tokenizer | 4.0.2 | npm | MIT | T71 |
+| @emnapi/core | 2.0.0-beta.2 | npm | MIT | T689 |
+| @emnapi/runtime | 2.0.0-beta.2 | npm | MIT | T689 |
+| @emnapi/wasi-threads | 2.2.0 | npm | MIT | T689 |
 | @esbuild/aix-ppc64 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/android-arm64 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/android-arm | 0.28.2 | npm | not declared | requires review |
@@ -863,25 +866,27 @@ Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires re
 | @jridgewell/trace-mapping | 0.3.31 | npm | MIT | T60 |
 | @keyv/bigmap | 1.3.1 | npm | MIT | T651 |
 | @keyv/serialize | 1.1.1 | npm | MIT | T116 |
+| @napi-rs/wasm-runtime | 1.2.6 | npm | MIT | T690 |
 | @oxc-project/types | 0.156.0 | npm | MIT | T490 |
 | @pkgjs/parseargs | 0.11.0 | npm | MIT | T9 |
 | @promptbook/utils | 0.69.5 | npm | CC-BY-4.0 | requires review |
 | @puppeteer/browsers | 3.2.1 | npm | Apache-2.0 | requires review |
-| @rolldown/binding-android-arm-eabi | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-android-arm64 | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-darwin-arm64 | 1.2.16 | npm | MIT | requires review |
-| @rolldown/binding-darwin-x64 | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-freebsd-x64 | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-linux-arm-gnueabihf | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-linux-arm64-gnu | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-linux-arm64-musl | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-linux-ppc64-gnu | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-linux-s390x-gnu | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-linux-x64-gnu | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-linux-x64-musl | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-openharmony-arm64 | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-win32-arm64-msvc | 1.2.16 | npm | not declared | requires review |
-| @rolldown/binding-win32-x64-msvc | 1.2.16 | npm | not declared | requires review |
+| @rolldown/binding-android-arm-eabi | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-android-arm64 | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-darwin-arm64 | 1.2.19 | npm | MIT | requires review |
+| @rolldown/binding-darwin-x64 | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-freebsd-x64 | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-linux-arm-gnueabihf | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-linux-arm64-gnu | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-linux-arm64-musl | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-linux-ppc64-gnu | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-linux-s390x-gnu | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-linux-x64-gnu | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-linux-x64-musl | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-openharmony-arm64 | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-wasm32-wasi | 1.2.19 | npm | MIT | T266, T691 |
+| @rolldown/binding-win32-arm64-msvc | 1.2.19 | npm | not declared | requires review |
+| @rolldown/binding-win32-x64-msvc | 1.2.19 | npm | not declared | requires review |
 | @rolldown/pluginutils | 1.0.1 | npm | MIT | T623 |
 | @sec-ant/readable-stream | 0.4.1 | npm | MIT | T444 |
 | @sinclair/typebox | 0.34.52 | npm | MIT | T521 |
@@ -911,6 +916,7 @@ Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires re
 | @testing-library/svelte | 5.4.2 | npm | MIT | T112 |
 | @testing-library/user-event | 14.6.8 | npm | MIT | T551 |
 | @tsconfig/svelte | 5.0.8 | npm | MIT | T392 |
+| @tybys/wasm-util | 0.10.4 | npm | MIT | T688 |
 | @types/aria-query | 5.0.4 | npm | MIT | T3 |
 | @types/chai | 5.2.3 | npm | MIT | T3 |
 | @types/deep-eql | 4.0.2 | npm | MIT | T3 |
@@ -930,16 +936,16 @@ Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires re
 | @types/ws | 8.18.1 | npm | MIT | T3 |
 | @types/yargs-parser | 21.0.3 | npm | MIT | T3 |
 | @types/yargs | 17.0.35 | npm | MIT | T3 |
-| @typescript-eslint/eslint-plugin | 8.72.1 | npm | MIT | T32 |
-| @typescript-eslint/parser | 8.72.1 | npm | MIT | T32 |
-| @typescript-eslint/project-service | 8.72.1 | npm | MIT | T102 |
-| @typescript-eslint/scope-manager | 8.72.1 | npm | MIT | T32 |
-| @typescript-eslint/tsconfig-utils | 8.72.1 | npm | MIT | T102 |
-| @typescript-eslint/type-utils | 8.72.1 | npm | MIT | T656 |
-| @typescript-eslint/types | 8.72.1 | npm | MIT | T32 |
-| @typescript-eslint/typescript-estree | 8.72.1 | npm | MIT | T32 |
-| @typescript-eslint/utils | 8.72.1 | npm | MIT | T32 |
-| @typescript-eslint/visitor-keys | 8.72.1 | npm | MIT | T32 |
+| @typescript-eslint/eslint-plugin | 8.72.2 | npm | MIT | T32 |
+| @typescript-eslint/parser | 8.72.2 | npm | MIT | T32 |
+| @typescript-eslint/project-service | 8.72.2 | npm | MIT | T102 |
+| @typescript-eslint/scope-manager | 8.72.2 | npm | MIT | T32 |
+| @typescript-eslint/tsconfig-utils | 8.72.2 | npm | MIT | T102 |
+| @typescript-eslint/type-utils | 8.72.2 | npm | MIT | T656 |
+| @typescript-eslint/types | 8.72.2 | npm | MIT | T32 |
+| @typescript-eslint/typescript-estree | 8.72.2 | npm | MIT | T32 |
+| @typescript-eslint/utils | 8.72.2 | npm | MIT | T32 |
+| @typescript-eslint/visitor-keys | 8.72.2 | npm | MIT | T32 |
 | @vitest/coverage-v8 | 5.1.0 | npm | MIT | T42 |
 | @vitest/istanbul-lib-coverage | 2.1.0 | npm | MIT | T147 |
 | @vitest/istanbul-lib-report | 2.1.0 | npm | MIT | T147 |
@@ -1328,7 +1334,7 @@ Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires re
 | resq | 1.11.0 | npm | MIT | T217 |
 | ret | 0.5.0 | npm | MIT | T566 |
 | rgb2hex | 0.2.5 | npm | MIT | T359 |
-| rolldown | 1.2.16 | npm | MIT | T266 |
+| rolldown | 1.2.19 | npm | MIT | T266 |
 | run-async | 4.0.6 | npm | MIT | T629 |
 | rxjs | 7.8.2 | npm | Apache-2.0 | T453 |
 | sade | 1.8.1 | npm | MIT | T560 |
@@ -1394,7 +1400,7 @@ Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires re
 | type-fest | 3.13.1 | npm | (MIT OR CC0-1.0) | requires review |
 | type-fest | 4.26.0 | npm | (MIT OR CC0-1.0) | requires review |
 | type-fest | 4.41.0 | npm | (MIT OR CC0-1.0) | T161, T4 |
-| typescript-eslint | 8.72.1 | npm | MIT | T32 |
+| typescript-eslint | 8.72.2 | npm | MIT | T32 |
 | typescript | 6.0.3 | npm | Apache-2.0 | T524 |
 | undici-types | 6.21.0 | npm | MIT | T66 |
 | undici | 6.29.1 | npm | MIT | T66 |
@@ -1406,7 +1412,7 @@ Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires re
 | userhome | 1.0.1 | npm | MIT | T503 |
 | util-deprecate | 1.0.2 | npm | MIT | T204 |
 | validate-npm-package-license | 3.0.4 | npm | Apache-2.0 | T20 |
-| vite | 8.3.6 | npm | MIT | T518 |
+| vite | 8.3.8 | npm | MIT | T518 |
 | vitefu | 1.1.3 | npm | MIT | T642 |
 | vitest | 5.1.0 | npm | MIT | T432 |
 | w3c-xmlserializer | 6.0.0 | npm | MIT | T534 |
@@ -1478,6 +1484,24 @@ specta 2.0.0-rc.25, specta-macros 2.0.0-rc.25, specta-serde 0.0.12, specta-types
 
 
 tauri-specta 2.0.0-rc.25, tauri-specta-macros 2.0.0-rc.25 declare MIT but ship no licence file. Reference T684 is the unmodified upstream LICENSE from https://github.com/specta-rs/tauri-specta/blob/e5e578fb339fc2b0d6c676b3031c3dafcec88083/LICENSE. The source file ends with a newline; Markdown adds a line break before the closing fence.
+
+
+@emnapi/core 2.0.0-beta.2: reviewed exact-version MIT reference; original texts preserved from https://registry.npmjs.org/@emnapi/core/-/core-2.0.0-beta.2.tgz.
+
+
+@emnapi/runtime 2.0.0-beta.2: reviewed exact-version MIT reference; original texts preserved from https://registry.npmjs.org/@emnapi/runtime/-/runtime-2.0.0-beta.2.tgz.
+
+
+@emnapi/wasi-threads 2.2.0: reviewed exact-version MIT reference; original texts preserved from https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-2.2.0.tgz.
+
+
+@napi-rs/wasm-runtime 1.2.6: reviewed exact-version MIT reference; original texts preserved from https://github.com/napi-rs/napi-rs/blob/4fff029f67693d08be0ff16818eb9ead2637a99e/LICENSE.
+
+
+@rolldown/binding-wasm32-wasi 1.2.19: reviewed exact-version MIT reference; original texts preserved from https://github.com/rolldown/rolldown/blob/b9c75ddc8bd50f2c1a4c7be0b548bdab5cba85ab/LICENSE, https://github.com/rolldown/rolldown/blob/b9c75ddc8bd50f2c1a4c7be0b548bdab5cba85ab/THIRD-PARTY-LICENSE.
+
+
+@tybys/wasm-util 0.10.4: reviewed exact-version MIT reference; original texts preserved from https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.4.tgz.
 
 
 ## Requires review
@@ -1565,21 +1589,21 @@ downloaded) or it ships no licence file. The declared licence, where known, is i
 - @humanfs/types 0.15.0 (npm, node_modules): Apache-2.0
 - @promptbook/utils 0.69.5 (npm, node_modules): CC-BY-4.0
 - @puppeteer/browsers 3.2.1 (npm, node_modules): Apache-2.0
-- @rolldown/binding-android-arm-eabi 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-android-arm64 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-darwin-arm64 1.2.16 (npm, node_modules): MIT
-- @rolldown/binding-darwin-x64 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-freebsd-x64 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-linux-arm-gnueabihf 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-linux-arm64-gnu 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-linux-arm64-musl 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-linux-ppc64-gnu 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-linux-s390x-gnu 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-linux-x64-gnu 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-linux-x64-musl 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-openharmony-arm64 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-win32-arm64-msvc 1.2.16 (npm, not on this machine): not declared
-- @rolldown/binding-win32-x64-msvc 1.2.16 (npm, not on this machine): not declared
+- @rolldown/binding-android-arm-eabi 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-android-arm64 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-darwin-arm64 1.2.19 (npm, node_modules): MIT
+- @rolldown/binding-darwin-x64 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-freebsd-x64 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-linux-arm-gnueabihf 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-linux-arm64-gnu 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-linux-arm64-musl 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-linux-ppc64-gnu 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-linux-s390x-gnu 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-linux-x64-gnu 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-linux-x64-musl 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-openharmony-arm64 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-win32-arm64-msvc 1.2.19 (npm, not on this machine): not declared
+- @rolldown/binding-win32-x64-msvc 1.2.19 (npm, not on this machine): not declared
 - @tauri-apps/cli-darwin-arm64 2.12.4 (npm, node_modules): Apache-2.0 OR MIT
 - @tauri-apps/cli-darwin-x64 2.12.4 (npm, not on this machine): not declared
 - @tauri-apps/cli-linux-arm-gnueabihf 2.12.4 (npm, not on this machine): not declared
@@ -4346,7 +4370,7 @@ limitations under the License.
 
 ### T32
 
-SHA-256 `2eb5c7a0bba9deb77a98c81bf6b9d3fb1c67118eebf968b6b1a787b3f8928ee0`. Used by: @typescript-eslint/eslint-plugin 8.72.1 (LICENSE), @typescript-eslint/parser 8.72.1 (LICENSE), @typescript-eslint/scope-manager 8.72.1 (LICENSE), @typescript-eslint/types 8.72.1 (LICENSE), @typescript-eslint/typescript-estree 8.72.1 (LICENSE), @typescript-eslint/utils 8.72.1 (LICENSE), @typescript-eslint/visitor-keys 8.72.1 (LICENSE), typescript-eslint 8.72.1 (LICENSE).
+SHA-256 `2eb5c7a0bba9deb77a98c81bf6b9d3fb1c67118eebf968b6b1a787b3f8928ee0`. Used by: @typescript-eslint/eslint-plugin 8.72.2 (LICENSE), @typescript-eslint/parser 8.72.2 (LICENSE), @typescript-eslint/scope-manager 8.72.2 (LICENSE), @typescript-eslint/types 8.72.2 (LICENSE), @typescript-eslint/typescript-estree 8.72.2 (LICENSE), @typescript-eslint/utils 8.72.2 (LICENSE), @typescript-eslint/visitor-keys 8.72.2 (LICENSE), typescript-eslint 8.72.2 (LICENSE).
 
 ```text
 MIT License
@@ -8233,7 +8257,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T102
 
-SHA-256 `053a75a14b7508a897466b65e12797201a06b0e9b5066d1223da72cac99601b5`. Used by: @typescript-eslint/project-service 8.72.1 (LICENSE), @typescript-eslint/tsconfig-utils 8.72.1 (LICENSE).
+SHA-256 `053a75a14b7508a897466b65e12797201a06b0e9b5066d1223da72cac99601b5`. Used by: @typescript-eslint/project-service 8.72.2 (LICENSE), @typescript-eslint/tsconfig-utils 8.72.2 (LICENSE).
 
 ```text
 MIT License
@@ -16061,7 +16085,7 @@ SOFTWARE.
 
 ### T266
 
-SHA-256 `23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734`. Used by: rolldown 1.2.16 (LICENSE).
+SHA-256 `23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734`. Used by: @rolldown/binding-wasm32-wasi 1.2.19 (rolldown-b9c75dd-LICENSE), rolldown 1.2.19 (LICENSE).
 
 ```text
 MIT License
@@ -32418,7 +32442,7 @@ SOFTWARE.
 
 ### T518
 
-SHA-256 `a22152baa1aef74402443008e767e7c689a524c0909d19b0431d97f5ab066a13`. Used by: vite 8.3.6 (LICENSE.md).
+SHA-256 `a22152baa1aef74402443008e767e7c689a524c0909d19b0431d97f5ab066a13`. Used by: vite 8.3.8 (LICENSE.md).
 
 ```text
 # Vite core license
@@ -40629,7 +40653,7 @@ SOFTWARE.
 
 ### T656
 
-SHA-256 `f3c51ace7f159b21566d72535e84ff354505ae7ffdca835dac81fcdafbf9e879`. Used by: @typescript-eslint/type-utils 8.72.1 (LICENSE).
+SHA-256 `f3c51ace7f159b21566d72535e84ff354505ae7ffdca835dac81fcdafbf9e879`. Used by: @typescript-eslint/type-utils 8.72.2 (LICENSE).
 
 ```text
 MIT License
@@ -43064,4 +43088,150 @@ SHA-256 `249fdb6694467dd615b259f7ddde07be3f8ae5a72cecebb0e24f6629af4215fe`. Used
    See the License for the specific language governing permissions and
    limitations under the License.
 
+```
+
+### T688
+
+SHA-256 `09e436100bf926e78df875ec80cf3d0c643dfec779b52cfe2aa96afa0de714cb`. Used by: @tybys/wasm-util 0.10.4 (tybys-wasm-util-0.10.4-LICENSE).
+
+```text
+MIT License
+
+Copyright (c) 2022-present Toyobayashi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### T689
+
+SHA-256 `2088f55c6731498410b20c95ebd345ed4a4a800bf74c0fba4d282fd2a021daaa`. Used by: @emnapi/core 2.0.0-beta.2 (emnapi-2.0.0-beta.2-LICENSE), @emnapi/runtime 2.0.0-beta.2 (emnapi-2.0.0-beta.2-LICENSE), @emnapi/wasi-threads 2.2.0 (emnapi-2.0.0-beta.2-LICENSE).
+
+```text
+MIT License
+
+Copyright (c) 2021-present Toyobayashi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### T690
+
+SHA-256 `3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215`. Used by: @napi-rs/wasm-runtime 1.2.6 (napi-rs-4fff029-LICENSE).
+
+```text
+MIT License
+
+Copyright (c) 2020-present LongYinan
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+MIT License
+
+Copyright (c) 2018 GitHub
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### T691
+
+SHA-256 `a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c`. Used by: @rolldown/binding-wasm32-wasi 1.2.19 (rolldown-b9c75dd-THIRD-PARTY-LICENSE).
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2017 [these people](https://github.com/rollup/rollup/graphs/contributors)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+MIT License
+
+Copyright (c) 2020 Evan Wallace
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```

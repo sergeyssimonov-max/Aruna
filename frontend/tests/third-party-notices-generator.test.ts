@@ -29,6 +29,8 @@ describe('the third-party notice generator', { timeout: 20_000 }, () => {
     mkdirSync(join(root, 'scripts'))
     copyFileSync(SCRIPT, join(root, 'scripts/third-party-notices.mjs'))
     writeFileSync(join(root, 'scripts/third-party-license-order.json'), '[]\n')
+    mkdirSync(join(root, 'scripts/third-party-sources'))
+    writeFileSync(join(root, 'scripts/third-party-sources/npm-reviewed.json'), '[]\n')
     writeFileSync(join(root, 'THIRD-PARTY-NOTICES.md'), SENTINEL)
     writeFileSync(
       join(root, 'Cargo.lock'),
@@ -79,6 +81,85 @@ describe('the third-party notice generator', { timeout: 20_000 }, () => {
       },
     })
   }
+
+  function reviewedNpm() {
+    const bytes = 'Reviewed upstream licence.\n'
+    const source = join(root, 'scripts/third-party-sources')
+    writeFileSync(join(source, 'reviewed-LICENSE'), bytes)
+    writeFileSync(
+      join(source, 'npm-reviewed.json'),
+      JSON.stringify([
+        {
+          name: 'off-platform',
+          version: '1.0.0',
+          license: 'MIT',
+          files: [
+            {
+              file: 'reviewed-LICENSE',
+              sha256: createHash('sha256').update(bytes).digest('hex'),
+              source: 'https://example.test/immutable/LICENSE',
+            },
+          ],
+        },
+      ]),
+    )
+    return source
+  }
+
+  it('uses an offline exact-version npm reference and preserves its bytes', () => {
+    reviewedNpm()
+    expect(run().status).toBe(0)
+    const notice = readFileSync(join(root, 'THIRD-PARTY-NOTICES.md'), 'utf8')
+    expect(notice).toContain('| off-platform | 1.0.0 | npm | MIT | T')
+    expect(notice).toContain('Reviewed upstream licence.\n')
+    expect(run(['--check']).status).toBe(0)
+  })
+
+  it('does not extend a reviewed npm licence to another version', () => {
+    reviewedNpm()
+    for (const dir of ['.', 'frontend']) {
+      const lock = join(root, dir, 'pnpm-lock.yaml')
+      writeFileSync(
+        lock,
+        readFileSync(lock, 'utf8').replace('off-platform@1.0.0', 'off-platform@1.0.1'),
+      )
+    }
+    expect(run().status).toBe(0)
+    expect(readFileSync(join(root, 'THIRD-PARTY-NOTICES.md'), 'utf8')).toContain(
+      '| off-platform | 1.0.1 | npm | not declared | requires review |',
+    )
+  })
+
+  it.each(['missing', 'modified'])(
+    'rejects a %s reviewed npm text without writing notices',
+    (state) => {
+      const source = reviewedNpm()
+      if (state === 'missing') rmSync(join(source, 'reviewed-LICENSE'))
+      else writeFileSync(join(source, 'reviewed-LICENSE'), 'changed')
+      expect(run().status).not.toBe(0)
+      expect(readFileSync(join(root, 'THIRD-PARTY-NOTICES.md'), 'utf8')).toBe(SENTINEL)
+    },
+  )
+
+  it.each(['declaration', 'text'])('rejects a conflicting installed npm %s', (kind) => {
+    reviewedNpm()
+    const dir = join(
+      root,
+      'frontend/node_modules/.pnpm/off-platform@1.0.0/node_modules/off-platform',
+    )
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: 'off-platform',
+        version: '1.0.0',
+        license: kind === 'declaration' ? 'Apache-2.0' : 'MIT',
+      }),
+    )
+    if (kind === 'text') writeFileSync(join(dir, 'LICENSE'), 'Unexpected text')
+    expect(run().status).not.toBe(0)
+    expect(readFileSync(join(root, 'THIRD-PARTY-NOTICES.md'), 'utf8')).toBe(SENTINEL)
+  })
 
   it.each([
     ['.', 'missing'],
@@ -253,7 +334,7 @@ describe('the third-party notice generator', { timeout: 20_000 }, () => {
           )
       }
       const sources = join(root, 'scripts/third-party-sources')
-      mkdirSync(sources)
+      mkdirSync(sources, { recursive: true })
       const noticePath = join(sources, 'typst-0.15.1-NOTICE')
       if (state !== 'missing notice') {
         copyFileSync(
@@ -317,7 +398,7 @@ describe('the third-party notice generator', { timeout: 20_000 }, () => {
         '[package]\nname = "objc2-foundation"\nversion = "0.3.2"\nlicense = "MIT"\n',
       )
       const sources = join(root, 'scripts/third-party-sources')
-      mkdirSync(sources)
+      mkdirSync(sources, { recursive: true })
       const policy = join(sources, 'objc2-LICENSE.md')
       copyFileSync(
         fileURLToPath(
@@ -384,7 +465,7 @@ describe('the third-party notice generator', { timeout: 20_000 }, () => {
         },
       ]
       const sources = join(root, 'scripts/third-party-sources')
-      mkdirSync(sources)
+      mkdirSync(sources, { recursive: true })
       for (const group of groups) {
         const path = join(sources, group.file)
         if (state !== `missing ${group.key}`) {

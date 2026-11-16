@@ -9,8 +9,10 @@
 // before the release with PDF. Nothing here is written by hand and nothing is
 // fetched: a text is copied byte for byte from the local Cargo registry (the
 // unpacked crate, or the .crate archive when it was never unpacked) or from
-// node_modules. A package whose files are not on this machine is marked
-// "requires review" and listed. The set of crates is Cargo.lock, which cargo
+// node_modules, with exact-version references to verified local upstream
+// texts in scripts/third-party-sources. A package without an available or
+// reviewed text is marked "requires review" and listed. The set of crates is
+// Cargo.lock, which cargo
 // resolves with every feature of the workspace; the script checks it against
 // `cargo metadata --all-features` before it writes.
 // Both pnpm stores must contain installed locked packages. Otherwise an
@@ -121,15 +123,36 @@ function npmDir(lockDir, name, version) {
   return null
 }
 
+// Offline, exact-version references reviewed against registry archives or the
+// publishing commit. Never extend a reference to an unreviewed version.
+const npmReviewed = JSON.parse(readFileSync(join(ROOT, 'scripts/third-party-sources/npm-reviewed.json'), 'utf8'))
+const npmReferences = new Map()
 function npmFiles(lockDir, name, version) {
   const dir = npmDir(lockDir, name, version)
-  if (!dir) return { declared: null, files: [], where: null }
-  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+  const manifest = dir ? JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) : {}
   const declared =
     typeof manifest.license === 'string'
       ? manifest.license
       : (manifest.license?.type ?? manifest.licenses?.map((l) => l.type ?? l).join(' OR ') ?? null)
-  return { declared, files: licenceFiles(dir), where: 'node_modules' }
+  const files = dir ? licenceFiles(dir) : []
+  const reference = npmReviewed.find((r) => r.name === name && r.version === version)
+  if (!reference) return { declared, files, where: dir ? 'node_modules' : null }
+  if (dir && declared !== reference.license) throw new Error(`reviewed npm licence declaration changed: ${name} ${version}`)
+  const verified = reference.files.map(({ file, sha256 }) => {
+    const path = join(ROOT, 'scripts/third-party-sources', file)
+    const bytes = existsSync(path) ? readFileSync(path) : null
+    if (!bytes || createHash('sha256').update(bytes).digest('hex') !== sha256) {
+      throw new Error(`verified npm licence is missing or changed: ${file}`)
+    }
+    return [file, bytes]
+  })
+  // Installed texts remain authoritative: do not conceal unexpected changes.
+  for (const [file, bytes] of files) {
+    const digest = createHash('sha256').update(bytes).digest('hex')
+    if (!reference.files.some((f) => f.sha256 === digest)) throw new Error(`installed npm licence differs from review: ${name} ${file}`)
+  }
+  npmReferences.set(`${name} ${version}`, reference)
+  return { declared: reference.license, files: verified, where: 'verified source' }
 }
 
 /** cargo metadata --all-features: the registry crates it resolves. */
@@ -318,6 +341,9 @@ if (objc2Reviews.length) {
 }
 for (const group of spectaGroups.filter((g) => g.reviewed.length)) {
   out.push('', `${group.reviewed.map((r) => `${r.name} ${r.version}`).join(', ')} declare MIT but ship no licence file. Reference ${label.get(group.digest)} is the unmodified upstream LICENSE from ${group.source}. The source file ${group.finalNewline ? 'ends' : 'does not end'} with a newline; Markdown adds a line break before the closing fence.`, '')
+}
+for (const [name, reference] of npmReferences) {
+  out.push('', `${name}: reviewed exact-version MIT reference; original texts preserved from ${reference.files.map((f) => f.source).join(', ')}.`, '')
 }
 out.push('', '## Requires review', '')
 out.push(

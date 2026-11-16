@@ -390,7 +390,7 @@ const TOOLING_EDGES: [string, string[]][] = [
     'minimatch@10.2.6',
     [
       '@eslint/config-array@0.23.5',
-      '@typescript-eslint/typescript-estree@8.72.1',
+      '@typescript-eslint/typescript-estree@8.72.2',
       'eslint@10.14.0',
     ],
   ],
@@ -613,7 +613,7 @@ describe('the temporary glob and minimatch development exceptions', () => {
     }
     for (const text of callerSources(
       '@typescript-eslint/typescript-estree',
-      '8.72.1',
+      '8.72.2',
       'dist/useProgramFromProjectService.js',
     )) {
       expect(text).toContain('(0, minimatch_1.minimatch)(filePath, pattern, { dot: true })')

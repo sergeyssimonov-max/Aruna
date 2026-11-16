@@ -1,0 +1,104 @@
+[
+  {
+    "name": "@emnapi/core",
+    "version": "2.0.0-beta.2",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "emnapi-2.0.0-beta.2-LICENSE",
+        "sha256": "2088f55c6731498410b20c95ebd345ed4a4a800bf74c0fba4d282fd2a021daaa",
+        "source": "https://registry.npmjs.org/@emnapi/core/-/core-2.0.0-beta.2.tgz"
+      }
+    ],
+    "archive": {
+      "url": "https://registry.npmjs.org/@emnapi/core/-/core-2.0.0-beta.2.tgz",
+      "integrity": "sha512-MzCVoWtcg4Pm2B3je5mMvYMvj3MmBKw+fU7vbsJc9/iT8ip6/eYIHo/Dsm/mr+wsHB6SEyJDuxB09Yy6r/8+4A=="
+    }
+  },
+  {
+    "name": "@emnapi/runtime",
+    "version": "2.0.0-beta.2",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "emnapi-2.0.0-beta.2-LICENSE",
+        "sha256": "2088f55c6731498410b20c95ebd345ed4a4a800bf74c0fba4d282fd2a021daaa",
+        "source": "https://registry.npmjs.org/@emnapi/runtime/-/runtime-2.0.0-beta.2.tgz"
+      }
+    ],
+    "archive": {
+      "url": "https://registry.npmjs.org/@emnapi/runtime/-/runtime-2.0.0-beta.2.tgz",
+      "integrity": "sha512-JcrSPzPvZuNZvJqPTF9Fw25LbOJ8avzFVlaf2grmH4Cku0oGP47tRgqPZadcfj3YoZMHkFVnCYFbQM8I+i5QEw=="
+    }
+  },
+  {
+    "name": "@emnapi/wasi-threads",
+    "version": "2.2.0",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "emnapi-2.0.0-beta.2-LICENSE",
+        "sha256": "2088f55c6731498410b20c95ebd345ed4a4a800bf74c0fba4d282fd2a021daaa",
+        "source": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-2.2.0.tgz"
+      }
+    ],
+    "archive": {
+      "url": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-2.2.0.tgz",
+      "integrity": "sha512-JP7OYH38Q7+pyTAe14raZHLQIK7BDKbdwji+Xi3pcd/6QkJYQH3SX4wu6EplGrGJWRepoNzedfm0G3B9Z4e9Rw=="
+    }
+  },
+  {
+    "name": "@tybys/wasm-util",
+    "version": "0.10.4",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "tybys-wasm-util-0.10.4-LICENSE",
+        "sha256": "09e436100bf926e78df875ec80cf3d0c643dfec779b52cfe2aa96afa0de714cb",
+        "source": "https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.4.tgz"
+      }
+    ],
+    "archive": {
+      "url": "https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.4.tgz",
+      "integrity": "sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A=="
+    }
+  },
+  {
+    "name": "@napi-rs/wasm-runtime",
+    "version": "1.2.6",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "napi-rs-4fff029-LICENSE",
+        "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+        "source": "https://github.com/napi-rs/napi-rs/blob/4fff029f67693d08be0ff16818eb9ead2637a99e/LICENSE"
+      }
+    ],
+    "archive": {
+      "url": "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.6.tgz",
+      "integrity": "sha512-mRyDmEw9/fCDXCGfL1sbgIw/GUK0PVxRW4YwgPN61F3LQ+fSyoBFarJVzgGyhF6kRzEQZ0FejDqm4WLXSeqQmw=="
+    }
+  },
+  {
+    "name": "@rolldown/binding-wasm32-wasi",
+    "version": "1.2.19",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "rolldown-b9c75dd-LICENSE",
+        "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+        "source": "https://github.com/rolldown/rolldown/blob/b9c75ddc8bd50f2c1a4c7be0b548bdab5cba85ab/LICENSE"
+      },
+      {
+        "file": "rolldown-b9c75dd-THIRD-PARTY-LICENSE",
+        "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c",
+        "source": "https://github.com/rolldown/rolldown/blob/b9c75ddc8bd50f2c1a4c7be0b548bdab5cba85ab/THIRD-PARTY-LICENSE"
+      }
+    ],
+    "archive": {
+      "url": "https://registry.npmjs.org/@rolldown/binding-wasm32-wasi/-/binding-wasm32-wasi-1.2.19.tgz",
+      "integrity": "sha512-7EH+skOsl5qpWnK0vzamgJFhOv1cwxQpsxm8tI883K9fur5c27p8q87fzEO6BbBPabA2/+s/zR63/pLc137iOg=="
+    },
+    "publication": "https://registry.npmjs.org/-/npm/v1/attestations/@rolldown%2fbinding-wasm32-wasi@1.2.19"
+  }
+]
