@@ -58,6 +58,39 @@ printed the parse of each synthetic archive buried its own failures.
 
 ## Profiles
 
+The explicit Cargo `corpus` profile inherits the test profile and uses
+`opt-level = 3`, one codegen unit and ThinLTO. It retains
+`debug-assertions = true` and `overflow-checks = true`; debug symbols and
+incremental caching are disabled only in this heavy profile to bound disk use.
+Everyday `test`,
+development and release profiles keep their original settings. ThinLTO is
+limited to the heavy acceptance because linking every ordinary test with it
+is unnecessarily expensive.
+
+Run the same ten heavy checks on each macOS architecture, one test at a time:
+
+```sh
+INSTA_UPDATE=no ARUNA_REQUIRE_FIXTURE=1 cargo nextest run --locked \
+  --workspace --lib --test authenticity --test corpus --test document_model --test pdf_module \
+  --cargo-profile corpus --target x86_64-apple-darwin \
+  --run-ignored ignored-only -E 'not test(regenerate_the_bindings)' \
+  --no-tests=fail --no-fail-fast -j 1
+```
+
+Repeat with `aarch64-apple-darwin`. Supply `ARUNA_ZIP` and `ARUNA_FONTS` when
+using non-default fixture paths. The selectors build only six binaries;
+all ten heavy checks remain selected, and the bindings generator remains
+excluded. This does not change nextest's 120/300-second deadlines or snapshots.
+
+The XML reference tools process groups of 16 corpus documents. Each result
+is still checked separately against the same independent oracle. Malformed
+input or an ambiguous separator falls back to individual invocations, and
+regression tests compare batching with those original invocations. Both
+`xmllint` and `xsltproc` must be available for these regression tests; the Linux
+CI jobs install them explicitly. Historical timings below retain the settings
+of their original runs. Never hide a failure by changing a timeout or adding
+automatic retries.
+
 ### Fast — about 12 s
 
 Formatting, compilation, and everything that does not touch the corpus archive.
