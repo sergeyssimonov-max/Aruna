@@ -181,9 +181,103 @@ for (const row of rows) {
     return digest
   })
 }
-const order = [...texts.keys()].sort((a, b) => texts.get(b).users.length - texts.get(a).users.length || (a < b ? -1 : 1))
+// selectors 0.38.0 and 0.41.0 declare MPL-2.0 and their source headers point to Mozilla,
+// but the published crate contains no licence file. This is a reviewed,
+// version-specific reference to the exact MPL text shipped by cssparser 0.38.0;
+// do not treat missing crates or unknown versions as reviewed.
+const selectorsSources = new Map([
+  ['0.38.0', '572ecba2d1600e7c3d490586692a209faf703baa'],
+  ['0.41.0', '34d25f741765a0bdb894f8271852e633299352d8'],
+])
+const mplDigest = 'fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85'
+const selectorsReferences = []
+for (const selectors of rows.filter((r) => r.eco === 'crate' && r.name === 'selectors' && selectorsSources.has(r.version))) {
+  if (!selectors.where || selectors.declared !== 'MPL-2.0' || selectors.files.length !== 0) continue
+  const source = rows.find((r) => r.eco === 'crate' && r.name === 'cssparser' && r.version === '0.38.0')
+  const licence = source?.files.find(([name]) => name === 'LICENSE')
+  if (source?.declared !== 'MPL-2.0' || !licence || createHash('sha256').update(licence[1]).digest('hex') !== mplDigest) {
+    console.error('third-party-notices: verified MPL-2.0 reference is missing or changed')
+    process.exit(1)
+  }
+  selectors.refs = [mplDigest]
+  selectorsReferences.push(selectors)
+}
+
+// These crates share one reviewed upstream commit. The published crates omit
+// its root LICENSE and NOTICE. Keep the upstream NOTICE byte for byte and
+// verify both it and the identical LICENSE from typst-assets before use.
+const typstNames = new Set(['typst', 'typst-eval', 'typst-html', 'typst-layout', 'typst-library', 'typst-macros', 'typst-pdf', 'typst-realize', 'typst-svg', 'typst-syntax', 'typst-timing', 'typst-utils'])
+const typstLicenseDigest = '62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a'
+const typstNoticeDigest = '1778244777547c281b6f5fa9fc0c18ab21f8d4491c803f64e09046800f5fcb26'
+const typstReferences = []
+for (const row of rows.filter((r) => r.eco === 'crate' && typstNames.has(r.name) && r.version === '0.15.1')) {
+  if (!row.where || row.declared !== 'Apache-2.0' || row.files.length !== 0) continue
+  const source = rows.find((r) => r.eco === 'crate' && r.name === 'typst-assets' && r.version === '0.15.1')
+  const licence = source?.files.find(([name]) => name === 'LICENSE')
+  const noticePath = join(ROOT, 'scripts/third-party-sources/typst-0.15.1-NOTICE')
+  const notice = existsSync(noticePath) ? readFileSync(noticePath) : null
+  if (source?.declared !== 'Apache-2.0' || !licence || createHash('sha256').update(licence[1]).digest('hex') !== typstLicenseDigest || !notice || createHash('sha256').update(notice).digest('hex') !== typstNoticeDigest) {
+    console.error('third-party-notices: verified Typst licence or upstream NOTICE is missing or changed')
+    process.exit(1)
+  }
+  if (!texts.has(typstNoticeDigest)) texts.set(typstNoticeDigest, { bytes: notice, users: ['Typst upstream NOTICE, commit 9dfd3a08500b7896045f907433cf7b4b02434fad'] })
+  row.refs = [typstLicenseDigest, typstNoticeDigest]
+  typstReferences.push(row)
+}
+
+// The upstream policy confirms SPDX declarations but flags uncertainty about
+// Apple SDK-derived code and does not itself contain the full MIT text. Keep
+// those packages in review while preserving the original upstream policy.
+const objc2Versions = new Map([
+  ['block2', '0.6.2'], ['dispatch2', '0.3.1'], ['objc2', '0.6.4'],
+  ['objc2-encode', '4.1.0'], ['objc2-exception-helper', '0.1.1'],
+  ...['app-kit', 'cloud-kit', 'core-data', 'core-foundation', 'core-graphics', 'core-image', 'core-location', 'core-text', 'core-video', 'foundation', 'io-surface', 'javascript-core', 'quartz-core', 'security', 'ui-kit', 'user-notifications', 'web-kit'].map((name) => [`objc2-${name}`, '0.3.2']),
+])
+const objc2PolicyDigest = '7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54'
+const objc2Reviews = rows.filter((r) => r.eco === 'crate' && objc2Versions.get(r.name) === r.version && r.refs.length === 0)
+if (objc2Reviews.length) {
+  const path = join(ROOT, 'scripts/third-party-sources/objc2-LICENSE.md')
+  const policy = existsSync(path) ? readFileSync(path) : null
+  if (!policy || createHash('sha256').update(policy).digest('hex') !== objc2PolicyDigest) {
+    console.error('third-party-notices: verified objc2 upstream policy is missing or changed')
+    process.exit(1)
+  }
+  if (!texts.has(objc2PolicyDigest)) texts.set(objc2PolicyDigest, { bytes: policy, users: ['objc2 upstream licence policy'] })
+}
+
+// Each Specta repository has its own reviewed MIT licence and commit. Their
+// texts differ by a final newline, so retain and verify both byte sequences.
+const spectaGroups = [
+  { versions: new Map([['specta', '2.0.0-rc.25'], ['specta-macros', '2.0.0-rc.25'], ['specta-serde', '0.0.12'], ['specta-typescript', '0.0.12'], ['specta-util', '0.0.12']]), file: 'specta-e7fd23f-LICENSE', digest: '9ec86f39e235fcd35e6d91ef3fd4d6b88e5763f3ce1e296c222969986b6f6475', source: 'https://github.com/specta-rs/specta/blob/e7fd23f586b9bd58de39002dabe49b1f978bf971/LICENSE', finalNewline: false },
+  { versions: new Map([['tauri-specta', '2.0.0-rc.25'], ['tauri-specta-macros', '2.0.0-rc.25']]), file: 'tauri-specta-e5e578f-LICENSE', digest: '79b0c7d284efc4c2dc8da73c01a6d10c19caf61e70fca813e642dc010049eee7', source: 'https://github.com/specta-rs/tauri-specta/blob/e5e578fb339fc2b0d6c676b3031c3dafcec88083/LICENSE', finalNewline: true },
+]
+for (const group of spectaGroups) {
+  group.reviewed = []
+  for (const row of rows.filter((r) => r.eco === 'crate' && group.versions.get(r.name) === r.version)) {
+    if (!row.where || row.declared !== 'MIT' || row.files.length !== 0) continue
+    const path = join(ROOT, 'scripts/third-party-sources', group.file)
+    const licence = existsSync(path) ? readFileSync(path) : null
+    if (!licence || createHash('sha256').update(licence).digest('hex') !== group.digest) {
+      console.error(`third-party-notices: verified ${group.file} is missing or changed`)
+      process.exit(1)
+    }
+    if (!texts.has(group.digest)) texts.set(group.digest, { bytes: licence, users: [`upstream ${group.file}`] })
+    row.refs = [group.digest]
+    group.reviewed.push(row)
+  }
+}
+
+// Stable, reviewed baseline ordering avoids moving unchanged verbatim licence
+// text when the number of users changes. Unknown texts follow in hash order.
+// Append reviewed new hashes to the baseline; do not reorder existing entries.
+const baseline = JSON.parse(readFileSync(join(ROOT, 'scripts/third-party-license-order.json'), 'utf8'))
+if (!Array.isArray(baseline) || baseline.some((d) => typeof d !== 'string' || !/^[0-9a-f]{64}$/.test(d)) || new Set(baseline).size !== baseline.length) {
+  throw new Error('invalid third-party licence order')
+}
+const positions = new Map(baseline.map((d, i) => [d, i]))
+const order = [...texts.keys()].sort((a, b) => (positions.get(a) ?? Infinity) - (positions.get(b) ?? Infinity) || (a < b ? -1 : 1))
 const label = new Map(order.map((d, i) => [d, `T${i + 1}`]))
-const review = rows.filter((r) => r.files.length === 0)
+const review = rows.filter((r) => r.refs.length === 0)
 const cell = (s) => String(s ?? 'not declared').replaceAll('|', '\\|')
 
 const out = []
@@ -197,8 +291,9 @@ out.push(
   'subset of it. The crates are the set Cargo resolves with every feature of the workspace',
   '(`cargo metadata --all-features`), which is the set of `Cargo.lock`.',
   '',
-  'Every text below is copied byte for byte from the files the package itself ships – the local',
-  'Cargo registry for crates, `node_modules` for npm packages. None was written by hand. A package',
+  'Texts below are copied byte for byte from the local Cargo registry, installed npm packages,',
+  'or documented, verified upstream sources.',
+  'A documented reference may use another package’s identical standard licence text. A package',
   'whose files were not available without the network is marked *requires review* and listed',
   'under that heading. Identical texts are given once. The file is written by',
   '`scripts/third-party-notices.mjs` (owner\'s decision of 2026-10-02); its coverage of the lock',
@@ -211,6 +306,18 @@ out.push('## Packages', '', '| Package | Version | From | Declared licence | Tex
 for (const r of rows) {
   const t = r.refs.length ? r.refs.map((d) => label.get(d)).join(', ') : 'requires review'
   out.push(`| ${cell(r.name)} | ${cell(r.version)} | ${r.eco} | ${cell(r.declared)} | ${t} |`)
+}
+for (const selectors of selectorsReferences) {
+  out.push('', `selectors ${selectors.version} declares MPL-2.0 but ships no licence file. Its reference ${label.get(mplDigest)} is the unmodified MPL-2.0 text from cssparser 0.38.0 (LICENSE); its source headers point to https://mozilla.org/MPL/2.0/. The selectors source is https://github.com/servo/stylo/tree/${selectorsSources.get(selectors.version)}/selectors.`, '')
+}
+if (typstReferences.length) {
+  out.push('', `Typst ${typstReferences.map((r) => `${r.name} ${r.version}`).join(', ')} declare Apache-2.0 but ship no licence file. Reference ${label.get(typstLicenseDigest)} is the unmodified LICENSE from typst-assets 0.15.1, verified identical to the upstream LICENSE; ${label.get(typstNoticeDigest)} is the unmodified upstream NOTICE. Both originate from https://github.com/typst/typst/tree/9dfd3a08500b7896045f907433cf7b4b02434fad.`, '')
+}
+if (objc2Reviews.length) {
+  out.push('', `For ${objc2Reviews.map((r) => `${r.name} ${r.version}`).join(', ')}, ${label.get(objc2PolicyDigest)} preserves the upstream licence policy from https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md (identical at their four source commits). It identifies the declared licences, but does not provide the complete MIT text and notes uncertainty concerning Apple SDK-derived code. These packages remain listed for review.`, '')
+}
+for (const group of spectaGroups.filter((g) => g.reviewed.length)) {
+  out.push('', `${group.reviewed.map((r) => `${r.name} ${r.version}`).join(', ')} declare MIT but ship no licence file. Reference ${label.get(group.digest)} is the unmodified upstream LICENSE from ${group.source}. The source file ${group.finalNewline ? 'ends' : 'does not end'} with a newline; Markdown adds a line break before the closing fence.`, '')
 }
 out.push('', '## Requires review', '')
 out.push(

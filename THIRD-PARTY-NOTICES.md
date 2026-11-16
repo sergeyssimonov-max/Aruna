@@ -8,15 +8,16 @@ and the platform packages of other systems as well; what ends up in the applicat
 subset of it. The crates are the set Cargo resolves with every feature of the workspace
 (`cargo metadata --all-features`), which is the set of `Cargo.lock`.
 
-Every text below is copied byte for byte from the files the package itself ships – the local
-Cargo registry for crates, `node_modules` for npm packages. None was written by hand. A package
+Texts below are copied byte for byte from the local Cargo registry, installed npm packages,
+or documented, verified upstream sources.
+A documented reference may use another package’s identical standard licence text. A package
 whose files were not available without the network is marked *requires review* and listed
 under that heading. Identical texts are given once. The file is written by
 `scripts/third-party-notices.mjs` (owner's decision of 2026-10-02); its coverage of the lock
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires review: 163.
+Packages: 1438 – crates 751, npm 687. Distinct licence texts: 687. Requires review: 143.
 
 ## Packages
 
@@ -61,7 +62,9 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | biblatex | 0.12.0 | crate | MIT OR Apache-2.0 | T435, T2 |
 | bincode | 1.3.3 | crate | MIT | T265 |
 | bit-set | 0.8.0 | crate | Apache-2.0 OR MIT | T40, T195 |
+| bit-set | 0.11.1 | crate | Apache-2.0 OR MIT | T40, T195 |
 | bit-vec | 0.8.0 | crate | Apache-2.0 OR MIT | T40, T195 |
+| bit-vec | 0.10.1 | crate | Apache-2.0 OR MIT | T40, T195 |
 | bitflags | 1.3.2 | crate | MIT/Apache-2.0 | T1, T30 |
 | bitflags | 2.13.2 | crate | MIT OR Apache-2.0 | T1, T30 |
 | block-buffer | 0.10.4 | crate | MIT OR Apache-2.0 | T11, T598 |
@@ -82,7 +85,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | bytes | 1.12.1 | crate | MIT | T338 |
 | cairo-rs | 0.18.5 | crate | MIT | T22, T7 |
 | cairo-sys-rs | 0.18.2 | crate | MIT | T7 |
-| camino | 1.2.5 | crate | MIT OR Apache-2.0 | T1, T2 |
+| camino | 1.2.6 | crate | MIT OR Apache-2.0 | T1, T2 |
 | cargo-platform | 0.1.9 | crate | MIT OR Apache-2.0 | T51, T2 |
 | cargo_metadata | 0.19.2 | crate | MIT | T2 |
 | cargo_toml | 1.0.1 | crate | Apache-2.0 OR MIT | T645 |
@@ -131,6 +134,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | crypto-common | 0.1.7 | crate | MIT OR Apache-2.0 | T11, T306 |
 | crypto-common | 0.2.2 | crate | MIT OR Apache-2.0 | T11, T594 |
 | cssparser | 0.37.0 | crate | MPL-2.0 | T197 |
+| cssparser | 0.38.0 | crate | MPL-2.0 | T197 |
 | cssparser-macros | 0.7.1 | crate | MPL-2.0 | T197 |
 | csv | 1.4.0 | crate | Unlicense/MIT | T21, T23, T18 |
 | csv-core | 0.1.13 | crate | Unlicense/MIT | T21, T23, T18 |
@@ -143,7 +147,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | defmt | 1.1.1 | crate | MIT OR Apache-2.0 | T40, T121 |
 | defmt-macros | 1.1.1 | crate | MIT OR Apache-2.0 | T40, T121 |
 | defmt-parser | 1.0.0 | crate | MIT OR Apache-2.0 | requires review |
-| deranged | 0.5.8 | crate | MIT OR Apache-2.0 | T644, T264 |
+| deranged | 0.5.9 | crate | MIT OR Apache-2.0 | T644, T264 |
 | derive_more | 2.1.1 | crate | MIT | T151 |
 | derive_more-impl | 2.1.1 | crate | MIT | T151 |
 | digest | 0.10.7 | crate | MIT OR Apache-2.0 | T11, T506 |
@@ -157,6 +161,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | dlopen2 | 0.8.2 | crate | MIT | requires review |
 | dlopen2_derive | 0.4.3 | crate | MIT | requires review |
 | dom_query | 0.28.0 | crate | MIT | T426 |
+| dom_query | 0.29.0 | crate | MIT | T426 |
 | dpi | 0.1.2 | crate | Apache-2.0 AND MIT | T142, T510 |
 | dtoa | 1.0.11 | crate | MIT OR Apache-2.0 | T5, T2 |
 | dtoa-short | 0.3.5 | crate | MPL-2.0 | T247 |
@@ -167,15 +172,15 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | either | 1.18.0 | crate | MIT OR Apache-2.0 | T1, T84 |
 | embed-resource | 3.0.11 | crate | MIT | T241 |
 | embed_plist | 1.2.2 | crate | MIT OR Apache-2.0 | T20, T607 |
-| encoding_rs | 0.8.42 | crate | (Apache-2.0 OR MIT) AND BSD-3-Clause | T226, T20, T47, T454 |
+| encoding_rs | 0.8.44 | crate | (Apache-2.0 OR MIT) AND BSD-3-Clause | T226, T20, T47, T454 |
 | endi | 1.1.1 | crate | MIT | T2 |
 | enum-ordinalize | 4.4.2 | crate | MIT | T180 |
 | enum-ordinalize-derive | 4.4.2 | crate | MIT | T180 |
 | enumflags2 | 0.7.12 | crate | MIT OR Apache-2.0 | T324, T289 |
 | enumflags2_derive | 0.7.12 | crate | MIT OR Apache-2.0 | T399, T591 |
 | env_filter | 0.1.4 | crate | MIT OR Apache-2.0 | T12, T25 |
-| equivalent | 1.0.2 | crate | Apache-2.0 OR MIT | T1, T422 |
-| erased-serde | 0.4.10 | crate | MIT OR Apache-2.0 | T5, T2 |
+| equivalent | 1.0.3 | crate | Apache-2.0 OR MIT | T1, T422 |
+| erased-serde | 0.4.11 | crate | MIT OR Apache-2.0 | T5, T2 |
 | errno | 0.3.14 | crate | MIT OR Apache-2.0 | T1, T459 |
 | euclid | 0.22.14 | crate | MIT OR Apache-2.0 | T189, T1, T38 |
 | event-listener | 5.4.2 | crate | Apache-2.0 OR MIT | T1, T2 |
@@ -186,8 +191,8 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | fearless_simd | 0.4.1 | crate | Apache-2.0 OR MIT | T27, T56 |
 | fern | 0.7.1 | crate | MIT | T385 |
 | field-offset | 0.3.6 | crate | MIT OR Apache-2.0 | T27, T504 |
-| find-msvc-tools | 0.1.14 | crate | MIT OR Apache-2.0 | T1, T17 |
-| flate2 | 1.1.10 | crate | MIT OR Apache-2.0 | T1, T207 |
+| find-msvc-tools | 0.1.15 | crate | MIT OR Apache-2.0 | T1, T17 |
+| flate2 | 1.1.11 | crate | MIT OR Apache-2.0 | T1, T207 |
 | float-cmp | 0.9.0 | crate | MIT | T323 |
 | fnv | 1.0.7 | crate | Apache-2.0 / MIT | T1, T396 |
 | foldhash | 0.2.0 | crate | Zlib | T541 |
@@ -256,6 +261,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | hermit-abi | 0.5.2 | crate | MIT OR Apache-2.0 | T1, T2 |
 | hex | 0.4.3 | crate | MIT OR Apache-2.0 | T12, T666 |
 | html5ever | 0.39.0 | crate | MIT OR Apache-2.0 | T1, T89 |
+| html5ever | 0.40.1 | crate | MIT OR Apache-2.0 | T1, T89 |
 | http | 1.5.0 | crate | MIT OR Apache-2.0 | T468, T613 |
 | http-body | 1.1.0 | crate | MIT | T117 |
 | http-body-util | 0.1.5 | crate | MIT | T117 |
@@ -332,15 +338,16 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | lipsum | 0.9.1 | crate | MIT | T205 |
 | litemap | 0.8.3 | crate | Unicode-3.0 | T8 |
 | lock_api | 0.4.14 | crate | MIT OR Apache-2.0 | T1, T70 |
-| log | 0.4.34 | crate | MIT OR Apache-2.0 | T1, T30 |
-| lopdf | 0.45.0 | crate | MIT | T292 |
+| log | 0.4.35 | crate | MIT OR Apache-2.0 | T1, T30 |
+| lopdf | 0.47.0 | crate | MIT | T292 |
 | markup5ever | 0.39.0 | crate | MIT OR Apache-2.0 | T1, T89 |
+| markup5ever | 0.40.0 | crate | MIT OR Apache-2.0 | T1, T89 |
 | matchit | 0.8.4 | crate | MIT AND BSD-3-Clause | T617, T232 |
 | md-5 | 0.11.0 | crate | MIT OR Apache-2.0 | T11, T149 |
 | memchr | 2.8.3 | crate | Unlicense OR MIT | T21, T23, T18 |
 | memmap2 | 0.9.11 | crate | MIT OR Apache-2.0 | T211, T224 |
 | memoffset | 0.9.1 | crate | MIT | T300 |
-| mime | 0.3.17 | crate | MIT OR Apache-2.0 | T1, T619 |
+| mime | 0.3.18 | crate | MIT OR Apache-2.0 | T1, T619 |
 | miniz_oxide | 0.8.9 | crate | MIT OR Zlib OR Apache-2.0 | T128, T10, T148, T105 |
 | miniz_oxide | 0.9.1 | crate | MIT OR Zlib OR Apache-2.0 | T128, T10, T148, T105 |
 | mio | 1.2.2 | crate | MIT | T218 |
@@ -399,16 +406,21 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | peniko | 0.6.1 | crate | Apache-2.0 OR MIT | T670, T56 |
 | percent-encoding | 2.3.2 | crate | MIT OR Apache-2.0 | T1, T68 |
 | phf | 0.13.1 | crate | MIT | T44 |
+| phf | 0.14.0 | crate | MIT | T44 |
 | phf_codegen | 0.13.1 | crate | MIT | T44 |
+| phf_codegen | 0.14.0 | crate | MIT | T44 |
 | phf_generator | 0.13.1 | crate | MIT | T44 |
+| phf_generator | 0.14.0 | crate | MIT | T44 |
 | phf_macros | 0.13.1 | crate | MIT | T44 |
+| phf_macros | 0.14.0 | crate | MIT | T44 |
 | phf_shared | 0.13.1 | crate | MIT | T44 |
+| phf_shared | 0.14.0 | crate | MIT | T44 |
 | pic-scale | 0.7.12 | crate | BSD-3-Clause OR Apache-2.0 | T92, T75 |
 | pico-args | 0.5.0 | crate | MIT | T662 |
 | pin-project-lite | 0.2.17 | crate | Apache-2.0 OR MIT | T10, T2 |
 | piper | 0.2.5 | crate | MIT OR Apache-2.0 | T1, T2 |
 | pkg-config | 0.3.34 | crate | MIT OR Apache-2.0 | T1, T17 |
-| plist | 1.10.1 | crate | MIT | T371 |
+| plist | 1.10.3 | crate | MIT | T371 |
 | png | 0.18.1 | crate | MIT OR Apache-2.0 | T1, T637 |
 | polling | 3.11.0 | crate | Apache-2.0 OR MIT | T1, T2 |
 | polycool | 0.4.0 | crate | MIT OR Apache-2.0 | T20, T56 |
@@ -459,7 +471,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | ring | 0.17.14 | crate | Apache-2.0 AND ISC | T547, T202, T649 |
 | roman-numerals-rs | 3.1.0 | crate | 0BSD OR CC0-1.0 | requires review |
 | roxmltree | 0.20.0 | crate | MIT OR Apache-2.0 | T1, T200 |
-| roxmltree | 0.21.1 | crate | MIT OR Apache-2.0 | T1, T200 |
+| roxmltree | 0.21.2 | crate | MIT OR Apache-2.0 | T1, T200 |
 | rust_decimal | 1.43.0 | crate | MIT | T668 |
 | rustc-hash | 2.1.3 | crate | Apache-2.0 OR MIT | T489, T125 |
 | rustc_version | 0.4.1 | crate | MIT OR Apache-2.0 | T1, T70 |
@@ -476,7 +488,8 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | schemars | 1.2.2 | crate | MIT | T54 |
 | schemars_derive | 0.8.22 | crate | MIT | T54 |
 | scopeguard | 1.2.0 | crate | MIT OR Apache-2.0 | T1, T673 |
-| selectors | 0.38.0 | crate | MPL-2.0 | requires review |
+| selectors | 0.38.0 | crate | MPL-2.0 | T197 |
+| selectors | 0.41.0 | crate | MPL-2.0 | T197 |
 | semver | 1.0.28 | crate | MIT OR Apache-2.0 | T5, T2 |
 | serde | 1.0.229 | crate | MIT OR Apache-2.0 | T5, T2 |
 | serde-untagged | 0.1.9 | crate | MIT OR Apache-2.0 | T5, T2 |
@@ -487,7 +500,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | serde_path_to_error | 0.1.20 | crate | MIT OR Apache-2.0 | T5, T2 |
 | serde_repr | 0.1.21 | crate | MIT OR Apache-2.0 | T5, T2 |
 | serde_spanned | 0.6.9 | crate | MIT OR Apache-2.0 | T12, T25 |
-| serde_spanned | 1.1.1 | crate | MIT OR Apache-2.0 | T12, T25 |
+| serde_spanned | 1.1.3 | crate | MIT OR Apache-2.0 | T687, T25 |
 | serde_urlencoded | 0.7.1 | crate | MIT/Apache-2.0 | T5, T559 |
 | serde_with | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T84 |
 | serde_with_macros | 3.22.0 | crate | MIT OR Apache-2.0 | T1, T84 |
@@ -495,6 +508,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | serialize-to-javascript | 0.1.2 | crate | MIT OR Apache-2.0 | T9, T186 |
 | serialize-to-javascript-impl | 0.1.2 | crate | MIT OR Apache-2.0 | T9, T186 |
 | servo_arc | 0.4.3 | crate | MIT OR Apache-2.0 | T1, T2 |
+| servo_arc | 0.5.0 | crate | MIT OR Apache-2.0 | T1, T2 |
 | sha2 | 0.10.9 | crate | MIT OR Apache-2.0 | T11, T550 |
 | sha2 | 0.11.0 | crate | MIT OR Apache-2.0 | T11, T149 |
 | shlex | 2.0.1 | crate | MIT OR Apache-2.0 | T364, T332 |
@@ -507,23 +521,25 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | skrifa | 0.42.1 | crate | MIT OR Apache-2.0 | T65, T62 |
 | slab | 0.4.12 | crate | MIT | T471 |
 | slotmap | 1.1.1 | crate | Zlib | T410 |
-| smallvec | 1.16.2 | crate | MIT OR Apache-2.0 | T1, T220 |
+| smallvec | 1.16.5 | crate | MIT OR Apache-2.0 | T1, T220 |
 | socket2 | 0.6.5 | crate | MIT OR Apache-2.0 | T1, T17 |
 | softbuffer | 0.4.8 | crate | MIT OR Apache-2.0 | T519, T209 |
 | soup3 | 0.5.0 | crate | MIT | T86 |
 | soup3-sys | 0.5.0 | crate | MIT | T86 |
-| specta | 2.0.0-rc.25 | crate | MIT | requires review |
-| specta-macros | 2.0.0-rc.25 | crate | MIT | requires review |
-| specta-serde | 0.0.12 | crate | MIT | requires review |
-| specta-typescript | 0.0.12 | crate | MIT | requires review |
-| specta-util | 0.0.12 | crate | MIT | requires review |
+| specta | 2.0.0-rc.25 | crate | MIT | T686 |
+| specta-macros | 2.0.0-rc.25 | crate | MIT | T686 |
+| specta-serde | 0.0.12 | crate | MIT | T686 |
+| specta-typescript | 0.0.12 | crate | MIT | T686 |
+| specta-util | 0.0.12 | crate | MIT | T686 |
 | spin | 0.9.9 | crate | MIT | T406 |
 | stable_deref_trait | 1.2.1 | crate | MIT OR Apache-2.0 | T1, T379 |
 | stacker | 0.1.25 | crate | MIT OR Apache-2.0 | T1, T17 |
 | static_vcruntime | 3.0.0 | crate | MIT OR Apache-2.0 OR Zlib | T557, T100, T423, T569 |
 | strict-num | 0.1.1 | crate | MIT | T293 |
 | string_cache | 0.9.0 | crate | MIT OR Apache-2.0 | T1, T38 |
+| string_cache | 0.11.0 | crate | MIT OR Apache-2.0 | T1, T38 |
 | string_cache_codegen | 0.6.1 | crate | MIT OR Apache-2.0 | T1, T38 |
+| string_cache_codegen | 0.11.2 | crate | MIT OR Apache-2.0 | T1, T38 |
 | stringprep | 0.1.5 | crate | MIT/Apache-2.0 | T12, T514 |
 | strsim | 0.11.1 | crate | MIT | T246 |
 | strum | 0.27.2 | crate | MIT | T152 |
@@ -534,13 +550,13 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | swift-rs | 1.0.9 | crate | MIT OR Apache-2.0 | T477, T655 |
 | syn | 1.0.109 | crate | MIT OR Apache-2.0 | T1, T2 |
 | syn | 2.0.119 | crate | MIT OR Apache-2.0 | T5, T2 |
-| syn | 3.0.6 | crate | MIT OR Apache-2.0 | T5, T2 |
+| syn | 3.0.9 | crate | MIT OR Apache-2.0 | T5, T2 |
 | sync_wrapper | 1.0.2 | crate | Apache-2.0 | T10 |
 | synstructure | 0.14.0 | crate | MIT | T258 |
 | syntect | 5.3.0 | crate | MIT | T575 |
 | system-deps | 6.2.2 | crate | MIT OR Apache-2.0 | T1, T2 |
 | system-deps | 7.0.8 | crate | MIT OR Apache-2.0 | T1, T2 |
-| tao | 0.37.1 | crate | Apache-2.0 | T142, T208 |
+| tao | 0.37.2 | crate | Apache-2.0 | T142, T208 |
 | tao-macros | 0.1.4 | crate | MIT OR Apache-2.0 | T1, T584, T475 |
 | target-lexicon | 0.12.16 | crate | Apache-2.0 WITH LLVM-exception | T37 |
 | target-lexicon | 0.13.5 | crate | Apache-2.0 WITH LLVM-exception | T37 |
@@ -558,13 +574,13 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | tauri-plugin-window-state | 2.5.0 | crate | Apache-2.0 OR MIT | T41, T16, T50 |
 | tauri-runtime | 2.12.2 | crate | Apache-2.0 OR MIT | T10, T26 |
 | tauri-runtime-wry | 2.12.3 | crate | Apache-2.0 OR MIT | T10, T26 |
-| tauri-specta | 2.0.0-rc.25 | crate | MIT | requires review |
-| tauri-specta-macros | 2.0.0-rc.25 | crate | MIT | requires review |
+| tauri-specta | 2.0.0-rc.25 | crate | MIT | T684 |
+| tauri-specta-macros | 2.0.0-rc.25 | crate | MIT | T684 |
 | tauri-utils | 2.10.2 | crate | Apache-2.0 OR MIT | T10, T26 |
 | tauri-winres | 0.3.6 | crate | MIT | T602 |
 | tempfile | 3.27.0 | crate | MIT OR Apache-2.0 | T1, T465 |
 | tendril | 0.5.1 | crate | MIT OR Apache-2.0 | T1, T383 |
-| thin-vec | 0.2.20 | crate | MIT OR Apache-2.0 | T5, T2 |
+| thin-vec | 0.2.21 | crate | MIT OR Apache-2.0 | T5, T2 |
 | thiserror | 1.0.69 | crate | MIT OR Apache-2.0 | T5, T2 |
 | thiserror | 2.0.21 | crate | MIT OR Apache-2.0 | T5, T2 |
 | thiserror-impl | 1.0.69 | crate | MIT OR Apache-2.0 | T5, T2 |
@@ -603,19 +619,19 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | typed-path | 0.12.3 | crate | MIT OR Apache-2.0 | T5, T2 |
 | typeid | 1.0.3 | crate | MIT OR Apache-2.0 | T5, T2 |
 | typenum | 1.20.1 | crate | MIT OR Apache-2.0 | T608, T356, T525 |
-| typst | 0.15.1 | crate | Apache-2.0 | requires review |
+| typst | 0.15.1 | crate | Apache-2.0 | T5, T683 |
 | typst-assets | 0.15.1 | crate | Apache-2.0 | T5, T450 |
-| typst-eval | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-html | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-layout | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-library | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-macros | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-pdf | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-realize | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-svg | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-syntax | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-timing | 0.15.1 | crate | Apache-2.0 | requires review |
-| typst-utils | 0.15.1 | crate | Apache-2.0 | requires review |
+| typst-eval | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-html | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-layout | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-library | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-macros | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-pdf | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-realize | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-svg | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-syntax | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-timing | 0.15.1 | crate | Apache-2.0 | T5, T683 |
+| typst-utils | 0.15.1 | crate | Apache-2.0 | T5, T683 |
 | uds_windows | 1.2.1 | crate | MIT | T276 |
 | unic-langid | 0.9.6 | crate | MIT OR Apache-2.0 | T1, T2 |
 | unic-langid-impl | 0.9.6 | crate | MIT OR Apache-2.0 | T1, T2 |
@@ -624,9 +640,9 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | unicode-bidi | 0.3.18 | crate | MIT OR Apache-2.0 | T250, T643, T1, T39 |
 | unicode-bidi-mirroring | 0.4.0 | crate | MIT/Apache-2.0 | T1, T83 |
 | unicode-ccc | 0.4.0 | crate | MIT/Apache-2.0 | T1, T83 |
-| unicode-ident | 1.0.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T5, T2, T667 |
+| unicode-ident | 1.0.27 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T5, T2, T667 |
 | unicode-math-class | 0.1.0 | crate | MIT OR Apache-2.0 | T5, T24 |
-| unicode-normalization | 0.1.25 | crate | MIT OR Apache-2.0 | T73, T1, T39 |
+| unicode-normalization | 0.1.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T73, T1, T39, T667 |
 | unicode-properties | 0.1.4 | crate | MIT/Apache-2.0 | T73, T1, T39 |
 | unicode-script | 0.5.8 | crate | MIT OR Apache-2.0 | T440, T437 |
 | unicode-segmentation | 1.13.3 | crate | MIT OR Apache-2.0 | T73, T1, T39 |
@@ -666,6 +682,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | web-sys | 0.3.104 | crate | MIT OR Apache-2.0 | T1, T17 |
 | web-time | 1.1.0 | crate | MIT OR Apache-2.0 | T362, T657 |
 | web_atoms | 0.2.6 | crate | MIT OR Apache-2.0 | T1, T89 |
+| web_atoms | 0.3.0 | crate | MIT OR Apache-2.0 | T1, T89 |
 | webkit2gtk | 2.0.2 | crate | MIT | T320 |
 | webkit2gtk-sys | 2.0.2 | crate | MIT | T277 |
 | webpki-roots | 0.26.11 | crate | CDLA-Permissive-2.0 | T185 |
@@ -729,7 +746,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | write-fonts | 0.48.1 | crate | MIT OR Apache-2.0 | T65, T62 |
 | write16 | 1.0.0 | crate | Apache-2.0 OR MIT | T299, T20, T47 |
 | writeable | 0.6.4 | crate | Unicode-3.0 | T8 |
-| wry | 0.57.0 | crate | Apache-2.0 OR MIT | T1, T647, T270 |
+| wry | 0.57.2 | crate | Apache-2.0 OR MIT | T1, T647, T270 |
 | x11 | 2.21.0 | crate | MIT | T2 |
 | x11-dl | 2.21.0 | crate | MIT | T2 |
 | xmlwriter | 0.1.0 | crate | MIT | T286 |
@@ -741,8 +758,8 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | zbus_macros | 5.19.0 | crate | MIT | T46 |
 | zbus_names | 4.3.4 | crate | MIT | T46 |
 | zcheapstr | 1.1.0 | crate | MIT | T368 |
-| zerocopy | 0.8.59 | crate | BSD-2-Clause OR Apache-2.0 OR MIT | T159, T150, T113 |
-| zerocopy-derive | 0.8.59 | crate | BSD-2-Clause OR Apache-2.0 OR MIT | T159, T150, T113 |
+| zerocopy | 0.8.63 | crate | BSD-2-Clause OR Apache-2.0 OR MIT | T159, T150, T113 |
+| zerocopy-derive | 0.8.63 | crate | BSD-2-Clause OR Apache-2.0 OR MIT | T159, T150, T113 |
 | zerofrom | 0.1.8 | crate | Unicode-3.0 | T8 |
 | zerofrom-derive | 0.1.8 | crate | Unicode-3.0 | T8 |
 | zeroize | 1.9.0 | crate | Apache-2.0 OR MIT | T20, T469 |
@@ -923,15 +940,15 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | @typescript-eslint/typescript-estree | 8.72.1 | npm | MIT | T32 |
 | @typescript-eslint/utils | 8.72.1 | npm | MIT | T32 |
 | @typescript-eslint/visitor-keys | 8.72.1 | npm | MIT | T32 |
-| @vitest/coverage-v8 | 5.0.5 | npm | MIT | T42 |
-| @vitest/istanbul-lib-coverage | 1.0.2 | npm | MIT | T147 |
-| @vitest/istanbul-lib-report | 1.0.2 | npm | MIT | T147 |
-| @vitest/mocker | 5.0.5 | npm | MIT | T42 |
+| @vitest/coverage-v8 | 5.1.0 | npm | MIT | T42 |
+| @vitest/istanbul-lib-coverage | 2.1.0 | npm | MIT | T147 |
+| @vitest/istanbul-lib-report | 2.1.0 | npm | MIT | T147 |
+| @vitest/mocker | 5.1.0 | npm | MIT | T42 |
 | @vitest/pretty-format | 3.2.7 | npm | MIT | T181 |
 | @vitest/pretty-format | 4.1.11 | npm | MIT | T42 |
 | @vitest/snapshot | 3.2.7 | npm | MIT | T181 |
 | @vitest/snapshot | 4.1.11 | npm | MIT | T42 |
-| @vitest/spy | 5.0.5 | npm | MIT | T42 |
+| @vitest/spy | 5.1.0 | npm | MIT | T42 |
 | @vitest/utils | 4.1.11 | npm | MIT | T42 |
 | @wdio/cli | 9.31.9 | npm | MIT | T14 |
 | @wdio/config | 9.31.9 | npm | MIT | T14 |
@@ -1391,7 +1408,7 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | validate-npm-package-license | 3.0.4 | npm | Apache-2.0 | T20 |
 | vite | 8.3.6 | npm | MIT | T518 |
 | vitefu | 1.1.3 | npm | MIT | T642 |
-| vitest | 5.0.5 | npm | MIT | T432 |
+| vitest | 5.1.0 | npm | MIT | T432 |
 | w3c-xmlserializer | 6.0.0 | npm | MIT | T534 |
 | wait-port | 1.1.0 | npm | MIT | T271 |
 | wcwidth | 1.0.1 | npm | MIT | T388 |
@@ -1445,6 +1462,24 @@ Packages: 1422 – crates 735, npm 687. Distinct licence texts: 682. Requires re
 | @tauri-apps/cli-win32-x64-msvc | 2.12.4 | npm (root) | not declared | requires review |
 | @tauri-apps/cli | 2.12.4 | npm (root) | Apache-2.0 OR MIT | T10, T26 |
 
+selectors 0.38.0 declares MPL-2.0 but ships no licence file. Its reference T197 is the unmodified MPL-2.0 text from cssparser 0.38.0 (LICENSE); its source headers point to https://mozilla.org/MPL/2.0/. The selectors source is https://github.com/servo/stylo/tree/572ecba2d1600e7c3d490586692a209faf703baa/selectors.
+
+
+selectors 0.41.0 declares MPL-2.0 but ships no licence file. Its reference T197 is the unmodified MPL-2.0 text from cssparser 0.38.0 (LICENSE); its source headers point to https://mozilla.org/MPL/2.0/. The selectors source is https://github.com/servo/stylo/tree/34d25f741765a0bdb894f8271852e633299352d8/selectors.
+
+
+Typst typst 0.15.1, typst-eval 0.15.1, typst-html 0.15.1, typst-layout 0.15.1, typst-library 0.15.1, typst-macros 0.15.1, typst-pdf 0.15.1, typst-realize 0.15.1, typst-svg 0.15.1, typst-syntax 0.15.1, typst-timing 0.15.1, typst-utils 0.15.1 declare Apache-2.0 but ship no licence file. Reference T5 is the unmodified LICENSE from typst-assets 0.15.1, verified identical to the upstream LICENSE; T683 is the unmodified upstream NOTICE. Both originate from https://github.com/typst/typst/tree/9dfd3a08500b7896045f907433cf7b4b02434fad.
+
+
+For block2 0.6.2, dispatch2 0.3.1, objc2 0.6.4, objc2-app-kit 0.3.2, objc2-cloud-kit 0.3.2, objc2-core-data 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-core-image 0.3.2, objc2-core-location 0.3.2, objc2-core-text 0.3.2, objc2-core-video 0.3.2, objc2-encode 4.1.0, objc2-exception-helper 0.1.1, objc2-foundation 0.3.2, objc2-io-surface 0.3.2, objc2-javascript-core 0.3.2, objc2-quartz-core 0.3.2, objc2-security 0.3.2, objc2-ui-kit 0.3.2, objc2-user-notifications 0.3.2, objc2-web-kit 0.3.2, T685 preserves the upstream licence policy from https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md (identical at their four source commits). It identifies the declared licences, but does not provide the complete MIT text and notes uncertainty concerning Apple SDK-derived code. These packages remain listed for review.
+
+
+specta 2.0.0-rc.25, specta-macros 2.0.0-rc.25, specta-serde 0.0.12, specta-typescript 0.0.12, specta-util 0.0.12 declare MIT but ship no licence file. Reference T686 is the unmodified upstream LICENSE from https://github.com/specta-rs/specta/blob/e7fd23f586b9bd58de39002dabe49b1f978bf971/LICENSE. The source file does not end with a newline; Markdown adds a line break before the closing fence.
+
+
+tauri-specta 2.0.0-rc.25, tauri-specta-macros 2.0.0-rc.25 declare MIT but ship no licence file. Reference T684 is the unmodified upstream LICENSE from https://github.com/specta-rs/tauri-specta/blob/e5e578fb339fc2b0d6c676b3031c3dafcec88083/LICENSE. The source file ends with a newline; Markdown adds a line break before the closing fence.
+
+
 ## Requires review
 
 No licence file of these packages was available on the machine that wrote this file: either
@@ -1489,28 +1524,8 @@ downloaded) or it ships no licence file. The declared licence, where known, is i
 - objc2-user-notifications 0.3.2 (crate, registry): Zlib OR Apache-2.0 OR MIT
 - objc2-web-kit 0.3.2 (crate, registry): Zlib OR Apache-2.0 OR MIT
 - roman-numerals-rs 3.1.0 (crate, registry): 0BSD OR CC0-1.0
-- selectors 0.38.0 (crate, registry): MPL-2.0
-- specta 2.0.0-rc.25 (crate, registry): MIT
-- specta-macros 2.0.0-rc.25 (crate, registry): MIT
-- specta-serde 0.0.12 (crate, registry): MIT
-- specta-typescript 0.0.12 (crate, registry): MIT
-- specta-util 0.0.12 (crate, registry): MIT
 - tauri-plugin 2.7.2 (crate, registry): Apache-2.0 OR MIT
 - tauri-plugin-wdio 1.5.0 (crate, registry): MIT OR Apache-2.0
-- tauri-specta 2.0.0-rc.25 (crate, registry): MIT
-- tauri-specta-macros 2.0.0-rc.25 (crate, registry): MIT
-- typst 0.15.1 (crate, registry): Apache-2.0
-- typst-eval 0.15.1 (crate, registry): Apache-2.0
-- typst-html 0.15.1 (crate, registry): Apache-2.0
-- typst-layout 0.15.1 (crate, registry): Apache-2.0
-- typst-library 0.15.1 (crate, registry): Apache-2.0
-- typst-macros 0.15.1 (crate, registry): Apache-2.0
-- typst-pdf 0.15.1 (crate, registry): Apache-2.0
-- typst-realize 0.15.1 (crate, registry): Apache-2.0
-- typst-svg 0.15.1 (crate, registry): Apache-2.0
-- typst-syntax 0.15.1 (crate, registry): Apache-2.0
-- typst-timing 0.15.1 (crate, registry): Apache-2.0
-- typst-utils 0.15.1 (crate, registry): Apache-2.0
 - wasmi 1.1.0 (crate, registry): MIT/Apache-2.0
 - wasmi_collections 1.1.0 (crate, registry): MIT/Apache-2.0
 - wasmi_core 1.1.0 (crate, registry): MIT/Apache-2.0
@@ -1619,7 +1634,7 @@ downloaded) or it ships no licence file. The declared licence, where known, is i
 
 ### T1
 
-SHA-256 `a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2`. Used by: arrayvec 0.7.8 (LICENSE-APACHE), async-channel 2.5.0 (LICENSE-APACHE), async-executor 1.14.1 (LICENSE-APACHE), async-io 2.6.0 (LICENSE-APACHE), async-lock 3.4.2 (LICENSE-APACHE), async-process 2.5.0 (LICENSE-APACHE), async-signal 0.2.14 (LICENSE-APACHE), async-task 4.7.1 (LICENSE-APACHE), atomic-waker 1.1.2 (LICENSE-APACHE), autocfg 1.5.1 (LICENSE-APACHE), az 1.3.0 (LICENSE-APACHE), base64 0.21.7 (LICENSE-APACHE), base64 0.22.1 (LICENSE-APACHE), base64 0.23.1 (LICENSE-APACHE), bitflags 1.3.2 (LICENSE-APACHE), bitflags 2.13.2 (LICENSE-APACHE), blocking 1.7.0 (LICENSE-APACHE), bs58 0.5.1 (LICENSE-APACHE), bumpalo 3.20.3 (LICENSE-APACHE), by_address 1.2.1 (LICENSE-APACHE), camino 1.2.5 (LICENSE-APACHE), cc 1.4.4 (LICENSE-APACHE), cfg-if 1.0.5 (LICENSE-APACHE), concurrent-queue 2.5.0 (LICENSE-APACHE), core-foundation 0.10.1 (LICENSE-APACHE), core-foundation-sys 0.8.7 (LICENSE-APACHE), core-graphics 0.25.0 (LICENSE-APACHE), core-graphics-types 0.2.0 (LICENSE-APACHE), crossbeam-channel 0.5.17 (LICENSE-APACHE), crossbeam-deque 0.8.8 (LICENSE-APACHE), crossbeam-epoch 0.9.21 (LICENSE-APACHE), crossbeam-utils 0.8.23 (LICENSE-APACHE), data-url 0.3.2 (LICENSE-APACHE), displaydoc 0.2.7 (LICENSE-APACHE), either 1.18.0 (LICENSE-APACHE), equivalent 1.0.2 (LICENSE-APACHE), errno 0.3.14 (LICENSE-APACHE), euclid 0.22.14 (LICENSE-APACHE), event-listener 5.4.2 (LICENSE-APACHE), event-listener-strategy 0.5.4 (LICENSE-APACHE), fastrand 2.5.0 (LICENSE-APACHE), find-msvc-tools 0.1.14 (LICENSE-APACHE), flate2 1.1.10 (LICENSE-APACHE), fnv 1.0.7 (LICENSE-APACHE), form_urlencoded 1.2.2 (LICENSE-APACHE), futures-lite 2.6.1 (LICENSE-APACHE), glob 0.3.4 (LICENSE-APACHE), hashbrown 0.12.3 (LICENSE-APACHE), hashbrown 0.17.1 (LICENSE-APACHE), heck 0.4.1 (LICENSE-APACHE), heck 0.5.0 (LICENSE-APACHE), hermit-abi 0.5.2 (LICENSE-APACHE), html5ever 0.39.0 (LICENSE-APACHE), httparse 1.10.1 (LICENSE-APACHE), idna 1.1.0 (LICENSE-APACHE), idna_adapter 1.2.2 (LICENSE-APACHE), indexmap 1.9.3 (LICENSE-APACHE), indexmap 2.14.2 (LICENSE-APACHE), insta 1.49.0 (LICENSE), jni 0.21.1 (LICENSE-APACHE), js-sys 0.3.104 (LICENSE-APACHE), libappindicator 0.9.0 (LICENSE-APACHE), linux-raw-sys 0.12.1 (LICENSE-APACHE), lock_api 0.4.14 (LICENSE-APACHE), log 0.4.34 (LICENSE-APACHE), markup5ever 0.39.0 (LICENSE-APACHE), mime 0.3.17 (LICENSE-APACHE), muda 0.20.0 (LICENSE-APACHE), num-bigint 0.4.8 (LICENSE-APACHE), num-integer 0.1.47 (LICENSE-APACHE), num-traits 0.2.19 (LICENSE-APACHE), object 0.39.1 (LICENSE-APACHE), once_cell 1.21.4 (LICENSE-APACHE), ordered-stream 0.2.0 (LICENSE-APACHE), palette 0.7.7 (LICENSE-APACHE), palette_derive 0.7.7 (LICENSE-APACHE), palette_math 0.7.7 (LICENSE-APACHE), parking 2.2.1 (LICENSE-APACHE), parking_lot 0.12.5 (LICENSE-APACHE), parking_lot_core 0.9.12 (LICENSE-APACHE), percent-encoding 2.3.2 (LICENSE-APACHE), piper 0.2.5 (LICENSE-APACHE), pkg-config 0.3.34 (LICENSE-APACHE), png 0.18.1 (LICENSE-APACHE), polling 3.11.0 (LICENSE-APACHE), postcard 1.1.3 (LICENSE-APACHE), proc-macro-hack 0.5.20+deprecated (LICENSE-APACHE), rayon 1.12.0 (LICENSE-APACHE), rayon-core 1.13.0 (LICENSE-APACHE), regex 1.13.1 (LICENSE-APACHE), regex-automata 0.4.18 (LICENSE-APACHE), regex-syntax 0.8.11 (LICENSE-APACHE), roxmltree 0.20.0 (LICENSE-APACHE), roxmltree 0.21.1 (LICENSE-APACHE), rustc_version 0.4.1 (LICENSE-APACHE), rustix 1.1.6 (LICENSE-APACHE), rustls 0.23.46 (LICENSE-APACHE), scopeguard 1.2.0 (LICENSE-APACHE), serde_with 3.22.0 (LICENSE-APACHE), serde_with_macros 3.22.0 (LICENSE-APACHE), servo_arc 0.4.3 (LICENSE-APACHE), signal-hook-registry 1.4.8 (LICENSE-APACHE), similar 2.7.0 (LICENSE), simplecss 0.2.2 (LICENSE-APACHE), smallvec 1.16.2 (LICENSE-APACHE), socket2 0.6.5 (LICENSE-APACHE), stable_deref_trait 1.2.1 (LICENSE-APACHE), stacker 0.1.25 (LICENSE-APACHE), string_cache 0.9.0 (LICENSE-APACHE), string_cache_codegen 0.6.1 (LICENSE-APACHE), svgtypes 0.16.1 (LICENSE-APACHE), syn 1.0.109 (LICENSE-APACHE), system-deps 6.2.2 (LICENSE-APACHE), system-deps 7.0.8 (LICENSE-APACHE), tao-macros 0.1.4 (LICENSE-APACHE), tempfile 3.27.0 (LICENSE-APACHE), tendril 0.5.1 (LICENSE-APACHE), toml_datetime 0.6.3 (LICENSE-APACHE), tray-icon 0.25.1 (LICENSE-APACHE), ttf-parser 0.25.1 (LICENSE-APACHE), two-face 0.4.5 (LICENSE-APACHE), unic-langid 0.9.6 (LICENSE-APACHE), unic-langid-impl 0.9.6 (LICENSE-APACHE), unic-langid-macros 0.9.6 (LICENSE-APACHE), unic-langid-macros-impl 0.9.6 (LICENSE-APACHE), unicode-bidi 0.3.18 (LICENSE-APACHE), unicode-bidi-mirroring 0.4.0 (LICENSE-APACHE), unicode-ccc 0.4.0 (LICENSE-APACHE), unicode-normalization 0.1.25 (LICENSE-APACHE), unicode-properties 0.1.4 (LICENSE-APACHE), unicode-segmentation 1.13.3 (LICENSE-APACHE), unicode-vo 0.1.0 (LICENSE-APACHE), url 2.5.8 (LICENSE-APACHE), uuid 1.27.0 (LICENSE-APACHE), version_check 0.9.5 (LICENSE-APACHE), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-APACHE), wasip2 1.0.4+wasi-0.2.12 (LICENSE-APACHE), wasm-bindgen 0.2.127 (LICENSE-APACHE), wasm-bindgen-futures 0.4.77 (LICENSE-APACHE), wasm-bindgen-macro 0.2.127 (LICENSE-APACHE), wasm-bindgen-macro-support 0.2.127 (LICENSE-APACHE), wasm-bindgen-shared 0.2.127 (LICENSE-APACHE), web-sys 0.3.104 (LICENSE-APACHE), web_atoms 0.2.6 (LICENSE-APACHE), window-vibrancy 0.8.1 (LICENSE-APACHE), wit-bindgen 0.57.1 (LICENSE-APACHE), wry 0.57.0 (LICENSE-APACHE), yaml-rust 0.4.5 (LICENSE-APACHE).
+SHA-256 `a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2`. Used by: arrayvec 0.7.8 (LICENSE-APACHE), async-channel 2.5.0 (LICENSE-APACHE), async-executor 1.14.1 (LICENSE-APACHE), async-io 2.6.0 (LICENSE-APACHE), async-lock 3.4.2 (LICENSE-APACHE), async-process 2.5.0 (LICENSE-APACHE), async-signal 0.2.14 (LICENSE-APACHE), async-task 4.7.1 (LICENSE-APACHE), atomic-waker 1.1.2 (LICENSE-APACHE), autocfg 1.5.1 (LICENSE-APACHE), az 1.3.0 (LICENSE-APACHE), base64 0.21.7 (LICENSE-APACHE), base64 0.22.1 (LICENSE-APACHE), base64 0.23.1 (LICENSE-APACHE), bitflags 1.3.2 (LICENSE-APACHE), bitflags 2.13.2 (LICENSE-APACHE), blocking 1.7.0 (LICENSE-APACHE), bs58 0.5.1 (LICENSE-APACHE), bumpalo 3.20.3 (LICENSE-APACHE), by_address 1.2.1 (LICENSE-APACHE), camino 1.2.6 (LICENSE-APACHE), cc 1.4.4 (LICENSE-APACHE), cfg-if 1.0.5 (LICENSE-APACHE), concurrent-queue 2.5.0 (LICENSE-APACHE), core-foundation 0.10.1 (LICENSE-APACHE), core-foundation-sys 0.8.7 (LICENSE-APACHE), core-graphics 0.25.0 (LICENSE-APACHE), core-graphics-types 0.2.0 (LICENSE-APACHE), crossbeam-channel 0.5.17 (LICENSE-APACHE), crossbeam-deque 0.8.8 (LICENSE-APACHE), crossbeam-epoch 0.9.21 (LICENSE-APACHE), crossbeam-utils 0.8.23 (LICENSE-APACHE), data-url 0.3.2 (LICENSE-APACHE), displaydoc 0.2.7 (LICENSE-APACHE), either 1.18.0 (LICENSE-APACHE), equivalent 1.0.3 (LICENSE-APACHE), errno 0.3.14 (LICENSE-APACHE), euclid 0.22.14 (LICENSE-APACHE), event-listener 5.4.2 (LICENSE-APACHE), event-listener-strategy 0.5.4 (LICENSE-APACHE), fastrand 2.5.0 (LICENSE-APACHE), find-msvc-tools 0.1.15 (LICENSE-APACHE), flate2 1.1.11 (LICENSE-APACHE), fnv 1.0.7 (LICENSE-APACHE), form_urlencoded 1.2.2 (LICENSE-APACHE), futures-lite 2.6.1 (LICENSE-APACHE), glob 0.3.4 (LICENSE-APACHE), hashbrown 0.12.3 (LICENSE-APACHE), hashbrown 0.17.1 (LICENSE-APACHE), heck 0.4.1 (LICENSE-APACHE), heck 0.5.0 (LICENSE-APACHE), hermit-abi 0.5.2 (LICENSE-APACHE), html5ever 0.39.0 (LICENSE-APACHE), html5ever 0.40.1 (LICENSE-APACHE), httparse 1.10.1 (LICENSE-APACHE), idna 1.1.0 (LICENSE-APACHE), idna_adapter 1.2.2 (LICENSE-APACHE), indexmap 1.9.3 (LICENSE-APACHE), indexmap 2.14.2 (LICENSE-APACHE), insta 1.49.0 (LICENSE), jni 0.21.1 (LICENSE-APACHE), js-sys 0.3.104 (LICENSE-APACHE), libappindicator 0.9.0 (LICENSE-APACHE), linux-raw-sys 0.12.1 (LICENSE-APACHE), lock_api 0.4.14 (LICENSE-APACHE), log 0.4.35 (LICENSE-APACHE), markup5ever 0.39.0 (LICENSE-APACHE), markup5ever 0.40.0 (LICENSE-APACHE), mime 0.3.18 (LICENSE-APACHE), muda 0.20.0 (LICENSE-APACHE), num-bigint 0.4.8 (LICENSE-APACHE), num-integer 0.1.47 (LICENSE-APACHE), num-traits 0.2.19 (LICENSE-APACHE), object 0.39.1 (LICENSE-APACHE), once_cell 1.21.4 (LICENSE-APACHE), ordered-stream 0.2.0 (LICENSE-APACHE), palette 0.7.7 (LICENSE-APACHE), palette_derive 0.7.7 (LICENSE-APACHE), palette_math 0.7.7 (LICENSE-APACHE), parking 2.2.1 (LICENSE-APACHE), parking_lot 0.12.5 (LICENSE-APACHE), parking_lot_core 0.9.12 (LICENSE-APACHE), percent-encoding 2.3.2 (LICENSE-APACHE), piper 0.2.5 (LICENSE-APACHE), pkg-config 0.3.34 (LICENSE-APACHE), png 0.18.1 (LICENSE-APACHE), polling 3.11.0 (LICENSE-APACHE), postcard 1.1.3 (LICENSE-APACHE), proc-macro-hack 0.5.20+deprecated (LICENSE-APACHE), rayon 1.12.0 (LICENSE-APACHE), rayon-core 1.13.0 (LICENSE-APACHE), regex 1.13.1 (LICENSE-APACHE), regex-automata 0.4.18 (LICENSE-APACHE), regex-syntax 0.8.11 (LICENSE-APACHE), roxmltree 0.20.0 (LICENSE-APACHE), roxmltree 0.21.2 (LICENSE-APACHE), rustc_version 0.4.1 (LICENSE-APACHE), rustix 1.1.6 (LICENSE-APACHE), rustls 0.23.46 (LICENSE-APACHE), scopeguard 1.2.0 (LICENSE-APACHE), serde_with 3.22.0 (LICENSE-APACHE), serde_with_macros 3.22.0 (LICENSE-APACHE), servo_arc 0.4.3 (LICENSE-APACHE), servo_arc 0.5.0 (LICENSE-APACHE), signal-hook-registry 1.4.8 (LICENSE-APACHE), similar 2.7.0 (LICENSE), simplecss 0.2.2 (LICENSE-APACHE), smallvec 1.16.5 (LICENSE-APACHE), socket2 0.6.5 (LICENSE-APACHE), stable_deref_trait 1.2.1 (LICENSE-APACHE), stacker 0.1.25 (LICENSE-APACHE), string_cache 0.9.0 (LICENSE-APACHE), string_cache 0.11.0 (LICENSE-APACHE), string_cache_codegen 0.6.1 (LICENSE-APACHE), string_cache_codegen 0.11.2 (LICENSE-APACHE), svgtypes 0.16.1 (LICENSE-APACHE), syn 1.0.109 (LICENSE-APACHE), system-deps 6.2.2 (LICENSE-APACHE), system-deps 7.0.8 (LICENSE-APACHE), tao-macros 0.1.4 (LICENSE-APACHE), tempfile 3.27.0 (LICENSE-APACHE), tendril 0.5.1 (LICENSE-APACHE), toml_datetime 0.6.3 (LICENSE-APACHE), tray-icon 0.25.1 (LICENSE-APACHE), ttf-parser 0.25.1 (LICENSE-APACHE), two-face 0.4.5 (LICENSE-APACHE), unic-langid 0.9.6 (LICENSE-APACHE), unic-langid-impl 0.9.6 (LICENSE-APACHE), unic-langid-macros 0.9.6 (LICENSE-APACHE), unic-langid-macros-impl 0.9.6 (LICENSE-APACHE), unicode-bidi 0.3.18 (LICENSE-APACHE), unicode-bidi-mirroring 0.4.0 (LICENSE-APACHE), unicode-ccc 0.4.0 (LICENSE-APACHE), unicode-normalization 0.1.26 (LICENSE-APACHE), unicode-properties 0.1.4 (LICENSE-APACHE), unicode-segmentation 1.13.3 (LICENSE-APACHE), unicode-vo 0.1.0 (LICENSE-APACHE), url 2.5.8 (LICENSE-APACHE), uuid 1.27.0 (LICENSE-APACHE), version_check 0.9.5 (LICENSE-APACHE), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-APACHE), wasip2 1.0.4+wasi-0.2.12 (LICENSE-APACHE), wasm-bindgen 0.2.127 (LICENSE-APACHE), wasm-bindgen-futures 0.4.77 (LICENSE-APACHE), wasm-bindgen-macro 0.2.127 (LICENSE-APACHE), wasm-bindgen-macro-support 0.2.127 (LICENSE-APACHE), wasm-bindgen-shared 0.2.127 (LICENSE-APACHE), web-sys 0.3.104 (LICENSE-APACHE), web_atoms 0.2.6 (LICENSE-APACHE), web_atoms 0.3.0 (LICENSE-APACHE), window-vibrancy 0.8.1 (LICENSE-APACHE), wit-bindgen 0.57.1 (LICENSE-APACHE), wry 0.57.2 (LICENSE-APACHE), yaml-rust 0.4.5 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -1827,7 +1842,7 @@ limitations under the License.
 
 ### T2
 
-SHA-256 `23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3`. Used by: adler2 2.0.1 (LICENSE-MIT), anyhow 1.0.104 (LICENSE-MIT), async-channel 2.5.0 (LICENSE-MIT), async-executor 1.14.1 (LICENSE-MIT), async-io 2.6.0 (LICENSE-MIT), async-lock 3.4.2 (LICENSE-MIT), async-process 2.5.0 (LICENSE-MIT), async-signal 0.2.14 (LICENSE-MIT), async-task 4.7.1 (LICENSE-MIT), async-trait 0.1.92 (LICENSE-MIT), atomic-waker 1.1.2 (LICENSE-MIT), biblatex 0.12.0 (LICENSE-MIT), blocking 1.7.0 (LICENSE-MIT), camino 1.2.5 (LICENSE-MIT), cargo-platform 0.1.9 (LICENSE-MIT), cargo_metadata 0.19.2 (LICENSE-MIT), citationberg 0.7.0 (LICENSE-MIT), concurrent-queue 2.5.0 (LICENSE-MIT), displaydoc 0.2.7 (LICENSE-MIT), dtoa 1.0.11 (LICENSE-MIT), dyn-clone 1.0.20 (LICENSE-MIT), endi 1.1.1 (LICENSE-MIT), erased-serde 0.4.10 (LICENSE-MIT), event-listener 5.4.2 (LICENSE-MIT), event-listener-strategy 0.5.4 (LICENSE-MIT), fastrand 2.5.0 (LICENSE-MIT), futures-lite 2.6.1 (LICENSE-MIT), hayagriva 0.10.1 (LICENSE-MIT), hermit-abi 0.5.2 (LICENSE-MIT), itoa 1.0.18 (LICENSE-MIT), linux-raw-sys 0.12.1 (LICENSE-MIT), num_enum 0.7.6 (LICENSE-MIT), num_enum_derive 0.7.6 (LICENSE-MIT), once_cell 1.21.4 (LICENSE-MIT), ordered-stream 0.2.0 (LICENSE-MIT), parking 2.2.1 (LICENSE-MIT), paste 1.0.15 (LICENSE-MIT), pin-project-lite 0.2.17 (LICENSE-MIT), piper 0.2.5 (LICENSE-MIT), polling 3.11.0 (LICENSE-MIT), portable-atomic 1.15.0 (LICENSE-MIT), portable-atomic-util 0.2.7 (LICENSE-MIT), proc-macro-crate 1.3.1 (LICENSE-MIT), proc-macro-crate 2.0.2 (LICENSE-MIT), proc-macro-crate 3.5.0 (LICENSE-MIT), proc-macro2 1.0.107 (LICENSE-MIT), quote 1.0.47 (LICENSE-MIT), ref-cast 1.0.27 (LICENSE-MIT), ref-cast-impl 1.0.27 (LICENSE-MIT), rustix 1.1.6 (LICENSE-MIT), rustversion 1.0.23 (LICENSE-MIT), semver 1.0.28 (LICENSE-MIT), serde 1.0.229 (LICENSE-MIT), serde-untagged 0.1.9 (LICENSE-MIT), serde_core 1.0.229 (LICENSE-MIT), serde_derive 1.0.229 (LICENSE-MIT), serde_derive_internals 0.29.1 (LICENSE-MIT), serde_json 1.0.154 (LICENSE-MIT), serde_path_to_error 0.1.20 (LICENSE-MIT), serde_repr 0.1.21 (LICENSE-MIT), serde_yaml 0.9.34+deprecated (LICENSE-MIT), servo_arc 0.4.3 (LICENSE-MIT), syn 1.0.109 (LICENSE-MIT), syn 2.0.119 (LICENSE-MIT), syn 3.0.6 (LICENSE-MIT), system-deps 6.2.2 (LICENSE-MIT), system-deps 7.0.8 (LICENSE-MIT), thin-vec 0.2.20 (LICENSE-MIT), thiserror 1.0.69 (LICENSE-MIT), thiserror 2.0.21 (LICENSE-MIT), thiserror-impl 1.0.69 (LICENSE-MIT), thiserror-impl 2.0.21 (LICENSE-MIT), typed-path 0.12.3 (LICENSE-MIT), typeid 1.0.3 (LICENSE-MIT), unic-langid 0.9.6 (LICENSE-MIT), unic-langid-impl 0.9.6 (LICENSE-MIT), unic-langid-macros 0.9.6 (LICENSE-MIT), unic-langid-macros-impl 0.9.6 (LICENSE-MIT), unicode-ident 1.0.26 (LICENSE-MIT), unsafe-libyaml 0.2.11 (LICENSE-MIT), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-MIT), wasip2 1.0.4+wasi-0.2.12 (LICENSE-MIT), wasm-streams 0.5.0 (LICENSE-MIT), wit-bindgen 0.57.1 (LICENSE-MIT), x11 2.21.0 (LICENSE-MIT), x11-dl 2.21.0 (LICENSE-MIT), zmij 1.0.23 (LICENSE-MIT), zvariant_utils 4.2.0 (LICENSE).
+SHA-256 `23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3`. Used by: adler2 2.0.1 (LICENSE-MIT), anyhow 1.0.104 (LICENSE-MIT), async-channel 2.5.0 (LICENSE-MIT), async-executor 1.14.1 (LICENSE-MIT), async-io 2.6.0 (LICENSE-MIT), async-lock 3.4.2 (LICENSE-MIT), async-process 2.5.0 (LICENSE-MIT), async-signal 0.2.14 (LICENSE-MIT), async-task 4.7.1 (LICENSE-MIT), async-trait 0.1.92 (LICENSE-MIT), atomic-waker 1.1.2 (LICENSE-MIT), biblatex 0.12.0 (LICENSE-MIT), blocking 1.7.0 (LICENSE-MIT), camino 1.2.6 (LICENSE-MIT), cargo-platform 0.1.9 (LICENSE-MIT), cargo_metadata 0.19.2 (LICENSE-MIT), citationberg 0.7.0 (LICENSE-MIT), concurrent-queue 2.5.0 (LICENSE-MIT), displaydoc 0.2.7 (LICENSE-MIT), dtoa 1.0.11 (LICENSE-MIT), dyn-clone 1.0.20 (LICENSE-MIT), endi 1.1.1 (LICENSE-MIT), erased-serde 0.4.11 (LICENSE-MIT), event-listener 5.4.2 (LICENSE-MIT), event-listener-strategy 0.5.4 (LICENSE-MIT), fastrand 2.5.0 (LICENSE-MIT), futures-lite 2.6.1 (LICENSE-MIT), hayagriva 0.10.1 (LICENSE-MIT), hermit-abi 0.5.2 (LICENSE-MIT), itoa 1.0.18 (LICENSE-MIT), linux-raw-sys 0.12.1 (LICENSE-MIT), num_enum 0.7.6 (LICENSE-MIT), num_enum_derive 0.7.6 (LICENSE-MIT), once_cell 1.21.4 (LICENSE-MIT), ordered-stream 0.2.0 (LICENSE-MIT), parking 2.2.1 (LICENSE-MIT), paste 1.0.15 (LICENSE-MIT), pin-project-lite 0.2.17 (LICENSE-MIT), piper 0.2.5 (LICENSE-MIT), polling 3.11.0 (LICENSE-MIT), portable-atomic 1.15.0 (LICENSE-MIT), portable-atomic-util 0.2.7 (LICENSE-MIT), proc-macro-crate 1.3.1 (LICENSE-MIT), proc-macro-crate 2.0.2 (LICENSE-MIT), proc-macro-crate 3.5.0 (LICENSE-MIT), proc-macro2 1.0.107 (LICENSE-MIT), quote 1.0.47 (LICENSE-MIT), ref-cast 1.0.27 (LICENSE-MIT), ref-cast-impl 1.0.27 (LICENSE-MIT), rustix 1.1.6 (LICENSE-MIT), rustversion 1.0.23 (LICENSE-MIT), semver 1.0.28 (LICENSE-MIT), serde 1.0.229 (LICENSE-MIT), serde-untagged 0.1.9 (LICENSE-MIT), serde_core 1.0.229 (LICENSE-MIT), serde_derive 1.0.229 (LICENSE-MIT), serde_derive_internals 0.29.1 (LICENSE-MIT), serde_json 1.0.154 (LICENSE-MIT), serde_path_to_error 0.1.20 (LICENSE-MIT), serde_repr 0.1.21 (LICENSE-MIT), serde_yaml 0.9.34+deprecated (LICENSE-MIT), servo_arc 0.4.3 (LICENSE-MIT), servo_arc 0.5.0 (LICENSE-MIT), syn 1.0.109 (LICENSE-MIT), syn 2.0.119 (LICENSE-MIT), syn 3.0.9 (LICENSE-MIT), system-deps 6.2.2 (LICENSE-MIT), system-deps 7.0.8 (LICENSE-MIT), thin-vec 0.2.21 (LICENSE-MIT), thiserror 1.0.69 (LICENSE-MIT), thiserror 2.0.21 (LICENSE-MIT), thiserror-impl 1.0.69 (LICENSE-MIT), thiserror-impl 2.0.21 (LICENSE-MIT), typed-path 0.12.3 (LICENSE-MIT), typeid 1.0.3 (LICENSE-MIT), unic-langid 0.9.6 (LICENSE-MIT), unic-langid-impl 0.9.6 (LICENSE-MIT), unic-langid-macros 0.9.6 (LICENSE-MIT), unic-langid-macros-impl 0.9.6 (LICENSE-MIT), unicode-ident 1.0.27 (LICENSE-MIT), unsafe-libyaml 0.2.11 (LICENSE-MIT), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-MIT), wasip2 1.0.4+wasi-0.2.12 (LICENSE-MIT), wasm-streams 0.5.0 (LICENSE-MIT), wit-bindgen 0.57.1 (LICENSE-MIT), x11 2.21.0 (LICENSE-MIT), x11-dl 2.21.0 (LICENSE-MIT), zmij 1.0.23 (LICENSE-MIT), zvariant_utils 4.2.0 (LICENSE).
 
 ```text
 Permission is hereby granted, free of charge, to any
@@ -1901,7 +1916,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### T5
 
-SHA-256 `62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a`. Used by: anyhow 1.0.104 (LICENSE-APACHE), async-trait 0.1.92 (LICENSE-APACHE), codex 0.3.0 (LICENSE), comemo 0.5.1 (LICENSE-APACHE), dtoa 1.0.11 (LICENSE-APACHE), dyn-clone 1.0.20 (LICENSE-APACHE), ecow 0.2.6 (LICENSE-APACHE), erased-serde 0.4.10 (LICENSE-APACHE), glifo 0.1.1 (LICENSE-APACHE), hypher 0.1.8 (LICENSE-APACHE), itoa 1.0.18 (LICENSE-APACHE), libc 0.2.190 (LICENSE-APACHE), num_enum 0.7.6 (LICENSE-APACHE), num_enum_derive 0.7.6 (LICENSE-APACHE), paste 1.0.15 (LICENSE-APACHE), pdf-writer 0.15.0 (LICENSE-APACHE), proc-macro2 1.0.107 (LICENSE-APACHE), quote 1.0.47 (LICENSE-APACHE), ref-cast 1.0.27 (LICENSE-APACHE), ref-cast-impl 1.0.27 (LICENSE-APACHE), rustversion 1.0.23 (LICENSE-APACHE), ryu 1.0.23 (LICENSE-APACHE), semver 1.0.28 (LICENSE-APACHE), serde 1.0.229 (LICENSE-APACHE), serde-untagged 0.1.9 (LICENSE-APACHE), serde_core 1.0.229 (LICENSE-APACHE), serde_derive 1.0.229 (LICENSE-APACHE), serde_derive_internals 0.29.1 (LICENSE-APACHE), serde_json 1.0.154 (LICENSE-APACHE), serde_path_to_error 0.1.20 (LICENSE-APACHE), serde_repr 0.1.21 (LICENSE-APACHE), serde_urlencoded 0.7.1 (LICENSE-APACHE), serde_yaml 0.9.34+deprecated (LICENSE-APACHE), subsetter 0.2.6 (LICENSE-APACHE), syn 2.0.119 (LICENSE-APACHE), syn 3.0.6 (LICENSE-APACHE), thin-vec 0.2.20 (LICENSE-APACHE), thiserror 1.0.69 (LICENSE-APACHE), thiserror 2.0.21 (LICENSE-APACHE), thiserror-impl 1.0.69 (LICENSE-APACHE), thiserror-impl 2.0.21 (LICENSE-APACHE), typed-path 0.12.3 (LICENSE-APACHE), typeid 1.0.3 (LICENSE-APACHE), typst-assets 0.15.1 (LICENSE), unicode-ident 1.0.26 (LICENSE-APACHE), unicode-math-class 0.1.0 (LICENSE-APACHE), unscanny 0.1.0 (LICENSE-APACHE), wasm-streams 0.5.0 (LICENSE-APACHE), xmp-writer 0.3.3 (LICENSE-APACHE).
+SHA-256 `62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a`. Used by: anyhow 1.0.104 (LICENSE-APACHE), async-trait 0.1.92 (LICENSE-APACHE), codex 0.3.0 (LICENSE), comemo 0.5.1 (LICENSE-APACHE), dtoa 1.0.11 (LICENSE-APACHE), dyn-clone 1.0.20 (LICENSE-APACHE), ecow 0.2.6 (LICENSE-APACHE), erased-serde 0.4.11 (LICENSE-APACHE), glifo 0.1.1 (LICENSE-APACHE), hypher 0.1.8 (LICENSE-APACHE), itoa 1.0.18 (LICENSE-APACHE), libc 0.2.190 (LICENSE-APACHE), num_enum 0.7.6 (LICENSE-APACHE), num_enum_derive 0.7.6 (LICENSE-APACHE), paste 1.0.15 (LICENSE-APACHE), pdf-writer 0.15.0 (LICENSE-APACHE), proc-macro2 1.0.107 (LICENSE-APACHE), quote 1.0.47 (LICENSE-APACHE), ref-cast 1.0.27 (LICENSE-APACHE), ref-cast-impl 1.0.27 (LICENSE-APACHE), rustversion 1.0.23 (LICENSE-APACHE), ryu 1.0.23 (LICENSE-APACHE), semver 1.0.28 (LICENSE-APACHE), serde 1.0.229 (LICENSE-APACHE), serde-untagged 0.1.9 (LICENSE-APACHE), serde_core 1.0.229 (LICENSE-APACHE), serde_derive 1.0.229 (LICENSE-APACHE), serde_derive_internals 0.29.1 (LICENSE-APACHE), serde_json 1.0.154 (LICENSE-APACHE), serde_path_to_error 0.1.20 (LICENSE-APACHE), serde_repr 0.1.21 (LICENSE-APACHE), serde_urlencoded 0.7.1 (LICENSE-APACHE), serde_yaml 0.9.34+deprecated (LICENSE-APACHE), subsetter 0.2.6 (LICENSE-APACHE), syn 2.0.119 (LICENSE-APACHE), syn 3.0.9 (LICENSE-APACHE), thin-vec 0.2.21 (LICENSE-APACHE), thiserror 1.0.69 (LICENSE-APACHE), thiserror 2.0.21 (LICENSE-APACHE), thiserror-impl 1.0.69 (LICENSE-APACHE), thiserror-impl 2.0.21 (LICENSE-APACHE), typed-path 0.12.3 (LICENSE-APACHE), typeid 1.0.3 (LICENSE-APACHE), typst-assets 0.15.1 (LICENSE), unicode-ident 1.0.27 (LICENSE-APACHE), unicode-math-class 0.1.0 (LICENSE-APACHE), unscanny 0.1.0 (LICENSE-APACHE), wasm-streams 0.5.0 (LICENSE-APACHE), xmp-writer 0.3.3 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -2970,7 +2985,7 @@ limitations under the License.
 
 ### T12
 
-SHA-256 `c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08`. Used by: cobs 0.3.0 (LICENSE-APACHE), crc32fast 1.5.2 (LICENSE-APACHE), env_filter 0.1.4 (LICENSE-APACHE), foreign-types 0.5.0 (LICENSE-APACHE), foreign-types-macros 0.2.4 (LICENSE-APACHE), foreign-types-shared 0.3.1 (LICENSE-APACHE), hex 0.4.3 (LICENSE-APACHE), jni-sys 0.3.1 (LICENSE-APACHE), jni-sys 0.4.1 (LICENSE-APACHE), quick-error 2.0.1 (LICENSE-APACHE), serde_spanned 0.6.9 (LICENSE-APACHE), serde_spanned 1.1.1 (LICENSE-APACHE), stringprep 0.1.5 (LICENSE-APACHE), toml 0.8.2 (LICENSE-APACHE), toml 1.1.4+spec-1.1.0 (LICENSE-APACHE), toml_datetime 1.1.1+spec-1.1.0 (LICENSE-APACHE), toml_edit 0.19.15 (LICENSE-APACHE), toml_edit 0.20.2 (LICENSE-APACHE), toml_edit 0.25.13+spec-1.1.0 (LICENSE-APACHE), toml_parser 1.1.3+spec-1.1.0 (LICENSE-APACHE), toml_writer 1.1.2+spec-1.1.0 (LICENSE-APACHE).
+SHA-256 `c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08`. Used by: cobs 0.3.0 (LICENSE-APACHE), crc32fast 1.5.2 (LICENSE-APACHE), env_filter 0.1.4 (LICENSE-APACHE), foreign-types 0.5.0 (LICENSE-APACHE), foreign-types-macros 0.2.4 (LICENSE-APACHE), foreign-types-shared 0.3.1 (LICENSE-APACHE), hex 0.4.3 (LICENSE-APACHE), jni-sys 0.3.1 (LICENSE-APACHE), jni-sys 0.4.1 (LICENSE-APACHE), quick-error 2.0.1 (LICENSE-APACHE), serde_spanned 0.6.9 (LICENSE-APACHE), stringprep 0.1.5 (LICENSE-APACHE), toml 0.8.2 (LICENSE-APACHE), toml 1.1.4+spec-1.1.0 (LICENSE-APACHE), toml_datetime 1.1.1+spec-1.1.0 (LICENSE-APACHE), toml_edit 0.19.15 (LICENSE-APACHE), toml_edit 0.20.2 (LICENSE-APACHE), toml_edit 0.25.13+spec-1.1.0 (LICENSE-APACHE), toml_parser 1.1.3+spec-1.1.0 (LICENSE-APACHE), toml_writer 1.1.2+spec-1.1.0 (LICENSE-APACHE).
 
 ```text
                                  Apache License
@@ -3435,7 +3450,7 @@ SHA-256 `0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9`. Used
 
 ### T17
 
-SHA-256 `378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397`. Used by: cc 1.4.4 (LICENSE-MIT), cfg-if 1.0.5 (LICENSE-MIT), find-msvc-tools 0.1.14 (LICENSE-MIT), js-sys 0.3.104 (LICENSE-MIT), pkg-config 0.3.34 (LICENSE-MIT), socket2 0.6.5 (LICENSE-MIT), stacker 0.1.25 (LICENSE-MIT), toml_datetime 0.6.3 (LICENSE-MIT), wasm-bindgen 0.2.127 (LICENSE-MIT), wasm-bindgen-futures 0.4.77 (LICENSE-MIT), wasm-bindgen-macro 0.2.127 (LICENSE-MIT), wasm-bindgen-macro-support 0.2.127 (LICENSE-MIT), wasm-bindgen-shared 0.2.127 (LICENSE-MIT), web-sys 0.3.104 (LICENSE-MIT).
+SHA-256 `378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397`. Used by: cc 1.4.4 (LICENSE-MIT), cfg-if 1.0.5 (LICENSE-MIT), find-msvc-tools 0.1.15 (LICENSE-MIT), js-sys 0.3.104 (LICENSE-MIT), pkg-config 0.3.34 (LICENSE-MIT), socket2 0.6.5 (LICENSE-MIT), stacker 0.1.25 (LICENSE-MIT), toml_datetime 0.6.3 (LICENSE-MIT), wasm-bindgen 0.2.127 (LICENSE-MIT), wasm-bindgen-futures 0.4.77 (LICENSE-MIT), wasm-bindgen-macro 0.2.127 (LICENSE-MIT), wasm-bindgen-macro-support 0.2.127 (LICENSE-MIT), wasm-bindgen-shared 0.2.127 (LICENSE-MIT), web-sys 0.3.104 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2014 Alex Crichton
@@ -3527,7 +3542,7 @@ SOFTWARE.
 
 ### T20
 
-SHA-256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`. Used by: embed_plist 1.2.2 (LICENSE-APACHE), encoding_rs 0.8.42 (LICENSE-APACHE), kurbo 0.13.1 (LICENSE-APACHE), multiversion_no_op 1.0.0 (LICENSE-APACHE), polycool 0.4.0 (LICENSE-APACHE), siphasher 1.0.4 (LICENSE-APACHE), tinyvec 1.13.3 (LICENSE-APACHE.md), utf16_iter 1.0.5 (LICENSE-APACHE), utf8_iter 1.0.4 (LICENSE-APACHE), write16 1.0.0 (LICENSE-APACHE), zeroize 1.9.0 (LICENSE-APACHE), ejs 3.1.10 (LICENSE), spdx-correct 3.2.0 (LICENSE), validate-npm-package-license 3.0.4 (LICENSE).
+SHA-256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`. Used by: embed_plist 1.2.2 (LICENSE-APACHE), encoding_rs 0.8.44 (LICENSE-APACHE), kurbo 0.13.1 (LICENSE-APACHE), multiversion_no_op 1.0.0 (LICENSE-APACHE), polycool 0.4.0 (LICENSE-APACHE), siphasher 1.0.4 (LICENSE-APACHE), tinyvec 1.13.3 (LICENSE-APACHE.md), utf16_iter 1.0.5 (LICENSE-APACHE), utf8_iter 1.0.4 (LICENSE-APACHE), write16 1.0.0 (LICENSE-APACHE), zeroize 1.9.0 (LICENSE-APACHE), ejs 3.1.10 (LICENSE), spdx-correct 3.2.0 (LICENSE), validate-npm-package-license 3.0.4 (LICENSE).
 
 ```text
 
@@ -3821,7 +3836,7 @@ SOFTWARE.
 
 ### T25
 
-SHA-256 `6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6`. Used by: env_filter 0.1.4 (LICENSE-MIT), serde_spanned 0.6.9 (LICENSE-MIT), serde_spanned 1.1.1 (LICENSE-MIT), toml 0.8.2 (LICENSE-MIT), toml 1.1.4+spec-1.1.0 (LICENSE-MIT), toml_datetime 1.1.1+spec-1.1.0 (LICENSE-MIT), toml_edit 0.19.15 (LICENSE-MIT), toml_edit 0.20.2 (LICENSE-MIT), toml_edit 0.25.13+spec-1.1.0 (LICENSE-MIT), toml_parser 1.1.3+spec-1.1.0 (LICENSE-MIT), toml_writer 1.1.2+spec-1.1.0 (LICENSE-MIT).
+SHA-256 `6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6`. Used by: env_filter 0.1.4 (LICENSE-MIT), serde_spanned 0.6.9 (LICENSE-MIT), serde_spanned 1.1.3 (LICENSE-MIT), toml 0.8.2 (LICENSE-MIT), toml 1.1.4+spec-1.1.0 (LICENSE-MIT), toml_datetime 1.1.1+spec-1.1.0 (LICENSE-MIT), toml_edit 0.19.15 (LICENSE-MIT), toml_edit 0.20.2 (LICENSE-MIT), toml_edit 0.25.13+spec-1.1.0 (LICENSE-MIT), toml_parser 1.1.3+spec-1.1.0 (LICENSE-MIT), toml_writer 1.1.2+spec-1.1.0 (LICENSE-MIT).
 
 ```text
 Copyright (c) Individual contributors
@@ -4090,7 +4105,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### T30
 
-SHA-256 `6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb`. Used by: bitflags 1.3.2 (LICENSE-MIT), bitflags 2.13.2 (LICENSE-MIT), glob 0.3.4 (LICENSE-MIT), log 0.4.34 (LICENSE-MIT), num-bigint 0.4.8 (LICENSE-MIT), num-integer 0.1.47 (LICENSE-MIT), num-traits 0.2.19 (LICENSE-MIT), regex 1.13.1 (LICENSE-MIT), regex-automata 0.4.18 (LICENSE-MIT), regex-syntax 0.8.11 (LICENSE-MIT).
+SHA-256 `6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb`. Used by: bitflags 1.3.2 (LICENSE-MIT), bitflags 2.13.2 (LICENSE-MIT), glob 0.3.4 (LICENSE-MIT), log 0.4.35 (LICENSE-MIT), num-bigint 0.4.8 (LICENSE-MIT), num-integer 0.1.47 (LICENSE-MIT), num-traits 0.2.19 (LICENSE-MIT), regex 1.13.1 (LICENSE-MIT), regex-automata 0.4.18 (LICENSE-MIT), regex-syntax 0.8.11 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2014 The Rust Project Developers
@@ -4696,7 +4711,7 @@ Software.
 
 ### T38
 
-SHA-256 `62065228e42caebca7e7d7db1204cbb867033de5982ca4009928915e4095f3a3`. Used by: core-foundation 0.10.1 (LICENSE-MIT), core-foundation-sys 0.8.7 (LICENSE-MIT), core-graphics 0.25.0 (LICENSE-MIT), core-graphics-types 0.2.0 (LICENSE-MIT), euclid 0.22.14 (LICENSE-MIT), string_cache 0.9.0 (LICENSE-MIT), string_cache_codegen 0.6.1 (LICENSE-MIT).
+SHA-256 `62065228e42caebca7e7d7db1204cbb867033de5982ca4009928915e4095f3a3`. Used by: core-foundation 0.10.1 (LICENSE-MIT), core-foundation-sys 0.8.7 (LICENSE-MIT), core-graphics 0.25.0 (LICENSE-MIT), core-graphics-types 0.2.0 (LICENSE-MIT), euclid 0.22.14 (LICENSE-MIT), string_cache 0.9.0 (LICENSE-MIT), string_cache 0.11.0 (LICENSE-MIT), string_cache_codegen 0.6.1 (LICENSE-MIT), string_cache_codegen 0.11.2 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2012-2013 Mozilla Foundation
@@ -4728,7 +4743,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T39
 
-SHA-256 `7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0`. Used by: heck 0.4.1 (LICENSE-MIT), heck 0.5.0 (LICENSE-MIT), linked-hash-map 0.5.6 (LICENSE-MIT), unicode-bidi 0.3.18 (LICENSE-MIT), unicode-normalization 0.1.25 (LICENSE-MIT), unicode-properties 0.1.4 (LICENSE-MIT), unicode-segmentation 1.13.3 (LICENSE-MIT).
+SHA-256 `7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0`. Used by: heck 0.4.1 (LICENSE-MIT), heck 0.5.0 (LICENSE-MIT), linked-hash-map 0.5.6 (LICENSE-MIT), unicode-bidi 0.3.18 (LICENSE-MIT), unicode-normalization 0.1.26 (LICENSE-MIT), unicode-properties 0.1.4 (LICENSE-MIT), unicode-segmentation 1.13.3 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2015 The Rust Project Developers
@@ -4760,7 +4775,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T40
 
-SHA-256 `8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90`. Used by: bit-set 0.8.0 (LICENSE-APACHE), bit-vec 0.8.0 (LICENSE-APACHE), cfg-expr 0.15.8 (LICENSE-APACHE), cfg-expr 0.20.9 (LICENSE-APACHE), defmt 1.1.1 (LICENSE-APACHE), defmt-macros 1.1.1 (LICENSE-APACHE), linked-hash-map 0.5.6 (LICENSE-APACHE).
+SHA-256 `8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90`. Used by: bit-set 0.8.0 (LICENSE-APACHE), bit-set 0.11.1 (LICENSE-APACHE), bit-vec 0.8.0 (LICENSE-APACHE), bit-vec 0.10.1 (LICENSE-APACHE), cfg-expr 0.15.8 (LICENSE-APACHE), cfg-expr 0.20.9 (LICENSE-APACHE), defmt 1.1.1 (LICENSE-APACHE), defmt-macros 1.1.1 (LICENSE-APACHE), linked-hash-map 0.5.6 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -4995,7 +5010,7 @@ Creator: Person: Daniel Thompson-Yvetot
 
 ### T42
 
-SHA-256 `04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551`. Used by: @vitest/coverage-v8 5.0.5 (LICENSE), @vitest/mocker 5.0.5 (LICENSE), @vitest/pretty-format 4.1.11 (LICENSE), @vitest/snapshot 4.1.11 (LICENSE), @vitest/spy 5.0.5 (LICENSE), @vitest/utils 4.1.11 (LICENSE).
+SHA-256 `04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551`. Used by: @vitest/coverage-v8 5.1.0 (LICENSE), @vitest/mocker 5.1.0 (LICENSE), @vitest/pretty-format 4.1.11 (LICENSE), @vitest/snapshot 4.1.11 (LICENSE), @vitest/spy 5.1.0 (LICENSE), @vitest/utils 4.1.11 (LICENSE).
 
 ```text
 MIT License
@@ -5231,7 +5246,7 @@ limitations under the License.
 
 ### T44
 
-SHA-256 `0ab4d106b6faac07fb6a051815fd1b4d862d730895e2d7d7358c2f13565e7a38`. Used by: phf 0.13.1 (LICENSE), phf_codegen 0.13.1 (LICENSE), phf_generator 0.13.1 (LICENSE), phf_macros 0.13.1 (LICENSE), phf_shared 0.13.1 (LICENSE).
+SHA-256 `0ab4d106b6faac07fb6a051815fd1b4d862d730895e2d7d7358c2f13565e7a38`. Used by: phf 0.13.1 (LICENSE), phf 0.14.0 (LICENSE), phf_codegen 0.13.1 (LICENSE), phf_codegen 0.14.0 (LICENSE), phf_generator 0.13.1 (LICENSE), phf_generator 0.14.0 (LICENSE), phf_macros 0.13.1 (LICENSE), phf_macros 0.14.0 (LICENSE), phf_shared 0.13.1 (LICENSE), phf_shared 0.14.0 (LICENSE).
 
 ```text
 The MIT License (MIT)
@@ -5319,7 +5334,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T47
 
-SHA-256 `3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c`. Used by: encoding_rs 0.8.42 (LICENSE-MIT), multiversion_no_op 1.0.0 (LICENSE-MIT), utf16_iter 1.0.5 (LICENSE-MIT), utf8_iter 1.0.4 (LICENSE-MIT), write16 1.0.0 (LICENSE-MIT).
+SHA-256 `3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c`. Used by: encoding_rs 0.8.44 (LICENSE-MIT), multiversion_no_op 1.0.0 (LICENSE-MIT), utf16_iter 1.0.5 (LICENSE-MIT), utf8_iter 1.0.4 (LICENSE-MIT), write16 1.0.0 (LICENSE-MIT).
 
 ```text
 Copyright Mozilla Foundation
@@ -6650,7 +6665,7 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
 ### T73
 
-SHA-256 `23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d`. Used by: unicode-normalization 0.1.25 (COPYRIGHT), unicode-properties 0.1.4 (COPYRIGHT), unicode-segmentation 1.13.3 (COPYRIGHT).
+SHA-256 `23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d`. Used by: unicode-normalization 0.1.26 (COPYRIGHT), unicode-properties 0.1.4 (COPYRIGHT), unicode-segmentation 1.13.3 (COPYRIGHT).
 
 ```text
 Licensed under the Apache License, Version 2.0
@@ -7076,7 +7091,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 
 ### T89
 
-SHA-256 `86dd7f026f916daf7511e39951ad8ea8cf55a8db67ae64060dacf829761c18f3`. Used by: html5ever 0.39.0 (LICENSE-MIT), markup5ever 0.39.0 (LICENSE-MIT), web_atoms 0.2.6 (LICENSE-MIT).
+SHA-256 `86dd7f026f916daf7511e39951ad8ea8cf55a8db67ae64060dacf829761c18f3`. Used by: html5ever 0.39.0 (LICENSE-MIT), html5ever 0.40.1 (LICENSE-MIT), markup5ever 0.39.0 (LICENSE-MIT), markup5ever 0.40.0 (LICENSE-MIT), web_atoms 0.2.6 (LICENSE-MIT), web_atoms 0.3.0 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2014 The html5ever Project Developers
@@ -8558,7 +8573,7 @@ SOFTWARE.
 
 ### T113
 
-SHA-256 `1a2f5c12ddc934d58956aa5dbdd3255fe55fd957633ab7d0d39e4f0daa73f7df`. Used by: zerocopy 0.8.59 (LICENSE-MIT), zerocopy-derive 0.8.59 (LICENSE-MIT).
+SHA-256 `1a2f5c12ddc934d58956aa5dbdd3255fe55fd957633ab7d0d39e4f0daa73f7df`. Used by: zerocopy 0.8.63 (LICENSE-MIT), zerocopy-derive 0.8.63 (LICENSE-MIT).
 
 ```text
 Copyright 2023 The Fuchsia Authors
@@ -10307,7 +10322,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### T142
 
-SHA-256 `6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a`. Used by: dpi 0.1.2 (LICENSE), tao 0.37.1 (LICENSE).
+SHA-256 `6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a`. Used by: dpi 0.1.2 (LICENSE), tao 0.37.2 (LICENSE).
 
 ```text
 Apache License
@@ -10797,7 +10812,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T147
 
-SHA-256 `77bf9ac1273b3af5c59c632e9dfad86bd1961f65d8a56c76b5fb844488b4991c`. Used by: @vitest/istanbul-lib-coverage 1.0.2 (LICENSE), @vitest/istanbul-lib-report 1.0.2 (LICENSE).
+SHA-256 `77bf9ac1273b3af5c59c632e9dfad86bd1961f65d8a56c76b5fb844488b4991c`. Used by: @vitest/istanbul-lib-coverage 2.1.0 (LICENSE), @vitest/istanbul-lib-report 2.1.0 (LICENSE).
 
 ```text
 Copyright 2012-2015 Yahoo! Inc.
@@ -10916,7 +10931,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T150
 
-SHA-256 `83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32`. Used by: zerocopy 0.8.59 (LICENSE-BSD), zerocopy-derive 0.8.59 (LICENSE-BSD).
+SHA-256 `83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32`. Used by: zerocopy 0.8.63 (LICENSE-BSD), zerocopy-derive 0.8.63 (LICENSE-BSD).
 
 ```text
 Copyright 2019 The Fuchsia Authors.
@@ -11161,7 +11176,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T159
 
-SHA-256 `9d185ac6703c4b0453974c0d85e9eee43e6941009296bb1f5eb0b54e2329e9f3`. Used by: zerocopy 0.8.59 (LICENSE-APACHE), zerocopy-derive 0.8.59 (LICENSE-APACHE).
+SHA-256 `9d185ac6703c4b0453974c0d85e9eee43e6941009296bb1f5eb0b54e2329e9f3`. Used by: zerocopy 0.8.63 (LICENSE-APACHE), zerocopy-derive 0.8.63 (LICENSE-APACHE).
 
 ```text
                                  Apache License
@@ -12457,7 +12472,7 @@ SOFTWARE.
 
 ### T195
 
-SHA-256 `f51ac2c59a222f7476ce507ca879960e2b64ea64bb2786eefdbeb7b0b538d1b7`. Used by: bit-set 0.8.0 (LICENSE-MIT), bit-vec 0.8.0 (LICENSE-MIT).
+SHA-256 `f51ac2c59a222f7476ce507ca879960e2b64ea64bb2786eefdbeb7b0b538d1b7`. Used by: bit-set 0.8.0 (LICENSE-MIT), bit-set 0.11.1 (LICENSE-MIT), bit-vec 0.8.0 (LICENSE-MIT), bit-vec 0.10.1 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2023 The Rust Project Developers
@@ -12521,7 +12536,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T197
 
-SHA-256 `fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85`. Used by: cssparser 0.37.0 (LICENSE), cssparser-macros 0.7.1 (LICENSE).
+SHA-256 `fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85`. Used by: cssparser 0.37.0 (LICENSE), cssparser 0.38.0 (LICENSE), cssparser-macros 0.7.1 (LICENSE).
 
 ```text
 Mozilla Public License Version 2.0
@@ -12961,7 +12976,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T200
 
-SHA-256 `fffe218c1e349e1d482a05677f2ce850502f88298174d77f6ac7c04821db7899`. Used by: roxmltree 0.20.0 (LICENSE-MIT), roxmltree 0.21.1 (LICENSE-MIT).
+SHA-256 `fffe218c1e349e1d482a05677f2ce850502f88298174d77f6ac7c04821db7899`. Used by: roxmltree 0.20.0 (LICENSE-MIT), roxmltree 0.21.2 (LICENSE-MIT).
 
 ```text
 The MIT License (MIT)
@@ -13601,7 +13616,7 @@ limitations under the License.
 
 ### T207
 
-SHA-256 `025436edff4cfcdde17a5811fdea78892d8482efd1abdec5a17872d07a4f2112`. Used by: flate2 1.1.10 (LICENSE-MIT).
+SHA-256 `025436edff4cfcdde17a5811fdea78892d8482efd1abdec5a17872d07a4f2112`. Used by: flate2 1.1.11 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2014-2026 Alex Crichton
@@ -13633,7 +13648,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T208
 
-SHA-256 `02b6448337b757772d90e5f31caaa0f9e6afaad2221c01771d0a3deaa4d4196c`. Used by: tao 0.37.1 (LICENSE.spdx).
+SHA-256 `02b6448337b757772d90e5f31caaa0f9e6afaad2221c01771d0a3deaa4d4196c`. Used by: tao 0.37.2 (LICENSE.spdx).
 
 ```text
 SPDXVersion: SPDX-2.1
@@ -14107,7 +14122,7 @@ The views and conclusions contained in the software and documentation are those 
 
 ### T220
 
-SHA-256 `0b28172679e0009b655da42797c03fd163a3379d5cfa67ba1f1655e974a2a1a9`. Used by: smallvec 1.16.2 (LICENSE-MIT).
+SHA-256 `0b28172679e0009b655da42797c03fd163a3379d5cfa67ba1f1655e974a2a1a9`. Used by: smallvec 1.16.5 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2018 The Servo Project Developers
@@ -14283,7 +14298,7 @@ THIS SOFTWARE.
 
 ### T226
 
-SHA-256 `11789f45bb180841cd362a5eee6789c68ddb573a11105e30768c308a6add0190`. Used by: encoding_rs 0.8.42 (COPYRIGHT).
+SHA-256 `11789f45bb180841cd362a5eee6789c68ddb573a11105e30768c308a6add0190`. Used by: encoding_rs 0.8.44 (COPYRIGHT).
 
 ```text
 encoding_rs is copyright Mozilla Foundation.
@@ -15992,7 +16007,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ### T264
 
-SHA-256 `231c837c45eb53f108fb48929e488965bc4fcc14e9ea21d35f50e6b99d98685b`. Used by: deranged 0.5.8 (LICENSE-MIT).
+SHA-256 `231c837c45eb53f108fb48929e488965bc4fcc14e9ea21d35f50e6b99d98685b`. Used by: deranged 0.5.9 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2024 Jacob Pratt et al.
@@ -16168,7 +16183,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T270
 
-SHA-256 `26235c41e314fb0da35b33b2bb5bcbc4dd523839f8eeca52efcd43586f441fb5`. Used by: wry 0.57.0 (LICENSE.spdx).
+SHA-256 `26235c41e314fb0da35b33b2bb5bcbc4dd523839f8eeca52efcd43586f441fb5`. Used by: wry 0.57.2 (LICENSE.spdx).
 
 ```text
 SPDXVersion: SPDX-2.1
@@ -17116,7 +17131,7 @@ SOFTWARE.
 
 ### T292
 
-SHA-256 `2fb01e6708ea9d53e8b7e74bd82af23bce5256f19f4de93915027a53173c50d8`. Used by: lopdf 0.45.0 (LICENSE).
+SHA-256 `2fb01e6708ea9d53e8b7e74bd82af23bce5256f19f4de93915027a53173c50d8`. Used by: lopdf 0.47.0 (LICENSE).
 
 ```text
 MIT License
@@ -21791,7 +21806,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### T371
 
-SHA-256 `5b0ae40d1a35f7ae6591a28e44771240e6a88cb03a66c9189a45b9681639b466`. Used by: plist 1.10.1 (LICENCE).
+SHA-256 `5b0ae40d1a35f7ae6591a28e44771240e6a88cb03a66c9189a45b9681639b466`. Used by: plist 1.10.3 (LICENCE).
 
 ```text
 Copyright (c) 2015 Edward Barnard
@@ -24173,7 +24188,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### T422
 
-SHA-256 `7365cc8878a1d7ce155a58c4ca09c3d7a6be413efa5334a80ea842912b669349`. Used by: equivalent 1.0.2 (LICENSE-MIT).
+SHA-256 `7365cc8878a1d7ce155a58c4ca09c3d7a6be413efa5334a80ea842912b669349`. Used by: equivalent 1.0.3 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2016--2023
@@ -24459,7 +24474,7 @@ limitations under the License.
 
 ### T426
 
-SHA-256 `7554701d1e74fc434f68c522b1dd743c8c16d816a4b761b5213f367b898884c8`. Used by: dom_query 0.28.0 (LICENSE).
+SHA-256 `7554701d1e74fc434f68c522b1dd743c8c16d816a4b761b5213f367b898884c8`. Used by: dom_query 0.28.0 (LICENSE), dom_query 0.29.0 (LICENSE).
 
 ```text
 MIT License
@@ -25143,7 +25158,7 @@ SOFTWARE.
 
 ### T432
 
-SHA-256 `78fbac9e571c2ee260deb2a1941a8a18f0a85e3f39c23d08e2dcee6da4841998`. Used by: vitest 5.0.5 (LICENSE.md).
+SHA-256 `7f3ddf93a2280ef07bddd352939f5a09d345e1ffe619c518c010021344f22312`. Used by: vitest 5.1.0 (LICENSE.md).
 
 ```text
 # Vitest core license
@@ -25636,7 +25651,7 @@ Repository: git+https://github.com/antfu-collective/local-pkg.git
 ## mime
 License: MIT
 By: Robert Kieffer
-Repository: https://github.com/broofa/mime
+Repository: git+https://github.com/broofa/mime.git
 
 > MIT License
 >
@@ -28965,7 +28980,7 @@ SHA-256 `81c407ac717813b0e3795402960e04003c7bba8ba59b621624707028531c9ade`. Used
 
 ### T454
 
-SHA-256 `838118388fe5c2e7f1dbbaeed13e1c7f3ebf88be91319c7c1d77c18e987d1a50`. Used by: encoding_rs 0.8.42 (LICENSE-WHATWG).
+SHA-256 `838118388fe5c2e7f1dbbaeed13e1c7f3ebf88be91319c7c1d77c18e987d1a50`. Used by: encoding_rs 0.8.44 (LICENSE-WHATWG).
 
 ```text
 Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
@@ -38901,7 +38916,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### T619
 
-SHA-256 `df9cfd06d8a44d9a671eadd39ffd97f166481da015a30f45dfd27886209c5922`. Used by: mime 0.3.17 (LICENSE-MIT).
+SHA-256 `df9cfd06d8a44d9a671eadd39ffd97f166481da015a30f45dfd27886209c5922`. Used by: mime 0.3.18 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2014 Sean McArthur
@@ -39912,7 +39927,7 @@ according to those terms.
 
 ### T644
 
-SHA-256 `edd65bdd88957a205c47d53fa499eed8865a70320f0f03f6391668cb304ea376`. Used by: deranged 0.5.8 (LICENSE-Apache).
+SHA-256 `edd65bdd88957a205c47d53fa499eed8865a70320f0f03f6391668cb304ea376`. Used by: deranged 0.5.9 (LICENSE-Apache).
 
 ```text
 
@@ -40359,7 +40374,7 @@ SOFTWARE.
 
 ### T647
 
-SHA-256 `ef88893533af22ffbb68ceef0724ba1389518df26165a34f3c99ad30b884df4f`. Used by: wry 0.57.0 (LICENSE-MIT).
+SHA-256 `ef88893533af22ffbb68ceef0724ba1389518df26165a34f3c99ad30b884df4f`. Used by: wry 0.57.2 (LICENSE-MIT).
 
 ```text
 MIT License
@@ -41308,7 +41323,7 @@ SOFTWARE.
 
 ### T667
 
-SHA-256 `f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1`. Used by: unicode-ident 1.0.26 (LICENSE-UNICODE).
+SHA-256 `f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1`. Used by: unicode-ident 1.0.27 (LICENSE-UNICODE), unicode-normalization 0.1.26 (LICENSE-UNICODE).
 
 ```text
 UNICODE LICENSE V3
@@ -42338,4 +42353,715 @@ AUTHORS: (ordered alphabetically)
         Rob Bradford <robert.bradford@intel.com>, <rbradford@rivosinc.com>
         Tom Gundersen <teg@jklm.no>
         Trevor Gross <tmgross@umich.edu>
+```
+
+### T683
+
+SHA-256 `1778244777547c281b6f5fa9fc0c18ab21f8d4491c803f64e09046800f5fcb26`. Used by: Typst upstream NOTICE, commit 9dfd3a08500b7896045f907433cf7b4b02434fad.
+
+```text
+Licenses for third party components used by this project can be found below.
+
+================================================================================
+The MIT License applies to:
+
+* The default color set defined in `crates/typst/src/visualize/color.rs` which
+  is adapted from the colors.css project
+  (https://clrs.cc/)
+
+* The `RemoteReader` defined in `crates/typst-kit/src/download.rs` which is
+   closely modelled after the `DownloadTracker` from rustup
+   (https://github.com/rust-lang/rustup/blob/master/src/cli/download_tracker.rs)
+
+* The path diffing algorithm in `crates/typst-syntax/src/path.rs` which is
+  modified from rustc's `path_relative_from` function
+  (https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158)
+  Copyright 2012-2015 The Rust Project Developers.
+
+* The `SyntaxSet` defined in `crates/typst-syntax/src/set.rs` which is
+  based on the `TokenSet` from rust-analyzer
+  (https://github.com/rust-lang/rust-analyzer/blob/master/crates/parser/src/token_set.rs)
+
+* The Lorem Ipsum generator in `crates/typst-library/src/text/lorem.rs` which
+  is based on the `lipsum` crate
+  (https://github.com/mgeisler/lipsum/blob/0.9.1/src/lib.rs)
+  Copyright (c) 2017 Martin Geisler
+
+The MIT License (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+================================================================================
+
+
+================================================================================
+Translations defined in `crates/typst-library/translations/` are adapted from
+
+* Babel (https://ctan.org/pkg/babel)
+  Copyright (C) 2012-2025 Javier Bezos and Johannes L. Braams.
+  Copyright (C) 1989-2012 Johannes L. Braams and
+            any individual authors listed elsewhere.
+  All rights reserved.
+  This file is part of the Babel system
+  It may be distributed and/or modified under the
+  conditions of the LaTeX Project Public License, either version 1.3
+  of this license or (at your option) any later version.
+  The latest version of this license is in
+    http://www.latex-project.org/lppl.txt
+  and version 1.3 or later is part of all distributions of LaTeX
+  version 2003/12/01 or later.
+
+* Cleveref (https://ctan.org/pkg/cleveref)
+  Copyright 2006--2018 Toby Cubitt
+  This file may be distributed and/or modified under the
+  conditions of the LaTeX Project Public License, either version 1.2
+  of this license or (at your option) any later version.
+  The latest version of this license is in:
+     http://www.latex-project.org/lppl.txt
+  and version 1.2 or later is part of all distributions of LaTeX
+  version 1999/12/01 or later.
+================================================================================
+
+
+================================================================================
+Alpha multiplication and source-over blending in
+`crates/typst-render/src/text.rs` are ported from Skia code which can be found
+here:
+https://skia.googlesource.com/skia/+/refs/heads/main/include/core/SkColorPriv.h
+
+Copyright (c) 2011 Google Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+  * Neither the name of the copyright holder nor the names of its
+    contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+================================================================================
+
+
+================================================================================
+`Scalar::powi` implementation in `crates/typst-utils/src/scalar.rs` is ported
+from here:
+https://github.com/llvm/llvm-project/blob/0ee439b/compiler-rt/lib/builtins/powidf2.c
+
+------------------------------------------------------------------------------
+The LLVM Project is under the Apache License v2.0 with LLVM Exceptions:
+------------------------------------------------------------------------------
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+    TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+    1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+    2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+    3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+    4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+    5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+    6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+    7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+    8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+    9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+    END OF TERMS AND CONDITIONS
+
+    APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+    Copyright [yyyy] [name of copyright owner]
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+
+---- LLVM Exceptions to the Apache 2.0 License ----
+
+As an exception, if, as a result of your compiling your source code, portions
+of this Software are embedded into an Object form of such source code, you
+may redistribute such embedded portions in such Object form without complying
+with the conditions of Sections 4(a), 4(b) and 4(d) of the License.
+
+In addition, if you combine or link compiled forms of this Software with
+software that is licensed under the GPLv2 ("Combined Software") and if a
+court of competent jurisdiction determines that the patent provision (Section
+3), the indemnity provision (Section 9) or other Section of the License
+conflicts with the conditions of the GPLv2, you may retroactively and
+prospectively choose to deem waived or otherwise exclude such Section(s) of
+the License, but only in their entirety and only with respect to the Combined
+Software.
+
+------------------------------------------------------------------------------
+Software from third parties included in the LLVM Project:
+------------------------------------------------------------------------------
+The LLVM Project contains third party software which is under different license
+terms. All such code will be identified clearly using at least one of two
+mechanisms:
+1) It will be in a separate directory tree with its own `LICENSE.txt` or
+   `LICENSE` file at the top containing the specific license and restrictions
+   which apply to that software, or
+2) It will contain specific license and restriction terms at the top of every
+   file.
+
+------------------------------------------------------------------------------
+Legacy LLVM License (https://llvm.org/docs/DeveloperPolicy.html#legacy):
+------------------------------------------------------------------------------
+University of Illinois/NCSA
+Open Source License
+
+Copyright (c) 2003-2019 University of Illinois at Urbana-Champaign.
+All rights reserved.
+
+Developed by:
+
+    LLVM Team
+
+    University of Illinois at Urbana-Champaign
+
+    http://llvm.org
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal with
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimers.
+
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimers in the
+      documentation and/or other materials provided with the distribution.
+
+    * Neither the names of the LLVM Team, University of Illinois at
+      Urbana-Champaign, nor the names of its contributors may be used to
+      endorse or promote products derived from this Software without specific
+      prior written permission.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
+SOFTWARE.
+================================================================================
+```
+
+### T684
+
+SHA-256 `79b0c7d284efc4c2dc8da73c01a6d10c19caf61e70fca813e642dc010049eee7`. Used by: upstream tauri-specta-e5e578f-LICENSE.
+
+```text
+MIT License
+
+Copyright (c) 2022 Oscar Beaumont
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### T685
+
+SHA-256 `7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54`. Used by: objc2 upstream licence policy.
+
+```text
+# License
+
+The licensing of these crates is a bit complicated:
+- The crates `objc2`, `block2`, `objc2-foundation` and `objc2-encode` are
+  [currently][#23] licensed under [the MIT license][MIT].
+- All other crates are trio-licensed under the [Zlib], [Apache-2.0] or [MIT]
+  license, at your option.
+
+Furthermore, the crates are (usually automatically) derived from Apple SDKs,
+and that may have implications for licensing, see below for details.
+
+[#23]: https://github.com/madsmtm/objc2/issues/23
+[MIT]: https://opensource.org/license/MIT
+[Zlib]: https://zlib.net/zlib_license.html
+[Apache-2.0]: https://www.apache.org/licenses/LICENSE-2.0
+
+
+## Apple SDKs
+
+These crates are derived from Apple SDKs shipped with Xcode. You can obtain a
+copy of the Xcode license at:
+
+https://www.apple.com/legal/sla/docs/xcode.pdf
+
+Or by typing `xcodebuild -license` in your terminal.
+
+From reading the license, it is unclear whether distributing derived works
+such as these crates are allowed?
+
+But in any case, to practically use these crates, you will have to link, and
+that only works when you have the correct Xcode SDK available to provide the
+required `.tbd` files, which is why we choose to still use the normal SPDX
+identifiers in the crates (Xcode is required to use the crates, and when using
+Xcode you have already agreed to the Xcode license).
+```
+
+### T686
+
+SHA-256 `9ec86f39e235fcd35e6d91ef3fd4d6b88e5763f3ce1e296c222969986b6f6475`. Used by: upstream specta-e7fd23f-LICENSE.
+
+```text
+MIT License
+
+Copyright (c) 2022 Oscar Beaumont
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### T687
+
+SHA-256 `249fdb6694467dd615b259f7ddde07be3f8ae5a72cecebb0e24f6629af4215fe`. Used by: serde_spanned 1.1.3 (LICENSE-APACHE).
+
+```text
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "{}"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright Individual contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
 ```
