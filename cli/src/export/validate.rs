@@ -14,6 +14,7 @@
 use super::manifest;
 use super::naming::{dir_component, pdf_path, resolve};
 use super::{inventory, Placed, MANIFEST};
+use crate::diagnostics::text;
 use crate::error::{ArunaError, Result};
 use crate::parse::{group_label, group_runs, ManuscriptRecord};
 use std::collections::{HashMap, HashSet};
@@ -67,10 +68,7 @@ fn read_bounded(path: &Path, limit: u64) -> Result<String> {
         return Err(ArunaError::ExportInvalid {
             root: path.to_path_buf(),
             count: 1,
-            first: format!(
-                "{} is larger than the {limit} byte limit for this file, so it is not one this program wrote",
-                path.display()
-            ),
+            first: format!(text!(PackageFileTooLarge), path.display(), limit),
         });
     }
     Ok(text)
@@ -129,13 +127,10 @@ pub fn validate(
     );
     let pdfs_against_disk = against_disk(&expected_pdfs, &pdfs_on_disk);
     for missing in &pdfs_against_disk.missing {
-        errors.push(format!("PDF built but not on disk: {}", missing.display()));
+        errors.push(format!(text!(MissingPdf), missing.display()));
     }
     for stray in &pdfs_against_disk.orphans {
-        errors.push(format!(
-            "PDF on disk that no document built: {}",
-            stray.display()
-        ));
+        errors.push(format!(text!(OrphanPdf), stray.display()));
     }
     pdfs_against_disk.twins_into(&mut errors, true);
 
@@ -147,15 +142,15 @@ pub fn validate(
     // без шрифта под готовым именем и нечем вернуть прежний.
     for required in super::ROOT_FILES {
         if !at_the_root.contains(required) {
-            errors.push(format!("the package is missing {required}"));
+            errors.push(format!(text!(PackageMissingFile), required));
         }
     }
     let documents_against_disk = against_disk(&expected, &on_disk);
     for orphan in &documents_against_disk.orphans {
-        errors.push(format!("orphan file in the package: {}", orphan.display()));
+        errors.push(format!(text!(OrphanFile), orphan.display()));
     }
     for absent in &documents_against_disk.missing {
-        errors.push(format!("expected document missing: {}", absent.display()));
+        errors.push(format!(text!(MissingDocument), absent.display()));
     }
     documents_against_disk.twins_into(&mut errors, false);
     // The XML of a document with a PDF is linked from nowhere, so no link
@@ -173,10 +168,7 @@ pub fn validate(
             && !reported.contains(&place.relative)
             && !root.join(&place.relative).is_file()
         {
-            errors.push(format!(
-                "expected document does not open by its name: {}",
-                place.relative.display()
-            ));
+            errors.push(format!(text!(UnopenableDocument), place.relative.display()));
         }
     }
 
@@ -194,7 +186,7 @@ pub fn validate(
         .collect();
     for group in &groups {
         if !root.join(group).is_dir() {
-            errors.push(format!("group without a folder: {}", group.display()));
+            errors.push(format!(text!(MissingGroupFolder), group.display()));
         }
     }
 
@@ -225,24 +217,19 @@ struct AgainstDisk {
 
 impl AgainstDisk {
     /// The two kinds of twin as errors, the placed ones named as documents or
-    /// as PDFs. Whole sentences rather than a word put into one: the console
-    /// translates each phrase as written, and an English word inside a Russian
-    /// sentence is what that rule is there to prevent.
+    /// as PDFs. Separate keys keep the English noun out of the data captured
+    /// by the console's Russian translation.
     fn twins_into(&self, errors: &mut Vec<String>, pdfs: bool) {
         for (a, b) in &self.twins_placed {
             let (a, b) = (a.display(), b.display());
             errors.push(if pdfs {
-                format!("two PDFs differ only in Unicode form and the disk holds one file for both: {a} and {b}")
+                format!(text!(PdfUnicodeTwins), a, b)
             } else {
-                format!("two documents differ only in Unicode form and the disk holds one file for both: {a} and {b}")
+                format!(text!(DocumentUnicodeTwins), a, b)
             });
         }
         for (a, b) in &self.twins_on_disk {
-            errors.push(format!(
-                "two files on the disk differ only in Unicode form: {} and {}",
-                a.display(),
-                b.display()
-            ));
+            errors.push(format!(text!(DiskUnicodeTwins), a.display(), b.display()));
         }
     }
 }
@@ -364,13 +351,11 @@ fn check_links(
 ) {
     let (outside, rows) = inventory::links_by_row(html);
     for href in outside {
-        errors.push(format!(
-            "the inventory links something outside its rows: {href}"
-        ));
+        errors.push(format!(text!(InventoryOutsideRows), href));
     }
     if rows.len() != placed.len() {
         errors.push(format!(
-            "the inventory lists {} documents, and {} were placed",
+            text!(InventoryDocumentCount),
             rows.len(),
             placed.len()
         ));
@@ -384,19 +369,15 @@ fn check_links(
     for ((links, place), state) in rows.iter().zip(placed).zip(pdfs) {
         let document = place.relative.display();
         match links.len() {
-            0 => errors.push(format!("{document} has no link in the inventory")),
+            0 => errors.push(format!(text!(MissingInventoryLink), document)),
             1 => {}
-            n => errors.push(format!(
-                "{document} has {n} links in the inventory, and a document has one"
-            )),
+            n => errors.push(format!(text!(MultipleInventoryLinks), document, n)),
         }
         let built = state.built();
         let pdf = built.map_or_else(|| pdf_path(&place.relative), Path::to_path_buf);
         for href in links {
             let Some(relative) = resolve(href) else {
-                errors.push(format!(
-                    "the link of {document} is not a relative path inside the package: {href}"
-                ));
+                errors.push(format!(text!(LinkOutsidePackage), document, href));
                 continue;
             };
             // A group heading carried a link to a page inside each CTH folder
@@ -404,30 +385,26 @@ fn check_links(
             // link to one, so anything that is not a document's file is a
             // fault rather than another kind of link.
             if !(href.ends_with(".pdf") || href.ends_with(".xml")) {
-                errors.push(format!(
-                    "the link of {document} is not to a document: {href}"
-                ));
+                errors.push(format!(text!(LinkNotDocument), document, href));
                 continue;
             }
             counts.document_links += 1;
             if relative == pdf && built.is_none() {
-                errors.push(format!(
-                    "{document} links a PDF, and its PDF was refused: {href}"
-                ));
+                errors.push(format!(text!(LinkToRefusedPdf), document, href));
             } else if relative == place.relative && built.is_some() {
-                errors.push(format!(
-                    "{document} links its XML, and its PDF was built: {href}"
-                ));
+                errors.push(format!(text!(LinkToXmlWithPdf), document, href));
             } else if relative != pdf && relative != place.relative {
                 match owner.get(&relative) {
                     Some(other) => errors.push(format!(
-                        "{document} links a file of {}: {href}",
-                        other.display()
+                        text!(LinkToOtherDocument),
+                        document,
+                        other.display(),
+                        href
                     )),
-                    None => errors.push(format!("{document} links a file of no document: {href}")),
+                    None => errors.push(format!(text!(LinkToUnownedFile), document, href)),
                 }
             } else if !root.join(&relative).is_file() {
-                errors.push(format!("the link of {document} points at nothing: {href}"));
+                errors.push(format!(text!(LinkMissingFile), document, href));
             }
         }
     }
@@ -448,7 +425,7 @@ fn check_manifest(
     let json = match read_bounded(&path, MAX_MANIFEST) {
         Ok(json) => json,
         Err(err) => {
-            errors.push(format!("the manifest cannot be read: {err}"));
+            errors.push(format!(text!(UnreadableManifest), err));
             return;
         }
     };
@@ -465,16 +442,10 @@ fn check_manifest(
             .map(PathBuf::from)
             .collect();
         for missing in expected.difference(&named) {
-            errors.push(format!(
-                "the manifest has no {key} entry for {}",
-                missing.display()
-            ));
+            errors.push(format!(text!(MissingManifestEntry), key, missing.display()));
         }
         for extra in named.difference(&expected) {
-            errors.push(format!(
-                "the manifest has a {key} entry for {}, which is not in the package",
-                extra.display()
-            ));
+            errors.push(format!(text!(ExtraManifestEntry), key, extra.display()));
         }
         let documents = if key == "pdf" {
             expected.len()
@@ -483,8 +454,9 @@ fn check_manifest(
         };
         if named.len() != documents {
             errors.push(format!(
-                "the manifest lists {} distinct {key} names for {} documents",
+                text!(ManifestNameCount),
                 named.len(),
+                key,
                 documents
             ));
         }
@@ -494,14 +466,12 @@ fn check_manifest(
     // every document it names has a PDF entry – the path of one built, or why
     // one was refused.
     if !json.contains("\n  \"pdfs\": {\n") {
-        errors.push("the manifest has no pdfs section".to_string());
+        errors.push(text!(MissingPdfsSection).to_string());
     }
     let refusals = manifest::values_of(&json, "refused").len();
     let without = placed.len().saturating_sub(expected_pdfs.len());
     if refusals != without {
-        errors.push(format!(
-            "the manifest gives {refusals} reasons for a refused PDF, and {without} documents have none"
-        ));
+        errors.push(format!(text!(PdfRefusalCount), refusals, without));
     }
 }
 
@@ -525,14 +495,11 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
     // without a bound a link pointing at its own parent would recurse until the
     // stack ran out — which is a crash rather than a report.
     if depth == 0 {
-        errors.push(format!(
-            "{} is nested deeper than a package can be",
-            dir.display()
-        ));
+        errors.push(format!(text!(PackageTooDeep), dir.display()));
         return;
     }
     let Ok(entries) = fs::read_dir(dir) else {
-        errors.push(format!("cannot read {}", dir.display()));
+        errors.push(format!(text!(UnreadableDirectory), dir.display()));
         return;
     };
     let at_root = dir == root;
@@ -562,10 +529,7 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
         let kind = entry.file_type().ok();
         let is_link = kind.is_some_and(|t| t.is_symlink());
         if is_link {
-            errors.push(format!(
-                "the package holds a symbolic link, which an export never writes: {}",
-                path.display()
-            ));
+            errors.push(format!(text!(PackageSymlink), path.display()));
         } else if kind.is_some_and(|t| t.is_dir()) {
             walk(root, &path, depth - 1, found, errors);
         } else if belongs {
@@ -580,10 +544,7 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
                 found.pdfs.insert(relative.to_path_buf());
             }
         } else if !name.ends_with(".xml") {
-            errors.push(format!(
-                "unexpected file in the package: {}",
-                path.display()
-            ));
+            errors.push(format!(text!(UnexpectedPackageFile), path.display()));
         } else if let Ok(relative) = path.strip_prefix(root) {
             found.files.insert(relative.to_path_buf());
         }
@@ -613,18 +574,15 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
         return Ok(());
     };
     if meta.file_type().is_symlink() {
-        return refuse(
-            "it is a symbolic link, and whatever it points at is not this exporter's to replace"
-                .to_string(),
-        );
+        return refuse(text!(DestinationSymlink).to_string());
     }
     if !meta.is_dir() {
-        return refuse("it is a file, not a package".to_string());
+        return refuse(text!(DestinationFile).to_string());
     }
 
     if !root.join(crate::paths::OUTPUT_FILE_NAME).is_file() {
         return refuse(format!(
-            "there is no {} in it",
+            text!(DestinationMissingInventory),
             crate::paths::OUTPUT_FILE_NAME
         ));
     }
@@ -647,7 +605,8 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
             || name == ".DS_Store";
         if !ours {
             return refuse(format!(
-                "it contains {name:?}, which this exporter did not put there"
+                text!(DestinationForeignFile),
+                format_args!("{name:?}")
             ));
         }
     }
@@ -1025,6 +984,40 @@ mod tests {
             )),
             "{text}"
         );
+    }
+
+    /// The public error still carries the root, full count and joined English
+    /// reasons. Link errors precede disk errors, independently of translation.
+    #[test]
+    fn validation_keeps_the_error_fields_wording_and_order() {
+        use std::error::Error as _;
+
+        let dir = tempdir().expect("tempdir");
+        let fragments = sample();
+        let (placed, pdfs) = package_refusing(dir.path(), &fragments, &[]);
+        let own = link_to(&pdf_path(&placed[0].relative));
+        rewrite_inventory(dir.path(), |html| {
+            html.replacen(&own, "./CTH%205/nobody.pdf", 1)
+        });
+        fs::remove_file(dir.path().join(crate::fonts::PACKAGED_FONT)).expect("remove font");
+
+        let err = validate(dir.path(), &records(&fragments), &placed, &pdfs)
+            .expect_err("invalid package");
+        let expected = "CTH 5/KBo 1.1.xml links a file of no document: ./CTH%205/nobody.pdf; the package is missing UllikummiA.ttf";
+        let ArunaError::ExportInvalid { root, count, first } = &err else {
+            panic!("wrong public variant: {err:?}");
+        };
+        assert_eq!(root, dir.path());
+        assert_eq!(*count, 2);
+        assert_eq!(first, expected);
+        assert_eq!(
+            err.to_string(),
+            format!(
+                "{} failed validation with 2 problem(s): {expected}",
+                dir.path().display()
+            )
+        );
+        assert!(err.source().is_none());
     }
 
     /// A link at a name of no document of the package, and a row missing:
@@ -1611,6 +1604,30 @@ mod tests {
         fs::create_dir_all(ours.join("CTH 1")).expect("mkdir");
         fs::write(ours.join(format!("{PACKAGE}.html")), b"<html>").expect("write");
         check_destination(&ours).expect("our own build may be replaced");
+    }
+
+    #[test]
+    fn a_foreign_filename_keeps_debug_quoting_in_the_public_error() {
+        use std::error::Error as _;
+
+        let dir = tempdir().expect("tempdir");
+        fs::write(dir.path().join(crate::paths::OUTPUT_FILE_NAME), b"<html>").expect("inventory");
+        let foreign = dir.path().join("чужой \"𒀭\".txt");
+        fs::write(&foreign, b"reader's file").expect("foreign file");
+
+        let err = check_destination(dir.path()).expect_err("foreign file");
+        let expected = "it contains \"чужой \\\"𒀭\\\".txt\", which this exporter did not put there";
+        let ArunaError::ExportDestination { path, reason } = &err else {
+            panic!("wrong public variant: {err:?}");
+        };
+        assert_eq!(path, dir.path());
+        assert_eq!(reason, expected);
+        assert_eq!(
+            err.to_string(),
+            format!("refusing to replace {}: {expected}", dir.path().display())
+        );
+        assert!(err.source().is_none());
+        assert_eq!(fs::read(foreign).expect("preserved"), b"reader's file");
     }
 
     /// The folder a package makes for documents the corpus files under no CTH

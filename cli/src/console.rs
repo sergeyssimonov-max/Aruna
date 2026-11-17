@@ -6,11 +6,13 @@
 //! окну, – а человеку у терминала отказ пересказывается здесь: заголовок на
 //! каждый вариант, причина системы по ее виду, а формулировки, которые ядро
 //! пишет само (сверка нормализации, проверка пакета и назначения, держатель
-//! блокировки, покрытие шрифтов), – по таблице [`PHRASES`].
+//! блокировки, покрытие шрифтов), – по таблице [`Phrase`].
 //!
-//! Таблица держится тестом, который читает исходники ядра: формулировка,
-//! добавленная туда без перевода, роняет его, а не проходит в консоль
-//! по-английски. Имена, пути, адреса и числа – данные, они не переводятся.
+//! Ключи и английские шаблоны собраны в приватном `diagnostics`: проверка
+//! пакета уже пользуется ими, а русский текст выбирается исчерпывающим `match`.
+//! Остальные источники пока пишут строки; их полноту держит тест исходников.
+//! Публичные ошибки сохраняют строки, поэтому сопоставление с шаблоном еще
+//! нужно. Имена, пути, адреса и числа – данные, они не переводятся.
 
 use aruna::error::ArunaError;
 use aruna::job::Phase;
@@ -294,191 +296,101 @@ fn zip(err: &zip::result::ZipError) -> String {
     }
 }
 
-/// Формулировки, которые ядро пишет само, и их перевод.
-///
-/// `{}` – место для данных: имени, пути, значения. Слева – текст ядра с
-/// `{}` на месте каждой подстановки, справа – русский с теми же местами в том
-/// же порядке.
-const PHRASES: &[(&str, &str)] = &[
-    // export::verify – сверка нормализации
-    (
-        "the source declares encoding=\"{}\" and the canonical declaration says UTF-8; the bytes would be kept and their meaning changed",
-        "источник объявляет encoding=\"{}\", а каноническое объявление – UTF-8: байты остались бы прежними, а их смысл изменился",
-    ),
-    (
-        "the source declares version=\"{}\" and the canonical declaration says 1.0; the bytes would be kept and their meaning changed",
-        "источник объявляет version=\"{}\", а каноническое объявление – 1.0: байты остались бы прежними, а их смысл изменился",
-    ),
-    (
-        "instruction <?{}…?> was dropped and is not on the permit list",
-        "инструкция <?{}…?> снята, а в списке разрешенных ее нет",
-    ),
-    (
-        "content differs at byte {} (source {} bytes, output {} bytes)\n      source: …{}…\n      output: …{}…",
-        "содержимое расходится с байта {} (в источнике {} байт, на выходе {})\n      источник: …{}…\n      выход: …{}…",
-    ),
-    (
-        "the output does not begin with the canonical declaration",
-        "выход начинается не с канонического объявления",
-    ),
-    (
-        "an instruction appears in the output that was not in the source",
-        "на выходе появилась инструкция, которой в источнике не было",
-    ),
-    // export::validate – проверка пакета
-    ("the inventory links something outside its rows: {}", "опись ссылается на что-то вне строк документов: {}"),
-    ("the inventory lists {} documents, and {} were placed", "в описи {} документов, а размещено {}"),
-    ("{} has no link in the inventory", "у документа {} нет ссылки в описи"),
-    (
-        "{} has {} links in the inventory, and a document has one",
-        "у документа {} в описи {} ссылок, а ссылка у документа одна",
-    ),
-    (
-        "the link of {} is not a relative path inside the package: {}",
-        "ссылка документа {} ведет не внутрь пакета: {}",
-    ),
-    ("the link of {} is not to a document: {}", "ссылка документа {} ведет не на документ: {}"),
-    (
-        "{} links a PDF, and its PDF was refused: {}",
-        "документ {} ссылается на PDF, а в его PDF отказано: {}",
-    ),
-    (
-        "{} links its XML, and its PDF was built: {}",
-        "документ {} ссылается на свой XML, а его PDF построен: {}",
-    ),
-    // Раньше шаблона с двумя именами: тот прочел бы и эту фразу.
-    (
-        "{} links a file of no document: {}",
-        "документ {} ссылается на файл, который не принадлежит ни одному документу: {}",
-    ),
-    ("{} links a file of {}: {}", "документ {} ссылается на файл документа {}: {}"),
-    ("the link of {} points at nothing: {}", "ссылка документа {} ведет в пустоту: {}"),
-    ("the package is missing {}", "в пакете нет {}"),
-    ("orphan file in the package: {}", "в пакете лишний файл: {}"),
-    ("expected document missing: {}", "нет ожидаемого документа: {}"),
-    (
-        "expected document does not open by its name: {}",
-        "ожидаемый документ не открывается по своему имени: {}",
-    ),
-    (
-        "two documents differ only in Unicode form and the disk holds one file for both: {} and {}",
-        "два документа различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
-    ),
-    (
-        "two files on the disk differ only in Unicode form: {} and {}",
-        "два файла на диске различаются только формой Unicode: {} и {}",
-    ),
-    ("group without a folder: {}", "у группы нет папки: {}"),
-    ("the manifest cannot be read: {}", "манифест не читается: {}"),
-    (
-        "{} is larger than the {} byte limit for this file, so it is not one this program wrote",
-        "{} больше предела в {} байт для этого файла – значит, писала его не эта программа",
-    ),
-    ("the manifest has no {} entry for {}", "в манифесте нет записи {} для {}"),
-    (
-        "the manifest has a {} entry for {}, which is not in the package",
-        "в манифесте есть запись {} для {}, а в пакете такого нет",
-    ),
-    (
-        "the manifest lists {} distinct {} names for {} documents",
-        "в манифесте {} разных имен {} на {} документов",
-    ),
-    (
-        "the manifest has no pdfs section",
-        "в манифесте нет раздела pdfs",
-    ),
-    (
-        "the manifest gives {} reasons for a refused PDF, and {} documents have none",
-        "в манифесте {} причин отказа в PDF, а без PDF {} документов",
-    ),
-    ("{} is nested deeper than a package can be", "{} вложен глубже, чем бывает в пакете"),
-    ("cannot read {}", "не читается {}"),
-    (
-        "the package holds a symbolic link, which an export never writes: {}",
-        "в пакете символьная ссылка, а сборка их не пишет: {}",
-    ),
-    ("unexpected file in the package: {}", "в пакете неожиданный файл: {}"),
-    // export::validate – назначение
-    (
-        "it is a symbolic link, and whatever it points at is not this exporter's to replace",
-        "это символьная ссылка, и заменять то, на что она указывает, не дело сборщика",
-    ),
-    ("it is a file, not a package", "это файл, а не пакет"),
-    ("there is no {} in it", "в нем нет {}"),
-    (
-        "it contains {}, which this exporter did not put there",
-        "в нем лежит {}, которого сборщик туда не клал",
-    ),
-    // export – публикация
-    (
-        "the published package differs from the one that was built and checked",
-        "опубликованный пакет отличается от собранного и проверенного",
-    ),
-    // export::lock – держатель блокировки и то, что стоит на ее месте
-    (
-        "something that is not a lock file stands where the publish lock belongs",
-        "на месте блокировки публикации стоит не файл блокировки",
-    ),
-    ("pid {}, since {}", "процесс {}, с {}"),
-    ("a lock file this program did not write", "файл блокировки, который эта программа не писала"),
-    ("an unnamed run", "запуск без имени"),
-    // fonts – что рисует шрифт
-    ("U+100000, which nothing on a stock machine draws", "U+100000, которого не рисует ни один шрифт обычной машины"),
-    ("the 376 cuneiform signs of the corpus", "376 клинописных знаков корпуса"),
-    ("six editorial marks", "шесть редакторских помет"),
-    ("the main face of the PDF", "основное начертание PDF"),
-    ("the main face, italic", "основное начертание, курсив"),
-    ("the main face, bold", "основное начертание, полужирный"),
-    ("U+05C3", "U+05C3"),
-    (
-        "the terms the font beside it is distributed under",
-        "условия, на которых распространяется шрифт рядом",
-    ),
-    (
-        "the PDF, and no directory of fonts was named (ARUNA_FONTS in the console)",
-        "PDF, а каталог шрифтов не назван (в консоли – ARUNA_FONTS)",
-    ),
-    // export::validate и export::pdf – фаза PDF
-    ("PDF built but not on disk: {}", "PDF построен, но на диске его нет: {}"),
-    ("PDF on disk that no document built: {}", "PDF на диске, которого не строил ни один документ: {}"),
-    (
-        "two PDFs differ only in Unicode form and the disk holds one file for both: {} and {}",
-        "два PDF различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
-    ),
-    // pdf – нарушенные правила сборки PDF
-    (
-        "Typst asked for {}, and only the template and the data exist",
-        "Typst запросил {}, а есть только шаблон и данные",
-    ),
-    (
-        "{} labels in the text, {} label images in the file",
-        "меток в тексте {}, их изображений в файле {}",
-    ),
-    (
-        "{} label spans not found exactly once in their stream",
-        "{} меток не нашли своего места в потоке страницы",
-    ),
-    (
-        "page {}: two repeated clusters overlap at MCID {}",
-        "страница {}: два повтора кластера перекрываются у MCID {}",
-    ),
-    (
-        "the credit was predicted and UllikummiA is not embedded",
-        "сноска об авторстве предсказана, а UllikummiA не встроен",
-    ),
-    (
-        "UllikummiA is embedded and the credit was not predicted",
-        "UllikummiA встроен, а сноска об авторстве не предсказана",
-    ),
-    ("the main face cannot draw a label: {}", "основное начертание не рисует надпись метки: {}"),
-    ("the font stack has no regular face of {}", "в стеке шрифтов нет прямого начертания {}"),
-    ("the world of the template could not be built", "мир шаблона не построен"),
-    (
-        "the PDF this program wrote could not be read back: {}",
-        "PDF, только что записанный программой, не прочитан обратно: {}",
-    ),
-    ("Typst refused the document: {}", "Typst отказал документу: {}"),
-];
+// The binary and the library compile the same private catalogue; neither
+// needs a new public API solely to share diagnostic wording.
+#[path = "diagnostics.rs"]
+mod diagnostics;
+
+macro_rules! define_phrases {
+    ($($key:ident => $english:literal,)*) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        enum Phrase { $($key,)* }
+
+        impl Phrase {
+            const ALL: &'static [Self] = &[$(Self::$key,)*];
+
+            fn english(self) -> &'static str {
+                match self { $(Self::$key => diagnostics::text!($key),)* }
+            }
+        }
+    };
+}
+diagnostics::with_diagnostics!(define_phrases);
+
+impl Phrase {
+    /// Exhaustive: a new diagnostic key cannot compile without its wording.
+    fn russian(self) -> &'static str {
+        match self {
+            Self::SourceEncoding => "источник объявляет encoding=\"{}\", а каноническое объявление – UTF-8: байты остались бы прежними, а их смысл изменился",
+            Self::SourceVersion => "источник объявляет version=\"{}\", а каноническое объявление – 1.0: байты остались бы прежними, а их смысл изменился",
+            Self::DroppedInstruction => "инструкция <?{}…?> снята, а в списке разрешенных ее нет",
+            Self::ContentDiffers => "содержимое расходится с байта {} (в источнике {} байт, на выходе {})\n      источник: …{}…\n      выход: …{}…",
+            Self::MissingDeclaration => "выход начинается не с канонического объявления",
+            Self::AddedInstruction => "на выходе появилась инструкция, которой в источнике не было",
+            Self::InventoryOutsideRows => "опись ссылается на что-то вне строк документов: {}",
+            Self::InventoryDocumentCount => "в описи {} документов, а размещено {}",
+            Self::MissingInventoryLink => "у документа {} нет ссылки в описи",
+            Self::MultipleInventoryLinks => "у документа {} в описи {} ссылок, а ссылка у документа одна",
+            Self::LinkOutsidePackage => "ссылка документа {} ведет не внутрь пакета: {}",
+            Self::LinkNotDocument => "ссылка документа {} ведет не на документ: {}",
+            Self::LinkToRefusedPdf => "документ {} ссылается на PDF, а в его PDF отказано: {}",
+            Self::LinkToXmlWithPdf => "документ {} ссылается на свой XML, а его PDF построен: {}",
+            Self::LinkToUnownedFile => "документ {} ссылается на файл, который не принадлежит ни одному документу: {}",
+            Self::LinkToOtherDocument => "документ {} ссылается на файл документа {}: {}",
+            Self::LinkMissingFile => "ссылка документа {} ведет в пустоту: {}",
+            Self::PackageMissingFile => "в пакете нет {}",
+            Self::OrphanFile => "в пакете лишний файл: {}",
+            Self::MissingDocument => "нет ожидаемого документа: {}",
+            Self::UnopenableDocument => "ожидаемый документ не открывается по своему имени: {}",
+            Self::DocumentUnicodeTwins => "два документа различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
+            Self::DiskUnicodeTwins => "два файла на диске различаются только формой Unicode: {} и {}",
+            Self::MissingGroupFolder => "у группы нет папки: {}",
+            Self::UnreadableManifest => "манифест не читается: {}",
+            Self::PackageFileTooLarge => "{} больше предела в {} байт для этого файла – значит, писала его не эта программа",
+            Self::MissingManifestEntry => "в манифесте нет записи {} для {}",
+            Self::ExtraManifestEntry => "в манифесте есть запись {} для {}, а в пакете такого нет",
+            Self::ManifestNameCount => "в манифесте {} разных имен {} на {} документов",
+            Self::MissingPdfsSection => "в манифесте нет раздела pdfs",
+            Self::PdfRefusalCount => "в манифесте {} причин отказа в PDF, а без PDF {} документов",
+            Self::PackageTooDeep => "{} вложен глубже, чем бывает в пакете",
+            Self::UnreadableDirectory => "не читается {}",
+            Self::PackageSymlink => "в пакете символьная ссылка, а сборка их не пишет: {}",
+            Self::UnexpectedPackageFile => "в пакете неожиданный файл: {}",
+            Self::DestinationSymlink => "это символьная ссылка, и заменять то, на что она указывает, не дело сборщика",
+            Self::DestinationFile => "это файл, а не пакет",
+            Self::DestinationMissingInventory => "в нем нет {}",
+            Self::DestinationForeignFile => "в нем лежит {}, которого сборщик туда не клал",
+            Self::PublishedPackageDiffers => "опубликованный пакет отличается от собранного и проверенного",
+            Self::InvalidPublishLock => "на месте блокировки публикации стоит не файл блокировки",
+            Self::PublishHolder => "процесс {}, с {}",
+            Self::ForeignPublishLock => "файл блокировки, который эта программа не писала",
+            Self::UnnamedRun => "запуск без имени",
+            Self::FontUnassignedCuneiform => "U+100000, которого не рисует ни один шрифт обычной машины",
+            Self::FontCorpusCuneiform => "376 клинописных знаков корпуса",
+            Self::FontEditorialMarks => "шесть редакторских помет",
+            Self::FontMain => "основное начертание PDF",
+            Self::FontItalic => "основное начертание, курсив",
+            Self::FontBold => "основное начертание, полужирный",
+            Self::FontHebrewPunctuation => "U+05C3",
+            Self::FontTerms => "условия, на которых распространяется шрифт рядом",
+            Self::FontDirectoryUnnamed => "PDF, а каталог шрифтов не назван (в консоли – ARUNA_FONTS)",
+            Self::MissingPdf => "PDF построен, но на диске его нет: {}",
+            Self::OrphanPdf => "PDF на диске, которого не строил ни один документ: {}",
+            Self::PdfUnicodeTwins => "два PDF различаются только формой Unicode, а на диске для обоих один файл: {} и {}",
+            Self::PdfWorldAsked => "Typst запросил {}, а есть только шаблон и данные",
+            Self::PdfUnplacedLabels => "меток в тексте {}, их изображений в файле {}",
+            Self::PdfUnplacedSpans => "{} меток не нашли своего места в потоке страницы",
+            Self::PdfClusterOverlap => "страница {}: два повтора кластера перекрываются у MCID {}",
+            Self::PdfCreditMissing => "сноска об авторстве предсказана, а UllikummiA не встроен",
+            Self::PdfCreditUnexpected => "UllikummiA встроен, а сноска об авторстве не предсказана",
+            Self::PdfLabelGlyph => "основное начертание не рисует надпись метки: {}",
+            Self::PdfStackFace => "в стеке шрифтов нет прямого начертания {}",
+            Self::PdfWorld => "мир шаблона не построен",
+            Self::PdfReadBack => "PDF, только что записанный программой, не прочитан обратно: {}",
+            Self::PdfRefused => "Typst отказал документу: {}",
+        }
+    }
+}
 
 /// Перевод формулировки ядра; незнакомая остается как есть.
 ///
@@ -486,9 +398,9 @@ const PHRASES: &[(&str, &str)] = &[
 /// потерять текст отказа хуже, чем показать его по-английски.
 /// Выбирается первый подходящий шаблон: частные фразы идут раньше общих.
 fn translated(text: &str) -> String {
-    PHRASES
+    Phrase::ALL
         .iter()
-        .find_map(|(english, russian)| fill(russian, capture_values(english, text)?))
+        .find_map(|phrase| fill(phrase.russian(), capture_values(phrase.english(), text)?))
         .unwrap_or_else(|| text.to_string())
 }
 
@@ -846,6 +758,39 @@ mod tests {
         }
     }
 
+    /// Эталон снят с main до перехода на ключи: английские шаблоны, их
+    /// порядок и русские сообщения с различимыми данными на каждом месте.
+    #[test]
+    fn phrase_wording_and_order_stay_unchanged() {
+        let mut wording = String::new();
+        for phrase in Phrase::ALL {
+            let english = phrase.english();
+            let values: Vec<_> = (0..english.matches("{}").count())
+                .map(|i| format!("𒀭-e\u{301}-{{}}-{i}:данные"))
+                .collect();
+            let text = fill(english, values.iter().map(String::as_str).collect())
+                .expect("one value per placeholder");
+            wording.push_str(&format!("{english:?} => {:?}\n", translated(&text)));
+        }
+        assert_eq!(wording, include_str!("console/phrases.txt"));
+    }
+
+    #[test]
+    fn every_template_has_one_translation_with_the_same_slots() {
+        let mut seen = std::collections::HashSet::new();
+        for phrase in Phrase::ALL {
+            let english = phrase.english();
+            let russian = phrase.russian();
+            assert!(seen.insert(english), "duplicate template: {phrase:?}");
+            assert!(!russian.is_empty(), "empty translation: {phrase:?}");
+            assert_eq!(
+                english.matches("{}").count(),
+                russian.matches("{}").count(),
+                "translation drops or adds data: {phrase:?}"
+            );
+        }
+    }
+
     /// **Отказ прокси называется отказом прокси**, а не сетевым сбоем.
     #[test]
     fn a_proxy_refusal_is_named_as_one() {
@@ -940,8 +885,9 @@ mod tests {
 
     /// **Каждая формулировка, которую ядро пишет в отказ, здесь переведена.**
     ///
-    /// Читает исходники ядра, а не список, который мог бы отстать: новая
-    /// формулировка без перевода роняет этот тест.
+    /// Для `text!(Key)` полноту держит исчерпывающий `Phrase::russian`.
+    /// Здесь остаются литералы старых источников и обходы каталога: новая
+    /// формулировка без перевода роняет тест.
     #[test]
     fn every_phrase_the_core_writes_has_a_translation() {
         let sources = [
@@ -951,7 +897,7 @@ mod tests {
             (include_str!("export/verify.rs"), &["format!(", "Err("][..]),
             (
                 include_str!("export/validate.rs"),
-                &["format!(", "refuse(", "Err("][..],
+                &["format!(", "refuse(", "Err(", "errors.push("][..],
             ),
             (
                 include_str!("export/lock.rs"),
@@ -966,14 +912,22 @@ mod tests {
         // И сообщение, которое целиком – чужое сообщение внутри: `PdfError`
         // передает инвариант и отказ шрифтов как есть, их фразы – выше.
         let not_refusals = ["DROP_PI {}", "{}"];
-        let known: Vec<&str> = PHRASES
+        let known: Vec<&str> = Phrase::ALL
             .iter()
-            .map(|(english, _)| *english)
+            .map(|phrase| phrase.english())
             .chain(not_refusals)
             .collect();
         let mut missing = Vec::new();
         let mut seen = 0;
         for (source, calls) in sources {
+            // Учитываются места создания отказа, а не копия каталога:
+            // переводы вызовов по ключу уже проверены компилятором.
+            seen += source
+                .split("#[cfg(test)]")
+                .next()
+                .unwrap_or(source)
+                .matches("text!(")
+                .count();
             for literal in literals_after(source, calls) {
                 seen += 1;
                 let template = as_template(&literal);
@@ -984,5 +938,38 @@ mod tests {
         }
         assert!(seen >= 30, "the scan found only {seen} phrases");
         assert!(missing.is_empty(), "no Russian for: {missing:#?}");
+    }
+
+    /// Отрицательный контроль обхода старых источников: перенос строки,
+    /// экранированные кавычки и именованные подстановки не скрывают отказ.
+    #[test]
+    fn the_source_guard_notices_an_untranslated_refusal() {
+        let source = r#"
+            Err("a new refusal".into());
+            refuse(
+                "a new destination refusal".to_string()
+            );
+            first: format!(
+                "new \"{name}\" refusal; \
+                 count {count}",
+            );
+        "#;
+        let templates: Vec<_> = literals_after(source, &["Err(", "refuse(", "format!("])
+            .iter()
+            .map(|literal| as_template(literal))
+            .collect();
+        assert_eq!(
+            templates,
+            [
+                "a new refusal",
+                "a new destination refusal",
+                "new \"{}\" refusal; count {}"
+            ]
+        );
+        for template in templates {
+            assert!(!Phrase::ALL
+                .iter()
+                .any(|phrase| phrase.english() == template));
+        }
     }
 }
