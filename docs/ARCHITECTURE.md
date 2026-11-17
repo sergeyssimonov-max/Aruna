@@ -18,7 +18,7 @@ document is about the Rust that runs underneath it.
 | | |
 |---|---|
 | `cli/` | package `aruna` — the program; its version is the current release named in the [README](../README.md#выпуски). A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
-| `src-tauri/` | package `aruna-desktop` (its version is the core's since 2026-09-04), library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its six commands ask the core where the package went, read what is in it, open the inventory, and build or stop a build; the logic stays in `cli/`. `lib.rs` holds the commands, the event, the plugins and `run()`; `read.rs` (since 2026-10-01) what the window reads from a finished package. |
+| `src-tauri/` | package `aruna-desktop` (its version is the core's since 2026-09-04), library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its six commands ask the core where the package went, read what is in it, open the inventory, and build or stop a build; the logic stays in `cli/`. `lib.rs` holds startup and plugins; `commands.rs` the six commands and their registration, `dto.rs` their types, and `build.rs` the running job. `read.rs` reads the finished package. The current module map is in §7. |
 
 They were independent crates with a `Cargo.lock` each until 2026-08-30, when
 they were joined: the root manifest lists both, **one lock file** sits beside it
@@ -46,7 +46,7 @@ row is named by a lower one.
 
 | layer | modules | what it may not do |
 |---|---|---|
-| **adapter** | `main.rs` | — |
+| **adapter** | `main.rs`, `console` | — |
 | **application** | `app` | parse a command line, choose an exit code, print |
 | **presentation** | `presentation`, `style`, `html`, `export/inventory`, `pdf/{mod,layout,world,label,post,fonts}` | read the filesystem, parse XML |
 | **domain** | `parse`, `document`, `xml_wellformed`, `order`, `paths`, `catalog`, `json`, `cth_titles`, `fonts`, `md5`, `sha256`, `export/{naming,normalize,validate,verify,manifest,counts}` | know a renderer exists |
@@ -61,6 +61,13 @@ PDF phase, `pdf/` the renderer it calls – pure, a document in and bytes out,
 with `pdf/post` the one walk over a page's content stream that the product, the
 tests and the gate share. `console` is a module of the binary, not of the
 library: the Russian wording of the console.
+
+In the console adapter, `main.rs` selects exit codes, writes to stdout/stderr
+and supplies advice. `console` formats error headlines and causes, and keeps
+its phrase table and substitution helpers private. Translation uses the first
+matching template, preserves the captured data verbatim, and leaves an unknown
+phrase unchanged. The library's error types and their `Display` text are not
+translated; the desktop window has its own wording for its audience.
 
 `progress` and `job` sit beside the stack rather than in it: every layer may
 report through them, and they know nothing about what is being reported.
@@ -177,6 +184,31 @@ document model still knows nothing about PDF. "Not at `export`" above is kept
 for the rendering; the phase that writes files is where files are written.
 
 ## 7. Where a Tauri adapter attaches
+
+Current module boundaries, checked 2026-11-17:
+
+| module | responsibility |
+|---|---|
+| `src-tauri/src/lib.rs` | Application startup, plugins, managed state and startup font logging. |
+| `src-tauri/src/commands.rs` | The six IPC entry points and the one `contract()` used by both runtime registration and TypeScript export. |
+| `src-tauri/src/dto.rs` | Response and event types, error presentation, bounded counters and pure projections of core data. No filesystem access or Tauri runtime calls. |
+| `src-tauri/src/build.rs` | Destination validation, the running-job slot and its guard, cancellation, blocking work and the progress sink. |
+| `src-tauri/src/read.rs` | Reading and validating a finished package, using the core's names and rules. |
+| `src-tauri/src/tests/` | Existing wire, reading, cancellation and release-feature checks, still registered under their original root module names. The poisoned-mutex test lives beside the private state in `build.rs`. |
+
+The build command delegates to `build::start`. The order stays: validate the
+destination, obtain the resource directory and create the request and cancel
+flag, claim the slot, then create the job ID and progress sink inside
+`spawn_blocking`. `Claimed` releases the slot on success, failure or unwinding;
+`cancel_build` sets the existing core flag, and completion still supplies the
+cancellation acknowledgement. The mutex protecting the slot stays private.
+
+`BuildProgress` keeps the same event name, fields and stage spellings. Its pure
+projection and PDF-count carry-forward live with the DTO; the sink in `build`
+holds the last count and emits the event. `commands::contract()` remains the
+single source of registration and generated bindings. The bindings comparison,
+state and cancellation tests, component checks and native WebdriverIO scenario
+protect these boundaries. The dated account below records how they arose.
 
 At `app`, and it is attached. `src-tauri/Cargo.toml` carries
 

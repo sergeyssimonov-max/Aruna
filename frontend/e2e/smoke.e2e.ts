@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { corpusLifecycle } from './corpus.lifecycle'
 
 /**
  * Версия, которую приложение обязано о себе сообщать.
@@ -114,3 +115,5 @@ describe('Aruna window', () => {
     expect(stopped).toBe('ok')
   })
 })
+
+if (process.env.ARUNA_E2E_CORPUS_CACHE) corpusLifecycle()

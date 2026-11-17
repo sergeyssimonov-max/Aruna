@@ -39,6 +39,12 @@ const TAURI_CONF = json('../../src-tauri/tauri.conf.json')
 const CARGO = text('../../src-tauri/Cargo.toml')
 const CORE_CARGO = text('../../cli/Cargo.toml')
 const TAURI_LIB = text('../../src-tauri/src/lib.rs')
+const TAURI_COMMANDS = text('../../src-tauri/src/commands.rs')
+const TAURI_SOURCES = readdirSync(at('../../src-tauri/src'))
+  .filter((file) => file.endsWith('.rs'))
+  .sort()
+  .map((file) => text(`../../src-tauri/src/${file}`))
+  .join('\n')
 const VITE_CONFIG = text('../vite.config.ts')
 const INDEX_HTML = text('../index.html')
 const MAIN_TS = text('../src/main.ts')
@@ -286,7 +292,7 @@ describe('the window is granted what it calls and nothing more', () => {
    */
   it('carries neither the store nor npm halves nobody imports', () => {
     expect(CARGO).not.toMatch(/tauri-plugin-store/)
-    expect(TAURI_LIB).not.toMatch(/tauri_plugin_store/)
+    expect(TAURI_SOURCES).not.toMatch(/tauri_plugin_store/)
     for (const pkg of ['@tauri-apps/plugin-store', '@tauri-apps/plugin-window-state']) {
       expect(FRONTEND_PKG.dependencies).not.toHaveProperty(pkg)
     }
@@ -311,7 +317,7 @@ describe('the window is granted what it calls and nothing more', () => {
    */
   it('does not grant open_path, whose scope cannot be filled', () => {
     expect(DEFAULT_CAPABILITY.permissions).not.toContain('opener:allow-open-path')
-    expect(TAURI_LIB).toContain('fn open_inventory')
+    expect(TAURI_COMMANDS).toContain('fn open_inventory')
   })
 
   /**
@@ -330,7 +336,7 @@ describe('the window is granted what it calls and nothing more', () => {
   /** `tauri-plugin-shell` was replaced by opener on 21.08.2026 and stays out. */
   it('does not bring back the shell plugin', () => {
     expect(CARGO).not.toMatch(/tauri-plugin-shell/)
-    expect(TAURI_LIB).not.toMatch(/tauri_plugin_shell/)
+    expect(TAURI_SOURCES).not.toMatch(/tauri_plugin_shell/)
   })
 })
 

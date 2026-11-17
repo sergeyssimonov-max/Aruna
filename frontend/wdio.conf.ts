@@ -1,4 +1,19 @@
-import { finish, freePort, isolate, stopApplication, type Isolation } from './e2e/isolation'
+import {
+  childrenRunning,
+  finish,
+  freePort,
+  isolate,
+  stopApplication,
+  type Isolation,
+} from './e2e/isolation'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { once } from 'node:events'
+import { cpSync, lstatSync } from 'node:fs'
+import { join } from 'node:path'
+
+// The full corpus scenario is explicit: it needs a prepared cache and several
+// minutes. The application receives a copy inside this run's isolated home.
+const corpusCache = process.env.ARUNA_E2E_CORPUS_CACHE
 
 // Where the application under test keeps what it writes. macOS takes WebKit
 // data, caches and saved window state from CoreFoundation's home directory,
@@ -18,6 +33,7 @@ import { finish, freePort, isolate, stopApplication, type Isolation } from './e2
 // `onPrepare` spawns the application with this object as its environment.
 const appEnv: Record<string, string> = {}
 let run: Isolation | undefined
+let activity: ChildProcess | undefined
 
 // The binary the service starts, as `ps` shows it.
 const application = '../target/debug/aruna-desktop'
@@ -69,6 +85,27 @@ export const config: WebdriverIO.Config = {
   mochaOpts: { ui: 'bdd', timeout: 60000 },
   onPrepare: async () => {
     run = isolate(appEnv)
+    if (corpusCache) {
+      appEnv.ARUNA_CACHE_DIR = join(run.root, 'cache')
+      // A copied link could send writes back to the source cache. Accept only
+      // ordinary directories and files before the application is started.
+      if (!lstatSync(corpusCache).isDirectory()) {
+        throw new Error('The E2E corpus cache must be a regular directory')
+      }
+      cpSync(corpusCache, appEnv.ARUNA_CACHE_DIR, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+        filter: (source) => {
+          const entry = lstatSync(source)
+          if (!entry.isDirectory() && !entry.isFile()) {
+            throw new Error('The E2E corpus cache must contain only regular files and directories')
+          }
+          return true
+        },
+      })
+      process.env.ARUNA_E2E_ROOT = run.root
+    }
     // A port nothing holds, rather than the service's fixed one: a run that
     // starts while the last one's application is still going away would
     // otherwise meet its driver.
@@ -77,7 +114,26 @@ export const config: WebdriverIO.Config = {
   before: async () => {
     await windowAnswers()
   },
+  onWorkerStart: async () => {
+    if (!corpusCache) return
+    // The full PDF scenario needs the native process to remain active even
+    // when its window is behind another application. This assertion belongs
+    // only to the test process and ends with it; it changes no user setting.
+    const pids = childrenRunning('aruna-desktop')
+    if (pids.length !== 1) throw new Error('Expected one native E2E application process')
+    const pending = spawn('caffeinate', ['-i', '-w', String(pids[0])], { stdio: 'ignore' })
+    await once(pending, 'spawn')
+    activity = pending
+  },
   onComplete: async () => {
-    if (run) await finish(run, () => stopApplication('aruna-desktop'))
+    try {
+      if (run) await finish(run, () => stopApplication('aruna-desktop'))
+    } finally {
+      if (activity && activity.exitCode === null && activity.signalCode === null) {
+        const exited = once(activity, 'exit')
+        activity.kill()
+        await exited
+      }
+    }
   },
 }

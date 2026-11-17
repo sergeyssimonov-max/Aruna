@@ -10,6 +10,44 @@ coverage, corpus, native E2E and release artifacts. Run snapshot checks with
 From the repository root, native E2E is `pnpm --dir frontend test:e2e` and the
 universal release is `pnpm build --locked`. Both use the pinned local Tauri CLI.
 
+The shell module split is checked by the existing Rust suites, now physically
+under `src-tauri/src/tests/`; their root module names and the heavy-test filters
+are preserved. Only the poisoned-mutex test moved to `build::tests`, where it
+can inspect the private mutex without exposing it to other modules.
+
+The six native WebdriverIO smoke scenarios remain the default. To also run a
+real build, a concurrent-build refusal and cancellation of a rebuild during PDF
+conversion, supply a prepared cache containing the pinned corpus archive:
+
+```sh
+ARUNA_E2E_CORPUS_CACHE=/absolute/path/to/prepared-cache pnpm --dir frontend test:e2e
+```
+
+The cache must be a real directory containing only regular files and
+directories; symlinks and other special entries are refused. The runner copies
+it into its isolation directory; it does not use the source cache for writes.
+The seventh scenario uses the paths returned by
+`corpus_location`, asserts that they belong to the isolated home, starts and
+cancels builds through the real UI, observes the native `build-progress` events,
+and compares every output path and SHA-256 after cancellation. A successful
+run must use the cached archive, publish all 23 936 documents and 23 713 PDFs,
+and leave the existing package and an unrelated reader file unchanged when the
+next run is cancelled. This full-corpus scenario has its own 600-second test
+deadline (300 seconds for completion, 30 for cancellation); the six smoke tests
+retain their existing 60-second deadline. Missing or invalid input is a failed
+requested run, not a skipped scenario. It does not replace release acceptance.
+For this full scenario the launcher holds a temporary `caffeinate -i -w PID`
+assertion on behalf of its own native child, and releases it after the run.
+This keeps the test process active while its window is in the background;
+it changes no system preference or application behavior. The measured timing
+limitations and diagnostic runs are recorded in
+[the refactoring report](REFACTOR-2026-11-17.md).
+For a comparison between revisions, optionally set `ARUNA_E2E_OUTPUT_MANIFEST`
+to an absolute path for a new JSON file. It records every relative output path
+and SHA-256 from the completed build, including the unrelated reader file;
+an existing evidence file is never overwritten. Compare the two files directly
+when both revisions use the same archive and fonts.
+
 Post-release dependency checks are recorded in
 [the 2026-11-16 report](DEPENDENCY-UPDATE-2026-11-16.md). To run the heavy
 checks without rewriting generated bindings, use an explicit filter from the
