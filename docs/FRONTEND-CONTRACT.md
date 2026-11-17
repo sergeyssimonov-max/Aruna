@@ -587,6 +587,13 @@ to need parallelism, the limit must be explicit from the first line.
 
 ## 3. The IPC contract, as it was written
 
+Implementation layout, 2026-11-17: the six command declarations and their shared
+registration are in `src-tauri/src/commands.rs`; DTOs and event projections are
+in `dto.rs`, the job lifecycle in `build.rs`, and package reading in `read.rs`.
+`lib.rs` starts the application. This is a module split: command names,
+arguments, serialised responses, events and `frontend/src/bindings.ts` are
+unchanged. The dated contract below continues to apply.
+
 Written on 2026-09-02, when the window stopped being a viewer over
 `~/Downloads` and became the program's front door. Six commands and one event,
 and the names are part of the contract:
