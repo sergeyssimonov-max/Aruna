@@ -18,6 +18,7 @@ pub mod archive;
 pub mod cache;
 pub mod catalog;
 pub mod cth_titles;
+mod diagnostics;
 pub mod document;
 pub mod download;
 pub mod error;
