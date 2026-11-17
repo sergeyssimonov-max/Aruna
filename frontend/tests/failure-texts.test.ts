@@ -25,14 +25,18 @@
  * the number of arms rather than against a floor picked by hand.
  */
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const at = (relative: string) => fileURLToPath(new URL(relative, import.meta.url))
 
 /** Read once, at module level, the way the tests beside this one do. */
 const RUST = readFileSync(at('../../cli/src/app.rs'), 'utf8')
-const SHELL = readFileSync(at('../../src-tauri/src/lib.rs'), 'utf8')
+const SHELL = readdirSync(at('../../src-tauri/src'))
+  .filter((file) => file.endsWith('.rs'))
+  .sort()
+  .map((file) => readFileSync(at(`../../src-tauri/src/${file}`), 'utf8'))
+  .join('\n')
 const SVELTE = readFileSync(at('../src/App.svelte'), 'utf8')
 
 const MATCH = 'let (code, phase, retryable) = match error {'

@@ -1,4 +1,10 @@
 import { finish, freePort, isolate, stopApplication, type Isolation } from './e2e/isolation'
+import { cpSync, lstatSync } from 'node:fs'
+import { join } from 'node:path'
+
+// The full corpus scenario is explicit: it needs a prepared cache and several
+// minutes. The application receives a copy inside this run's isolated home.
+const corpusCache = process.env.ARUNA_E2E_CORPUS_CACHE
 
 // Where the application under test keeps what it writes. macOS takes WebKit
 // data, caches and saved window state from CoreFoundation's home directory,
@@ -69,6 +75,27 @@ export const config: WebdriverIO.Config = {
   mochaOpts: { ui: 'bdd', timeout: 60000 },
   onPrepare: async () => {
     run = isolate(appEnv)
+    if (corpusCache) {
+      appEnv.ARUNA_CACHE_DIR = join(run.root, 'cache')
+      // A copied link could send writes back to the source cache. Accept only
+      // ordinary directories and files before the application is started.
+      if (!lstatSync(corpusCache).isDirectory()) {
+        throw new Error('The E2E corpus cache must be a regular directory')
+      }
+      cpSync(corpusCache, appEnv.ARUNA_CACHE_DIR, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+        filter: (source) => {
+          const entry = lstatSync(source)
+          if (!entry.isDirectory() && !entry.isFile()) {
+            throw new Error('The E2E corpus cache must contain only regular files and directories')
+          }
+          return true
+        },
+      })
+      process.env.ARUNA_E2E_ROOT = run.root
+    }
     // A port nothing holds, rather than the service's fixed one: a run that
     // starts while the last one's application is still going away would
     // otherwise meet its driver.
