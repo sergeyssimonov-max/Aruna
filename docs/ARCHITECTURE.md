@@ -63,11 +63,22 @@ tests and the gate share. `console` is a module of the binary, not of the
 library: the Russian wording of the console.
 
 In the console adapter, `main.rs` selects exit codes, writes to stdout/stderr
-and supplies advice. `console` formats error headlines and causes, and keeps
-its phrase table and substitution helpers private. Translation uses the first
-matching template, preserves the captured data verbatim, and leaves an unknown
-phrase unchanged. The library's error types and their `Display` text are not
-translated; the desktop window has its own wording for its audience.
+and supplies advice. `console` formats error headlines and causes. The private
+`diagnostics.rs` catalogue supplies named English templates to both the library
+and the binary; `export::validate` uses those keys when formatting its 36
+diagnostics. A macro expands each key to a literal, so Rust's `format!` still
+checks the arguments. The binary compiles the same catalogue into `Phrase`;
+its exhaustive `russian` match requires a translation for every key. No key or
+helper is a public Rust API or part of IPC.
+
+The error fields remain strings, so the console still recognises their text.
+Translation uses the first matching template in catalogue order, preserves the
+captured data verbatim, and leaves an unknown phrase unchanged. In particular,
+the template for a file belonging to no document precedes the general template
+for a file belonging to another document. Producers outside `export::validate`
+still write English literals and are checked by the existing source guard.
+The library's error types and their `Display` text are not translated; the
+desktop window has its own wording for its audience.
 
 `progress` and `job` sit beside the stack rather than in it: every layer may
 report through them, and they know nothing about what is being reported.
@@ -146,9 +157,11 @@ cancels is not the thread that works; that is the arrangement a window needs.
 `error::ArunaError` is a `thiserror` enum, and the variants are the ones a
 caller can act on differently — network, HTTP status, checksum, truncation,
 oversize, collision, distortion, destination, invalid package, incomplete
-package, cancellation, I/O. Each keeps its source and a relative path. Nothing
-is flattened to a string before the outermost adapter: `main.rs` is where an
-error becomes text and advice.
+package, cancellation, I/O. Variants keep their associated paths, counts and,
+where applicable, typed source errors. Some detail fields (`reason`, `first`,
+`holder`, `invariant`) already contain English strings; they are not a typed
+diagnostic tree. `main.rs` selects the console's wording and advice without
+changing those public variants or their `Display` contract.
 
 ## 6. Where the PDF renderer attaches
 

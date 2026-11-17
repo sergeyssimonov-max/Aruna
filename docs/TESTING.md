@@ -10,6 +10,16 @@ coverage, corpus, native E2E and release artifacts. Run snapshot checks with
 From the repository root, native E2E is `pnpm --dir frontend test:e2e` and the
 universal release is `pnpm build --locked`. Both use the pinned local Tauri CLI.
 
+Console diagnostics have three complementary guards: the catalogue's exhaustive
+Russian match, template arity/uniqueness and the source scan of remaining literal
+producers. `console::tests::phrase_wording_and_order_stay_unchanged` compares all
+67 English templates and their Russian output with `cli/src/console/phrases.txt`,
+captured from `8ca1598` before the catalogue refactor. Treat that file as a wording
+contract, not generated output to refresh on failure. The validation tests also
+pin the public error fields, English `Display`, reason order and debug quoting
+of foreign filenames. See [the diagnostic refactoring report](CONSOLE-DIAGNOSTICS-2026-11-17.md)
+for the before/after comparison and limits.
+
 The shell module split is checked by the existing Rust suites, now physically
 under `src-tauri/src/tests/`; their root module names and the heavy-test filters
 are preserved. Only the poisoned-mutex test moved to `build::tests`, where it
