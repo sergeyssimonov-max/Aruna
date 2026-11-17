@@ -1,4 +1,13 @@
-import { finish, freePort, isolate, stopApplication, type Isolation } from './e2e/isolation'
+import {
+  childrenRunning,
+  finish,
+  freePort,
+  isolate,
+  stopApplication,
+  type Isolation,
+} from './e2e/isolation'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { once } from 'node:events'
 import { cpSync, lstatSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -24,6 +33,7 @@ const corpusCache = process.env.ARUNA_E2E_CORPUS_CACHE
 // `onPrepare` spawns the application with this object as its environment.
 const appEnv: Record<string, string> = {}
 let run: Isolation | undefined
+let activity: ChildProcess | undefined
 
 // The binary the service starts, as `ps` shows it.
 const application = '../target/debug/aruna-desktop'
@@ -104,7 +114,26 @@ export const config: WebdriverIO.Config = {
   before: async () => {
     await windowAnswers()
   },
+  onWorkerStart: async () => {
+    if (!corpusCache) return
+    // The full PDF scenario needs the native process to remain active even
+    // when its window is behind another application. This assertion belongs
+    // only to the test process and ends with it; it changes no user setting.
+    const pids = childrenRunning('aruna-desktop')
+    if (pids.length !== 1) throw new Error('Expected one native E2E application process')
+    const pending = spawn('caffeinate', ['-i', '-w', String(pids[0])], { stdio: 'ignore' })
+    await once(pending, 'spawn')
+    activity = pending
+  },
   onComplete: async () => {
-    if (run) await finish(run, () => stopApplication('aruna-desktop'))
+    try {
+      if (run) await finish(run, () => stopApplication('aruna-desktop'))
+    } finally {
+      if (activity && activity.exitCode === null && activity.signalCode === null) {
+        const exited = once(activity, 'exit')
+        activity.kill()
+        await exited
+      }
+    }
   },
 }
