@@ -36,6 +36,12 @@ next run is cancelled. This full-corpus scenario has its own 600-second test
 deadline (300 seconds for completion, 30 for cancellation); the six smoke tests
 retain their existing 60-second deadline. Missing or invalid input is a failed
 requested run, not a skipped scenario. It does not replace release acceptance.
+For this full scenario the launcher holds a temporary `caffeinate -i -w PID`
+assertion on behalf of its own native child, and releases it after the run.
+This keeps the test process active while its window is in the background;
+it changes no system preference or application behavior. The measured timing
+limitations and diagnostic runs are recorded in
+[the refactoring report](REFACTOR-2026-11-17.md).
 For a comparison between revisions, optionally set `ARUNA_E2E_OUTPUT_MANIFEST`
 to an absolute path for a new JSON file. It records every relative output path
 and SHA-256 from the completed build, including the unrelated reader file;
