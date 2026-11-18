@@ -1,0 +1,3 @@
+# A unified diff represents an empty context line by one space.
+# All other source files retain the normal whitespace checks.
+frontend/patches/*.patch whitespace=-blank-at-eol

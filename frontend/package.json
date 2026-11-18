@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "cd ../src-tauri && VITE_E2E=1 tauri build --debug --no-bundle --features e2e -- --locked && cd ../frontend && wdio run wdio.conf.ts",
     "audit": "./scripts/audit.sh",
-    "audit:strict": "pnpm audit"
+    "audit:strict": "./scripts/audit.sh --strict"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -58,3 +58,7 @@ audit:
     - GHSA-gcqx-w48m-w2h4
     - GHSA-3g3m-2fjr-6pw4
     - GHSA-g3hv-75wg-m249
+
+patchedDependencies:
+  picomatch@2.3.2: patches/picomatch@2.3.2.patch
+  picomatch@4.0.7: patches/picomatch@4.0.7.patch

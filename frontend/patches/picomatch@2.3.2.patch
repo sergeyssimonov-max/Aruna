@@ -1,0 +1,55 @@
+diff --git a/lib/parse.js b/lib/parse.js
+index caa2b86aa5a567df33cef4bda3c7a97794f439f8..d3b6150e3eafaeae999cfed72e9659e54db3b9cd 100644
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -45,6 +45,37 @@ const syntaxError = (type, char) => {
+   return `Missing ${type}: "${char}" - use "\\\\${char}" to match literal characters`;
+ };
+ 
++/**
++ * Aruna: reject nested unbounded repetition before creating a RegExp.
++ * Inspect emitted regex, not raw glob text: quoted/escaped stars and character
++ * classes are literals, while nested globs and regex mode have already expanded.
++ * This guard intentionally cannot be disabled with maxExtglobRecursion.
++ */
++const hasUnboundedQuantifier = source => {
++  let bracket = false;
++
++  for (let index = 0; index < source.length; index++) {
++    const ch = source[index];
++    if (ch === '\\') {
++      index++;
++      continue;
++    }
++    if (ch === '[' && !bracket) {
++      bracket = true;
++      continue;
++    }
++    if (ch === ']' && bracket) {
++      bracket = false;
++      continue;
++    }
++    if (!bracket && (ch === '*' || ch === '+' || (ch === '{' && /^\{\d+,\}/.test(source.slice(index))))) {
++      return true;
++    }
++  }
++
++  return false;
++};
++
+ const splitTopLevel = input => {
+   const parts = [];
+   let bracket = 0;
+@@ -508,6 +539,12 @@ const parse = (input, options) => {
+   };
+ 
+   const extglobClose = token => {
++    if ((token.type === 'plus' || token.type === 'star') && hasUnboundedQuantifier(state.output.slice(token.output.length))) {
++      const error = new SyntaxError('Repeated extglob contains an unbounded subexpression');
++      error.code = 'ERR_PICOMATCH_UNSAFE_EXTGLOB';
++      throw error;
++    }
++
+     const literal = input.slice(token.startIndex, state.index + 1);
+     const body = input.slice(token.startIndex + 2, state.index);
+     const analysis = analyzeRepeatedExtglob(body, opts);
