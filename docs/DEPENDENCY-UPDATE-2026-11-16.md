@@ -1002,3 +1002,59 @@ ignored: десять тяжелых проверок и генератор bind
 стенда сохранены в `dist/Aruna-webpki-roots-1.0.12-checks-2026-11-18/`
 с SHA256SUMS. Рабочие материалы – `/private/tmp/aruna-webpki-roots-1.0.12/`.
 Нового выпуска, коммита или отправки в GitHub это задание не выполняло.
+
+## ESLint 10.15.0, typescript-eslint 8.73.0 и minimatch, 18.11.2026
+
+По решению владельца линтеры обновлены до истечения семи суток, чтобы убрать
+из них уязвимую версию minimatch. На первом шаге ESLint 10.14.0 → 10.15.0
+и обязательный `@eslint/config-array` 0.23.5 → 0.23.6 перешли на minimatch
+11.0.8. На втором шаге typescript-eslint и десять пакетов `@typescript-eslint`
+обновлены с 8.72.2 до 8.73.0. Парсер использует ту же копию 11.0.8,
+что и ESLint. Версия 10.2.6 выбыла из дерева.
+[ESLint 10.15.0](https://eslint.org/blog/2026/11/eslint-v10.15.0-released/) ·
+[typescript-eslint 8.73.0](https://github.com/typescript-eslint/typescript-eslint/releases/tag/v8.73.0)
+
+Каждый шаг рассчитан pnpm отдельно. Семидневная выдержка закончилась бы
+20.11 в 21:34 UTC для группы ESLint и 23.11 в 17:15 UTC для всей группы
+typescript-eslint (округлено вверх до минуты). Для остальных пакетов действовала
+выдержка 10 080 минут. Она пройдена у minimatch 11.0.8 и нового
+`@isaacs/nonrecursive-glob-match` 1.1.0. Контрольные суммы всех 15 новых записей
+совпали с npm. Чистая установка через `pnpm --dir frontend install --frozen-lockfile`
+проверена на Node 22.23.5, pnpm 11.28.11 и macOS 13.7.8.
+
+| Установленный minimatch | Непосредственные потребители | GHSA-g3hv-75wg-m249 |
+|---|---|---|
+| 11.0.8 | ESLint, `@eslint/config-array`, `@typescript-eslint/typescript-estree` | Исправлено |
+| 9.0.9 | glob 10.5.0 через `@wdio/config` и `archiver-utils` | Под временным исключением до 30.11.2026 00:00 UTC |
+| 5.1.9 | filelist, glob 8, mocha, readdir-glob | Вне затронутого диапазона |
+| 3.1.5 | recursive-readdir | Вне затронутого диапазона |
+
+Стабильный `@wdio/tauri-service` использует WebdriverIO 9, чей конфиг требует
+glob 10. В изолированной копии `ConfigParser.getFilePaths` проверил настоящий
+шаблон `./e2e/**/*.e2e.ts`. С minimatch 9.0.9 он обнаружил `e2e/smoke.e2e.ts`,
+после подстановки 11.0.8 вернул пустой список. В glob 10 сегмент шаблона
+проверяется через `instanceof RegExp`, а minimatch 11 возвращает `Matcher`.
+Следующий переход требует совместимых версий glob, WebdriverIO и сервиса Tauri.
+[Изменения API minimatch](https://github.com/isaacs/minimatch/blob/main/changelog.md) ·
+[Манифест стабильного сервиса](https://registry.npmjs.org/@wdio%2ftauri-service/1.5.1)
+
+Команда `pnpm --dir frontend why minimatch --json` подтвердила состав таблицы.
+Сравнение полного графа семи прямых пакетов `@wdio/*` с исходным lock-файлом
+дало одинаковые 429 записей `snapshots` со всеми связями.
+
+До обновления, между шагами и после них ESLint проверил одни и те же 48 файлов
+(37 TypeScript, 9 Svelte, 2 JavaScript), без ошибок и предупреждений. Прошли
+`check`, `format:check`, `test:unit` (381 тест) и `audit:strict`. Тесты проверяют
+разрешение исправленной версии из каждого потребителя линтера, четыре разрешенных
+корневых пакета WDIO, обнаружение E2E-файлов и отсутствие glob/minimatch в обеих
+производственных сборках. Строгий аудит использовал прежние исключения.
+Диагностический `pnpm audit --json` без исключений вернул код 1 и две находки
+уровня moderate – glob 10.5.0 и minimatch 9.0.9. Для каждой npm указал 63 пути
+в дереве инструментов тестирования. Генератор уведомлений учел 1 445 пакетов.
+Все 691 лицензионный текст побайтно совпали с предыдущими, отметок
+`requires review` по-прежнему 143.
+[Бюллетень minimatch](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+
+На `aarch64-apple-darwin` также прошли проверки раздела 6.1 – `cargo fmt`,
+Clippy для workspace со всеми фичами и `-D warnings`, 799 обычных Rust-тестов
+под nextest (11 штатных пропусков) и `cargo deny check licenses bans sources`.
