@@ -17,7 +17,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires review: 143.
+Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires review: 143.
 
 ## Packages
 
@@ -824,7 +824,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | @esbuild/win32-x64 | 0.28.2 | npm | not declared | requires review |
 | @eslint-community/eslint-utils | 4.10.1 | npm | MIT | T198 |
 | @eslint-community/regexpp | 4.12.2 | npm | MIT | T198 |
-| @eslint/config-array | 0.23.5 | npm | Apache-2.0 | T9 |
+| @eslint/config-array | 0.23.6 | npm | Apache-2.0 | T9 |
 | @eslint/config-helpers | 0.7.0 | npm | Apache-2.0 | T9 |
 | @eslint/core | 1.2.1 | npm | Apache-2.0 | T9 |
 | @eslint/js | 10.0.1 | npm | MIT | T127 |
@@ -853,6 +853,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | @inquirer/select | 4.4.2 | npm | MIT | T15 |
 | @inquirer/type | 3.0.10 | npm | MIT | T15 |
 | @isaacs/cliui | 8.0.2 | npm | ISC | T57 |
+| @isaacs/nonrecursive-glob-match | 1.1.0 | npm | BlueOak-1.0.0 | T61 |
 | @jest/diff-sequences | 30.4.0 | npm | MIT | T19 |
 | @jest/expect-utils | 30.4.1 | npm | MIT | T19 |
 | @jest/get-type | 30.1.0 | npm | MIT | T19 |
@@ -936,16 +937,16 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | @types/ws | 8.18.1 | npm | MIT | T3 |
 | @types/yargs-parser | 21.0.3 | npm | MIT | T3 |
 | @types/yargs | 17.0.35 | npm | MIT | T3 |
-| @typescript-eslint/eslint-plugin | 8.72.2 | npm | MIT | T32 |
-| @typescript-eslint/parser | 8.72.2 | npm | MIT | T32 |
-| @typescript-eslint/project-service | 8.72.2 | npm | MIT | T102 |
-| @typescript-eslint/scope-manager | 8.72.2 | npm | MIT | T32 |
-| @typescript-eslint/tsconfig-utils | 8.72.2 | npm | MIT | T102 |
-| @typescript-eslint/type-utils | 8.72.2 | npm | MIT | T656 |
-| @typescript-eslint/types | 8.72.2 | npm | MIT | T32 |
-| @typescript-eslint/typescript-estree | 8.72.2 | npm | MIT | T32 |
-| @typescript-eslint/utils | 8.72.2 | npm | MIT | T32 |
-| @typescript-eslint/visitor-keys | 8.72.2 | npm | MIT | T32 |
+| @typescript-eslint/eslint-plugin | 8.73.0 | npm | MIT | T32 |
+| @typescript-eslint/parser | 8.73.0 | npm | MIT | T32 |
+| @typescript-eslint/project-service | 8.73.0 | npm | MIT | T102 |
+| @typescript-eslint/scope-manager | 8.73.0 | npm | MIT | T32 |
+| @typescript-eslint/tsconfig-utils | 8.73.0 | npm | MIT | T102 |
+| @typescript-eslint/type-utils | 8.73.0 | npm | MIT | T656 |
+| @typescript-eslint/types | 8.73.0 | npm | MIT | T32 |
+| @typescript-eslint/typescript-estree | 8.73.0 | npm | MIT | T32 |
+| @typescript-eslint/utils | 8.73.0 | npm | MIT | T32 |
+| @typescript-eslint/visitor-keys | 8.73.0 | npm | MIT | T32 |
 | @vitest/coverage-v8 | 5.1.0 | npm | MIT | T42 |
 | @vitest/istanbul-lib-coverage | 2.1.0 | npm | MIT | T147 |
 | @vitest/istanbul-lib-report | 2.1.0 | npm | MIT | T147 |
@@ -1104,7 +1105,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | eslint-visitor-keys | 3.4.3 | npm | Apache-2.0 | T99 |
 | eslint-visitor-keys | 4.2.1 | npm | Apache-2.0 | T99 |
 | eslint-visitor-keys | 5.0.1 | npm | Apache-2.0 | T99 |
-| eslint | 10.14.0 | npm | MIT | T127 |
+| eslint | 10.15.0 | npm | MIT | T127 |
 | esm-env | 1.2.2 | npm | MIT | T412 |
 | espree | 10.4.0 | npm | BSD-2-Clause | T119 |
 | espree | 11.2.0 | npm | BSD-2-Clause | T119 |
@@ -1254,7 +1255,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | magicast | 0.5.5 | npm | MIT | T433 |
 | mdn-data | 2.27.1 | npm | CC0-1.0 | T307 |
 | min-indent | 1.0.1 | npm | MIT | T491 |
-| minimatch | 10.2.6 | npm | BlueOak-1.0.0 | T123 |
+| minimatch | 11.0.8 | npm | BlueOak-1.0.0 | T123 |
 | minimatch | 3.1.5 | npm | ISC | T34 |
 | minimatch | 5.1.9 | npm | ISC | T174 |
 | minimatch | 9.0.9 | npm | ISC | T174 |
@@ -1400,7 +1401,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | type-fest | 3.13.1 | npm | (MIT OR CC0-1.0) | requires review |
 | type-fest | 4.26.0 | npm | (MIT OR CC0-1.0) | requires review |
 | type-fest | 4.41.0 | npm | (MIT OR CC0-1.0) | T161, T4 |
-| typescript-eslint | 8.72.2 | npm | MIT | T32 |
+| typescript-eslint | 8.73.0 | npm | MIT | T32 |
 | typescript | 6.0.3 | npm | Apache-2.0 | T524 |
 | undici-types | 6.21.0 | npm | MIT | T66 |
 | undici | 6.29.1 | npm | MIT | T66 |
@@ -2409,7 +2410,7 @@ ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation a
 
 ### T9
 
-SHA-256 `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4`. Used by: ciborium 0.2.2 (LICENSE), ciborium-io 0.2.2 (LICENSE), ciborium-ll 0.2.2 (LICENSE), serialize-to-javascript 0.1.2 (LICENSE-APACHE), serialize-to-javascript-impl 0.1.2 (LICENSE-APACHE), ureq 2.12.1 (LICENSE-APACHE), zune-core 0.5.3 (LICENSE-APACHE), zune-jpeg 0.5.15 (LICENSE-APACHE), @eslint/config-array 0.23.5 (LICENSE), @eslint/config-helpers 0.7.0 (LICENSE), @eslint/core 1.2.1 (LICENSE), @eslint/object-schema 3.0.5 (LICENSE), @eslint/plugin-kit 0.7.3 (LICENSE), @humanfs/core 0.19.2 (LICENSE), @humanfs/node 0.16.8 (LICENSE), @humanwhocodes/module-importer 1.0.1 (LICENSE), @humanwhocodes/retry 0.4.3 (LICENSE), @pkgjs/parseargs 0.11.0 (LICENSE), b4a 1.8.1 (LICENSE), bare-events 2.9.1 (LICENSE), bare-fs 4.8.0 (LICENSE), bare-path 3.1.1 (LICENSE), bare-stream 2.13.3 (LICENSE), bare-url 2.5.2 (LICENSE), events-universal 1.0.1 (LICENSE), text-decoder 1.2.7 (LICENSE).
+SHA-256 `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4`. Used by: ciborium 0.2.2 (LICENSE), ciborium-io 0.2.2 (LICENSE), ciborium-ll 0.2.2 (LICENSE), serialize-to-javascript 0.1.2 (LICENSE-APACHE), serialize-to-javascript-impl 0.1.2 (LICENSE-APACHE), ureq 2.12.1 (LICENSE-APACHE), zune-core 0.5.3 (LICENSE-APACHE), zune-jpeg 0.5.15 (LICENSE-APACHE), @eslint/config-array 0.23.6 (LICENSE), @eslint/config-helpers 0.7.0 (LICENSE), @eslint/core 1.2.1 (LICENSE), @eslint/object-schema 3.0.5 (LICENSE), @eslint/plugin-kit 0.7.3 (LICENSE), @humanfs/core 0.19.2 (LICENSE), @humanfs/node 0.16.8 (LICENSE), @humanwhocodes/module-importer 1.0.1 (LICENSE), @humanwhocodes/retry 0.4.3 (LICENSE), @pkgjs/parseargs 0.11.0 (LICENSE), b4a 1.8.1 (LICENSE), bare-events 2.9.1 (LICENSE), bare-fs 4.8.0 (LICENSE), bare-path 3.1.1 (LICENSE), bare-stream 2.13.3 (LICENSE), bare-url 2.5.2 (LICENSE), events-universal 1.0.1 (LICENSE), text-decoder 1.2.7 (LICENSE).
 
 ```text
                                  Apache License
@@ -4370,7 +4371,7 @@ limitations under the License.
 
 ### T32
 
-SHA-256 `2eb5c7a0bba9deb77a98c81bf6b9d3fb1c67118eebf968b6b1a787b3f8928ee0`. Used by: @typescript-eslint/eslint-plugin 8.72.2 (LICENSE), @typescript-eslint/parser 8.72.2 (LICENSE), @typescript-eslint/scope-manager 8.72.2 (LICENSE), @typescript-eslint/types 8.72.2 (LICENSE), @typescript-eslint/typescript-estree 8.72.2 (LICENSE), @typescript-eslint/utils 8.72.2 (LICENSE), @typescript-eslint/visitor-keys 8.72.2 (LICENSE), typescript-eslint 8.72.2 (LICENSE).
+SHA-256 `2eb5c7a0bba9deb77a98c81bf6b9d3fb1c67118eebf968b6b1a787b3f8928ee0`. Used by: @typescript-eslint/eslint-plugin 8.73.0 (LICENSE), @typescript-eslint/parser 8.73.0 (LICENSE), @typescript-eslint/scope-manager 8.73.0 (LICENSE), @typescript-eslint/types 8.73.0 (LICENSE), @typescript-eslint/typescript-estree 8.73.0 (LICENSE), @typescript-eslint/utils 8.73.0 (LICENSE), @typescript-eslint/visitor-keys 8.73.0 (LICENSE), typescript-eslint 8.73.0 (LICENSE).
 
 ```text
 MIT License
@@ -5939,7 +5940,7 @@ SOFTWARE.
 
 ### T61
 
-SHA-256 `8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004`. Used by: isexe 4.0.0 (LICENSE.md), lru-cache 11.5.3 (LICENSE.md), minipass 7.1.3 (LICENSE.md), path-scurry 1.11.1 (LICENSE.md).
+SHA-256 `8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004`. Used by: @isaacs/nonrecursive-glob-match 1.1.0 (LICENSE.md), isexe 4.0.0 (LICENSE.md), lru-cache 11.5.3 (LICENSE.md), minipass 7.1.3 (LICENSE.md), path-scurry 1.11.1 (LICENSE.md).
 
 ```text
 # Blue Oak Model License
@@ -8257,7 +8258,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T102
 
-SHA-256 `053a75a14b7508a897466b65e12797201a06b0e9b5066d1223da72cac99601b5`. Used by: @typescript-eslint/project-service 8.72.2 (LICENSE), @typescript-eslint/tsconfig-utils 8.72.2 (LICENSE).
+SHA-256 `053a75a14b7508a897466b65e12797201a06b0e9b5066d1223da72cac99601b5`. Used by: @typescript-eslint/project-service 8.73.0 (LICENSE), @typescript-eslint/tsconfig-utils 8.73.0 (LICENSE).
 
 ```text
 MIT License
@@ -8879,7 +8880,7 @@ SOFTWARE.
 
 ### T123
 
-SHA-256 `2c7c5d22ed5a8ee968c64757710979afcd77438c48b4a265b94e615babd8a901`. Used by: jackspeak 3.4.3 (LICENSE.md), minimatch 10.2.6 (LICENSE.md).
+SHA-256 `2c7c5d22ed5a8ee968c64757710979afcd77438c48b4a265b94e615babd8a901`. Used by: jackspeak 3.4.3 (LICENSE.md), minimatch 11.0.8 (LICENSE.md).
 
 ```text
 # Blue Oak Model License
@@ -9182,7 +9183,7 @@ END OF TERMS AND CONDITIONS
 
 ### T127
 
-SHA-256 `3b6be04f862a077a4b97929dbf247299360824d9365f8603c263769303ace18c`. Used by: @eslint/js 10.0.1 (LICENSE), eslint 10.14.0 (LICENSE).
+SHA-256 `3b6be04f862a077a4b97929dbf247299360824d9365f8603c263769303ace18c`. Used by: @eslint/js 10.0.1 (LICENSE), eslint 10.15.0 (LICENSE).
 
 ```text
 Copyright OpenJS Foundation and other contributors, <www.openjsf.org>
@@ -40653,7 +40654,7 @@ SOFTWARE.
 
 ### T656
 
-SHA-256 `f3c51ace7f159b21566d72535e84ff354505ae7ffdca835dac81fcdafbf9e879`. Used by: @typescript-eslint/type-utils 8.72.2 (LICENSE).
+SHA-256 `f3c51ace7f159b21566d72535e84ff354505ae7ffdca835dac81fcdafbf9e879`. Used by: @typescript-eslint/type-utils 8.73.0 (LICENSE).
 
 ```text
 MIT License

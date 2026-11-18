@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build, type Plugin } from 'vite'
 import { describe, expect, it } from 'vitest'
 import { ARTIFACTS, SCRIPT, inventoryBuild } from '../build/inventory.ts'
@@ -84,13 +85,16 @@ function snapshots(lock: string): Map<string, string[]> {
   for (const line of section(lock, 'snapshots')) {
     const entry = /^ {2}(\S.*):$/.exec(line)
     if (entry) {
-      current = []
-      graph.set(bare(entry[1]), current)
+      const key = bare(entry[1])
+      current = graph.get(key) ?? []
+      graph.set(key, current)
       continue
     }
     const dep = /^ {6}('?[^:']+'?): (\S+)$/.exec(line)
     if (dep && current) {
-      current.push(bare(`${dep[1].replace(/^'|'$/g, '')}@${dep[2]}`))
+      const ref = bare(dep[2])
+      // An npm alias records the resolved package name in the value.
+      current.push(ref.includes('@') ? ref : `${dep[1].replace(/^'|'$/g, '')}@${ref}`)
     }
   }
   return graph
@@ -386,15 +390,8 @@ const TOOLING_DUE = '2026-11-30T00:00:00Z'
 const TOOLING_EDGES: [string, string[]][] = [
   ['glob@10.5.0', ['@wdio/config@9.31.9', 'archiver-utils@5.0.2']],
   ['minimatch@9.0.9', ['glob@10.5.0']],
-  [
-    'minimatch@10.2.6',
-    [
-      '@eslint/config-array@0.23.5',
-      '@typescript-eslint/typescript-estree@8.72.2',
-      'eslint@10.14.0',
-    ],
-  ],
 ]
+const TOOLING_ROOTS = ['@wdio/cli', '@wdio/globals', '@wdio/local-runner', '@wdio/tauri-service']
 type Manifest = {
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
@@ -432,7 +429,7 @@ function toolingOutOfReason(now: Date, lock: string, pkg: Manifest): string | nu
     .map((v) => v.join('.'))
     .sort()
   if (JSON.stringify(glob) !== JSON.stringify(['10.5.0'])) return 'glob version changed or removed'
-  if (JSON.stringify(minimatch) !== JSON.stringify(['10.2.6', '9.0.9'])) {
+  if (minimatch.length !== 1 || minimatch[0] !== '9.0.9') {
     return 'minimatch version changed or removed'
   }
   const graph = snapshots(lock)
@@ -463,7 +460,9 @@ function toolingOutOfReason(now: Date, lock: string, pkg: Manifest): string | nu
   const developmentRoots = Object.keys(pkg.devDependencies ?? {}).filter((root) =>
     reachesTooling(graph, root),
   )
-  if (developmentRoots.length === 0) return 'no development root reaches the reviewed packages'
+  if (JSON.stringify(developmentRoots.sort()) !== JSON.stringify(TOOLING_ROOTS)) {
+    return 'tooling development roots changed: ' + developmentRoots.join(', ')
+  }
   return null
 }
 
@@ -488,12 +487,6 @@ const TOOLING_MARKERS = [
   {
     pkg: 'minimatch',
     version: '9.0.9',
-    file: 'dist/commonjs/index.js',
-    marker: 'firstPhasePreProcess',
-  },
-  {
-    pkg: 'minimatch',
-    version: '10.2.6',
     file: 'dist/commonjs/index.js',
     marker: 'firstPhasePreProcess',
   },
@@ -572,10 +565,21 @@ describe('the temporary glob and minimatch development exceptions', () => {
       /version changed/,
     )
     expect(
-      toolingOutOfReason(before, lock.replaceAll('minimatch@10.2.6', 'minimatch@11.0.5'), pkg),
+      toolingOutOfReason(before, lock.replaceAll('minimatch@9.0.9', 'minimatch@11.0.1'), pkg),
     ).toMatch(/version changed or removed/)
-    const extra = lock + '\n  unexpected@1.0.0:\n    dependencies:\n      glob: 10.5.0\n'
+    const oldLintCopy = lock.replace('packages:\n', 'packages:\n  minimatch@10.2.6:\n')
+    expect(toolingOutOfReason(before, oldLintCopy, pkg)).toMatch(/version changed or removed/)
+    const extra =
+      lock +
+      '\n  unexpected@1.0.0(peer@1):\n    dependencies:\n      glob-alias: glob@10.5.0\n' +
+      '  unexpected@1.0.0(peer@2):\n    dependencies:\n      peer: 2.0.0\n'
     expect(toolingOutOfReason(before, extra, pkg)).toMatch(/parent paths changed/)
+    expect(
+      toolingOutOfReason(before, lock, {
+        ...pkg,
+        devDependencies: { ...pkg.devDependencies, 'archiver-utils': '5.0.2' },
+      }),
+    ).toMatch(/development roots changed/)
     expect(
       toolingOutOfReason(before, lock, { ...pkg, devDependencies: { glob: '10.5.0' } }),
     ).toMatch(/direct dependency/)
@@ -602,27 +606,37 @@ describe('the temporary glob and minimatch development exceptions', () => {
     expect(config).not.toMatch(/\bexclude\s*:/)
   })
 
-  it('keeps lint consumers below the vulnerable minimatch optimization level', () => {
-    for (const text of callerSources('eslint', '10.14.0', 'lib/eslint/eslint-helpers.js')) {
-      expect(text).toContain('const MINIMATCH_OPTIONS = { dot: true }')
-      expect(text).not.toContain('optimizationLevel')
+  it('resolves a patched minimatch from each installed lint consumer', () => {
+    const project = createRequire(join(FRONTEND, 'package.json'))
+    const eslint = createRequire(project.resolve('eslint'))
+    const ts = createRequire(project.resolve('typescript-eslint'))
+    const fixed = resolved(lockfile(), 'minimatch')
+      .filter((v) => atOrPast(v, [11, 0, 1]))
+      .map((v) => v.join('.'))
+    for (const caller of [
+      eslint,
+      createRequire(eslint.resolve('@eslint/config-array')),
+      createRequire(ts.resolve('@typescript-eslint/typescript-estree')),
+    ]) {
+      const file = caller.resolve('minimatch/package.json')
+      const installed = JSON.parse(readFileSync(file, 'utf8')) as { version: string }
+      expect(fixed, file).toContain(installed.version)
     }
-    for (const text of callerSources('@eslint/config-array', '0.23.5', 'dist/cjs/index.cjs')) {
-      expect(text).toMatch(/const MINIMATCH_OPTIONS = \{\s*\/\/ matchBase: true,\s*dot: true,\s*\}/)
-      expect(text).not.toContain('optimizationLevel')
-    }
-    for (const text of callerSources(
-      '@typescript-eslint/typescript-estree',
-      '8.72.2',
-      'dist/useProgramFromProjectService.js',
-    )) {
-      expect(text).toContain('(0, minimatch_1.minimatch)(filePath, pattern, { dot: true })')
-      expect(text).not.toContain('optimizationLevel')
-    }
-    for (const version of ['9.0.9', '10.2.6']) {
-      for (const text of callerSources('minimatch', version, 'dist/commonjs/index.js')) {
-        expect(text).toContain('const { optimizationLevel = 1 } = this.options')
+  })
+
+  it('discovers every window spec through WebdriverIO', async () => {
+    const pattern = './e2e/**/*.e2e.ts'
+    const expected = readdirSync(join(FRONTEND, 'e2e'), { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.e2e.ts'))
+      .map((file) => 'e2e/' + file)
+      .sort()
+    expect(expected.length).toBeGreaterThan(0)
+    for (const dir of packageCopies('@wdio/config', '9.31.9')) {
+      const entry = pathToFileURL(join(dir, 'build/node/index.js')).href
+      const { FileSystemPathService } = (await import(entry)) as {
+        FileSystemPathService: new () => { glob(pattern: string, root: string): string[] }
       }
+      expect(new FileSystemPathService().glob(pattern, FRONTEND)).toEqual(expected)
     }
   })
 
