@@ -428,7 +428,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | portable-atomic-util | 0.2.7 | crate | Apache-2.0 OR MIT | T10, T2 |
 | postcard | 1.1.3 | crate | MIT OR Apache-2.0 | T1, T235 |
 | potential_utf | 0.1.6 | crate | Unicode-3.0 | T8 |
-| powerfmt | 0.2.0 | crate | MIT OR Apache-2.0 | T231, T216 |
+| powerfmt | 0.2.1 | crate | MIT OR Apache-2.0 | T231, T216 |
 | ppv-lite86 | 0.2.21 | crate | MIT OR Apache-2.0 | T206, T346 |
 | precomputed-hash | 0.1.1 | crate | MIT | T439 |
 | proc-macro-crate | 1.3.1 | crate | MIT OR Apache-2.0 | T51, T2 |
@@ -14048,7 +14048,7 @@ THE SOFTWARE.
 
 ### T216
 
-SHA-256 `070dbc7dda03a29296f2d58bdb9b7331af90f2abc9f31df22875d1eabaf29852`. Used by: powerfmt 0.2.0 (LICENSE-MIT).
+SHA-256 `070dbc7dda03a29296f2d58bdb9b7331af90f2abc9f31df22875d1eabaf29852`. Used by: powerfmt 0.2.1 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2023 Jacob Pratt et al.
@@ -14451,7 +14451,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T231
 
-SHA-256 `155420c6403d4e0fca34105e3c03fdd6939b64c393c7ec6f95f5b72c5474eab0`. Used by: powerfmt 0.2.0 (LICENSE-Apache).
+SHA-256 `155420c6403d4e0fca34105e3c03fdd6939b64c393c7ec6f95f5b72c5474eab0`. Used by: powerfmt 0.2.1 (LICENSE-Apache).
 
 ```text
 
