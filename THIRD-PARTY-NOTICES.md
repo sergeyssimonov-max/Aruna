@@ -686,7 +686,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | webkit2gtk | 2.0.2 | crate | MIT | T320 |
 | webkit2gtk-sys | 2.0.2 | crate | MIT | T277 |
 | webpki-roots | 0.26.11 | crate | CDLA-Permissive-2.0 | T185 |
-| webpki-roots | 1.0.11 | crate | CDLA-Permissive-2.0 | T185 |
+| webpki-roots | 1.0.12 | crate | CDLA-Permissive-2.0 | T185 |
 | webview2-com | 0.39.1 | crate | MIT | requires review |
 | webview2-com-macros | 0.8.1 | crate | MIT | requires review |
 | webview2-com-sys | 0.39.1 | crate | MIT | requires review |
@@ -12152,7 +12152,7 @@ SOFTWARE.
 
 ### T185
 
-SHA-256 `e271993808fec50ab29350b39539cdec611a9103f827e0aa26d61da70e2d33f8`. Used by: webpki-roots 0.26.11 (LICENSE), webpki-roots 1.0.11 (LICENSE).
+SHA-256 `e271993808fec50ab29350b39539cdec611a9103f827e0aa26d61da70e2d33f8`. Used by: webpki-roots 0.26.11 (LICENSE), webpki-roots 1.0.12 (LICENSE).
 
 ```text
 # Community Data License Agreement - Permissive - Version 2.0
