@@ -150,6 +150,7 @@ fn a_second_build_is_refused_while_the_first_is_running() {
         .expect_err("вторая сборка не начинается");
 
     assert_eq!(refused.code, "busy");
+    assert_eq!(refused.message, "сборка уже идет");
     assert!(refused.retryable, "повторить можно – после первой");
     assert!(!refused.cancelled);
 
@@ -222,6 +223,7 @@ fn a_panic_inside_the_build_reaches_the_window_as_interrupted() {
         .expect_err("сборка с паникой не может кончиться успехом");
 
     assert_eq!(refused.code, "interrupted");
+    assert_eq!(refused.message, "сборка оборвалась, не сказав почему");
     assert!(refused.retryable, "повторить можно");
     assert!(!refused.cancelled, "паника – не отмена");
 
@@ -271,6 +273,7 @@ fn a_destination_that_is_not_a_directory_is_refused_before_anything_starts() {
     let refused = chosen_destination(Some(missing.display().to_string()))
         .expect_err("несуществующая папка не принимается");
     assert_eq!(refused.code, "destination_missing");
+    assert_eq!(refused.message, "выбранной папки нет на месте");
     assert!(
         !refused.retryable,
         "повторять нечего: надо выбрать другую папку"
