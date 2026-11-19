@@ -125,7 +125,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | cpubits | 0.1.1 | crate | MIT OR Apache-2.0 | T11, T201 |
 | cpufeatures | 0.2.17 | crate | MIT OR Apache-2.0 | T11, T538 |
 | cpufeatures | 0.3.1 | crate | MIT OR Apache-2.0 | T11, T146 |
-| crc32fast | 1.5.2 | crate | MIT OR Apache-2.0 | T12, T387 |
+| crc32fast | 1.5.5 | crate | MIT OR Apache-2.0 | T12, T387 |
 | crossbeam-channel | 0.5.17 | crate | MIT OR Apache-2.0 | T1, T58, T542 |
 | crossbeam-deque | 0.8.8 | crate | MIT OR Apache-2.0 | T1, T58 |
 | crossbeam-epoch | 0.9.21 | crate | MIT OR Apache-2.0 | T1, T58 |
@@ -3010,7 +3010,7 @@ limitations under the License.
 
 ### T12
 
-SHA-256 `c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08`. Used by: cobs 0.3.0 (LICENSE-APACHE), crc32fast 1.5.2 (LICENSE-APACHE), env_filter 0.1.4 (LICENSE-APACHE), foreign-types 0.5.0 (LICENSE-APACHE), foreign-types-macros 0.2.4 (LICENSE-APACHE), foreign-types-shared 0.3.1 (LICENSE-APACHE), hex 0.4.3 (LICENSE-APACHE), jni-sys 0.3.1 (LICENSE-APACHE), jni-sys 0.4.1 (LICENSE-APACHE), quick-error 2.0.1 (LICENSE-APACHE), serde_spanned 0.6.9 (LICENSE-APACHE), stringprep 0.1.5 (LICENSE-APACHE), toml 0.8.2 (LICENSE-APACHE), toml 1.1.4+spec-1.1.0 (LICENSE-APACHE), toml_datetime 1.1.1+spec-1.1.0 (LICENSE-APACHE), toml_edit 0.19.15 (LICENSE-APACHE), toml_edit 0.20.2 (LICENSE-APACHE), toml_edit 0.25.13+spec-1.1.0 (LICENSE-APACHE), toml_parser 1.1.3+spec-1.1.0 (LICENSE-APACHE), toml_writer 1.1.2+spec-1.1.0 (LICENSE-APACHE).
+SHA-256 `c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08`. Used by: cobs 0.3.0 (LICENSE-APACHE), crc32fast 1.5.5 (LICENSE-APACHE), env_filter 0.1.4 (LICENSE-APACHE), foreign-types 0.5.0 (LICENSE-APACHE), foreign-types-macros 0.2.4 (LICENSE-APACHE), foreign-types-shared 0.3.1 (LICENSE-APACHE), hex 0.4.3 (LICENSE-APACHE), jni-sys 0.3.1 (LICENSE-APACHE), jni-sys 0.4.1 (LICENSE-APACHE), quick-error 2.0.1 (LICENSE-APACHE), serde_spanned 0.6.9 (LICENSE-APACHE), stringprep 0.1.5 (LICENSE-APACHE), toml 0.8.2 (LICENSE-APACHE), toml 1.1.4+spec-1.1.0 (LICENSE-APACHE), toml_datetime 1.1.1+spec-1.1.0 (LICENSE-APACHE), toml_edit 0.19.15 (LICENSE-APACHE), toml_edit 0.20.2 (LICENSE-APACHE), toml_edit 0.25.13+spec-1.1.0 (LICENSE-APACHE), toml_parser 1.1.3+spec-1.1.0 (LICENSE-APACHE), toml_writer 1.1.2+spec-1.1.0 (LICENSE-APACHE).
 
 ```text
                                  Apache License
@@ -22645,7 +22645,7 @@ SOFTWARE.
 
 ### T387
 
-SHA-256 `61d383b05b87d78f94d2937e2580cce47226d17823c0430fbcad09596537efcf`. Used by: crc32fast 1.5.2 (LICENSE-MIT).
+SHA-256 `61d383b05b87d78f94d2937e2580cce47226d17823c0430fbcad09596537efcf`. Used by: crc32fast 1.5.5 (LICENSE-MIT).
 
 ```text
 MIT License
