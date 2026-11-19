@@ -83,6 +83,52 @@ fn published() -> (TempDir, PathBuf, PathBuf) {
     (dir, zip, destination)
 }
 
+/// The progress notification is synchronous and runs after rename, immediately
+/// before validation reads the published tree. Damage only this test's copy.
+#[test]
+fn the_previous_copy_is_let_go_only_after_the_published_tree_is_read_again() {
+    use aruna::job::{Cancel, Job};
+    use aruna::progress::{Event, Progress};
+
+    struct RemovePublishedInventory(PathBuf);
+    impl Progress for RemovePublishedInventory {
+        fn report(&self, event: Event<'_>) {
+            if matches!(event, Event::CheckingPublished) {
+                std::fs::remove_file(&self.0).expect("remove the published inventory");
+            }
+        }
+    }
+
+    let (_dir, zip, destination) = published();
+    let package = destination.join(PACKAGE);
+    let snapshot = || {
+        files_under(&package)
+            .into_iter()
+            .map(|path| {
+                let bytes = std::fs::read(package.join(&path)).expect("package file");
+                (path, bytes)
+            })
+            .collect::<std::collections::BTreeMap<_, _>>()
+    };
+    let previous = snapshot();
+    let interrupt = RemovePublishedInventory(package.join(aruna::paths::OUTPUT_FILE_NAME));
+    let cancel = Cancel::new();
+    let failure = export::build(
+        &zip,
+        &destination,
+        "replacement",
+        support::fonts(),
+        &Job::new(&interrupt, &cancel),
+    )
+    .expect_err("the missing inventory must be detected on read-back");
+    assert!(
+        matches!(failure, aruna::error::ArunaError::Io { ref path, .. }
+        if *path == interrupt.0),
+        "{failure}"
+    );
+    assert_eq!(snapshot(), previous, "restore every original file");
+}
+
 /// A staging directory left by a run that was killed while writing.
 ///
 /// `Staging::fresh` clears whatever is at that path before it starts. Without

@@ -148,6 +148,84 @@ fn every_pdf_lies_beside_its_document_and_the_package_names_it() {
     assert!(!inventory.contains(">PDF</a>"), "a second link named PDF");
 }
 
+/// ZIP order differs from display order. Two entries have identical bytes and
+/// collide on the first XML name. The third has its own bytes and no PDF.
+#[test]
+fn each_manifest_row_keeps_its_archive_entry_hashes_and_pdf_target() {
+    use aruna::sha256::sha256_hex;
+    use support::Json;
+
+    let dir = tempdir().expect("tempdir");
+    let twin = manuscript("KBo 1.1", "FB", "2017-03-28");
+    let refused = with_body("KUB 2.2", "<lb/> <x:y/> refused");
+    let entries = [
+        ("root/CTH 9_XML_HFR/KUB 2.2.xml", refused),
+        ("root/CTH 5_XML_HFR/KBo 1.1.xml", twin.clone()),
+        ("root/CTH 5_XML_TLH/KBo 1.1.xml", twin),
+    ];
+    let zip = archive(&dir.path().join("input.zip"), &entries);
+    let out = dir.path().join("out");
+    build(&zip, &out).expect("build");
+    let root = out.join(PACKAGE);
+    let manifest = Json::parse(
+        &std::fs::read_to_string(root.join(export::MANIFEST)).expect("published manifest"),
+    )
+    .expect("published JSON");
+    let rows: Vec<_> = manifest
+        .get("groups")
+        .and_then(Json::as_arr)
+        .expect("manifest groups")
+        .iter()
+        .flat_map(|group| {
+            group
+                .get("documents")
+                .and_then(Json::as_arr)
+                .expect("group documents")
+        })
+        .collect();
+    let inventory = std::fs::read_to_string(root.join(aruna::paths::OUTPUT_FILE_NAME))
+        .expect("published inventory");
+    let links = export::hrefs(&inventory);
+    let expected = [
+        (1, "CTH 5/KBo 1.1.xml", true),
+        (2, "CTH 5/KBo 1.1 (CTH 5_XML_TLH).xml", true),
+        (0, "CTH 9/KUB 2.2.xml", false),
+    ];
+    assert_eq!(rows.len(), expected.len());
+    assert_eq!(links.len(), expected.len());
+    for ((row, link), (index, file, has_pdf)) in rows.into_iter().zip(links).zip(expected) {
+        let (entry, input) = &entries[index];
+        let field = |key| row.get(key).and_then(Json::as_str);
+        assert_eq!(field("source_entry"), Some(*entry));
+        assert_eq!(field("file"), Some(file));
+        assert_eq!(
+            field("source_sha256"),
+            Some(sha256_hex(input.as_bytes()).as_str())
+        );
+        let bytes = std::fs::read(root.join(file)).expect("published XML");
+        assert_eq!(field("sha256"), Some(sha256_hex(&bytes).as_str()));
+        assert_eq!(bytes, export::normalize_document(input.as_bytes()));
+        let pdf = Path::new(file).with_extension("pdf");
+        assert_eq!(root.join(&pdf).is_file(), has_pdf);
+        if has_pdf {
+            assert_eq!(field("pdf"), pdf.to_str());
+        } else {
+            let reason = row
+                .get("pdf")
+                .and_then(|value| value.get("refused"))
+                .and_then(Json::as_str);
+            assert!(
+                reason.is_some_and(|text| !text.is_empty()),
+                "{entry} needs its refusal reason"
+            );
+        }
+        assert_eq!(
+            link,
+            export::naming::href(if has_pdf { &pdf } else { Path::new(file) })
+        );
+    }
+}
+
 /// **Two repeated clusters in a row refuse this document only** (owner's
 /// decision of 2026-10-02): the wrappers of variant A would overlap, and the
 /// document gets no PDF and a record in the manifest, while the build goes on
