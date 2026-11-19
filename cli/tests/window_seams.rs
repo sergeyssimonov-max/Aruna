@@ -723,49 +723,6 @@ fn covers(error: &ArunaError) {
     }
 }
 
-/// The keys of the window's table of failure sentences, read from its source.
-///
-/// Read rather than restated: the table lives in `App.svelte`, and a copy here
-/// would be a third description of one contract. The block is found by its
-/// declaration and ends at the first line that closes it.
-fn window_sentences() -> std::collections::BTreeSet<String> {
-    let source = std::fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/src/App.svelte"),
-    )
-    .expect("App.svelte");
-    let start = source
-        .find("const FAILED: Record<string, string | undefined> = {")
-        .expect("the window's table of failure sentences");
-    let body = &source[start..];
-    let body = &body[..body.find("\n  }\n").expect("the end of the table")];
-    body.lines()
-        .filter_map(|line| {
-            let line = line.trim_start();
-            let (key, _) = line.split_once(':')?;
-            (!key.is_empty() && key.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'))
-                .then(|| key.to_string())
-        })
-        .collect()
-}
-
-/// The codes whose core message the window shows under its own sentence –
-/// `DETAILED` in `App.svelte`, read from there so the two cannot drift.
-fn detailed_codes() -> std::collections::BTreeSet<String> {
-    let source = std::fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/src/App.svelte"),
-    )
-    .expect("App.svelte");
-    let start = source
-        .find("const DETAILED: ReadonlySet<string> = new Set([")
-        .expect("the window's set of detailed codes");
-    let body = &source[start..];
-    let body = &body[body.find('[').expect("[") + 1..body.find(']').expect("]")];
-    body.split(',')
-        .map(|code| code.trim().trim_matches('\'').to_string())
-        .filter(|code| !code.is_empty())
-        .collect()
-}
-
 /// English words a line under a Russian sentence may not carry. The data in
 /// [`every_failure`] – group, sigla, entry names – has none of them.
 fn english_words_in(message: &str) -> Vec<&'static str> {
@@ -793,18 +750,14 @@ fn carries_a_path(message: &str) -> bool {
 /// **Every code the core reports has a Russian sentence in the window, and no
 /// two variants that mean different things share one.**
 ///
-/// The window shows `FAILED[code]` and falls back to the core's English
-/// sentence for a code it does not know. That fallback is deliberate — an
-/// English line is visible and gets fixed — but it is also how a new code
-/// reaches a Russian screen in English without any test noticing: the
-/// window's own test lists the codes by hand. This reads the list from the
-/// core and the sentences from the window, so the two cannot drift apart.
-///
-/// `cancelled` is the exception the window makes on purpose: its sentence is
-/// chosen by phase, not by code.
+/// The inputs exercise the real classifier, including both HTTP outcomes.
+/// The window imports the same translation data this test reads.
 #[test]
 fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
-    let sentences = window_sentences();
+    use support::Json;
+    let texts = Json::parse(include_str!("../../frontend/src/failure-texts.json"))
+        .expect("the translation catalogue is JSON");
+    let sentences = texts.get("sentences").expect("sentences");
     let mut codes = std::collections::BTreeMap::<&str, Vec<String>>::new();
     for error in every_failure() {
         let failure = app::Failure::of(&error);
@@ -815,7 +768,8 @@ fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
             failure.message
         );
         assert!(
-            failure.code == "cancelled" || sentences.contains(failure.code),
+            failure.code == "cancelled"
+                || sentences.get(failure.code).and_then(Json::as_str).is_some(),
             "the window has no sentence for `{}`; it would show the core's English",
             failure.code
         );
@@ -830,11 +784,13 @@ fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
     // A line the window shows as it came: names, and not an English sentence
     // around them. Rule 4.9 of the specification – no English line on the
     // screen on any path – was kept everywhere but here until 2026-09-24.
-    let detailed = detailed_codes();
-    assert!(
-        detailed.contains("collision") && detailed.contains("archive_duplicate"),
-        "the reader of DETAILED found {detailed:?}"
-    );
+    let detailed: std::collections::BTreeSet<_> = texts
+        .get("detailed")
+        .and_then(Json::as_arr)
+        .expect("detailed codes")
+        .iter()
+        .map(|code| code.as_str().expect("a code"))
+        .collect();
     for error in every_failure() {
         let failure = app::Failure::of(&error);
         if detailed.contains(failure.code) {
@@ -860,15 +816,17 @@ fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
         assert_eq!(kinds.len(), 1, "`{code}` is shared by {kinds:?}");
     }
 
-    // Negative controls: the two checks above have teeth.
-    assert!(
-        !sentences.contains("quantum_flux"),
-        "the table reader accepts a code the window does not have"
-    );
-    assert!(
-        sentences.len() >= 20,
-        "the table reader found {} keys; it is not reading the table",
-        sentences.len()
+    // Every translation also has a producer. Cancellation is explained by
+    // phase and the window itself supplies the broken-bridge failure.
+    let mut expected: std::collections::BTreeSet<_> = codes.keys().copied().collect();
+    expected.remove("cancelled");
+    expected.insert("broken");
+    assert_eq!(
+        sentences
+            .keys()
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>(),
+        expected
     );
     assert!(carries_a_path(
         "I/O error at /Users/nobody/Downloads/secret-corpus: busy"

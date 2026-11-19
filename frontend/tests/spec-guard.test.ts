@@ -49,7 +49,7 @@ const VITE_CONFIG = text('../vite.config.ts')
 const INDEX_HTML = text('../index.html')
 const MAIN_TS = text('../src/main.ts')
 const WDIO_CONF = text('../wdio.conf.ts')
-const APP_SVELTE = text('../src/App.svelte')
+const WINDOW_SOURCES = [text('../src/App.svelte'), text('../src/window-ipc.ts')]
 
 describe('the package manager is pnpm, pinned, and alone', () => {
   it('is pinned by the root manifest, which corepack reads', () => {
@@ -328,7 +328,7 @@ describe('the window is granted what it calls and nothing more', () => {
    * bring the empty scope back with it.
    */
   it('leaves the opener plugin to the shell', () => {
-    expect(APP_SVELTE).not.toMatch(/@tauri-apps\/plugin-opener/)
+    for (const source of WINDOW_SOURCES) expect(source).not.toMatch(/@tauri-apps\/plugin-opener/)
     expect(FRONTEND_PKG.dependencies).not.toHaveProperty('@tauri-apps/plugin-opener')
     expect(CARGO).toContain('tauri-plugin-opener')
   })
