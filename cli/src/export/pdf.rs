@@ -52,24 +52,22 @@ const PDFS_PER_TICK: usize = 250;
 /// Builds the PDF of every placed document, in the order they were placed –
 /// the one display order of the program – and writes each into the folder of
 /// its XML, under the same name.
-pub(crate) fn write_pdfs(
+pub(super) fn write_pdfs(
     staging: &Path,
-    records: &[ManuscriptRecord],
-    placed: &[Placed],
+    documents: Vec<super::Document>,
     fonts: &Fonts,
     package_bytes: &mut u64,
     job: &Job<'_>,
-) -> Result<Vec<PdfState>> {
-    job.report(Event::WritingPdfs {
-        documents: placed.len(),
-    });
-    let mut states = Vec::with_capacity(placed.len());
+) -> Result<super::PackageDocuments> {
+    let total = documents.len();
+    job.report(Event::WritingPdfs { documents: total });
+    let mut package = super::PackageDocuments::with_capacity(total);
     let mut built = 0usize;
-    for (n, (record, place)) in records.iter().zip(placed).enumerate() {
+    for (n, document) in documents.into_iter().enumerate() {
         // Between documents, as the XML phase asks: stopping here leaves the
         // staging directory to remove itself.
         job.check(Phase::Exporting)?;
-        let state = one(staging, record, place, fonts)?;
+        let state = one(staging, &document.record, &document.place, fonts)?;
         if let PdfState::Built(relative) = &state {
             built += 1;
             let bytes = fs::metadata(staging.join(relative))
@@ -78,17 +76,13 @@ pub(crate) fn write_pdfs(
             *package_bytes = package_bytes.saturating_add(bytes);
             super::within_package_ceiling(*package_bytes, super::MAX_PACKAGE)?;
         }
-        states.push(state);
+        package.push(document, state);
         let done = n + 1;
-        if done.is_multiple_of(PDFS_PER_TICK) || done == placed.len() {
-            job.report(Event::PdfsWritten {
-                done,
-                built,
-                total: placed.len(),
-            });
+        if done.is_multiple_of(PDFS_PER_TICK) || done == total {
+            job.report(Event::PdfsWritten { done, built, total });
         }
     }
-    Ok(states)
+    Ok(package)
 }
 
 /// A broken invariant of the PDF phase: the build stops, nothing is published,
