@@ -740,7 +740,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | windows_x86_64_msvc | 0.48.5 | crate | MIT OR Apache-2.0 | T6, T3 |
 | windows_x86_64_msvc | 0.52.6 | crate | MIT OR Apache-2.0 | T6, T3 |
 | winnow | 0.5.40 | crate | MIT | T172 |
-| winnow | 1.0.4 | crate | MIT | T172 |
+| winnow | 1.0.5 | crate | MIT | T172 |
 | winreg | 0.55.0 | crate | MIT | T636 |
 | wit-bindgen | 0.57.1 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | T1, T37, T2 |
 | write-fonts | 0.48.1 | crate | MIT OR Apache-2.0 | T65, T62 |
@@ -11797,7 +11797,7 @@ THE SOFTWARE.
 
 ### T172
 
-SHA-256 `cb5aedb296c5246d1f22e9099f925a65146f9f0d6b4eebba97fd27a6cdbbab2d`. Used by: winnow 0.5.40 (LICENSE-MIT), winnow 1.0.4 (LICENSE-MIT).
+SHA-256 `cb5aedb296c5246d1f22e9099f925a65146f9f0d6b4eebba97fd27a6cdbbab2d`. Used by: winnow 0.5.40 (LICENSE-MIT), winnow 1.0.5 (LICENSE-MIT).
 
 ```text
 Permission is hereby granted, free of charge, to any person obtaining
