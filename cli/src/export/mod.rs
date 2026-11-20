@@ -20,6 +20,7 @@
 //! of four documents exercise the same code the 24 000-manuscript corpus does.
 
 pub mod counts;
+mod documents;
 pub mod inventory;
 mod lock;
 pub mod manifest;
@@ -29,6 +30,8 @@ pub mod pdf;
 mod staging;
 pub mod validate;
 pub mod verify;
+
+use documents::{Document, PackageDocuments};
 
 pub use counts::{count_package, spread, CountError, GroupSize, PackageCounts, Spread};
 pub use inventory::{hrefs, render_package_inventory};
@@ -190,15 +193,8 @@ fn collision_key(relative: &Path) -> String {
 /// different documents. The second and later get a suffix taken from the
 /// archive path they came from, so both survive.
 ///
-/// **Which one is "the second" is archive order**, and so is the order of the
-/// manifest's lists, which follow the documents. The archive is pinned by its
-/// Zenodo record and its MD5, so the same archive gives the same package byte
-/// for byte; an archive with the same entries in another order would not –
-/// measured 23.09.2026 on the corpus reversed: the twin of `CTH 999/KUB 46.39+`
-/// swapped its suffix, and the 206 and the 17 were listed in the other order,
-/// the sets equal. Sorting both would move the package's bytes, and the owner
-/// decided on 24.09.2026 to keep them; until then this said the choice did not
-/// depend on the order, which was not so.
+/// Placement follows the caller's order. During export, the first document
+/// placed at a given path keeps the unsuffixed name.
 ///
 /// A collision that survives that is a build error rather than a file quietly
 /// overwritten.
@@ -212,13 +208,27 @@ fn collision_key(relative: &Path) -> String {
 /// is still held to distinct PDF names by [`validate()`], which reads them back
 /// from the published file rather than trusting the rule.
 pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
-    let mut taken: HashMap<String, String> = HashMap::with_capacity(fragments.len());
-    // A group's folder by its folded name: the name as written and the first
-    // document filed there.
-    let mut folders: HashMap<String, (String, String)> = HashMap::new();
-    let mut placed = Vec::with_capacity(fragments.len());
+    let mut names = PlacementNames::new(fragments.len());
+    fragments
+        .iter()
+        .map(|fragment| names.place(fragment))
+        .collect()
+}
 
-    for fragment in fragments {
+struct PlacementNames {
+    taken: HashMap<String, String>,
+    folders: HashMap<String, (String, String)>,
+}
+
+impl PlacementNames {
+    fn new(count: usize) -> Self {
+        Self {
+            taken: HashMap::with_capacity(count),
+            folders: HashMap::new(),
+        }
+    }
+
+    fn place(&mut self, fragment: &Fragment) -> Result<Placed> {
         let group = group_label(&fragment.record);
         let base = fragment.record.sigla.as_str();
 
@@ -230,7 +240,8 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
         // the corpus meet it. What case folding does not see – an NFC and an
         // NFD spelling – the write loop catches on the disk.
         let folder = naming::dir_component(group);
-        let (written, first) = folders
+        let (written, first) = self
+            .folders
             .entry(folder.to_lowercase())
             .or_insert_with(|| (folder.clone(), fragment.source.clone()));
         if *written != folder {
@@ -243,14 +254,14 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
         }
 
         let mut relative = output_path(group, base);
-        if taken.contains_key(&collision_key(&relative)) {
+        if self.taken.contains_key(&collision_key(&relative)) {
             // Stable, and derived from the one thing that is unique per
             // document: where it sits in the archive.
             let suffix = disambiguator(&fragment.source);
             relative = naming::twin_path(group, base, &suffix);
         }
 
-        if let Some(first) = taken.get(&collision_key(&relative)) {
+        if let Some(first) = self.taken.get(&collision_key(&relative)) {
             return Err(ArunaError::ExportCollision {
                 group: group.to_string(),
                 fragment: base.to_string(),
@@ -259,14 +270,13 @@ pub fn place(fragments: &[Fragment]) -> Result<Vec<Placed>> {
                 path: relative,
             });
         }
-        taken.insert(collision_key(&relative), fragment.source.clone());
-        placed.push(Placed {
+        self.taken
+            .insert(collision_key(&relative), fragment.source.clone());
+        Ok(Placed {
             relative,
             label: base.to_string(),
-        });
+        })
     }
-
-    Ok(placed)
 }
 
 /// A short, stable tag for one archive entry.
@@ -404,24 +414,24 @@ pub fn build(
         not_manuscripts,
     } = read_headers(zip, job)?;
     sort_by_display_order(&mut fragments, |f| &f.record);
-    let placed = place(&fragments)?;
-    let disambiguated = placed
+    let mut documents = Document::place_all(fragments)?;
+    let disambiguated = documents
         .iter()
-        .zip(&fragments)
-        .filter(|(p, f)| p.relative != output_path(group_label(&f.record), &f.record.sigla))
+        .filter(|doc| {
+            doc.place.relative != output_path(group_label(&doc.record), &doc.record.sigla)
+        })
         .count();
 
     sweep_abandoned_staging(destination);
     let staging = Staging::fresh(staging)?;
 
     job.report(Event::WritingDocuments {
-        documents: placed.len(),
+        documents: documents.len(),
     });
     let mut tallies = Tallies::default();
     let mut package_bytes = write_documents(
         &mut archive,
-        &fragments,
-        &placed,
+        &mut documents,
         staging.path(),
         &mut tallies,
         job,
@@ -439,62 +449,33 @@ pub fn build(
         .copied()
         .unwrap_or(0);
 
-    // Moved out of the fragments rather than copied out of them: the archive
-    // paths are what a fragment carries beyond its record, and the last thing
-    // that wanted them was the pass above. Cloning here duplicated every one of
-    // 23 936 records — ten owned strings each — beside the originals, which then
-    // stayed alive to the end of the build with nothing left to read them.
-    let records: Vec<ManuscriptRecord> = fragments.into_iter().map(|f| f.record).collect();
-
-    // The PDFs, before the inventory and the manifest: both say what became
-    // of each one.
-    let pdfs = pdf::write_pdfs(
-        staging.path(),
-        &records,
-        &placed,
-        fonts,
-        &mut package_bytes,
-        job,
-    )?;
-    write_inventory(staging.path(), &records, &placed, source_label, &pdfs)?;
+    let documents = pdf::write_pdfs(staging.path(), documents, fonts, &mut package_bytes, job)?;
+    let html_path = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
+    fs::write(&html_path, documents.inventory(source_label)).map_err(ArunaError::io(html_path))?;
     write_root_files(staging.path())?;
-    write_manifest(
-        staging.path(),
-        &records,
-        &placed,
-        &manifest::Source {
-            label: source_label,
-            archive_md5: &archive_digest,
-            not_manuscripts: &not_manuscripts,
-        },
-        &tallies,
-        &pdfs,
-    )?;
+    let source = manifest::Source {
+        label: source_label,
+        archive_md5: &archive_digest,
+        not_manuscripts: &not_manuscripts,
+    };
+    let manifest_path = staging.path().join(MANIFEST);
+    fs::write(&manifest_path, documents.manifest(&source, &tallies))
+        .map_err(ArunaError::io(manifest_path))?;
 
     // Validation reads back everything just written; a run cancelled during
     // the write should not spend six more seconds proving it was written.
     job.check(Phase::Validating)?;
     job.report(Event::CheckingPackage);
-    let staged = validate(staging.path(), &records, &placed, &pdfs)?;
-
-    let published = publish(
-        destination,
-        final_root,
-        staging,
-        &records,
-        &placed,
-        &pdfs,
-        staged,
-        job,
-    )?;
+    let staged = documents.validate(staging.path())?;
+    let published = publish(destination, final_root, staging, &documents, staged, job)?;
 
     Ok(Built {
-        groups: crate::parse::group_runs(&records).count(),
-        documents: placed.len(),
+        groups: documents.groups(),
+        documents: documents.len(),
         document_links: published.document_links,
         disambiguated,
         stylesheet_dropped,
-        pdfs: PdfCount::of(&pdfs),
+        pdfs: documents.pdf_count(),
     })
 }
 
@@ -548,27 +529,6 @@ fn read_headers(zip: &Path, job: &Job<'_>) -> Result<Headers> {
     })
 }
 
-/// What every document shows, decided once. Both pages are written from
-/// this and neither re-derives a name, a link or a fact of its own — see
-/// [`crate::presentation`].
-///
-/// Written and let go here, the page and the manifest alike: the
-/// checks below read both back from disk, and nothing after the write reads
-/// the strings. Held to the end of the function they sat beside the
-/// validation's own sets for the whole of both read-backs — 14 MB of text
-/// on the real corpus that nobody would look at again.
-fn write_inventory(
-    root: &Path,
-    records: &[ManuscriptRecord],
-    placed: &[Placed],
-    source_label: &str,
-    pdfs: &[PdfState],
-) -> Result<()> {
-    let html = inventory::render_package_inventory(records, placed, source_label, pdfs);
-    let inventory = root.join(crate::paths::OUTPUT_FILE_NAME);
-    fs::write(&inventory, html).map_err(ArunaError::io(inventory))
-}
-
 /// The font the page needs and the terms it travels under, written from the
 /// bytes compiled into this binary so that the console program and the
 /// window produce the same package. Unmodified, both of them: the terms
@@ -598,44 +558,15 @@ fn write_root_files(root: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The manifest, from the same two slices the inventory is written from.
-fn write_manifest(
-    root: &Path,
-    records: &[ManuscriptRecord],
-    placed: &[Placed],
-    source: &manifest::Source<'_>,
-    tallies: &Tallies,
-    pdfs: &[PdfState],
-) -> Result<()> {
-    {
-        let manifest_json = manifest::render_manifest(
-            records,
-            placed,
-            source,
-            &tallies.applied,
-            &tallies.fonts,
-            &tallies.xml,
-            &tallies.sums,
-            pdfs,
-        );
-        let manifest_path = root.join(MANIFEST);
-        fs::write(&manifest_path, &manifest_json).map_err(ArunaError::io(manifest_path))?;
-    }
-    Ok(())
-}
-
 /// Publication: the destination checked again under the lock, the package
 /// already there moved aside, the staged one renamed into place and read back
 /// – and the reader's copy let go only once the read-back equals what was
 /// checked before.
-#[allow(clippy::too_many_arguments)]
 fn publish(
     destination: &Path,
     final_root: PathBuf,
     staging: Staging,
-    records: &[ManuscriptRecord],
-    placed: &[Placed],
-    pdfs: &[PdfState],
+    documents: &PackageDocuments,
     staged: Validation,
     job: &Job<'_>,
 ) -> Result<Validation> {
@@ -670,7 +601,7 @@ fn publish(
     previous.published();
 
     job.report(Event::CheckingPublished);
-    let published = validate(&final_root, records, placed, pdfs)?;
+    let published = documents.validate(&final_root)?;
 
     // Опубликованное обязано совпасть с собранным – и проверяется это здесь,
     // пока копия читателя еще в `Replaced`, и отказом, а не паникой. Стоял тут
@@ -792,9 +723,6 @@ struct Tallies {
     fonts: manifest::FontContract,
     /// Which documents are not well-formed XML, and why.
     xml: manifest::XmlReport,
-    /// The two digests of each document, in the order of `placed` (owner's
-    /// decision of 2026-10-08): of what was written and of what was read.
-    sums: Vec<manifest::Sums>,
 }
 
 /// Pass 2: read each document whole, normalise it, write it where it belongs.
@@ -806,14 +734,33 @@ struct Tallies {
 /// way, and the two ways disagreed.
 fn write_documents(
     archive: &mut ZipArchive<BufReader<File>>,
-    fragments: &[Fragment],
-    placed: &[Placed],
+    documents: &mut [Document],
     staging: &Path,
     tallies: &mut Tallies,
     job: &Job<'_>,
 ) -> Result<u64> {
-    let wanted = slots(fragments, placed)?;
-    tallies.sums = vec![manifest::Sums::default(); placed.len()];
+    let total = documents.len();
+    // Keep display order for filesystem collision diagnostics. The ZIP pass
+    // looks up each name and writes directly into that manuscript's digests.
+    let mut placements = Vec::with_capacity(total);
+    let mut wanted = HashMap::with_capacity(total);
+    for document in documents {
+        let manifest::Sums {
+            source_entry,
+            sha256,
+            source_sha256,
+        } = &mut document.sums;
+        let name = source_entry.as_str();
+        placements.push((name, &document.place));
+        if wanted
+            .insert(name, (&document.place, sha256, source_sha256))
+            .is_some()
+        {
+            return Err(ArunaError::ArchiveDuplicateEntry {
+                entry: name.to_owned(),
+            });
+        }
+    }
 
     let mut written = 0usize;
     // The package's own size, accumulated as it is written rather than measured
@@ -843,10 +790,10 @@ fn write_documents(
 
         let mut entry = archive.by_index(i)?;
         let name = entry_name(entry.name_raw(), || entry.name())?.into_owned();
-        let Some(index) = wanted.get(name.as_str()).copied() else {
+        let Some((place, sha256, source_sha256)) = wanted.get_mut(name.as_str()) else {
             continue;
         };
-        let relative = placed[index].relative.as_path();
+        let relative = place.relative.as_path();
 
         read_document(&mut entry, relative, &name, &mut bytes)?;
         normalised.clear();
@@ -900,21 +847,18 @@ fn write_documents(
         if let Some(parent) = out.parent() {
             dirs.make(parent, &name, relative)?;
         }
-        let mut handle = create_document(&out, relative, &name, staging, fragments, placed)?;
+        let mut handle = create_document(&out, relative, &name, staging, &placements)?;
         handle.write_all(&normalised).map_err(ArunaError::io(out))?;
         // The two digests of the manifest, from the bytes in hand: the ones
-        // just written and the ones the archive gave – never a file read again;
-        // and the name of the entry that gave them, as its catalogue spells it.
-        tallies.sums[index] = manifest::Sums {
-            sha256: crate::sha256::sha256_hex(&normalised),
-            source_sha256: crate::sha256::sha256_hex(&bytes),
-            source_entry: name,
-        };
+        // just written and the ones the archive gave. The lookup already matched
+        // the catalogue name retained with these digests.
+        **sha256 = crate::sha256::sha256_hex(&normalised);
+        **source_sha256 = crate::sha256::sha256_hex(&bytes);
         written += 1;
         if written.is_multiple_of(DOCUMENTS_PER_TICK) {
             job.report(Event::DocumentsWritten {
                 done: written,
-                total: placed.len(),
+                total,
             });
         }
         package_bytes = package_bytes.saturating_add(normalised.len() as u64);
@@ -931,41 +875,17 @@ fn write_documents(
     if !written.is_multiple_of(DOCUMENTS_PER_TICK) {
         job.report(Event::DocumentsWritten {
             done: written,
-            total: placed.len(),
+            total,
         });
     }
 
-    if written != placed.len() {
+    if written != total {
         return Err(ArunaError::ExportIncomplete {
-            expected: placed.len(),
+            expected: total,
             written,
         });
     }
     Ok(package_bytes)
-}
-
-/// **One slot per entry name, and the archive is held to it here.**
-///
-/// `collect` on a map keeps the last value for a repeated key, so an archive
-/// with two entries of the same name used to lose one of the two places
-/// `place` had reserved. Both entries then resolved to the surviving path:
-/// the first write took it, the second met `create_new` and failed as
-/// `AlreadyExists` on a path — an I/O error that named the destination and
-/// said nothing about the archive that caused it, three hundred lines away.
-/// Inserting one at a time turns that into a sentence about the archive.
-///
-/// The slot is the document's index in `placed`, which is also its place among
-/// the manifest's digests.
-fn slots<'a>(fragments: &'a [Fragment], placed: &[Placed]) -> Result<HashMap<&'a str, usize>> {
-    let mut wanted: HashMap<&str, usize> = HashMap::with_capacity(fragments.len());
-    for (index, (fragment, _)) in fragments.iter().zip(placed).enumerate() {
-        if wanted.insert(fragment.source.as_str(), index).is_some() {
-            return Err(ArunaError::ArchiveDuplicateEntry {
-                entry: fragment.source.clone(),
-            });
-        }
-    }
-    Ok(wanted)
 }
 
 /// One document's bytes, whole, into `bytes`.
@@ -1041,8 +961,7 @@ fn create_document(
     relative: &Path,
     name: &str,
     staging: &Path,
-    fragments: &[Fragment],
-    placed: &[Placed],
+    placements: &[(&str, &Placed)],
 ) -> Result<File> {
     match fs::OpenOptions::new()
         .write(true)
@@ -1055,7 +974,7 @@ fn create_document(
         // folds case. That is a collision between two archive entries,
         // not a disk failure, and it is named as one.
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-            Err(twin_of(relative, name, staging, fragments, placed))
+            Err(twin_of(relative, name, staging, placements))
         }
         Err(err) => Err(ArunaError::io(out)(err)),
     }
@@ -1104,17 +1023,15 @@ fn twin_of(
     relative: &Path,
     second: &str,
     staging: &Path,
-    fragments: &[Fragment],
-    placed: &[Placed],
+    placements: &[(&str, &Placed)],
 ) -> ArunaError {
     use std::os::unix::fs::MetadataExt as _;
     let held = fs::metadata(staging.join(relative))
         .ok()
         .map(|meta| (meta.dev(), meta.ino()));
-    let first = fragments
+    let first = placements
         .iter()
-        .zip(placed)
-        .filter(|(fragment, placement)| placement.relative != relative && fragment.source != second)
+        .filter(|(source, placement)| placement.relative != relative && *source != second)
         .find(|(_, placement)| {
             fs::metadata(staging.join(&placement.relative))
                 .ok()
@@ -1123,12 +1040,12 @@ fn twin_of(
         })
         .map_or_else(
             || "(unknown)".to_string(),
-            |(fragment, _)| fragment.source.clone(),
+            |(source, _)| (*source).to_owned(),
         );
-    let fragment = placed
+    let fragment = placements
         .iter()
-        .find(|placement| placement.relative == relative)
-        .map(|placement| placement.label.clone())
+        .find(|(_, placement)| placement.relative == relative)
+        .map(|(_, placement)| placement.label.clone())
         .unwrap_or_default();
     ArunaError::ExportCollision {
         group: relative
@@ -1205,85 +1122,64 @@ pub(crate) mod tests_support {
 #[cfg(test)]
 mod tests {
     use super::staging::{classify_leftover, owner_marker, Leftover};
-
-    /// Прежняя копия читателя снимается только после того, как опубликованное
-    /// дерево прочитано заново.
-    ///
-    /// Свойство порядка, а не поведения: при удачном прогоне обе расстановки
-    /// дают один и тот же пакет, и поймать разницу можно лишь отказом проверки
-    /// в окне между переименованием и снятием – окне, которого у теста извне
-    /// нет. Поэтому порядок держится чтением исходника, как у стража границы
-    /// модели (`document::tests::the_model_names_no_output_format`).
-    ///
-    /// До 10.09.2026 порядок был обратный, и цена названа в самом коде: отказ
-    /// проверки заставал читателя без его копии и с непроверенным деревом под
-    /// ее именем.
-    #[test]
-    fn the_previous_copy_is_let_go_only_after_the_published_tree_is_read_again() {
-        let source = include_str!("mod.rs");
-        let code = source.split("#[cfg(test)]").next().unwrap_or(source);
-
-        let aside = code
-            .find("Replaced::aside(&final_root, destination)")
-            .expect("прежняя копия больше не отставляется в сторону");
-        let publish = code
-            .find("staging.publish(&final_root)")
-            .expect("staging больше не публикуется под окончательным именем");
-        let read_again = code
-            .find("let published = validate(&final_root")
-            .expect("опубликованное дерево больше не читается заново");
-        let let_go = code
-            .find("previous.committed()")
-            .expect("прежняя копия больше не снимается");
-
-        assert!(
-            aside < publish,
-            "прежняя копия отставляется в сторону после публикации: окно, в котором у читателя нет ни старого пакета, ни нового"
-        );
-        assert!(
-            publish < read_again,
-            "опубликованное дерево читается до того, как оно опубликовано"
-        );
-        assert!(
-            read_again < let_go,
-            "прежняя копия читателя снимается до повторного чтения дерева: отказ проверки застанет его без копии и с непроверенным деревом под ее именем"
-        );
-    }
-
-    /// **Опубликованное, не совпавшее с собранным, – отказ до снятия копии, а
-    /// не паника после.**
-    ///
-    /// `assert_eq!(staged, published)` стоял после `previous.committed()`: если
-    /// между переименованием и повторным чтением дерево кто-то менял, прогон
-    /// падал паникой, когда прежней копии читателя уже не было, и окно
-    /// говорило «сборка оборвалась» о пакете, который лежал под своим именем
-    /// непроверенным. Сравнение – отказ `ExportInvalid`, и стоит оно до
-    /// `committed`: `Replaced` при выходе с отказом возвращает копию читателя.
-    /// Воспроизвести расхождение прогоном нельзя – для этого чужой процесс
-    /// должен успеть переписать дерево в окне из одной проверки, – поэтому
-    /// держится порядок в исходнике, как у теста выше.
-    #[test]
-    fn a_package_changed_on_publishing_is_refused_before_the_copy_is_let_go() {
-        let source = include_str!("mod.rs");
-        let code = source.split("#[cfg(test)]").next().unwrap_or(source);
-
-        assert!(
-            !code.contains("assert_eq!(staged, published"),
-            "расхождение опубликованного с собранным все еще паника"
-        );
-        let compare = code
-            .find("if published != staged")
-            .expect("опубликованное больше не сверяется с собранным");
-        let let_go = code
-            .find("previous.committed()")
-            .expect("прежняя копия больше не снимается");
-        assert!(
-            compare < let_go,
-            "сверка опубликованного с собранным стоит после снятия копии читателя"
-        );
-    }
     use super::tests_support::fragment;
     use super::*;
+
+    /// A valid tree can still disagree with the validation supplied by the
+    /// staging pass. Inject that count at the private publication boundary.
+    #[test]
+    fn a_package_changed_on_publishing_is_refused_before_the_copy_is_let_go() {
+        let dir = tempfile::tempdir().expect("destination");
+        let target = dir.path().join(PACKAGE);
+        fs::create_dir(&target).expect("previous package");
+        let staging = Staging::fresh(dir.path().join(staging_name())).expect("staging");
+        let documents = PackageDocuments::with_capacity(0);
+        for (root, label) in [
+            (target.as_path(), "previous"),
+            (staging.path(), "candidate"),
+        ] {
+            write_root_files(root).expect("root files");
+            fs::write(
+                root.join(crate::paths::OUTPUT_FILE_NAME),
+                documents.inventory(label),
+            )
+            .expect("inventory");
+            let source = manifest::Source {
+                label,
+                archive_md5: "",
+                not_manuscripts: &[],
+            };
+            fs::write(
+                root.join(MANIFEST),
+                documents.manifest(&source, &Tallies::default()),
+            )
+            .expect("manifest");
+        }
+        let previous = fs::read(target.join(MANIFEST)).expect("original manifest");
+        let mut staged = documents
+            .validate(staging.path())
+            .expect("valid staged package");
+        staged.document_links += 1;
+
+        let failure = publish(
+            dir.path(),
+            target.clone(),
+            staging,
+            &documents,
+            staged,
+            &Job::unattended(),
+        )
+        .expect_err("the counts disagree");
+        assert!(
+            matches!(failure, ArunaError::ExportInvalid { ref first, .. }
+            if first == "the published package differs from the one that was built and checked"),
+            "{failure}"
+        );
+        assert_eq!(
+            fs::read(target.join(MANIFEST)).expect("restored manifest"),
+            previous
+        );
+    }
 
     /// **Отказ после публикации не отбирает у читателя его пакет.**
     ///
@@ -1395,13 +1291,13 @@ mod tests {
             fragment("KBo 1.1", "CTH 5", "xml/KBo 1.1.xml"),
             fragment("KBo 2.2", "CTH 5", "xml/KBo 1.1.xml"),
         ];
-        let placed = place(&fragments).expect("two distinct sigla take two places");
+        let mut documents =
+            Document::place_all(fragments).expect("two distinct sigla take two places");
         let mut tallies = Tallies::default();
 
         let failure = write_documents(
             &mut archive,
-            &fragments,
-            &placed,
+            &mut documents,
             Path::new("/nowhere/staging"),
             &mut tallies,
             &Job::unattended(),

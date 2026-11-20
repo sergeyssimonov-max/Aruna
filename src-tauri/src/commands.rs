@@ -188,3 +188,7 @@ pub(super) fn contract() -> tauri_specta::Builder<tauri::Wry> {
         ])
         .events(tauri_specta::collect_events![BuildProgress])
 }
+
+#[cfg(test)]
+#[path = "tests/package_commands.rs"]
+mod tests;

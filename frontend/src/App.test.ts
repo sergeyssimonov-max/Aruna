@@ -859,6 +859,32 @@ describe('идет сборка', () => {
     expect(screen.getByText('Скачиваю архив')).toBeInTheDocument()
   })
 
+  it('при быстром двойном нажатии запускает одну сборку и принимает ее отчет', async () => {
+    const user = userEvent.setup()
+    const run = deferred<unknown>()
+    corpusLocation.mockResolvedValue(location(false))
+    buildCorpus.mockReturnValue(run.promise)
+    render(App)
+    const start = await screen.findByRole('button', { name: 'Собрать по умолчанию' })
+    await user.dblClick(start)
+    expect(buildCorpus.mock.calls).toEqual([[null]])
+    expect(screen.getByRole('button', { name: 'Отменить' })).toBeEnabled()
+    run.settle(ok(report()))
+    expect(
+      await screen.findByRole('heading', { name: /Библиотека .+ собрана/ }),
+    ).toBeInTheDocument()
+  })
+
+  it('возвращает кнопку отмены после обрыва IPC и позволяет попросить еще раз', async () => {
+    await building()
+    cancelBuild.mockRejectedValueOnce(new Error('связь оборвалась'))
+    await fireEvent.click(screen.getByRole('button', { name: 'Отменить' }))
+    expect(await screen.findByText(/связь оборвалась/)).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Отменить' }))
+    expect(cancelBuild).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'Останавливаю…' })).toBeDisabled()
+  })
+
   it('на отмену говорит «Останавливаю…» и ждет подтверждения', async () => {
     const { finish } = await building()
 
@@ -1378,5 +1404,17 @@ it('снимает подписку на прогресс при размонт�
   await vi.waitFor(() => expect(listen).toHaveBeenCalledTimes(1))
   unmount()
 
+  await vi.waitFor(() => expect(unlisten).toHaveBeenCalledTimes(1))
+})
+
+it('снимает подписку даже при регистрации после закрытия окна', async () => {
+  corpusLocation.mockResolvedValue(location(false))
+  const pending = deferred<() => void>()
+  listen.mockReturnValueOnce(pending.promise)
+  const { unmount } = render(App)
+  await vi.waitFor(() => expect(listen).toHaveBeenCalledTimes(1))
+  unmount()
+  expect(unlisten).not.toHaveBeenCalled()
+  pending.settle(unlisten)
   await vi.waitFor(() => expect(unlisten).toHaveBeenCalledTimes(1))
 })
