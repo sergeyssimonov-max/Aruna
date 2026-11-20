@@ -1345,7 +1345,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | safe-regex2 | 5.1.1 | npm | MIT | T310 |
 | safer-buffer | 2.1.2 | npm | MIT | T345 |
 | saxes | 6.0.0 | npm | ISC | requires review |
-| semver | 7.8.5 | npm | ISC | T34 |
+| semver | 7.8.6 | npm | ISC | T34 |
 | serialize-error | 12.0.0 | npm | MIT | T4 |
 | serialize-javascript | 7.1.4 | npm | BSD-3-Clause | T595 |
 | setimmediate | 1.0.5 | npm | MIT | T572 |
@@ -4426,7 +4426,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T34
 
-SHA-256 `4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b`. Used by: isexe 2.0.0 (LICENSE), minimatch 3.1.5 (LICENSE), mute-stream 2.0.0 (LICENSE), once 1.4.0 (LICENSE), semver 7.8.5 (LICENSE), which 2.0.2 (LICENSE), which 6.0.1 (LICENSE), wrappy 1.0.2 (LICENSE).
+SHA-256 `4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b`. Used by: isexe 2.0.0 (LICENSE), minimatch 3.1.5 (LICENSE), mute-stream 2.0.0 (LICENSE), once 1.4.0 (LICENSE), semver 7.8.6 (LICENSE), which 2.0.2 (LICENSE), which 6.0.1 (LICENSE), wrappy 1.0.2 (LICENSE).
 
 ```text
 The ISC License
