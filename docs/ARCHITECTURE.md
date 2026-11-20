@@ -163,6 +163,18 @@ where applicable, typed source errors. Some detail fields (`reason`, `first`,
 diagnostic tree. `main.rs` selects the console's wording and advice without
 changing those public variants or their `Display` contract.
 
+### Manuscript identity during export
+
+`export::build` sorts the admitted fragments once in display order.
+`export/documents.rs` keeps each record, placement and source entry together.
+The second pass over the same open ZIP looks up the archive name and fills
+that document's two digests. Successful placement gives even entries with
+identical bytes distinct destinations. The PDF phase consumes each row and
+appends it with its PDF result to `PackageDocuments`. This is the only writer of the aligned
+slices used by the public renderers and validator. Staged and published
+validation each read the files from disk. Publication still rechecks the
+destination under the lock and retains the previous package through read-back.
+
 ## 6. Where the PDF renderer attaches
 
 *Corrected 2026-10-19.* The renderer is in the tree and attaches at the
@@ -222,6 +234,15 @@ holds the last count and emits the event. `commands::contract()` remains the
 single source of registration and generated bindings. The bindings comparison,
 state and cancellation tests, component checks and native WebdriverIO scenario
 protect these boundaries. The dated account below records how they arose.
+
+The Svelte component creates one `WindowState` per mounted window.
+`window-state.svelte.ts` keeps progress and cumulative counters on the
+building screen and filters events using the active and last finished job IDs.
+`window-ipc.ts` owns the subscription lifetime and the order of Tauri calls.
+The view reads the state and formats it. `failure-text.ts` uses the window's
+translation catalogue, selects cancellation text by phase and passes through
+the shell message for unknown codes. The Rust window-seam test compares
+actual core failures with the same catalogue used in the view.
 
 At `app`, and it is attached. `src-tauri/Cargo.toml` carries
 

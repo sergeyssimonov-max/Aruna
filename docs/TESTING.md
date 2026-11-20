@@ -20,6 +20,22 @@ pin the public error fields, English `Display`, reason order and debug quoting
 of foreign filenames. See [the diagnostic refactoring report](CONSOLE-DIAGNOSTICS-2026-11-17.md)
 for the before/after comparison and limits.
 
+The export PDF integration test places two archive entries with identical
+contents and a third manuscript whose PDF is refused. It checks the source
+name, both hashes, the published XML and the inventory target on each manifest
+row in display order. The recovery suite removes the new inventory on the
+synchronous `CheckingPublished` notification and checks every restored file.
+A unit test supplies a different staging validation count at the publication
+boundary and checks the resulting refusal and original manifest.
+
+The Rust `window_seams` suite exercises actual failure
+codes against `frontend/src/failure-texts.json`. Vitest calls the explanation
+function used by the window. The shell tests check the messages returned by
+the slot, worker and destination checks. The tests in `package_commands.rs`
+call the two package-reading commands on an older manifest without XML
+statistics and on a manifest outside the named package. See the [comparison
+with the base revision on Ventura](DEEP-REFACTOR-2026-11-20.md).
+
 The shell module split is checked by the existing Rust suites, now physically
 under `src-tauri/src/tests/`; their root module names and the heavy-test filters
 are preserved. Only the poisoned-mutex test moved to `build::tests`, where it
