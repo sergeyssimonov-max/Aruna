@@ -1389,8 +1389,8 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | tinyglobby | 0.2.17 | npm | MIT | T262 |
 | tinyrainbow | 2.0.0 | npm | MIT | T98 |
 | tinyrainbow | 3.2.0 | npm | MIT | T98 |
-| tldts-core | 7.4.10 | npm | MIT | T169 |
-| tldts | 7.4.10 | npm | MIT | T169 |
+| tldts-core | 7.5.2 | npm | MIT | T169 |
+| tldts | 7.5.2 | npm | MIT | T169 |
 | to-regex-range | 5.0.1 | npm | MIT | T633 |
 | tough-cookie | 6.0.2 | npm | BSD-3-Clause | T263 |
 | tr46 | 7.0.0 | npm | MIT | T343 |
@@ -11721,7 +11721,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T169
 
-SHA-256 `c64182d48160db948b6aa97a984f1a32974ce4d2053900361264cd33853796cb`. Used by: tldts-core 7.4.10 (LICENSE), tldts 7.4.10 (LICENSE).
+SHA-256 `c64182d48160db948b6aa97a984f1a32974ce4d2053900361264cd33853796cb`. Used by: tldts-core 7.5.2 (LICENSE), tldts 7.5.2 (LICENSE).
 
 ```text
 Copyright (c) 2017 Thomas Parisot, 2018 Rémi Berson
