@@ -193,8 +193,8 @@ fn collision_key(relative: &Path) -> String {
 /// different documents. The second and later get a suffix taken from the
 /// archive path they came from, so both survive.
 ///
-/// Placement follows its caller's order. The export applies stable display
-/// order first, so entries tied on the same manuscript key keep ZIP order.
+/// Placement follows the caller's order. During export, the first document
+/// placed at a given path keeps the unsuffixed name.
 ///
 /// A collision that survives that is a build error rather than a file quietly
 /// overwritten.
