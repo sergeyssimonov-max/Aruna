@@ -915,7 +915,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | @testing-library/jest-dom | 7.0.1 | npm | MIT | T166 |
 | @testing-library/svelte-core | 1.1.3 | npm | MIT | T112 |
 | @testing-library/svelte | 5.4.2 | npm | MIT | T112 |
-| @testing-library/user-event | 14.6.8 | npm | MIT | T551 |
+| @testing-library/user-event | 14.6.10 | npm | MIT | T551 |
 | @tsconfig/svelte | 5.0.8 | npm | MIT | T392 |
 | @tybys/wasm-util | 0.10.4 | npm | MIT | T688 |
 | @types/aria-query | 5.0.4 | npm | MIT | T3 |
@@ -36400,7 +36400,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T551
 
-SHA-256 `b5a4028c49c48f820831421de69c8ea83d621a062914bf16739fd0703c7c9fba`. Used by: @testing-library/user-event 14.6.8 (LICENSE).
+SHA-256 `b5a4028c49c48f820831421de69c8ea83d621a062914bf16739fd0703c7c9fba`. Used by: @testing-library/user-event 14.6.10 (LICENSE).
 
 ```text
 The MIT License (MIT)
