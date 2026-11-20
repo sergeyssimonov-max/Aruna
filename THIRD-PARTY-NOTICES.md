@@ -862,7 +862,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | @jest/types | 30.4.1 | npm | MIT | T19 |
 | @jridgewell/gen-mapping | 0.3.13 | npm | MIT | T60 |
 | @jridgewell/remapping | 2.3.5 | npm | MIT | T60 |
-| @jridgewell/resolve-uri | 3.1.2 | npm | MIT | T555 |
+| @jridgewell/resolve-uri | 3.1.3 | npm | MIT | T555 |
 | @jridgewell/sourcemap-codec | 1.6.0 | npm | MIT | T60 |
 | @jridgewell/trace-mapping | 0.3.31 | npm | MIT | T60 |
 | @keyv/bigmap | 1.3.1 | npm | MIT | T651 |
@@ -36531,7 +36531,7 @@ licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 
 ### T555
 
-SHA-256 `b8778b155bfde5a28b023a558753c0fa058a52bb9de35c343c250be1bbcdedab`. Used by: @jridgewell/resolve-uri 3.1.2 (LICENSE).
+SHA-256 `b8778b155bfde5a28b023a558753c0fa058a52bb9de35c343c250be1bbcdedab`. Used by: @jridgewell/resolve-uri 3.1.3 (LICENSE).
 
 ```text
 Copyright 2019 Justin Ridgewell <jridgewell@google.com>
