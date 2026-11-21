@@ -252,7 +252,7 @@ for (const row of rows.filter((r) => r.eco === 'crate' && typstNames.has(r.name)
 // Apple SDK-derived code and does not itself contain the full MIT text. Keep
 // those packages in review while preserving the original upstream policy.
 const objc2Versions = new Map([
-  ['block2', '0.6.2'], ['dispatch2', '0.3.1'], ['objc2', '0.6.4'],
+  ['block2', '0.6.2'], ['dispatch2', '0.3.1'], ['objc2', '0.6.5'],
   ['objc2-encode', '4.1.0'], ['objc2-exception-helper', '0.1.1'],
   ...['app-kit', 'cloud-kit', 'core-data', 'core-foundation', 'core-graphics', 'core-image', 'core-location', 'core-text', 'core-video', 'foundation', 'io-surface', 'javascript-core', 'quartz-core', 'security', 'ui-kit', 'user-notifications', 'web-kit'].map((name) => [`objc2-${name}`, '0.3.2']),
 ])
@@ -337,7 +337,7 @@ if (typstReferences.length) {
   out.push('', `Typst ${typstReferences.map((r) => `${r.name} ${r.version}`).join(', ')} declare Apache-2.0 but ship no licence file. Reference ${label.get(typstLicenseDigest)} is the unmodified LICENSE from typst-assets 0.15.1, verified identical to the upstream LICENSE; ${label.get(typstNoticeDigest)} is the unmodified upstream NOTICE. Both originate from https://github.com/typst/typst/tree/9dfd3a08500b7896045f907433cf7b4b02434fad.`, '')
 }
 if (objc2Reviews.length) {
-  out.push('', `For ${objc2Reviews.map((r) => `${r.name} ${r.version}`).join(', ')}, ${label.get(objc2PolicyDigest)} preserves the upstream licence policy from https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md (identical at their four source commits). It identifies the declared licences, but does not provide the complete MIT text and notes uncertainty concerning Apple SDK-derived code. These packages remain listed for review.`, '')
+  out.push('', `For ${objc2Reviews.map((r) => `${r.name} ${r.version}`).join(', ')}, ${label.get(objc2PolicyDigest)} preserves the upstream licence policy from https://github.com/madsmtm/objc2/blob/d7d2fa23ceaa5e6096c923b081040e5d81b3b9df/LICENSE.md (identical at all five reviewed source commits). It identifies the declared licences, but does not provide the complete MIT text and notes uncertainty concerning Apple SDK-derived code. These packages remain listed for review.`, '')
 }
 for (const group of spectaGroups.filter((g) => g.reviewed.length)) {
   out.push('', `${group.reviewed.map((r) => `${r.name} ${r.version}`).join(', ')} declare MIT but ship no licence file. Reference ${label.get(group.digest)} is the unmodified upstream LICENSE from ${group.source}. The source file ${group.finalNewline ? 'ends' : 'does not end'} with a newline; Markdown adds a line break before the closing fence.`, '')
