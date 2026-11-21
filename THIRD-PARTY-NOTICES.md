@@ -997,7 +997,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | aria-query | 5.3.0 | npm | Apache-2.0 | T97 |
 | aria-query | 5.3.1 | npm | Apache-2.0 | T97 |
 | assertion-error | 2.0.1 | npm | MIT | T255 |
-| ast-v8-to-istanbul | 1.0.7 | npm | MIT | T431 |
+| ast-v8-to-istanbul | 1.0.8 | npm | MIT | T431 |
 | async-exit-hook | 2.0.1 | npm | MIT | T414 |
 | async | 3.2.6 | npm | MIT | T603 |
 | axobject-query | 4.1.0 | npm | Apache-2.0 | T97 |
@@ -25155,7 +25155,7 @@ SOFTWARE.
 
 ### T431
 
-SHA-256 `7771f0b6f55e76efe99cb8e6fdbff583193c9bdfd74d41620d330cc3db6b913a`. Used by: ast-v8-to-istanbul 1.0.7 (LICENSE).
+SHA-256 `7771f0b6f55e76efe99cb8e6fdbff583193c9bdfd74d41620d330cc3db6b913a`. Used by: ast-v8-to-istanbul 1.0.8 (LICENSE).
 
 ```text
 MIT License
