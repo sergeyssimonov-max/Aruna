@@ -320,7 +320,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | js-sys | 0.3.104 | crate | MIT OR Apache-2.0 | T1, T17 |
 | json-patch | 4.2.0 | crate | MIT/Apache-2.0 | T94, T462 |
 | jsonptr | 0.7.1 | crate | MIT OR Apache-2.0 | T287, T284 |
-| kamadak-exif | 0.6.1 | crate | BSD-2-Clause | T236 |
+| kamadak-exif | 0.6.2 | crate | BSD-2-Clause | T236 |
 | keyboard-types | 0.8.3 | crate | MIT OR Apache-2.0 | T43, T298 |
 | krilla | 0.8.2 | crate | MIT OR Apache-2.0 | requires review |
 | krilla-svg | 0.8.1 | crate | MIT OR Apache-2.0 | requires review |
@@ -14785,7 +14785,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T236
 
-SHA-256 `17c496a77909a1f26006427d27e58a1d1514baa6a332240aa5fc543e3fa7295d`. Used by: kamadak-exif 0.6.1 (LICENSE).
+SHA-256 `17c496a77909a1f26006427d27e58a1d1514baa6a332240aa5fc543e3fa7295d`. Used by: kamadak-exif 0.6.2 (LICENSE).
 
 ```text
 Copyright (c) 2016-2023 KAMADA Ken'ichi.
