@@ -1214,7 +1214,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | json-schema-traverse | 0.4.1 | npm | MIT | T87 |
 | json-stable-stringify-without-jsonify | 1.0.1 | npm | MIT | T130 |
 | json5 | 2.2.3 | npm | MIT | T360 |
-| jszip | 3.10.1 | npm | (MIT OR GPL-3.0-or-later) | T365 |
+| jszip | 3.10.2 | npm | (MIT OR GPL-3.0-or-later) | T365 |
 | keyv | 5.6.0 | npm | MIT | T116 |
 | known-css-properties | 0.37.0 | npm | MIT | T452 |
 | lazystream | 1.0.1 | npm | MIT | T634 |
@@ -21034,7 +21034,7 @@ limitations under the License.
 
 ### T365
 
-SHA-256 `566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4`. Used by: jszip 3.10.1 (LICENSE.markdown).
+SHA-256 `566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4`. Used by: jszip 3.10.2 (LICENSE.markdown).
 
 ```text
 JSZip is dual licensed. At your choice you may use it under the MIT license *or* the GPLv3
