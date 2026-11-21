@@ -58,6 +58,7 @@ impl Replaced {
     /// `symlink_metadata`, not `exists`: `exists` follows links, and a link is
     /// what would be renamed here.
     pub(super) fn aside(target: &Path, destination: &Path) -> Result<Self> {
+        let target_missing = super::target_metadata(target)?.is_none();
         let mut held = Self {
             target: target.to_path_buf(),
             aside: None,
@@ -66,7 +67,7 @@ impl Replaced {
             committed: false,
         };
         let aside = destination.join(format!(".{PACKAGE}.previous"));
-        if fs::symlink_metadata(target).is_err() {
+        if target_missing {
             // Nothing to move. Anything under the aside name is an earlier
             // run's, orphaned by a kill; see [`Replaced::stale`].
             if aside.exists() {

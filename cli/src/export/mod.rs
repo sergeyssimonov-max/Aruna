@@ -28,6 +28,8 @@ pub mod naming;
 pub mod normalize;
 pub mod pdf;
 mod staging;
+#[cfg(test)]
+mod target_metadata_tests;
 pub mod validate;
 pub mod verify;
 
@@ -54,9 +56,13 @@ use crate::parse::{
 use crate::parse::{ManuscriptRecord, HEADER_READ_LIMIT};
 use crate::progress::Event;
 use std::collections::HashMap;
+#[cfg(not(test))]
+use std::fs::symlink_metadata as read_target_metadata;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Write as _};
 use std::path::{Path, PathBuf};
+#[cfg(test)]
+use target_metadata_tests::read_target_metadata;
 use zip::ZipArchive;
 
 /// What the package is called, in the folder and in the inventory's file name.
@@ -556,6 +562,16 @@ fn write_root_files(root: &Path) -> Result<()> {
         fs::write(&path, bytes).map_err(ArunaError::io(path))?;
     }
     Ok(())
+}
+
+/// Only NotFound establishes that the package name is free. Every other
+/// lookup error must reach the caller before either publication rename.
+fn target_metadata(target: &Path) -> Result<Option<fs::Metadata>> {
+    match read_target_metadata(target) {
+        Ok(meta) => Ok(Some(meta)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(ArunaError::io(target)(error)),
+    }
 }
 
 /// Publication: the destination checked again under the lock, the package

@@ -570,7 +570,7 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
     // about the target and says "nothing there" for a link that dangles. Either
     // answer is the wrong one to act on — what gets renamed over, and what a
     // recursive delete would walk into, is the link.
-    let Ok(meta) = fs::symlink_metadata(root) else {
+    let Some(meta) = super::target_metadata(root)? else {
         return Ok(());
     };
     if meta.file_type().is_symlink() {
