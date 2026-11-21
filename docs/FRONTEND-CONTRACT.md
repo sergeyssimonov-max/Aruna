@@ -707,12 +707,16 @@ that is not there.
 - *Errors cross as a tagged structure.* `BuildFailure` carries `code`, `phase`,
   `message`, `retryable` and `cancelled` — `app::Failure`'s five fields, one for
   one. The two reading commands keep a bare sentence, because each has exactly
-  one failure and there is nothing to branch on; the build has twenty-nine
-  codes – twenty-six from the core's `app::Failure::of` and three from the
+  one failure and there is nothing to branch on; the build has thirty
+  codes – twenty-seven from the core's `app::Failure::of` and three from the
   shell, `busy`, `interrupted` and `destination_missing` – and the window's
   next move depends on which. The window adds one of its own, `broken`, for a
   bridge that failed. This document said twenty until 2026-10-18, and
   twenty-eight until `pdf_invariant` came the same day.
+- `rollback_failed` identifies a publication failure followed by a failed
+  rollback. The phase is `publishing` and `retryable` is false. The window asks
+  the reader to check the destination and recovery copies. Local paths and OS
+  diagnostics stay in the core and CLI.
 - *A PDF that breaks a rule of the program is `pdf_invariant`* (owner's
   decision 4.4 of 2026-10-18). Phase `exporting`, `retryable: false`: the
   same run breaks the same rule, and the defect is the program's, not the
