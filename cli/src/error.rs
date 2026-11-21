@@ -200,6 +200,14 @@ pub enum ArunaError {
         first: String,
     },
 
+    /// Publication failed and restoring the destination failed as well.
+    #[error("{publication}. Publication rollback failed: {rollback}")]
+    ExportRollback {
+        publication: Box<ArunaError>,
+        #[source]
+        rollback: Box<ArunaError>,
+    },
+
     /// A PDF broke an invariant of this program: the build stops in the PDF
     /// phase and nothing is published. A defect of the program, not of the
     /// data (owner's decision 4.4 of 2026-10-18).

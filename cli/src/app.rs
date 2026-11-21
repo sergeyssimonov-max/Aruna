@@ -368,6 +368,7 @@ impl Failure {
             // for — but a caller that wants to try again is not wrong to.
             PublishBusy { .. } => ("publish_busy", Some(Phase::Publishing), true),
             ExportInvalid { .. } => ("package_invalid", Some(Phase::Validating), false),
+            ExportRollback { .. } => ("rollback_failed", Some(Phase::Publishing), false),
             ExportIncomplete { .. } => ("package_incomplete", Some(Phase::Validating), false),
             ExportPackageTooLarge { .. } => ("package_too_large", Some(Phase::Exporting), false),
 
@@ -399,7 +400,7 @@ fn file_name(path: &std::path::Path) -> std::borrow::Cow<'_, str> {
 /// The sentence, with no path from the machine's filesystem in it.
 ///
 /// [`Failure`] promises exactly that above, and for most errors `Display`
-/// already keeps the promise. Seven variants do not, because they are read by
+/// already keeps the promise. Some variants carry local paths and are read by
 /// two audiences: `main` prints `ArunaError` itself to a terminal, where the
 /// path is the most useful thing in the line, and this crosses to a window,
 /// where it is a leak and a person can act on none of it. This is where the two
@@ -424,6 +425,7 @@ fn message_of(error: &ArunaError) -> String {
         ExportInvalid { count, .. } => {
             format!("the package failed validation with {count} problem(s)")
         }
+        ExportRollback { .. } => "publication failed and rollback could not be completed".into(),
         // The place inside the package is dropped and the two sources are not:
         // a reader who has to decide which of two documents keeps the name
         // needs to know which two, and both of those are entries inside the

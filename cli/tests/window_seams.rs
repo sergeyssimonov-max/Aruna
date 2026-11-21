@@ -665,6 +665,16 @@ fn every_failure() -> Vec<ArunaError> {
             count: 1,
             first: format!("{} is missing", secret.display()),
         },
+        ArunaError::ExportRollback {
+            publication: Box::new(ArunaError::ExportInvalid {
+                root: secret.clone(),
+                count: 1,
+                first: secret.display().to_string(),
+            }),
+            rollback: Box::new(ArunaError::io(&secret)(
+                std::io::ErrorKind::PermissionDenied.into(),
+            )),
+        },
         // A broken rule of the PDF phase: the document inside the package, or
         // no document and the family the font stack lacks. Neither carries a
         // path of this machine, and the test above holds that.
@@ -716,6 +726,7 @@ fn covers(error: &ArunaError) {
         | ArchiveTooManyEntries { .. }
         | ExportPackageTooLarge { .. }
         | ExportInvalid { .. }
+        | ExportRollback { .. }
         | PdfInvariant { .. }
         | PublishBusy { .. }
         | ExportDestination { .. }
