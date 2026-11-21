@@ -320,7 +320,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | js-sys | 0.3.104 | crate | MIT OR Apache-2.0 | T1, T17 |
 | json-patch | 4.2.0 | crate | MIT/Apache-2.0 | T94, T462 |
 | jsonptr | 0.7.1 | crate | MIT OR Apache-2.0 | T287, T284 |
-| kamadak-exif | 0.6.1 | crate | BSD-2-Clause | T236 |
+| kamadak-exif | 0.6.2 | crate | BSD-2-Clause | T236 |
 | keyboard-types | 0.8.3 | crate | MIT OR Apache-2.0 | T43, T298 |
 | krilla | 0.8.2 | crate | MIT OR Apache-2.0 | requires review |
 | krilla-svg | 0.8.1 | crate | MIT OR Apache-2.0 | requires review |
@@ -368,7 +368,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | num_enum | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T5, T107, T2 |
 | num_enum_derive | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T5, T107, T2 |
 | num_threads | 0.1.7 | crate | MIT OR Apache-2.0 | T576, T549 |
-| objc2 | 0.6.4 | crate | MIT | requires review |
+| objc2 | 0.6.5 | crate | MIT | requires review |
 | objc2-app-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
 | objc2-cloud-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
 | objc2-core-data | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
@@ -997,7 +997,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | aria-query | 5.3.0 | npm | Apache-2.0 | T97 |
 | aria-query | 5.3.1 | npm | Apache-2.0 | T97 |
 | assertion-error | 2.0.1 | npm | MIT | T255 |
-| ast-v8-to-istanbul | 1.0.7 | npm | MIT | T431 |
+| ast-v8-to-istanbul | 1.0.8 | npm | MIT | T431 |
 | async-exit-hook | 2.0.1 | npm | MIT | T414 |
 | async | 3.2.6 | npm | MIT | T603 |
 | axobject-query | 4.1.0 | npm | Apache-2.0 | T97 |
@@ -1478,7 +1478,7 @@ selectors 0.41.0 declares MPL-2.0 but ships no licence file. Its reference T197 
 Typst typst 0.15.1, typst-eval 0.15.1, typst-html 0.15.1, typst-layout 0.15.1, typst-library 0.15.1, typst-macros 0.15.1, typst-pdf 0.15.1, typst-realize 0.15.1, typst-svg 0.15.1, typst-syntax 0.15.1, typst-timing 0.15.1, typst-utils 0.15.1 declare Apache-2.0 but ship no licence file. Reference T5 is the unmodified LICENSE from typst-assets 0.15.1, verified identical to the upstream LICENSE; T683 is the unmodified upstream NOTICE. Both originate from https://github.com/typst/typst/tree/9dfd3a08500b7896045f907433cf7b4b02434fad.
 
 
-For block2 0.6.2, dispatch2 0.3.1, objc2 0.6.4, objc2-app-kit 0.3.2, objc2-cloud-kit 0.3.2, objc2-core-data 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-core-image 0.3.2, objc2-core-location 0.3.2, objc2-core-text 0.3.2, objc2-core-video 0.3.2, objc2-encode 4.1.0, objc2-exception-helper 0.1.1, objc2-foundation 0.3.2, objc2-io-surface 0.3.2, objc2-javascript-core 0.3.2, objc2-quartz-core 0.3.2, objc2-security 0.3.2, objc2-ui-kit 0.3.2, objc2-user-notifications 0.3.2, objc2-web-kit 0.3.2, T685 preserves the upstream licence policy from https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md (identical at their four source commits). It identifies the declared licences, but does not provide the complete MIT text and notes uncertainty concerning Apple SDK-derived code. These packages remain listed for review.
+For block2 0.6.2, dispatch2 0.3.1, objc2 0.6.5, objc2-app-kit 0.3.2, objc2-cloud-kit 0.3.2, objc2-core-data 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-core-image 0.3.2, objc2-core-location 0.3.2, objc2-core-text 0.3.2, objc2-core-video 0.3.2, objc2-encode 4.1.0, objc2-exception-helper 0.1.1, objc2-foundation 0.3.2, objc2-io-surface 0.3.2, objc2-javascript-core 0.3.2, objc2-quartz-core 0.3.2, objc2-security 0.3.2, objc2-ui-kit 0.3.2, objc2-user-notifications 0.3.2, objc2-web-kit 0.3.2, T685 preserves the upstream licence policy from https://github.com/madsmtm/objc2/blob/d7d2fa23ceaa5e6096c923b081040e5d81b3b9df/LICENSE.md (identical at all five reviewed source commits). It identifies the declared licences, but does not provide the complete MIT text and notes uncertainty concerning Apple SDK-derived code. These packages remain listed for review.
 
 
 specta 2.0.0-rc.25, specta-macros 2.0.0-rc.25, specta-serde 0.0.12, specta-typescript 0.0.12, specta-util 0.0.12 declare MIT but ship no licence file. Reference T686 is the unmodified upstream LICENSE from https://github.com/specta-rs/specta/blob/e7fd23f586b9bd58de39002dabe49b1f978bf971/LICENSE. The source file does not end with a newline; Markdown adds a line break before the closing fence.
@@ -1528,7 +1528,7 @@ downloaded) or it ships no licence file. The declared licence, where known, is i
 - ndk 0.9.0 (crate, registry): MIT OR Apache-2.0
 - ndk-context 0.1.1 (crate, registry): MIT OR Apache-2.0
 - ndk-sys 0.6.0+11769913 (crate, registry): MIT OR Apache-2.0
-- objc2 0.6.4 (crate, registry): MIT
+- objc2 0.6.5 (crate, registry): MIT
 - objc2-app-kit 0.3.2 (crate, registry): Zlib OR Apache-2.0 OR MIT
 - objc2-cloud-kit 0.3.2 (crate, registry): Zlib OR Apache-2.0 OR MIT
 - objc2-core-data 0.3.2 (crate, registry): Zlib OR Apache-2.0 OR MIT
@@ -14785,7 +14785,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T236
 
-SHA-256 `17c496a77909a1f26006427d27e58a1d1514baa6a332240aa5fc543e3fa7295d`. Used by: kamadak-exif 0.6.1 (LICENSE).
+SHA-256 `17c496a77909a1f26006427d27e58a1d1514baa6a332240aa5fc543e3fa7295d`. Used by: kamadak-exif 0.6.2 (LICENSE).
 
 ```text
 Copyright (c) 2016-2023 KAMADA Ken'ichi.
@@ -25155,7 +25155,7 @@ SOFTWARE.
 
 ### T431
 
-SHA-256 `7771f0b6f55e76efe99cb8e6fdbff583193c9bdfd74d41620d330cc3db6b913a`. Used by: ast-v8-to-istanbul 1.0.7 (LICENSE).
+SHA-256 `7771f0b6f55e76efe99cb8e6fdbff583193c9bdfd74d41620d330cc3db6b913a`. Used by: ast-v8-to-istanbul 1.0.8 (LICENSE).
 
 ```text
 MIT License
