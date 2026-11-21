@@ -381,11 +381,10 @@ impl PdfCount {
 
 /// Build the package under `destination`, and return what it contains.
 ///
-/// Nothing is published until everything is checked: the build happens in a
-/// sibling directory and takes the final name only once validation is clean, so
-/// a failure never leaves half a package behind. The published copy is then
-/// validated again, because what a caller opens is that one and not the staging
-/// directory it was renamed from.
+/// The build is validated in a sibling directory and read back under its final
+/// name. If read-back fails, publication restores the previous working tree.
+/// A failed restore is reported with the original error and leaves recovery
+/// copies for the reader.
 ///
 /// `job` hears each stage begin and is asked, between documents, whether to
 /// keep going. The build is about two minutes (122 s on the whole corpus on
@@ -395,8 +394,7 @@ impl PdfCount {
 ///
 /// A cancelled build publishes nothing. The work happens in a staging
 /// directory that removes itself unless it is published, so stopping leaves
-/// the destination exactly as it was found — the same guarantee a failed build
-/// already had, reached by the same mechanism.
+/// the working package in place.
 ///
 /// Each document also gets its PDF, set in `fonts` and built between the XML
 /// documents and the inventory ([`pdf`]); the inventory links it beside the
@@ -586,8 +584,6 @@ fn publish(
     staged: Validation,
     job: &Job<'_>,
 ) -> Result<Validation> {
-    // Only now does it get the name. The package already there is moved aside
-    // first, and put back if the publish fails.
     // The last moment at which stopping costs the reader nothing. Past this
     // line the existing package is moved aside and a new one takes its name,
     // and a run that stopped half way through that would leave the destination
@@ -602,7 +598,7 @@ fn publish(
     // destination was correct every time and the losing run reported a
     // validation failure. The guard is released when it goes out of scope,
     // whichever way this function leaves.
-    let _publication = lock::Publication::acquire(destination, job)?;
+    let publication = lock::Publication::acquire(destination, job)?;
 
     // **Второй раз, и уже под замком.** Первая проверка стоит в начале сборки,
     // за шесть секунд до этой строки: между ними чужой процесс успевает
@@ -612,33 +608,22 @@ fn publish(
     // публикацией не может вклиниться другой прогон Aruna.
     validate::check_destination(&final_root)?;
 
-    let mut previous = Replaced::aside(&final_root, destination)?;
-    staging.publish(&final_root)?;
-    previous.published();
-
-    job.report(Event::CheckingPublished);
-    let published = documents.validate(&final_root)?;
-
-    // Опубликованное обязано совпасть с собранным – и проверяется это здесь,
-    // пока копия читателя еще в `Replaced`, и отказом, а не паникой. Стоял тут
-    // `assert_eq!` после `committed()`: расхождение, которое могло дать только
-    // вмешательство извне между переименованием и повторным чтением, роняло
-    // прогон, когда прежней копии уже не было. Сравнение двух описей стоит
-    // микросекунды и работает в выпуске, не только в отладочной сборке.
-    if published != staged {
-        return Err(ArunaError::ExportInvalid {
-            root: final_root,
-            count: 1,
-            first: "the published package differs from the one that was built and checked".into(),
-        });
-    }
-
-    // **Только теперь, и не строкой раньше.** Прежний пакет снимался сразу
-    // после переименования, то есть до того, как опубликованное дерево было
-    // прочитано заново: отказ этой проверки заставал читателя без его копии и
-    // с непроверенной под ее именем. Пока `committed` не вызван, `Replaced`
-    // держит копию и по выходу отсюда любым отказом вернет ее на место.
-    for left in previous.committed() {
+    let previous = Replaced::aside(&final_root, destination)?;
+    let (published, leftovers) =
+        previous.publish(staging, destination, publication.exclusive, || {
+            job.report(Event::CheckingPublished);
+            let published = documents.validate(&final_root)?;
+            if published != staged {
+                return Err(ArunaError::ExportInvalid {
+                    root: final_root,
+                    count: 1,
+                    first: "the published package differs from the one that was built and checked"
+                        .into(),
+                });
+            }
+            Ok(published)
+        })?;
+    for left in leftovers {
         job.report(Event::PreviousPackageLeft { path: &left });
     }
 
@@ -1224,12 +1209,13 @@ mod tests {
         fs::create_dir_all(target.join("CTH 5")).expect("create");
         fs::write(target.join("CTH 5/KBo 1.1.xml"), b"previous").expect("write");
 
-        let held = Replaced::aside(&target, dir.path()).expect("moved aside");
+        let mut held = Replaced::aside(&target, dir.path()).expect("moved aside");
         assert!(!target.exists(), "старый пакет не убран с имени");
 
         // Публикация: на освободившемся имени встает дерево этого прогона.
         fs::create_dir_all(target.join("CTH 9")).expect("create");
         fs::write(target.join("CTH 9/KBo 2.1.xml"), b"new").expect("write");
+        held.published();
 
         // И проверка опубликованного отказала: подтверждения нет.
         drop(held);

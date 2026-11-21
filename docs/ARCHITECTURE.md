@@ -174,6 +174,13 @@ appends it with its PDF result to `PackageDocuments`. This is the only writer of
 slices used by the public renderers and validator. Staged and published
 validation each read the files from disk. Publication still rechecks the
 destination under the lock and retains the previous package through read-back.
+If an interrupted rollback left `.TLHdig_Beta_0.3.previous` beside the working
+package, a retry leaves that backup in place. It moves the working package to
+a marked, run-specific recovery directory. A rejected retry restores only the
+package it moved. A successful read-back releases the backups. On a filesystem
+without a verified publication lock, a run only releases copies it moved itself.
+If restoring the working name fails, the error carries both the publication
+failure and the rollback failure.
 
 ## 6. Where the PDF renderer attaches
 

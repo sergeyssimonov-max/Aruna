@@ -169,3 +169,83 @@ fn metadata_errors_other_than_not_found_keep_the_native_code_and_target_path() {
     }
     assert_eq!(fs::read(parent).expect("original parent"), b"original");
 }
+
+#[test]
+fn a_failed_rollback_keeps_the_last_good_package_through_rejected_retries() {
+    struct OnReadBack<'a>(&'a (dyn Fn() + Sync));
+    impl Progress for OnReadBack<'_> {
+        fn report(&self, event: Event<'_>) {
+            if matches!(event, Event::CheckingPublished) {
+                (self.0)();
+            }
+        }
+    }
+    let dir = tempdir().expect("fixture");
+    let (zip, fonts) = source(dir.path());
+    let out = dir.path().join("out");
+    fs::create_dir(&out).expect("destination");
+    let target = out.join(PACKAGE);
+    let backup = out.join(format!(".{PACKAGE}.previous"));
+    let run = |label, check: &(dyn Fn() + Sync)| {
+        build(
+            &zip,
+            &out,
+            label,
+            &fonts,
+            &Job::new(&OnReadBack(check), &Cancel::new()),
+        )
+    };
+    run("A", &|| {}).expect("original package");
+    let original = package_files(&target);
+    let pdf = original
+        .keys()
+        .find(|p| p.extension().is_some_and(|e| e == "pdf"))
+        .expect("fixture PDF");
+    let keep_a = || {
+        assert!(
+            package_files(&backup) == original,
+            "A changed during read-back"
+        )
+    };
+    let reject = || {
+        keep_a();
+        fs::remove_file(target.join(pdf)).expect("remove only the candidate PDF");
+    };
+    let deny_rollback = || {
+        reject();
+        assert!(DENY.replace(Some((target.clone(), 1))).is_none());
+    };
+    let failed_rollback = |label| {
+        let failure = run(label, &deny_rollback).expect_err("validation and rollback must fail");
+        assert!(DENY.take().is_none(), "fault was not consumed on rollback");
+        let ArunaError::ExportRollback {
+            publication,
+            rollback,
+        } = failure
+        else {
+            panic!("{failure}")
+        };
+        assert!(
+            matches!(*publication, ArunaError::ExportInvalid { root, ref first, .. }
+            if root == target && first.contains("PDF built but not on disk"))
+        );
+        assert!(matches!(*rollback, ArunaError::Io { path, source }
+            if path == target && source.kind() == io::ErrorKind::PermissionDenied && source.to_string() == DENIED));
+        keep_a();
+    };
+
+    failed_rollback("B");
+    let rejected_b = package_files(&target);
+    assert!(
+        matches!(run("C", &reject), Err(ArunaError::ExportInvalid { root, .. }) if root == target)
+    );
+    assert!(package_files(&target) == rejected_b);
+    keep_a();
+
+    // A second rollback failure leaves a displaced package for the next valid run.
+    failed_rollback("D");
+    run("E", &keep_a).expect("verified replacement");
+    assert!(target.join(pdf).is_file());
+    assert!(package_files(&target) != original);
+    assert_eq!(fs::read_dir(&out).expect("destination").count(), 1);
+}

@@ -101,6 +101,8 @@ fn lock_path(destination: &Path) -> PathBuf {
 #[derive(Debug)]
 pub(super) struct Publication {
     path: PathBuf,
+    /// Another run's recovery copies can be retired only under a verified lock.
+    pub(super) exclusive: bool,
     /// Held open for as long as the guard lives: closing it releases the lock.
     file: fs::File,
 }
@@ -229,14 +231,22 @@ fn acquire_with(
                     drifted += 1;
                     if drifted >= ATTEMPTS {
                         job.report(crate::progress::Event::PublishingWithoutLock);
-                        return Ok(Publication { path, file });
+                        return Ok(Publication {
+                            path,
+                            file,
+                            exclusive: false,
+                        });
                     }
                     drop(file);
                     std::thread::sleep(poll);
                     continue;
                 }
                 write_token(&file).map_err(ArunaError::io(&path))?;
-                return Ok(Publication { path, file });
+                return Ok(Publication {
+                    path,
+                    file,
+                    exclusive: true,
+                });
             }
             Err(fs::TryLockError::WouldBlock) => {
                 if !told {
@@ -256,7 +266,11 @@ fn acquire_with(
             // (owner's decision, 25.09.2026).
             Err(fs::TryLockError::Error(source)) if unsupported(&source) => {
                 job.report(crate::progress::Event::PublishingWithoutLock);
-                return Ok(Publication { path, file });
+                return Ok(Publication {
+                    path,
+                    file,
+                    exclusive: false,
+                });
             }
             Err(fs::TryLockError::Error(source)) => {
                 return Err(ArunaError::Io { path, source });
@@ -557,6 +571,7 @@ mod tests {
         let (wait, poll) = instant();
         let taken =
             acquire_within(dir.path(), &Job::unattended(), wait, poll).expect("the name is free");
+        assert!(taken.exclusive);
         assert!(same_file(&taken.file, &path));
     }
 
@@ -596,6 +611,7 @@ mod tests {
                 same_file,
             )
             .unwrap_or_else(|err| panic!("errno {errno}: refused: {err}"));
+            assert!(!taken.exclusive);
             drop(taken);
             let heard = heard.0.into_inner().expect("heard");
             assert_eq!(
@@ -650,6 +666,7 @@ mod tests {
             },
         )
         .expect("published unguarded");
+        assert!(!taken.exclusive);
         drop(taken);
         assert!(started.elapsed() < Duration::from_secs(5), "it waited");
         assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), ATTEMPTS);

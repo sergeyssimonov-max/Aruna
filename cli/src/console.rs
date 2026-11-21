@@ -115,6 +115,13 @@ pub(crate) fn headline(err: &ArunaError) -> String {
                 .collect::<Vec<_>>()
                 .join("; ")
         ),
+        ExportRollback { publication, rollback } => {
+            let mut original = headline(publication);
+            if let Some(cause) = cause(publication) {
+                original.push_str(&format!(" ({cause})"));
+            }
+            format!("{original}. Не удалось выполнить откат. {}", headline(rollback))
+        }
         // Документ внутри пакета и правило, которое PDF нарушил, или
         // семейство, которого нет в стеке шрифтов. Путей машины здесь нет.
         PdfInvariant {
@@ -175,6 +182,7 @@ pub(crate) fn cause(err: &ArunaError) -> Option<String> {
     match err {
         ArunaError::Io { source, .. } | ArunaError::Replace { source, .. } => Some(io(source)),
         ArunaError::Network { source, .. } => Some(network(source.as_ref())),
+        ArunaError::ExportRollback { rollback, .. } => cause(rollback),
         ArunaError::Zip(inner) => Some(zip(inner)),
         _ => None,
     }
@@ -690,6 +698,30 @@ mod tests {
     fn the_english_guard_notices_english() {
         assert!(!english_in("I/O error at /п/к: Permission denied").is_empty());
         assert!(!english_in(&ArunaError::EmptyArchive.to_string()).is_empty());
+    }
+
+    #[test]
+    fn failed_rollback_reports_both_causes_in_russian() {
+        let root = std::path::PathBuf::from("/корпус");
+        let failure = ArunaError::ExportRollback {
+            publication: Box::new(ArunaError::ExportInvalid {
+                root: root.clone(),
+                count: 1,
+                first: "PDF built but not on disk: лист.pdf".into(),
+            }),
+            rollback: Box::new(ArunaError::io(&root)(std::io::Error::from_raw_os_error(13))),
+        };
+        let message = headline(&failure);
+        assert!(
+            message.contains("не прошел проверку")
+                && message.contains("лист.pdf")
+                && message.contains("Не удалось выполнить откат")
+        );
+        assert!(english_in(&message).is_empty());
+        assert_eq!(
+            cause(&failure).as_deref(),
+            Some("нет прав (код системы 13)")
+        );
     }
 
     /// Многоместные случаи перевода, включая данные с двоеточием внутри, и

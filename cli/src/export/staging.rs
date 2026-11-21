@@ -2,148 +2,231 @@
 //! destination, the marker that says whose it is, the package that was already
 //! there held aside, and the sweep that clears what an earlier run abandoned.
 //!
-//! Moved out of `export/mod.rs` on 2026-10-01 without a change of logic: these
-//! guards are what make a failed or cancelled build leave the destination as
-//! it was found, and they are read together.
+//! A failed publication attempts to restore the working package. If rollback
+//! fails, the saved packages remain available to the next run.
 
 use super::{create_dir_all, remove_dir_all, PACKAGE};
 use crate::error::{ArunaError, Result};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
-/// The package that was already there, held aside until its replacement is in
-/// place.
-///
-/// Deleting it first meant that between the delete and the rename there was no
-/// package at all, and for a 389 MB tree that gap is seconds long rather than
-/// instants — a run interrupted inside it left the reader with neither the old
-/// package nor the new one. A rename is atomic, so the gap is now one syscall
-/// wide.
-///
-/// A guard rather than a sequence of statements in [`build`], for the reason
-/// [`Staging`] and [`crate::paths::write_atomic`] are: cleanup that runs only
-/// on the paths the author remembered is cleanup that stops running the moment
-/// someone adds a `?`. Dropping without [`committed`](Self::committed) puts the
-/// old package back.
+/// The working package and any backup that was already present before this run.
 pub(super) struct Replaced {
     target: PathBuf,
-    /// The package this run moved out of the way. Put back by [`Drop`].
-    aside: Option<PathBuf>,
-    /// An aside copy an earlier run left behind and this one did not make.
-    ///
-    /// It exists when a process was killed between the rename that moved a
-    /// package aside and the one that published its replacement — the window
-    /// `Drop` cannot cover, because a kill runs no destructor. Nothing had ever
-    /// cleared it: [`aside`](Self::aside) only looks at that path when there is
-    /// a package at `target` to move, and after a kill there is not. The copy
-    /// then sat in the destination through the next build — a second, hidden
-    /// package the size of the real one — and was only swept up by the build
-    /// after that.
-    ///
-    /// Kept apart from `aside` rather than merged into it because the two are
-    /// owed different things. This one is the reader's only remaining copy of
-    /// the package they had, so it is removed once a new one is safely
-    /// published and never before — and [`Drop`] must not rename it onto
-    /// `target`, which would be restoring something this run did not move.
-    stale: Option<PathBuf>,
-    /// This run's tree stands under `target`: a refusal from here on takes it
-    /// down again, whether or not there was a reader's copy to put back.
+    /// Only the package moved by this run may be put back on rollback.
+    aside: Option<SavedPackage>,
+    /// An earlier run's backup stays under its original name until read-back succeeds.
+    previous: Option<PathBuf>,
     published: bool,
-    committed: bool,
+    finished: bool,
 }
 
 impl Replaced {
-    /// Move whatever is at `target` out of the way, if anything is.
-    ///
-    /// `symlink_metadata`, not `exists`: `exists` follows links, and a link is
-    /// what would be renamed here.
     pub(super) fn aside(target: &Path, destination: &Path) -> Result<Self> {
-        let target_missing = super::target_metadata(target)?.is_none();
-        let mut held = Self {
-            target: target.to_path_buf(),
-            aside: None,
-            stale: None,
-            published: false,
-            committed: false,
-        };
-        let aside = destination.join(format!(".{PACKAGE}.previous"));
-        if target_missing {
-            // Nothing to move. Anything under the aside name is an earlier
-            // run's, orphaned by a kill; see [`Replaced::stale`].
-            if aside.exists() {
-                held.stale = Some(aside);
+        let exists = super::target_metadata(target)?.is_some();
+        let previous = destination.join(format!(".{PACKAGE}.previous"));
+        let occupied = super::target_metadata(&previous)?.is_some();
+        let aside = if !exists {
+            None
+        } else if occupied {
+            let slot = RecoverySlot::reserve(destination)?;
+            if let Err(error) = fs::rename(target, slot.package()) {
+                slot.remove_if_empty();
+                return Err(ArunaError::io(target)(error));
             }
-            return Ok(held);
-        }
-        if aside.exists() {
-            remove_dir_all(&aside)?;
-        }
-        fs::rename(target, &aside).map_err(ArunaError::io(&target))?;
-        held.aside = Some(aside);
-        Ok(held)
+            Some(SavedPackage::Displaced(slot))
+        } else {
+            fs::rename(target, &previous).map_err(ArunaError::io(target))?;
+            Some(SavedPackage::Previous(previous.clone()))
+        };
+        Ok(Self {
+            target: target.to_owned(),
+            aside,
+            previous: occupied.then_some(previous),
+            published: false,
+            finished: false,
+        })
     }
 
-    /// This run's tree has just taken `target`, and is not yet confirmed.
     pub(super) fn published(&mut self) {
         self.published = true;
     }
 
-    /// The replacement is in place; the old copy is now only occupying space.
-    ///
-    /// Failing to remove it is not a reason to fail a build that worked, so
-    /// whatever is left is handed back for [`build`] to report. Returned rather
-    /// than printed here: this guard exists to be correct on every exit path,
-    /// and a sink threaded through it for one line would have to reach [`Drop`]
-    /// too, where there is no caller left to tell.
-    ///
-    /// Both copies go: the one this run moved aside, and an orphan an earlier
-    /// killed run left. Now is the moment for both — a new package is in place,
-    /// so neither is anybody's last copy of anything any more.
-    pub(super) fn committed(mut self) -> Vec<PathBuf> {
-        self.committed = true;
-        self.aside
-            .iter()
-            .chain(self.stale.iter())
-            .filter(|path| remove_dir_all(path).is_err())
-            .cloned()
-            .collect()
+    /// All fallible work after moving the destination goes through this method,
+    /// including the staging rename itself, before the publication guard is dropped.
+    pub(super) fn publish<T>(
+        mut self,
+        staging: Staging,
+        destination: &Path,
+        exclusive: bool,
+        read_back: impl FnOnce() -> Result<T>,
+    ) -> Result<(T, Vec<PathBuf>)> {
+        let result = staging.publish(&self.target).and_then(|()| {
+            self.published();
+            read_back()
+        });
+        self.finished = true;
+        match result {
+            Ok(value) => Ok((value, self.committed(destination, exclusive))),
+            Err(publication) => match self.restore() {
+                Ok(()) => Err(publication),
+                Err(rollback) => Err(ArunaError::ExportRollback {
+                    publication: Box::new(publication),
+                    rollback: Box::new(rollback),
+                }),
+            },
+        }
     }
+
+    fn restore(&self) -> Result<()> {
+        if self.aside.is_some() || self.published {
+            // A failed metadata read gives us no authority to remove this tree.
+            if super::target_metadata(&self.target)?.is_some() {
+                if !self.published {
+                    return Err(ArunaError::io(&self.target)(
+                        std::io::ErrorKind::AlreadyExists.into(),
+                    ));
+                }
+                remove_dir_all(&self.target)?;
+            }
+        }
+        if let Some(aside) = &self.aside {
+            let restored = match aside {
+                SavedPackage::Previous(path) => fs::rename(path, &self.target),
+                SavedPackage::Displaced(slot) => {
+                    fs::rename(slot.package(), &self.target).map(|()| slot.remove_if_empty())
+                }
+            };
+            restored.map_err(ArunaError::io(&self.target))?;
+        }
+        Ok(())
+    }
+
+    fn committed(&self, destination: &Path, exclusive: bool) -> Vec<PathBuf> {
+        let mut left = Vec::new();
+        let slot = match &self.aside {
+            Some(SavedPackage::Displaced(slot)) => {
+                slot.retire(&mut left);
+                Some(slot)
+            }
+            Some(SavedPackage::Previous(path)) => {
+                if remove_dir_all(path).is_err() {
+                    left.push(path.clone());
+                }
+                None
+            }
+            None => None,
+        };
+        // On a disk that cannot serialize publication another run may still
+        // need its recovery slot or the .previous we found on entry.
+        if exclusive {
+            RecoverySlot::retire_abandoned(destination, slot, &mut left);
+        }
+        if let Some(previous) = &self.previous {
+            // A recovery directory can be retired, a foreign file or symlink cannot.
+            if !exclusive
+                || !fs::symlink_metadata(previous).is_ok_and(|m| m.is_dir())
+                || remove_dir_all(previous).is_err()
+            {
+                left.push(previous.clone());
+            }
+        }
+        left
+    }
+}
+
+enum SavedPackage {
+    Previous(PathBuf),
+    Displaced(RecoverySlot),
 }
 
 impl Drop for Replaced {
     fn drop(&mut self) {
-        if self.committed {
-            return;
+        // Ordinary error returns call restore explicitly so the caller gets both
+        // failures. Unwinding still makes one best-effort attempt under the lock.
+        if !self.finished {
+            let _ = self.restore();
         }
-        if let Some(aside) = &self.aside {
-            // **Имя может быть занято, и снять занявшее его дерево здесь
-            // правильно.** Сюда приходят и отказы после публикации: под именем
-            // пакета в этот момент стоит то, что положил этот прогон, а
-            // читательская копия лежит в `aside`. Один `rename` на занятое имя
-            // отвечает `ENOTEMPTY` и молча ничего не делает – читатель
-            // остается с непроверенным пакетом под своим именем и со своим
-            // собственным под точечным, которого он не видит.
-            //
-            // Убирается только то, что этот прогон сам туда поставил: `aside`
-            // не `None` лишь после удавшегося переименования с этого имени,
-            // после которого занять его мог только `Staging::publish` этого
-            // прогона. Чужой прогон Aruna сюда не встанет – блокировка
-            // публикации объявлена раньше `Replaced` и потому снимается позже.
-            if fs::symlink_metadata(&self.target).is_ok() {
-                let _ = fs::remove_dir_all(&self.target);
+    }
+}
+
+/// A retry must vacate the working name without overwriting an earlier .previous.
+/// These marked slots are outside the abandoned-staging sweep.
+struct RecoverySlot(PathBuf);
+
+impl RecoverySlot {
+    const MARKER: &'static str = ".aruna-rollback";
+
+    fn reserve(destination: &Path) -> Result<Self> {
+        loop {
+            let path = destination.join(format!("{}.rollback", staging_name()));
+            match fs::create_dir(&path) {
+                Ok(()) => (),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(ArunaError::io(&path)(error)),
             }
-            // Best effort, and the only thing left worth doing: the run has
-            // already failed, and putting the reader's package back matters
-            // more than reporting why the restore failed too.
-            let _ = fs::rename(aside, &self.target);
-        } else if self.published {
-            // **Первая сборка, и она отказала после публикации.** Возвращать
-            // нечего, но и оставлять нечего: под именем пакета стоит дерево,
-            // которое проверка только что отвергла, и читатель принял бы его за
-            // пакет. До 25.09.2026 оно так и оставалось – `Drop` действовал
-            // лишь при `aside`. Копию, брошенную убитым прогоном (`stale`), это
-            // не трогает: она остается ждать следующей удачной сборки.
-            let _ = fs::remove_dir_all(&self.target);
+            let marker = path.join(Self::MARKER);
+            if let Err(error) = File::create_new(&marker) {
+                let _ = fs::remove_dir(&path);
+                return Err(ArunaError::io(marker)(error));
+            }
+            return Ok(Self(path));
+        }
+    }
+
+    fn package(&self) -> PathBuf {
+        self.0.join(PACKAGE)
+    }
+
+    fn remove_if_empty(&self) {
+        let _ = fs::remove_file(self.0.join(Self::MARKER));
+        let _ = fs::remove_dir(&self.0);
+    }
+
+    fn retire(&self, left: &mut Vec<PathBuf>) {
+        let package = self.package();
+        match fs::remove_dir_all(&package) {
+            Ok(()) => (),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(_) => {
+                left.push(package);
+                return;
+            }
+        }
+        // Only the marked package is ours. An unrelated sibling stays in place.
+        self.remove_if_empty();
+    }
+
+    fn retire_abandoned(destination: &Path, current: Option<&Self>, left: &mut Vec<PathBuf>) {
+        let Ok(entries) = fs::read_dir(destination) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let kind = name
+                .to_str()
+                .and_then(|s| s.strip_suffix(".rollback"))
+                .and_then(classify_leftover);
+            if kind != Some(Leftover::Staging) || !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                continue;
+            }
+            let slot = Self(entry.path());
+            if current.is_some_and(|own| own.0 == slot.0) {
+                continue;
+            }
+            if !fs::symlink_metadata(slot.0.join(Self::MARKER))
+                .is_ok_and(|m| m.is_file() && m.len() == 0)
+            {
+                continue;
+            }
+            // A slot left by a dead process only ever held a working package
+            // that passed the destination check. Keep anything unrecognizable.
+            let package = slot.package();
+            if super::validate::check_destination(&package).is_err() {
+                left.push(package);
+                continue;
+            }
+            slot.retire(left);
         }
     }
 }
@@ -447,5 +530,85 @@ pub(super) fn sweep_abandoned_staging(destination: &Path) {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn a_lockless_retry_retires_only_its_own_slot() {
+        let dir = tempfile::tempdir().expect("destination");
+        let out = dir.path();
+        let target = out.join(PACKAGE);
+        let previous = out.join(format!(".{PACKAGE}.previous"));
+        let other = RecoverySlot::reserve(out).expect("another publisher's slot");
+        let unmarked = out.join(format!(".{PACKAGE}.build.99999.1.rollback"));
+        for root in [
+            &previous,
+            &target,
+            &other.package(),
+            &unmarked.join(PACKAGE),
+        ] {
+            fs::create_dir_all(root).expect("directory");
+            fs::write(root.join(crate::paths::OUTPUT_FILE_NAME), b"keep").expect("inventory");
+        }
+        let publish = |exclusive| {
+            let staging = Staging::fresh(out.join(staging_name())).expect("fresh");
+            Replaced::aside(&target, out)
+                .expect("move aside")
+                .publish(staging, out, exclusive, || Ok(()))
+                .expect("publish")
+                .1
+        };
+        assert_eq!(publish(false).as_slice(), std::slice::from_ref(&previous));
+        for root in [&previous, &other.package()] {
+            assert_eq!(
+                fs::read(root.join(crate::paths::OUTPUT_FILE_NAME)).expect("preserved"),
+                b"keep"
+            );
+        }
+        assert!(publish(true).is_empty());
+        assert!(!previous.exists() && !other.0.exists());
+        assert_eq!(
+            fs::read(unmarked.join(PACKAGE).join(crate::paths::OUTPUT_FILE_NAME))
+                .expect("unmarked"),
+            b"keep"
+        );
+    }
+
+    #[test]
+    fn a_failed_staging_rename_does_not_remove_an_unpublished_occupant() {
+        let dir = tempfile::tempdir().expect("destination");
+        let out = dir.path();
+        let target = out.join(PACKAGE);
+        fs::create_dir(&target).expect("target");
+        fs::write(target.join("data"), b"original").expect("file");
+        let staging = Staging::fresh(out.join(staging_name())).expect("fresh");
+        let held = Replaced::aside(&target, out).expect("move aside");
+        fs::create_dir(&target).expect("foreign occupant");
+        fs::write(target.join("data"), b"other").expect("file");
+        let failure = held
+            .publish(staging, out, true, || -> Result<()> {
+                panic!("the failed staging rename must stop before read-back")
+            })
+            .expect_err("occupied target");
+        let ArunaError::ExportRollback {
+            publication,
+            rollback,
+        } = failure
+        else {
+            panic!("{failure}")
+        };
+        assert!(matches!(*publication, ArunaError::Io { path, .. } if path == target));
+        assert!(
+            matches!(*rollback, ArunaError::Io { path, source } if path == target && source.kind() == std::io::ErrorKind::AlreadyExists)
+        );
+        assert_eq!(fs::read(target.join("data")).expect("occupant"), b"other");
+        assert_eq!(
+            fs::read(out.join(format!(".{PACKAGE}.previous")).join("data")).expect("original"),
+            b"original"
+        );
     }
 }
