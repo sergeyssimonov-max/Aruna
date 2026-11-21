@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
@@ -8,59 +9,25 @@ import { build, type Plugin } from 'vite'
 import { describe, expect, it } from 'vitest'
 import { ARTIFACTS, SCRIPT, inventoryBuild } from '../build/inventory.ts'
 
-/**
- * Each audit exception covers only its documented development path.
- *
- * GHSA-vfj7-8cjw-p6xm is held to its path (below); GHSA-gcqx-w48m-w2h4 to its
- * date, its versions, its path and the dist (at the end of the file).
- *
- * `pnpm-workspace.yaml` excepts GHSA-vfj7-8cjw-p6xm (braces, owner's decision
- * of 2026-10-03): braces comes only with the window tests, through
- * @wdio/mocha-framework > mocha 10 > chokidar 3, and no fixed release exists.
- * `pnpm audit` goes quiet for the identifier wherever braces turns up, so this
- * holds the exception to its reason: braces at 3.0.3 only, reached by that
- * chain only. Anything else – another dependent, another version, or no braces
- * at all – fails, and the exception is reconsidered or removed.
- */
-
 const FRONTEND = join(dirname(fileURLToPath(import.meta.url)), '..')
-
-const GHSA = 'GHSA-vfj7-8cjw-p6xm'
 
 /** Fixed by raising serialize-javascript to 7.1.4 and so never to be excepted again. */
 const M5MM = 'GHSA-m5mm-p8h7-m29v'
 
-const GCQX = 'GHSA-gcqx-w48m-w2h4'
-const GLOB = 'GHSA-3g3m-2fjr-6pw4'
-const MINIMATCH = 'GHSA-g3hv-75wg-m249'
-const EXCEPTIONS = [GHSA, GCQX, GLOB, MINIMATCH]
-
-/** Fixed by the undici raise of 2026-10-24 and so never to be excepted again. */
-const RAISED = ['GHSA-xjj6-f33q-929c', 'GHSA-4qv8-2p9j-2685', 'GHSA-f72v-6w45-q472']
-
-const workspace = () => readFileSync(join(FRONTEND, 'pnpm-workspace.yaml'), 'utf8')
 const lockfile = () => readFileSync(join(FRONTEND, 'pnpm-lock.yaml'), 'utf8')
 
-/** Every GHSA the workspace names: `audit.ignore` is the only place one goes. */
-function ignored(text: string): string[] {
-  return [...text.matchAll(/GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}/g)].map((m) => m[0])
-}
-
 describe('the audit exceptions', () => {
-  it('are exactly the four reviewed identifiers, through audit.ignore', () => {
-    const text = workspace()
-    expect(new Set(ignored(text))).toEqual(new Set(EXCEPTIONS))
-    for (const id of [...RAISED, M5MM]) expect(ignored(text)).not.toContain(id)
-    expect(text).not.toMatch(/auditConfig|ignoreGhsas|ignoreCves/)
+  it('allows exactly the two reviewed WebdriverIO advisories in the effective pnpm policy', () => {
+    const policy = execFileSync('pnpm', ['config', 'get', 'audit', '--json'], {
+      cwd: FRONTEND,
+      encoding: 'utf8',
+    })
+    expect(JSON.parse(policy)).toEqual({ ignore: ['GHSA-3g3m-2fjr-6pw4', 'GHSA-g3hv-75wg-m249'] })
+    expect(readFileSync(join(FRONTEND, 'pnpm-workspace.yaml'), 'utf8')).not.toMatch(
+      /auditConfig|ignoreGhsas|ignoreCves/,
+    )
   })
 })
-
-/** Each link of the excepted chain: the package, and the one allowed to depend on it. */
-const CHAIN: [RegExp, RegExp][] = [
-  [/^braces@3\.0\.3$/, /^chokidar@3\./],
-  [/^chokidar@3\./, /^mocha@10\./],
-  [/^mocha@10\./, /^@wdio\/mocha-framework@/],
-]
 
 /** `name@version` without the peer suffix pnpm adds in `snapshots`. */
 function bare(key: string): string {
@@ -100,91 +67,11 @@ function snapshots(lock: string): Map<string, string[]> {
   return graph
 }
 
-/** The packages that depend on anything matching `target`. */
-function dependents(graph: Map<string, string[]>, target: RegExp): string[] {
-  return [...graph].filter(([, deps]) => deps.some((dep) => target.test(dep))).map(([pkg]) => pkg)
-}
-
-/** Why the exception no longer fits the tree, or `null` while it does. */
-function outOfReason(lock: string): string | null {
-  const graph = snapshots(lock)
-  const braces = [...graph.keys()].filter((pkg) => pkg.startsWith('braces@'))
-  if (braces.length === 0) {
-    return `the lockfile resolves no braces: ${GHSA} excepts nothing, remove it`
-  }
-  const others = braces.filter((pkg) => pkg !== 'braces@3.0.3')
-  if (others.length > 0) {
-    return `braces at another version (${others.join(', ')}): ${GHSA} was granted for 3.0.3`
-  }
-  for (const [pkg, allowed] of CHAIN) {
-    const stray = dependents(graph, pkg).filter((by) => !allowed.test(by))
-    if (stray.length > 0) {
-      return `${pkg.source} is reached by ${stray.join(', ')}: ${GHSA} covers only @wdio/mocha-framework > mocha 10 > chokidar 3 > braces`
-    }
-  }
-  const direct = section(lock, 'importers').filter((line) =>
-    /^ {6}'?(braces|chokidar|mocha)'?:$/.test(line),
-  )
-  if (direct.length > 0) {
-    return `the project names ${direct.map((l) => l.trim()).join(', ')} itself`
-  }
-  return null
-}
-
-describe(`the audit exception ${GHSA}`, () => {
-  it('is still reached by its chain alone', () => {
-    expect(ignored(workspace())).toContain(GHSA)
-    expect(outOfReason(lockfile())).toBeNull()
-  })
-
-  it('would fail on another path, another version, or no braces', () => {
-    const chain = [
-      'snapshots:',
-      '',
-      '  braces@3.0.3:',
-      '    dependencies:',
-      '      fill-range: 7.1.1',
-      '',
-      '  chokidar@3.6.0:',
-      '    dependencies:',
-      '      braces: 3.0.3',
-      '',
-      '  mocha@10.8.2:',
-      '    dependencies:',
-      '      chokidar: 3.6.0',
-      '',
-      "  '@wdio/mocha-framework@9.31.2(supports-color@8.1.1)':",
-      '    dependencies:',
-      '      mocha: 10.8.2',
-      '',
-    ].join('\n')
-    expect(outOfReason(chain)).toBeNull()
-
-    const micromatch = `${chain}  micromatch@4.0.8:\n    dependencies:\n      braces: 3.0.3\n`
-    expect(outOfReason(micromatch)).toMatch(/is reached by micromatch@4\.0\.8/)
-
-    const watcher = `${chain}  nodemon@3.1.0:\n    dependencies:\n      chokidar: 3.6.0\n`
-    expect(outOfReason(watcher)).toMatch(/is reached by nodemon@3\.1\.0/)
-
-    const newer = chain.replaceAll('3.0.3', '3.0.4')
-    expect(outOfReason(newer)).toMatch(/another version/)
-
-    const none = chain
-      .split('\n\n')
-      .filter((block) => !/braces/.test(block))
-      .join('\n\n')
-    expect(outOfReason(none)).toMatch(/resolves no braces/)
-
-    const imported = `importers:\n\n  .:\n    devDependencies:\n      mocha:\n        specifier: 10.8.2\n\n${chain}`
-    expect(outOfReason(imported)).toMatch(/names mocha: itself/)
-  })
-})
-
 /**
  * GHSA-m5mm-p8h7-m29v (serialize-javascript below 7.1.3) was excepted from
  * 2026-10-24 to 2026-10-31 and is closed by the override at 7.1.4: no
  * serialize-javascript below the fix comes back. undici was raised the same day
- * past the three advisories in RAISED, and does not slide back either.
+ * past its reviewed advisories, and does not slide back either.
  */
 
 /** The first fixed serialize-javascript. */
@@ -231,35 +118,6 @@ function undiciBelowFloor(lock: string): string | null {
     : `undici below its raise of 2026-10-24: ${low.map((v) => v.join('.')).join(', ')}`
 }
 
-/** Every file of the window's dist, as `pnpm build` makes it, built into a directory of its own. */
-async function builtDist(): Promise<Record<string, string>> {
-  const out = await mkdtemp(join(tmpdir(), 'aruna-dist-'))
-  try {
-    await build({
-      root: FRONTEND,
-      configFile: join(FRONTEND, 'vite.config.ts'),
-      logLevel: 'silent',
-      build: { outDir: out, emptyOutDir: true },
-    })
-    const files: Record<string, string> = {}
-    for (const entry of await readdir(out, { recursive: true, withFileTypes: true })) {
-      if (!entry.isFile()) continue
-      const path = join(entry.parentPath, entry.name)
-      files[path.slice(out.length + 1)] = await readFile(path, 'utf8')
-    }
-    return files
-  } finally {
-    await rm(out, { recursive: true, force: true })
-  }
-}
-
-/** The installed copy of each package the lockfile resolves, as `node_modules/.pnpm` lays it out. */
-function installed(lock: string, pkg: string): string[] {
-  return resolved(lock, pkg).map((v) =>
-    join(FRONTEND, 'node_modules', '.pnpm', `${pkg}@${v.join('.')}`, 'node_modules', pkg),
-  )
-}
-
 describe('the raised packages', () => {
   it('keep serialize-javascript at or past 7.1.3', () => {
     expect(resolved(lockfile(), 'serialize-javascript').length).toBeGreaterThan(0)
@@ -281,102 +139,6 @@ describe('the raised packages', () => {
     expect(undiciBelowFloor(lock('7.1.4'))).toBeNull()
     expect(undiciBelowFloor(lock('7.1.4', '6.29.1', '7.29.1'))).toMatch(/7\.29\.1/)
     expect(undiciBelowFloor(lock('7.1.4', '6.28.1', '7.30.1'))).toMatch(/6\.28\.1/)
-
-    const withM5mm = 'audit:\n  ignore:\n    - GHSA-vfj7-8cjw-p6xm\n    - GHSA-m5mm-p8h7-m29v\n'
-    expect(new Set(ignored(withM5mm))).not.toEqual(new Set(EXCEPTIONS))
-    expect(ignored(withM5mm)).toContain(M5MM)
-  })
-})
-
-/**
- * GHSA-gcqx-w48m-w2h4 (deepmerge 4.2.0 to 4.3.1, owner's decision of
- * 2026-10-28, release-3.0.2) is excepted for a month: no fixed deepmerge
- * exists. It comes with the build only – @sveltejs/vite-plugin-svelte calls it
- * in Node while Vite builds – and none of its code is in the dist. This keeps
- * all three true: the exception goes on its date or as soon as it is not
- * needed, nothing else depends on deepmerge, and its code does not ship.
- */
-
-/** The exception is gone by then, whatever the lockfile says. */
-const GCQX_DUE = '2026-11-30T00:00:00Z'
-
-/** The versions the advisory names. */
-const GCQX_FROM: Version = [4, 2, 0]
-const GCQX_TO: Version = [4, 3, 1]
-
-/** The one package allowed to depend on deepmerge. */
-const GCQX_BY = /^@sveltejs\/vite-plugin-svelte@/
-
-/**
- * A property deepmerge reads off its options – `options.isMergeableObject` – in
- * `dist/cjs.js`, the file its `main` names. A minifier renames identifiers but
- * keeps property names, so bundled deepmerge would carry it.
- */
-const GCQX_MARKER = { pkg: 'deepmerge', file: 'dist/cjs.js', marker: 'isMergeableObject' }
-
-/** Why GHSA-gcqx has to go, or `null` while it is still needed, in date and on its path. */
-function gcqxOutOfReason(now: Date, lock: string): string | null {
-  if (now.getTime() >= Date.parse(GCQX_DUE)) {
-    return `срок исключения ${GCQX} истек: ${GCQX_DUE}, now ${now.toISOString()}`
-  }
-  const affected = resolved(lock, 'deepmerge').filter(
-    (v) => atOrPast(v, GCQX_FROM) && atOrPast(GCQX_TO, v),
-  )
-  if (affected.length === 0) {
-    return `the lockfile resolves no deepmerge in 4.2.0 to 4.3.1: снять исключение ${GCQX}`
-  }
-  const stray = dependents(snapshots(lock), /^deepmerge@/).filter((by) => !GCQX_BY.test(by))
-  if (stray.length > 0) {
-    return `deepmerge is reached by ${stray.join(', ')}: ${GCQX} covers only @sveltejs/vite-plugin-svelte`
-  }
-  if (section(lock, 'importers').some((line) => /^ {6}'?deepmerge'?:$/.test(line))) {
-    return `the project names deepmerge itself: ${GCQX} covers a build dependency only`
-  }
-  return null
-}
-
-describe(`the audit exception ${GCQX}`, () => {
-  it('is still needed, in date and on its path', () => {
-    expect(ignored(workspace())).toContain(GCQX)
-    expect(gcqxOutOfReason(new Date(), lockfile())).toBeNull()
-  })
-
-  it('covers code that does not ship', { timeout: 120_000 }, async () => {
-    const files = await builtDist()
-    expect(Object.keys(files)).toContain('index.html')
-    const found = Object.entries(files)
-      .filter(([, text]) => text.includes(GCQX_MARKER.marker))
-      .map(([name]) => name)
-    expect(found).toEqual([])
-  })
-
-  /** A marker that is not in its own package would find nothing anywhere. */
-  it('looks for a string deepmerge really carries', () => {
-    const copies = installed(lockfile(), GCQX_MARKER.pkg)
-    expect(copies.length).toBeGreaterThan(0)
-    for (const dir of copies) {
-      expect(readFileSync(join(dir, GCQX_MARKER.file), 'utf8')).toContain(GCQX_MARKER.marker)
-    }
-  })
-
-  it('would fail on the due date, once it is not needed, on another path, and when named directly', () => {
-    const before = new Date('2026-11-29T23:59:59Z')
-    const due = new Date(GCQX_DUE)
-    const lock = (version: string, by = "'@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.0.0)'") =>
-      `packages:\n\n  deepmerge@${version}:\n\nsnapshots:\n\n  ${by}:\n    dependencies:\n      deepmerge: ${version}\n`
-
-    expect(gcqxOutOfReason(before, lock('4.3.1'))).toBeNull()
-    expect(gcqxOutOfReason(before, lock('4.2.0'))).toBeNull()
-    expect(gcqxOutOfReason(due, lock('4.3.1'))).toMatch(/срок исключения GHSA-gcqx-w48m-w2h4 истек/)
-    expect(gcqxOutOfReason(new Date('2026-10-01T00:00:00Z'), lock('4.3.1'))).toBeNull()
-    expect(gcqxOutOfReason(before, lock('4.3.2'))).toMatch(/снять исключение GHSA-gcqx-w48m-w2h4/)
-    expect(gcqxOutOfReason(before, lock('4.1.9'))).toMatch(/снять исключение/)
-    expect(gcqxOutOfReason(before, 'packages:\n\n  undici@6.29.1:\n')).toMatch(/снять исключение/)
-    expect(gcqxOutOfReason(before, lock('4.3.1', 'cosmiconfig@9.0.0'))).toMatch(
-      /is reached by cosmiconfig@9\.0\.0/,
-    )
-    const imported = `importers:\n\n  .:\n    devDependencies:\n      deepmerge:\n        specifier: 4.3.1\n\n${lock('4.3.1')}`
-    expect(gcqxOutOfReason(before, imported)).toMatch(/names deepmerge itself/)
   })
 })
 
@@ -404,13 +166,17 @@ function affectedTooling(pkg: string): boolean {
   return TOOLING_EDGES.some(([target]) => pkg === target)
 }
 
-/** Whether a declared root can reach either reviewed vulnerable package. */
-function reachesTooling(graph: Map<string, string[]>, root: string): boolean {
+/** Walk all versions reachable from a declared dependency. */
+function reachesPackage(
+  graph: Map<string, string[]>,
+  root: string,
+  matches: (pkg: string) => boolean,
+): boolean {
   const pending = [...graph.keys()].filter((key) => key.startsWith(root + '@'))
   const visited = new Set<string>()
   while (pending.length > 0) {
     const pkg = pending.pop()!
-    if (affectedTooling(pkg)) return true
+    if (matches(pkg)) return true
     if (visited.has(pkg)) continue
     visited.add(pkg)
     pending.push(...(graph.get(pkg) ?? []))
@@ -454,11 +220,12 @@ function toolingOutOfReason(now: Date, lock: string, pkg: Manifest): string | nu
   }
   for (const group of [pkg.dependencies, pkg.optionalDependencies, pkg.peerDependencies]) {
     for (const root of Object.keys(group ?? {})) {
-      if (reachesTooling(graph, root)) return 'production dependency reaches tooling: ' + root
+      if (reachesPackage(graph, root, affectedTooling))
+        return 'production dependency reaches tooling: ' + root
     }
   }
   const developmentRoots = Object.keys(pkg.devDependencies ?? {}).filter((root) =>
-    reachesTooling(graph, root),
+    reachesPackage(graph, root, affectedTooling),
   )
   if (JSON.stringify(developmentRoots.sort()) !== JSON.stringify(TOOLING_ROOTS)) {
     return 'tooling development roots changed: ' + developmentRoots.join(', ')
@@ -466,7 +233,7 @@ function toolingOutOfReason(now: Date, lock: string, pkg: Manifest): string | nu
   return null
 }
 
-/** Includes peer-qualified pnpm directories, which the unscoped marker helper does not need. */
+/** Include peer-qualified pnpm directories when inspecting installed files. */
 function packageCopies(name: string, version: string): string[] {
   const store = join(FRONTEND, 'node_modules', '.pnpm')
   const prefix = name.replace('/', '+') + '@' + version
@@ -492,11 +259,18 @@ const TOOLING_MARKERS = [
   },
 ]
 
+const DEEPMERGE_MARKER = 'isMergeableObject'
+const BUILD_ONLY_MODULE = /[/\\]node_modules[/\\](?:braces|deepmerge|glob|minimatch)[/\\]/
+
 function shippedTooling(modules: string[], files: Record<string, string>): string[] {
   return [
-    ...modules.filter((id) => /[/\\]node_modules[/\\](?:glob|minimatch)[/\\]/.test(id)),
+    ...modules.filter((id) => BUILD_ONLY_MODULE.test(id)),
     ...Object.entries(files)
-      .filter(([, text]) => TOOLING_MARKERS.some(({ marker }) => text.includes(marker)))
+      .filter(
+        ([, text]) =>
+          text.includes(DEEPMERGE_MARKER) ||
+          TOOLING_MARKERS.some(({ marker }) => text.includes(marker)),
+      )
       .map(([name]) => name),
   ]
 }
@@ -549,9 +323,47 @@ async function toolingInBuild(kind: 'window' | 'inventory'): Promise<string[]> {
   }
 }
 
+describe('braces and deepmerge stay in development tooling', () => {
+  const isBuildOnly = (pkg: string) => /^(?:braces|deepmerge)@/.test(pkg)
+
+  it('keeps both packages out of every production dependency chain', () => {
+    const graph = snapshots(lockfile())
+    const { dependencies, optionalDependencies, peerDependencies } = manifest()
+    for (const group of [dependencies, optionalDependencies, peerDependencies]) {
+      const roots = Object.keys(group ?? {}).filter((root) =>
+        reachesPackage(graph, root, isBuildOnly),
+      )
+      expect(roots).toEqual([])
+    }
+  })
+
+  it.each(['braces', 'deepmerge'])(
+    'detects a direct or transitive production use of %s',
+    (name) => {
+      const graph = new Map([
+        ['runtime@1.0.0', ['indirect@1.0.0']],
+        ['indirect@1.0.0', [name + '@1.0.0']],
+        [name + '@1.0.0', []],
+      ])
+      expect(reachesPackage(graph, name, isBuildOnly)).toBe(true)
+      expect(reachesPackage(graph, 'runtime', isBuildOnly)).toBe(true)
+      const module = '/repo/node_modules/' + name + '/index.js'
+      expect(shippedTooling([module], {})).toEqual([module])
+    },
+  )
+
+  it('recognizes the deepmerge marker in installed code and in a bundle', () => {
+    for (const version of resolved(lockfile(), 'deepmerge')) {
+      for (const source of callerSources('deepmerge', version.join('.'), 'dist/cjs.js')) {
+        expect(source).toContain(DEEPMERGE_MARKER)
+      }
+    }
+    expect(shippedTooling([], { 'app.js': DEEPMERGE_MARKER })).toEqual(['app.js'])
+  })
+})
+
 describe('the temporary glob and minimatch development exceptions', () => {
   it('remain in date, at the reviewed versions and paths, with no runtime root', () => {
-    expect(ignored(workspace())).toEqual(expect.arrayContaining([GLOB, MINIMATCH]))
     expect(toolingOutOfReason(new Date(), lockfile(), manifest())).toBeNull()
   })
 
@@ -650,8 +462,12 @@ describe('the temporary glob and minimatch development exceptions', () => {
     expect(shippedTooling(['/repo/src/app.ts'], { 'app.js': 'console.log(1)' })).toEqual([])
   })
 
-  it('ships no glob or minimatch in either production bundle', { timeout: 120_000 }, async () => {
-    expect(await toolingInBuild('window')).toEqual([])
-    expect(await toolingInBuild('inventory')).toEqual([])
-  })
+  it(
+    'ships no braces, deepmerge, glob or minimatch in either production bundle',
+    { timeout: 120_000 },
+    async () => {
+      expect(await toolingInBuild('window')).toEqual([])
+      expect(await toolingInBuild('inventory')).toEqual([])
+    },
+  )
 })

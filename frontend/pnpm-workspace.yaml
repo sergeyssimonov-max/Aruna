@@ -8,33 +8,6 @@ overrides:
   deepmerge-ts: '8.0.2'
   serialize-javascript: '7.1.4'
 
-# GHSA-vfj7-8cjw-p6xm (CVE-2026-93687) – braces, stack exhaustion through deeply
-# nested patterns; high, published 2026-09-18, no fixed release (3.0.3 is the
-# last). Excepted by the owner's decision of 2026-10-03: a dev dependency of the
-# window tests only, it does not ship – @wdio/mocha-framework > mocha 10 >
-# chokidar 3 > braces, loaded with mocha's run-helpers but called only by
-# chokidar.watch in mocha's --watch mode, on patterns from our own config. No
-# update breaks the chain (@wdio/mocha-framework 9.32.0 still wants mocha
-# ^10.8.2, which wants chokidar ^3.5.3), and overrides are not used.
-# Removed by its own commit as soon as either holds: a fixed braces is released,
-# or @wdio/mocha-framework moves to a mocha without chokidar 3.
-# Guard: tests/audit-exception.test.ts fails if braces reaches the tree by any
-# other path or at any version but 3.0.3, or leaves it.
-#
-# GHSA-gcqx-w48m-w2h4 – deepmerge 4.2.0 to 4.3.1, prototype poisoning of the
-# objects mergeObject() returns; low, published after the gate's audit of
-# 2026-10-27, no fixed release. Excepted until 2026-11-30T00:00Z by the owner's
-# decision of 2026-10-28 (release-3.0.2): a build dependency only, it does not
-# ship – @sveltejs/vite-plugin-svelte > deepmerge 4.3.1, called by the plugin in
-# Node while Vite builds; neither dist nor the 3.0.2 image carries its code (its
-# name is in THIRD-PARTY-NOTICES.md, which lists every package, and that is a
-# notice, not code). Removed by its own commit as soon as either holds: a fixed
-# deepmerge is released and old enough to take, or the plugin leaves it.
-# Guard: tests/audit-exception.test.ts fails from 2026-11-30T00:00Z, as soon as
-# no deepmerge in pnpm-lock.yaml is in 4.2.0 to 4.3.1, if anything but
-# @sveltejs/vite-plugin-svelte depends on it, and if its code turns up in the
-# built dist.
-#
 # GHSA-3g3m-2fjr-6pw4 (glob 10.5.0) and GHSA-g3hv-75wg-m249 (minimatch
 # 9.0.9): temporary window-test exceptions, reviewed 2026-11-18,
 # expiring 2026-11-30T00:00Z.
@@ -52,8 +25,6 @@ overrides:
 # Evidence and follow-up: ../docs/DEPENDENCY-REVIEW-3.1.0.md.
 audit:
   ignore:
-    - GHSA-vfj7-8cjw-p6xm
-    - GHSA-gcqx-w48m-w2h4
     - GHSA-3g3m-2fjr-6pw4
     - GHSA-g3hv-75wg-m249
 
