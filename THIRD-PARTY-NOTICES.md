@@ -1359,7 +1359,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | spdx-correct | 3.2.0 | npm | Apache-2.0 | T20 |
 | spdx-exceptions | 2.5.0 | npm | CC-BY-3.0 | requires review |
 | spdx-expression-parse | 3.0.1 | npm | MIT | T333, T447 |
-| spdx-license-ids | 3.0.23 | npm | CC0-1.0 | requires review |
+| spdx-license-ids | 3.0.24 | npm | CC0-1.0 | requires review |
 | split2 | 4.2.0 | npm | ISC | T571 |
 | stack-utils | 2.0.6 | npm | MIT | T500 |
 | std-env | 4.3.0 | npm | MIT | T523 |
@@ -1640,7 +1640,7 @@ downloaded) or it ships no licence file. The declared licence, where known, is i
 - natural-compare 1.4.0 (npm, node_modules): MIT
 - saxes 6.0.0 (npm, node_modules): ISC
 - spdx-exceptions 2.5.0 (npm, node_modules): CC-BY-3.0
-- spdx-license-ids 3.0.23 (npm, node_modules): CC0-1.0
+- spdx-license-ids 3.0.24 (npm, node_modules): CC0-1.0
 - type-fest 3.13.1 (npm, node_modules): (MIT OR CC0-1.0)
 - type-fest 4.26.0 (npm, node_modules): (MIT OR CC0-1.0)
 - @tauri-apps/cli-darwin-arm64 2.12.4 (npm (root), node_modules): Apache-2.0 OR MIT
