@@ -17,7 +17,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires review: 143.
+Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires review: 143.
 
 ## Packages
 
@@ -1305,8 +1305,7 @@ Packages: 1445 – crates 751, npm 694. Distinct licence texts: 691. Requires re
 | postcss-safe-parser | 7.0.1 | npm | MIT | T168 |
 | postcss-scss | 4.0.9 | npm | MIT | T168 |
 | postcss-selector-parser | 7.1.6 | npm | MIT | T278 |
-| postcss | 8.5.29 | npm | MIT | T134 |
-| postcss | 8.5.32 | npm | MIT | T134 |
+| postcss | 8.5.33 | npm | MIT | T134 |
 | prelude-ls | 1.2.1 | npm | MIT | T69 |
 | prettier-plugin-svelte | 4.1.1 | npm | MIT | T434 |
 | prettier | 3.9.10 | npm | MIT | T540 |
@@ -9560,7 +9559,7 @@ SOFTWARE.
 
 ### T134
 
-SHA-256 `5be1f3465bba68a626777f984878814aaf35e7ef8e9fd314d469bcf887050fb8`. Used by: postcss 8.5.29 (LICENSE), postcss 8.5.32 (LICENSE).
+SHA-256 `5be1f3465bba68a626777f984878814aaf35e7ef8e9fd314d469bcf887050fb8`. Used by: postcss 8.5.33 (LICENSE).
 
 ```text
 The MIT License (MIT)
