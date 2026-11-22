@@ -70,6 +70,33 @@
     display: table-footer-group;
   }
 
+  @supports (font: -apple-system-body) {
+    #inv > table:not([hidden]) {
+      display: block;
+    }
+
+    #inv colgroup, #inv thead {
+      display: none;
+    }
+
+    #inv tbody {
+      table-layout: fixed;
+      border-collapse: collapse;
+      break-inside: avoid;
+      width: 100%;
+      display: table;
+    }
+
+    tr:not([hidden]) ~ .print-columns, .print-columns:only-child {
+      display: table-header-group;
+    }
+
+    #inv td:not([colspan]) {
+      padding-top: .35rem;
+      padding-bottom: .35rem;
+    }
+  }
+
   body {
     overflow-wrap: break-word;
   }

@@ -9,10 +9,12 @@
    */
   const {
     head = '',
+    className = '',
   }: {
     /** What the column is called. */
     head?: string
+    className?: string
   } = $props()
 </script>
 
-<th scope="col">{head}</th>
+<th scope="col" class={className}>{head}</th>

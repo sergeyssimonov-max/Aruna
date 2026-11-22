@@ -125,31 +125,31 @@ table {
   width: 100%;
 }
 
-col.c-num {
+col.c-num, .print-columns .c-num {
   width: 4.75rem;
 }
 
-col.c-sig {
+col.c-sig, .print-columns .c-sig {
   width: auto;
 }
 
-col.c-lang {
+col.c-lang, .print-columns .c-lang {
   width: 7rem;
 }
 
-col.c-corp {
+col.c-corp, .print-columns .c-corp {
   width: 5rem;
 }
 
-col.c-ed {
+col.c-ed, .print-columns .c-ed {
   width: 28%;
 }
 
-col.c-year {
+col.c-year, .print-columns .c-year {
   width: 4rem;
 }
 
-thead th {
+thead th, .print-columns th {
   text-align: left;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -161,7 +161,7 @@ thead th {
   font-weight: 500;
 }
 
-thead th:last-child {
+thead th:last-child, .print-columns th:last-child {
   text-align: right;
   padding-right: 0;
 }
@@ -285,7 +285,7 @@ tr.group.folded .chevron {
   font-style: italic;
 }
 
-@media (max-width: 720px) {
+@media screen and (max-width: 720px) {
   col.c-ed {
     width: 0;
   }

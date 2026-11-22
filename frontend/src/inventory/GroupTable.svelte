@@ -5,8 +5,8 @@
     label = '',
     colgroup = '',
     thead = '',
-    rows = '',
-  }: { label?: string; colgroup?: string; thead?: string; rows?: string } = $props()
+    bodies = '',
+  }: { label?: string; colgroup?: string; thead?: string; bodies?: string } = $props()
 </script>
 
 <table aria-label={label}>
@@ -14,7 +14,5 @@
   <thead>
     <tr>{@html thead}</tr>
   </thead>
-  <tbody>
-    {@html rows}
-  </tbody>
+  {@html bodies}
 </table>

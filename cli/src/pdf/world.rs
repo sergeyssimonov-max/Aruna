@@ -4,6 +4,7 @@
 //! way to a bibliography style (the guard of the `quick-xml` exception,
 //! `.cargo/audit.toml`).
 
+use std::cell::OnceCell;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
@@ -21,6 +22,28 @@ use super::fonts::Fonts;
 pub(crate) const MAIN: &str = "/main.typ";
 pub(crate) const DATA: &str = "/doc.json";
 
+/// The first document to reach Typst parses the template. Later worlds share
+/// the immutable syntax tree; each world still owns its JSON and path log.
+pub(crate) struct Template<'a> {
+    text: &'a str,
+    parsed: OnceCell<Source>,
+}
+
+impl<'a> Template<'a> {
+    pub(crate) fn new(text: &'a str) -> Self {
+        Self {
+            text,
+            parsed: OnceCell::new(),
+        }
+    }
+
+    fn source(&self, main_id: FileId) -> Source {
+        self.parsed
+            .get_or_init(|| Source::new(main_id, self.text.to_owned()))
+            .clone()
+    }
+}
+
 pub(crate) struct PdfWorld<'f> {
     library: LazyHash<Library>,
     fonts: &'f Fonts,
@@ -37,14 +60,14 @@ fn file_id(p: &'static str) -> Option<FileId> {
 }
 
 impl<'f> PdfWorld<'f> {
-    pub(crate) fn new(fonts: &'f Fonts, template: &str, json: String) -> Option<Self> {
+    pub(crate) fn new(fonts: &'f Fonts, template: &Template<'_>, json: String) -> Option<Self> {
         let main_id = file_id(MAIN)?;
         Some(PdfWorld {
             library: LazyHash::new(Library::default()),
             fonts,
             main_id,
             data_id: file_id(DATA)?,
-            main: Source::new(main_id, template.to_string()),
+            main: template.source(main_id),
             data: Bytes::new(json.into_bytes()),
             asked: Mutex::new(BTreeSet::new()),
         })

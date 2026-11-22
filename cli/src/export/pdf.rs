@@ -5,8 +5,8 @@
 //! manifest, inside the staging directory: a cancelled or failed run leaves
 //! the reader's folder as it was by the same mechanism as every other phase.
 //! Each document is read back from the staging directory, not held in memory
-//! from its writing, so memory stays bounded; the cache of Typst is emptied
-//! after each one ([`crate::pdf::render`]).
+//! from its writing, so memory stays bounded. The batch shares the parsed
+//! template and clears the Typst compilation cache after each render.
 //!
 //! A document Typst refuses, or one the model refuses, gets no PDF and a
 //! record in the manifest, and the build goes on (`PDF-ACCEPTANCE.md` §5) –
@@ -21,7 +21,7 @@ use crate::document::Document;
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, Phase};
 use crate::parse::{group_label, ManuscriptRecord};
-use crate::pdf::{Fonts, PdfError};
+use crate::pdf::{self, Fonts, PdfError, Template};
 use crate::progress::Event;
 
 use super::naming::{dir_component, pdf_path};
@@ -63,6 +63,7 @@ pub(super) fn write_pdfs(
     job.report(Event::WritingPdfs { documents: total });
     let mut package = super::PackageDocuments::with_capacity(total);
     let mut built = 0usize;
+    let template = Template::new(pdf::TEMPLATE);
     for (n, document) in documents.into_iter().enumerate() {
         // Between documents, as the XML phase asks: stopping here leaves the
         // staging directory to remove itself.
@@ -72,6 +73,7 @@ pub(super) fn write_pdfs(
             &document.record,
             &document.place,
             fonts,
+            &template,
             package_bytes,
         )?;
         if matches!(state, PdfState::Built(_)) {
@@ -103,6 +105,7 @@ fn one(
     record: &ManuscriptRecord,
     place: &Placed,
     fonts: &Fonts,
+    template: &Template<'_>,
     package_bytes: &mut super::PackageBytes,
 ) -> Result<PdfState> {
     let xml_path = staging.join(&place.relative);
@@ -114,7 +117,7 @@ fn one(
     let relative = pdf_path(&place.relative);
     let ident = relative.to_string_lossy();
     let group = dir_component(group_label(record));
-    match crate::pdf::render(&doc, &group, &place.label, &ident, fonts) {
+    match pdf::render_with_template(&doc, &group, &place.label, &ident, fonts, template) {
         Ok(rendered) => {
             let out = staging.join(&relative);
             // Against the ceiling by the bytes in hand, before the file is
