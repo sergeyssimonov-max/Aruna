@@ -644,7 +644,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | unicode-math-class | 0.1.0 | crate | MIT OR Apache-2.0 | T5, T24 |
 | unicode-normalization | 0.1.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T73, T1, T39, T667 |
 | unicode-properties | 0.1.4 | crate | MIT/Apache-2.0 | T73, T1, T39 |
-| unicode-script | 0.5.8 | crate | MIT OR Apache-2.0 | T440, T437 |
+| unicode-script | 0.5.9 | crate | MIT OR Apache-2.0 | T440, T437 |
 | unicode-segmentation | 1.13.3 | crate | MIT OR Apache-2.0 | T73, T1, T39 |
 | unicode-vo | 0.1.0 | crate | MIT/Apache-2.0 | T1, T106 |
 | unsafe-libyaml | 0.2.11 | crate | MIT | T2 |
@@ -26466,7 +26466,7 @@ SHA-256 `7abd9b6960dcf7d4d0a48606a5b71bfe37d472db68d70637f3a58a56785f1621`. Used
 
 ### T437
 
-SHA-256 `7ad3ea8ca3caf894db98c3f31d5d4949173ffa93c883ef19a9e529ad48960f8c`. Used by: unicode-script 0.5.8 (LICENSE-MIT).
+SHA-256 `7ad3ea8ca3caf894db98c3f31d5d4949173ffa93c883ef19a9e529ad48960f8c`. Used by: unicode-script 0.5.9 (LICENSE-MIT).
 
 ```text
 MIT License
@@ -26726,7 +26726,7 @@ SOFTWARE.
 
 ### T440
 
-SHA-256 `7cbb56d1b5d83d735056b363ab20958524120afafc4ad8206e6be98cdec5d737`. Used by: unicode-script 0.5.8 (LICENSE-APACHE).
+SHA-256 `7cbb56d1b5d83d735056b363ab20958524120afafc4ad8206e6be98cdec5d737`. Used by: unicode-script 0.5.9 (LICENSE-APACHE).
 
 ```text
                               Apache License
