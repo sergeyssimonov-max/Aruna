@@ -26,6 +26,8 @@ mod lock;
 pub mod manifest;
 pub mod naming;
 pub mod normalize;
+#[cfg(test)]
+mod package_ceiling_tests;
 pub mod pdf;
 mod staging;
 #[cfg(test)]
@@ -147,6 +149,48 @@ fn within_package_ceiling(written: u64, limit: u64) -> Result<()> {
         return Err(ArunaError::ExportPackageTooLarge { written, limit });
     }
     Ok(())
+}
+
+/// The bytes of the package as it is written, against the most it may hold.
+///
+/// One counter for every file of the package – the documents, their PDFs, the
+/// inventory, the font and the terms, the manifest – and asked **before** a
+/// file is created, with the length of the buffer about to be written: the
+/// point of the ceiling is to stop before the disk is full, and a check after
+/// the write is a check after the damage. A file the package has no room for
+/// is not created, and one that failed to be written is not counted.
+struct PackageBytes {
+    written: u64,
+    limit: u64,
+}
+
+impl PackageBytes {
+    /// An empty package that may hold `limit` bytes: [`MAX_PACKAGE`], except
+    /// where a test asks what happens at the edge.
+    fn within(limit: u64) -> Self {
+        PackageBytes { written: 0, limit }
+    }
+
+    /// Writes one file of `len` bytes through `write`, if the package has room
+    /// for it, and counts it once it is written.
+    ///
+    /// Exactly the limit is room. One byte more is
+    /// [`ArunaError::ExportPackageTooLarge`], naming the size the package would
+    /// have reached, and `write` is not called. A sum past `u64` is past any
+    /// limit and is refused as the largest size there is.
+    fn write<T>(&mut self, len: usize, write: impl FnOnce() -> Result<T>) -> Result<T> {
+        let total = u64::try_from(len)
+            .ok()
+            .and_then(|len| self.written.checked_add(len))
+            .ok_or(ArunaError::ExportPackageTooLarge {
+                written: u64::MAX,
+                limit: self.limit,
+            })?;
+        within_package_ceiling(total, self.limit)?;
+        let done = write()?;
+        self.written = total;
+        Ok(done)
+    }
 }
 
 /// A record and the archive entry it was parsed from.
@@ -406,6 +450,19 @@ pub fn build(
     fonts: &crate::pdf::Fonts,
     job: &Job<'_>,
 ) -> Result<Built> {
+    build_within(zip, destination, source_label, fonts, job, MAX_PACKAGE)
+}
+
+/// [`build`], with the most the package may hold given: [`MAX_PACKAGE`] for
+/// every build there is, and a few bytes where a test stands at the edge.
+fn build_within(
+    zip: &Path,
+    destination: &Path,
+    source_label: &str,
+    fonts: &crate::pdf::Fonts,
+    job: &Job<'_>,
+    limit: u64,
+) -> Result<Built> {
     let final_root = destination.join(PACKAGE);
     let staging = destination.join(staging_name());
 
@@ -418,7 +475,7 @@ pub fn build(
         not_manuscripts,
     } = read_headers(zip, job)?;
     sort_by_display_order(&mut fragments, |f| &f.record);
-    let mut documents = Document::place_all(fragments)?;
+    let documents = Document::place_all(fragments)?;
     let disambiguated = documents
         .iter()
         .filter(|doc| {
@@ -429,42 +486,23 @@ pub fn build(
     sweep_abandoned_staging(destination);
     let staging = Staging::fresh(staging)?;
 
-    job.report(Event::WritingDocuments {
-        documents: documents.len(),
-    });
-    let mut tallies = Tallies::default();
-    let mut package_bytes = write_documents(
-        &mut archive,
-        &mut documents,
-        staging.path(),
-        &mut tallies,
-        job,
-    )?;
-    // Read off the tally the manifest publishes rather than counted a second
-    // time beside it. Two counters over the same documents are two answers to
-    // one question, and these two gave different ones: this number came from a
-    // search for the literal `<?xml-stylesheet` — once per document, whether
-    // the document carried one instruction or two — while `applied` is filled
-    // by `verify::compare`, which names every instruction it actually saw
-    // removed. The number the caller prints is now that one.
-    let stylesheet_dropped = tallies
-        .applied
-        .get(&verify::drop_pi("xml-stylesheet"))
-        .copied()
-        .unwrap_or(0);
-
-    let documents = pdf::write_pdfs(staging.path(), documents, fonts, &mut package_bytes, job)?;
-    let html_path = staging.path().join(crate::paths::OUTPUT_FILE_NAME);
-    fs::write(&html_path, documents.inventory(source_label)).map_err(ArunaError::io(html_path))?;
-    write_root_files(staging.path())?;
     let source = manifest::Source {
         label: source_label,
         archive_md5: &archive_digest,
         not_manuscripts: &not_manuscripts,
     };
-    let manifest_path = staging.path().join(MANIFEST);
-    fs::write(&manifest_path, documents.manifest(&source, &tallies))
-        .map_err(ArunaError::io(manifest_path))?;
+    let Staged {
+        documents,
+        stylesheet_dropped,
+    } = stage(
+        staging.path(),
+        &mut archive,
+        documents,
+        &source,
+        fonts,
+        job,
+        &mut PackageBytes::within(limit),
+    )?;
 
     // Validation reads back everything just written; a run cancelled during
     // the write should not spend six more seconds proving it was written.
@@ -480,6 +518,64 @@ pub fn build(
         disambiguated,
         stylesheet_dropped,
         pdfs: documents.pdf_count(),
+    })
+}
+
+/// What [`stage`] leaves: the documents as the package holds them, and how
+/// many lost a stylesheet instruction on the way.
+struct Staged {
+    documents: PackageDocuments,
+    stylesheet_dropped: usize,
+}
+
+/// Every file of the package, written into `staging` in the order the package
+/// has always been written: the documents, their PDFs, the inventory, the
+/// font and the terms, the manifest. Each goes through `package`, so none is
+/// created that the package has no room for.
+fn stage(
+    staging: &Path,
+    archive: &mut ZipArchive<BufReader<File>>,
+    mut documents: Vec<Document>,
+    source: &manifest::Source<'_>,
+    fonts: &crate::pdf::Fonts,
+    job: &Job<'_>,
+    package: &mut PackageBytes,
+) -> Result<Staged> {
+    job.report(Event::WritingDocuments {
+        documents: documents.len(),
+    });
+    let mut tallies = Tallies::default();
+    write_documents(archive, &mut documents, staging, &mut tallies, package, job)?;
+    // Read off the tally the manifest publishes rather than counted a second
+    // time beside it. Two counters over the same documents are two answers to
+    // one question, and these two gave different ones: this number came from a
+    // search for the literal `<?xml-stylesheet` — once per document, whether
+    // the document carried one instruction or two — while `applied` is filled
+    // by `verify::compare`, which names every instruction it actually saw
+    // removed. The number the caller prints is now that one.
+    let stylesheet_dropped = tallies
+        .applied
+        .get(&verify::drop_pi("xml-stylesheet"))
+        .copied()
+        .unwrap_or(0);
+
+    let documents = pdf::write_pdfs(staging, documents, fonts, package, job)?;
+    write_root_file(
+        staging,
+        crate::paths::OUTPUT_FILE_NAME,
+        documents.inventory(source.label).as_bytes(),
+        package,
+    )?;
+    write_root_files(staging, package)?;
+    write_root_file(
+        staging,
+        MANIFEST,
+        documents.manifest(source, &tallies).as_bytes(),
+        package,
+    )?;
+    Ok(Staged {
+        documents,
+        stylesheet_dropped,
     })
 }
 
@@ -538,7 +634,7 @@ fn read_headers(zip: &Path, job: &Job<'_>) -> Result<Headers> {
 /// window produce the same package. Unmodified, both of them: the terms
 /// forbid distributing a changed file, and `fonts::tests` holds these bytes
 /// against the ones on disk.
-fn write_root_files(root: &Path) -> Result<()> {
+fn write_root_files(root: &Path, package: &mut PackageBytes) -> Result<()> {
     for (name, bytes) in [
         (
             crate::fonts::PACKAGED_FONT,
@@ -556,10 +652,24 @@ fn write_root_files(root: &Path) -> Result<()> {
             crate::cth_titles::PACKAGED_TERMS_BYTES,
         ),
     ] {
-        let path = root.join(name);
-        fs::write(&path, bytes).map_err(ArunaError::io(path))?;
+        write_root_file(root, name, bytes, package)?;
     }
     Ok(())
+}
+
+/// One file at the root of the package – the inventory, the font, the terms,
+/// the manifest – counted against the ceiling like every document, and not
+/// created when the package has no room for it.
+fn write_root_file(
+    root: &Path,
+    name: &str,
+    bytes: &[u8],
+    package: &mut PackageBytes,
+) -> Result<()> {
+    package.write(bytes.len(), || {
+        let path = root.join(name);
+        fs::write(&path, bytes).map_err(ArunaError::io(path))
+    })
 }
 
 /// Only NotFound establishes that the package name is free. Every other
@@ -728,8 +838,9 @@ struct Tallies {
 
 /// Pass 2: read each document whole, normalise it, write it where it belongs.
 ///
-/// Returns the bytes written, which the caller carries on into the PDF phase
-/// against the package ceiling. Everything this pass counts goes into
+/// The bytes written go into `package`, which the caller carries on into the
+/// PDF phase and the root files against the package ceiling; each document is
+/// put to it before its file is created. Everything this pass counts goes into
 /// [`Tallies`], which the manifest reads and which the caller now reads too —
 /// the stylesheet count used to come back as a return value counted a second
 /// way, and the two ways disagreed.
@@ -738,8 +849,9 @@ fn write_documents(
     documents: &mut [Document],
     staging: &Path,
     tallies: &mut Tallies,
+    package: &mut PackageBytes,
     job: &Job<'_>,
-) -> Result<u64> {
+) -> Result<()> {
     let total = documents.len();
     // Keep display order for filesystem collision diagnostics. The ZIP pass
     // looks up each name and writes directly into that manuscript's digests.
@@ -764,10 +876,6 @@ fn write_documents(
     }
 
     let mut written = 0usize;
-    // The package's own size, accumulated as it is written rather than measured
-    // afterwards: the point of the ceiling is to stop before the disk is full,
-    // and a check after the last write is a check after the damage.
-    let mut package_bytes = 0u64;
     // Both buffers live across the loop: one document at a time, and the same
     // allocation for all 24 000 of them.
     let mut bytes = Vec::new();
@@ -844,12 +952,17 @@ fn write_documents(
         // the only place that knows a document may not be counted under both.
         tallies.xml.examine(relative, &normalised);
 
+        // The package's own size, asked before the file exists rather than
+        // measured after it: a document the package has no room for is not
+        // created, and neither is its folder.
         let out = staging.join(relative);
-        if let Some(parent) = out.parent() {
-            dirs.make(parent, &name, relative)?;
-        }
-        let mut handle = create_document(&out, relative, &name, staging, &placements)?;
-        handle.write_all(&normalised).map_err(ArunaError::io(out))?;
+        package.write(normalised.len(), || {
+            if let Some(parent) = out.parent() {
+                dirs.make(parent, &name, relative)?;
+            }
+            let mut handle = create_document(&out, relative, &name, staging, &placements)?;
+            handle.write_all(&normalised).map_err(ArunaError::io(&out))
+        })?;
         // The two digests of the manifest, from the bytes in hand: the ones
         // just written and the ones the archive gave. The lookup already matched
         // the catalogue name retained with these digests.
@@ -862,8 +975,6 @@ fn write_documents(
                 total,
             });
         }
-        package_bytes = package_bytes.saturating_add(normalised.len() as u64);
-        within_package_ceiling(package_bytes, MAX_PACKAGE)?;
     }
 
     if let Some(refusal) = refusal_of(distorted) {
@@ -886,7 +997,7 @@ fn write_documents(
             written,
         });
     }
-    Ok(package_bytes)
+    Ok(())
 }
 
 /// One document's bytes, whole, into `bytes`.
@@ -1139,7 +1250,7 @@ mod tests {
             (target.as_path(), "previous"),
             (staging.path(), "candidate"),
         ] {
-            write_root_files(root).expect("root files");
+            write_root_files(root, &mut PackageBytes::within(MAX_PACKAGE)).expect("root files");
             fs::write(
                 root.join(crate::paths::OUTPUT_FILE_NAME),
                 documents.inventory(label),
@@ -1302,6 +1413,7 @@ mod tests {
             &mut documents,
             Path::new("/nowhere/staging"),
             &mut tallies,
+            &mut PackageBytes::within(MAX_PACKAGE),
             &Job::unattended(),
         )
         .expect_err("a duplicated entry name must not be written");
