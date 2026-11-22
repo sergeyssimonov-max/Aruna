@@ -220,6 +220,13 @@ fn the_counter_admits_its_limit_and_does_not_write_one_byte_more() {
     assert_eq!(refused(&outcome), (11, 10));
     assert!(!called, "the write ran after the refusal");
     assert_eq!(package.written, 10, "a refused file was counted");
+    let error = outcome.expect_err("the next byte does not fit");
+    let failure = crate::app::Failure::of(&error);
+    assert_eq!(failure.code, "package_too_large");
+    assert_eq!(
+        failure.message,
+        "writing the next file would bring the package to 11 bytes, exceeding the limit of 10 bytes"
+    );
 }
 
 #[test]

@@ -125,9 +125,9 @@ pub const MAX_DOCUMENT: u64 = 64 * 1024 * 1024;
 /// failure being a full disk in `~/Downloads`, reported as an I/O error from
 /// whichever write happened to be last.
 ///
-/// The real package is 384 MiB. Eight gibibytes is twenty times that, and a
-/// corpus edition that genuinely crosses it is a decision to take deliberately
-/// rather than a number to discover here.
+/// Including PDFs and root files, the TLHdig Beta 0.3 package totals about
+/// 1.30 GiB. Eight GiB is roughly six times that size. Raising the ceiling
+/// for a future corpus edition should be a deliberate decision.
 pub(crate) const MAX_PACKAGE: u64 = 8 * 1024 * 1024 * 1024;
 
 /// How often the write pass says how many documents are out.
