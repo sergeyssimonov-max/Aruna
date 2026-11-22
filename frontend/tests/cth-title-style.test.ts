@@ -24,7 +24,7 @@ function rule(css: string, selector: string): string {
 describe('название CTH в заголовке группы', () => {
   const screen = read('screen.css')
   const print = read('print.css')
-  const narrow = screen.slice(screen.indexOf('@media (max-width: 720px)'))
+  const narrow = screen.slice(screen.indexOf('@media screen and (max-width: 720px)'))
 
   it('на обычной ширине – одна строка с многоточием, номер и счет не сжимаются', () => {
     const title = rule(screen, '.group-title')

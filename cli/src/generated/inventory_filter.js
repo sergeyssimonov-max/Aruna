@@ -130,7 +130,7 @@
 		doc.body.classList.add("filter-on");
 		const groups = [];
 		for (const table of inventory.querySelectorAll("table")) {
-			const rows = Array.from(table.tBodies[0].rows);
+			const rows = Array.from(table.querySelectorAll("tbody > tr:not(.print-columns)"));
 			const heading = rows.shift();
 			if (!heading) continue;
 			groups.push({
