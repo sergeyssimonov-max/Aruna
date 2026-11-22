@@ -72,9 +72,9 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 691. Requires re
 | block-padding | 0.4.2 | crate | MIT OR Apache-2.0 | T11, T156 |
 | block2 | 0.6.2 | crate | MIT | requires review |
 | blocking | 1.7.0 | crate | Apache-2.0 OR MIT | T1, T2 |
-| brotli | 9.0.0 | crate | BSD-3-Clause AND MIT | T52, T316 |
+| brotli | 9.1.3 | crate | BSD-3-Clause AND MIT | T52, T316 |
 | brotli-decompressor | 5.0.3 | crate | BSD-3-Clause/MIT | T52 |
-| brotli-decompressor | 6.0.1 | crate | BSD-3-Clause/MIT | T52 |
+| brotli-decompressor | 6.3.2 | crate | BSD-3-Clause/MIT | T52 |
 | bs58 | 0.5.1 | crate | MIT/Apache-2.0 | T1, T327 |
 | bumpalo | 3.20.4 | crate | MIT OR Apache-2.0 | T1, T394 |
 | by_address | 1.2.1 | crate | MIT OR Apache-2.0 | T1, T606 |
@@ -5665,7 +5665,7 @@ limitations under the License.
 
 ### T52
 
-SHA-256 `c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae`. Used by: alloc-no-stdlib 2.0.4 (LICENSE), alloc-no-stdlib 3.0.0 (LICENSE), brotli 9.0.0 (LICENSE.BSD-3-Clause), brotli-decompressor 5.0.3 (LICENSE), brotli-decompressor 6.0.1 (LICENSE).
+SHA-256 `c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae`. Used by: alloc-no-stdlib 2.0.4 (LICENSE), alloc-no-stdlib 3.0.0 (LICENSE), brotli 9.1.3 (LICENSE.BSD-3-Clause), brotli-decompressor 5.0.3 (LICENSE), brotli-decompressor 6.3.2 (LICENSE).
 
 ```text
 Copyright (c) 2016 Dropbox, Inc.
@@ -18141,7 +18141,7 @@ THE SOFTWARE.
 
 ### T316
 
-SHA-256 `3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94`. Used by: brotli 9.0.0 (LICENSE.MIT).
+SHA-256 `3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94`. Used by: brotli 9.1.3 (LICENSE.MIT).
 
 ```text
 Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors.
