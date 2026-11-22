@@ -367,7 +367,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | num-traits | 0.2.19 | crate | MIT OR Apache-2.0 | T1, T30 |
 | num_enum | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T5, T107, T2 |
 | num_enum_derive | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T5, T107, T2 |
-| num_threads | 0.1.7 | crate | MIT OR Apache-2.0 | T576, T549 |
+| num_threads | 0.1.8 | crate | MIT OR Apache-2.0 | T576, T549 |
 | objc2 | 0.6.5 | crate | MIT | requires review |
 | objc2-app-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
 | objc2-cloud-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
@@ -36339,7 +36339,7 @@ SOFTWARE.
 
 ### T549
 
-SHA-256 `b4bf94a9fceb8846320fda938ee53fc16b506572609da5cf1d2d289a5597a8f8`. Used by: num_threads 0.1.7 (LICENSE-MIT).
+SHA-256 `b4bf94a9fceb8846320fda938ee53fc16b506572609da5cf1d2d289a5597a8f8`. Used by: num_threads 0.1.8 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2021 Jacob Pratt
@@ -37240,7 +37240,7 @@ SOFTWARE.
 
 ### T576
 
-SHA-256 `c69b72788ec261765e460532016b4bb78372f238e449b5e70e3268ec1e18fd15`. Used by: num_threads 0.1.7 (LICENSE-Apache).
+SHA-256 `c69b72788ec261765e460532016b4bb78372f238e449b5e70e3268ec1e18fd15`. Used by: num_threads 0.1.8 (LICENSE-Apache).
 
 ```text
 
