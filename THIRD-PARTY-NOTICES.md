@@ -1251,7 +1251,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | lru-cache | 11.5.3 | npm | BlueOak-1.0.0 | T61 |
 | lz-string | 1.5.0 | npm | MIT | T329 |
 | magic-string | 0.30.21 | npm | MIT | T114 |
-| magic-string | 1.4.3 | npm | MIT | T114 |
+| magic-string | 1.4.5 | npm | MIT | T114 |
 | magicast | 0.5.5 | npm | MIT | T433 |
 | mdn-data | 2.27.1 | npm | CC0-1.0 | T307 |
 | min-indent | 1.0.1 | npm | MIT | T491 |
@@ -8630,7 +8630,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T114
 
-SHA-256 `1cbe51b907662f6cb1492b16c359384a595180bf0e4d101603ed525e75c4e484`. Used by: magic-string 0.30.21 (LICENSE), magic-string 1.4.3 (LICENSE).
+SHA-256 `1cbe51b907662f6cb1492b16c359384a595180bf0e4d101603ed525e75c4e484`. Used by: magic-string 0.30.21 (LICENSE), magic-string 1.4.5 (LICENSE).
 
 ```text
 Copyright 2018 Rich Harris
