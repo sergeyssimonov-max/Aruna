@@ -285,7 +285,7 @@ tr.group.folded .chevron {
   font-style: italic;
 }
 
-@media (max-width: 720px) {
+@media screen and (max-width: 720px) {
   col.c-ed {
     width: 0;
   }

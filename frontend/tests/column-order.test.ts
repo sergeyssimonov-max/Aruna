@@ -42,7 +42,7 @@ describe('порядок колонок', () => {
    * класса и номера.
    */
   it('на узком экране прячет ту колонку, которую сужает', () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 720px)'))
+    const narrow = css.slice(css.indexOf('@media screen and (max-width: 720px)'))
     const hidden = narrow.match(/td:nth-child\((\d+)\)/)
     expect(hidden, 'правило `td:nth-child(N)` в медиазапросе').not.toBeNull()
 
@@ -59,7 +59,7 @@ describe('порядок колонок', () => {
    * оставило бы на узком экране шапку без содержимого.
    */
   it('прячет заголовок тем же номером, что и ячейку', () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 720px)'))
+    const narrow = css.slice(css.indexOf('@media screen and (max-width: 720px)'))
     const cell = narrow.match(/td:nth-child\((\d+)\)/)
     const head = narrow.match(/th:nth-child\((\d+)\)/)
     expect(head, 'правило `th:nth-child(N)`').not.toBeNull()
