@@ -436,13 +436,13 @@ fn text_from_the_archive_is_escaped_in_the_document() {
     // rather than the whole body: the inventory legitimately carries a
     // `<script>` of its own — the search and the folding — and the question here
     // is only what the archive's text was allowed to become.
-    let rows = html
-        .split("<tbody>")
-        .nth(1)
-        .and_then(|rest| rest.split("</tbody>").next())
-        .expect("the table's rows");
-    for tag in ["<c>", "<script", "<style"] {
-        assert!(!rows.contains(tag), "the archive's text opened {tag}");
+    let bodies: Vec<_> = html.split("<tbody>").skip(1).collect();
+    assert!(!bodies.is_empty(), "expected inventory rows");
+    for body in bodies {
+        let (rows, _) = body.split_once("</tbody>").expect("complete table body");
+        for tag in ["<c>", "<script", "<style"] {
+            assert!(!rows.contains(tag), "the archive's text opened {tag}");
+        }
     }
 }
 

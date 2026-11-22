@@ -106,6 +106,35 @@
     display: table-footer-group;
   }
 
+  /* Safari 18 does not repeat a native thead when a table spans pages
+   * (WebKit bug 17205). Each body can instead print as a short table.
+   * Keep the header after the rows in the DOM so a filtered-out section
+   * has no printable header. Table layout places that header first. */
+  @supports (font: -apple-system-body) {
+    #inv > table:not([hidden]) {
+      display: block;
+    }
+    #inv colgroup,
+    #inv thead {
+      display: none;
+    }
+    #inv tbody {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+      break-inside: avoid;
+    }
+    tr:not([hidden]) ~ .print-columns,
+    .print-columns:only-child {
+      display: table-header-group;
+    }
+    #inv td:not([colspan]) {
+      padding-top: 0.35rem;
+      padding-bottom: 0.35rem;
+    }
+  }
+
   /* Transliteration runs long and has few break opportunities; the alternative
    * to breaking a word is a cell that runs off the page and is clipped. */
   body {

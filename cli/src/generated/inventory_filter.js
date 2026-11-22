@@ -123,27 +123,24 @@
 	*/
 	function attachInventoryFilter(doc) {
 		const input = doc.getElementById("q");
-		const table = doc.getElementById("inv");
+		const inventory = doc.getElementById("inv");
 		const hint = doc.getElementById("hint");
 		const foldAll = doc.getElementById("fold-all");
-		if (!input || !table) return;
-		const tbody = table.tBodies[0];
-		const rows = Array.prototype.slice.call(tbody.rows);
+		if (!input || !inventory) return;
 		doc.body.classList.add("filter-on");
 		const groups = [];
-		let current = null;
-		for (const tr of rows) if (tr.classList.contains("group")) {
-			current = {
-				tr,
-				text: groupText(tr),
-				items: [],
-				texts: [],
+		for (const table of inventory.querySelectorAll("table")) {
+			const rows = Array.from(table.querySelectorAll("tbody > tr:not(.print-columns)"));
+			const heading = rows.shift();
+			if (!heading) continue;
+			groups.push({
+				table,
+				tr: heading,
+				text: groupText(heading),
+				items: rows,
+				texts: rows.map(rowText),
 				folded: false
-			};
-			groups.push(current);
-		} else if (current) {
-			current.items.push(tr);
-			current.texts.push(rowText(tr));
+			});
 		}
 		/** The toolbar button folds everything, or opens everything back up. */
 		function syncFoldAll() {
@@ -167,7 +164,7 @@
 					if (hit) anyHit = true;
 				}
 				const groupVisible = q === "" || anyHit;
-				group.tr.hidden = !groupVisible;
+				group.table.hidden = !groupVisible;
 				for (let j = 0; j < group.items.length; j++) {
 					const show = groupVisible && hits[j];
 					group.items[j].hidden = !show || group.folded;
@@ -192,7 +189,7 @@
 			for (const group of groups) setFolded(group, fold);
 			render();
 		});
-		tbody.addEventListener("click", (event) => {
+		inventory.addEventListener("click", (event) => {
 			const target = event.target;
 			const button = target && target.closest ? target.closest(".group-toggle") : null;
 			if (!button) return;

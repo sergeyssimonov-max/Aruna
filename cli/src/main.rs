@@ -305,9 +305,7 @@ fn advice(err: &ArunaError) -> Option<String> {
                 .to_string()
         }
         ArunaError::ExportPackageTooLarge { .. } => {
-            "Пакет вырос больше допустимого предела, сборка остановлена.\n\
-             Опубликованного пакета это не коснулось: все писалось во временную\n\
-             папку, и она удалена."
+            "Сборка остановлена до записи этого файла. Прежний пакет, если он был, сохранен."
                 .to_string()
         }
         // The one failure that means the data was at risk rather than the run.
@@ -532,6 +530,21 @@ mod tests {
             advice.contains("MAX_DOWNLOAD"),
             "names the other one: {advice}"
         );
+    }
+
+    #[test]
+    fn the_package_size_in_the_headline_is_the_size_the_next_file_would_reach() {
+        let error = ArunaError::ExportPackageTooLarge {
+            written: 11,
+            limit: 10,
+        };
+        assert_eq!(
+            console::headline(&error),
+            "следующий файл увеличил бы размер пакета до 11 Б при лимите 10 Б"
+        );
+        assert!(advice(&error)
+            .expect("an oversized package has advice")
+            .contains("Сборка остановлена до записи этого файла"));
     }
 
     /// Errors whose own message is the whole story get no second paragraph.

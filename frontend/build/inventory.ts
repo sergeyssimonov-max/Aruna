@@ -102,13 +102,21 @@ const MARKUP: readonly {
         'manuscripts',
         'groups',
         'legend',
-        'colgroup',
-        'thead',
-        'rows',
+        'tables',
       ),
       style: inOwnBlock('style'),
       script: inOwnBlock('script'),
     },
+  },
+  {
+    component: 'GroupTable.svelte',
+    artifact: 'group_table.html',
+    props: placeholders('label', 'colgroup', 'thead', 'bodies'),
+  },
+  {
+    component: 'InventoryBody.svelte',
+    artifact: 'inventory_body.html',
+    props: placeholders('rows', 'headings'),
   },
   {
     component: 'GroupHeading.svelte',
@@ -133,7 +141,7 @@ const MARKUP: readonly {
   {
     component: 'ColumnHeading.svelte',
     artifact: 'column_heading.html',
-    props: placeholders('head'),
+    props: placeholders('head', 'className'),
   },
   {
     component: 'LegendEntry.svelte',

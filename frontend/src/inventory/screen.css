@@ -144,29 +144,36 @@ table {
 /* Wide enough for six digits at 15px tabular-nums plus the gap to the siglum:
    the table is `table-layout: fixed` and its cells clip, so a column that is
    too narrow loses characters instead of widening. */
-col.c-num {
+col.c-num,
+.print-columns .c-num {
   width: 4.75rem;
 }
-col.c-sig {
+col.c-sig,
+.print-columns .c-sig {
   width: auto;
 }
 /* Wide enough for three codes — `Hit, Akk, Sum` is 92px at 15px, and 6% of the
    corpus names more than one language. The table is `table-layout: fixed` and
    its cells clip, so a column that is too narrow loses characters. */
-col.c-lang {
+col.c-lang,
+.print-columns .c-lang {
   width: 7rem;
 }
-col.c-corp {
+col.c-corp,
+.print-columns .c-corp {
   width: 5rem;
 }
-col.c-ed {
+col.c-ed,
+.print-columns .c-ed {
   width: 28%;
 }
-col.c-year {
+col.c-year,
+.print-columns .c-year {
   width: 4rem;
 }
 
-thead th {
+thead th,
+.print-columns th {
   text-align: left;
   font-weight: 500;
   font-size: 0.7rem;
@@ -177,7 +184,8 @@ thead th {
   border-bottom: 1px solid #e5e5e5;
   white-space: nowrap;
 }
-thead th:last-child {
+thead th:last-child,
+.print-columns th:last-child {
   text-align: right;
   padding-right: 0;
 }
@@ -305,7 +313,7 @@ tr.group.folded .chevron {
   font-style: italic;
 }
 
-@media (max-width: 720px) {
+@media screen and (max-width: 720px) {
   col.c-ed {
     width: 0;
   }

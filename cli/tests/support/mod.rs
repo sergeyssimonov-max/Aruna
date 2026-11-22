@@ -517,16 +517,12 @@ pub fn mixed_archive(dir: &Path) -> PathBuf {
 use std::io::{Read as _, Write as _};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-/// How long a gated origin will wait for the clients it was told to expect.
-///
-/// A deadline rather than a synchronisation device: when every expected client
-/// does arrive — which is the case the gate exists for — it is never reached,
-/// and the clients are released the instant the last one connects. It is here
-/// so a test that produces fewer clients than it meant to fails on its own
-/// assertion instead of hanging.
+/// Bound a test server's wait for missing clients or a missing progress signal
+/// so the test can reach its assertion.
 const GATE_DEADLINE: Duration = Duration::from_secs(10);
 
 /// A server that hands out one body and counts what it was asked for.
@@ -551,7 +547,13 @@ pub struct Origin {
 impl Origin {
     /// Serve `body` to everyone, with a matching `Content-Length`.
     pub fn serving(body: Vec<u8>) -> Self {
-        Self::start(body, 0)
+        Self::start(body, 0, None)
+    }
+
+    /// Pace the first response in chunks until the client reports progress.
+    /// Later requests get the same complete body at full speed.
+    pub fn streaming_first(body: Vec<u8>, first_tick: Receiver<()>) -> Self {
+        Self::start(body, 0, Some(first_tick))
     }
 
     /// As [`Origin::serving`], but answer nobody until `gate` clients have
@@ -564,10 +566,10 @@ impl Origin {
     /// connections open until all of them exist makes the overlap a fact of the
     /// test rather than a hope about the machine.
     pub fn gated(body: Vec<u8>, gate: usize) -> Self {
-        Self::start(body, gate)
+        Self::start(body, gate, None)
     }
 
-    fn start(body: Vec<u8>, gate: usize) -> Self {
+    fn start(body: Vec<u8>, gate: usize, mut first_tick: Option<Receiver<()>>) -> Self {
         // Port 0: the operating system picks a free one, so tests running side
         // by side cannot collide over a number.
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -599,6 +601,7 @@ impl Origin {
                 let body = Arc::clone(&body);
                 let l = Arc::clone(&l);
                 let arrivals = Arc::clone(&arrivals);
+                let first_tick = first_tick.take();
                 workers.push(std::thread::spawn(move || {
                     // Read the request line so the client is not writing into a
                     // socket nobody is reading.
@@ -621,7 +624,10 @@ impl Origin {
                         body.len()
                     );
                     let _ = stream.write_all(head.as_bytes());
-                    let _ = stream.write_all(&body);
+                    let _ = match first_tick {
+                        Some(tick) => write_until_tick(&mut stream, &body, tick),
+                        None => stream.write_all(&body),
+                    };
                     let _ = stream.flush();
                     l.fetch_sub(1, Ordering::SeqCst);
                 }));
@@ -661,6 +667,27 @@ impl Origin {
     pub fn live_connections(&self) -> usize {
         self.live.load(Ordering::SeqCst)
     }
+}
+
+fn write_until_tick(
+    stream: &mut TcpStream,
+    mut body: &[u8],
+    tick: Receiver<()>,
+) -> std::io::Result<()> {
+    // A fast response can report only its final byte count. Keep supplying
+    // partial reads while the real progress clock runs; only the sink cancels.
+    const CHUNK: usize = 1024;
+    while body.len() > CHUNK {
+        let (next, rest) = body.split_at(CHUNK);
+        stream.write_all(next)?;
+        body = rest;
+        if tick.recv_timeout(Duration::from_millis(20)) != Err(RecvTimeoutError::Timeout) {
+            return stream.write_all(body);
+        }
+    }
+    // Reserve the last chunk for the signal. Bound the wait if ticks regress.
+    let _ = tick.recv_timeout(GATE_DEADLINE);
+    stream.write_all(body)
 }
 
 impl Drop for Origin {

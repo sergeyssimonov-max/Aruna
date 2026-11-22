@@ -17,7 +17,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires review: 143.
+Packages: 1443 – crates 751, npm 692. Distinct licence texts: 691. Requires review: 143.
 
 ## Packages
 
@@ -25,7 +25,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 |---|---|---|---|---|
 | Inflector | 0.11.4 | crate | BSD-2-Clause | requires review |
 | adler2 | 2.0.1 | crate | 0BSD OR MIT OR Apache-2.0 | T458, T51, T2 |
-| aes | 0.9.3 | crate | MIT OR Apache-2.0 | T11, T269 |
+| aes | 0.9.4 | crate | MIT OR Apache-2.0 | T11, T269 |
 | aho-corasick | 1.1.5 | crate | Unlicense OR MIT | T21, T23, T18 |
 | alloc-no-stdlib | 2.0.4 | crate | BSD-3-Clause | T52 |
 | alloc-no-stdlib | 3.0.0 | crate | BSD-3-Clause | T52 |
@@ -72,9 +72,9 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | block-padding | 0.4.2 | crate | MIT OR Apache-2.0 | T11, T156 |
 | block2 | 0.6.2 | crate | MIT | requires review |
 | blocking | 1.7.0 | crate | Apache-2.0 OR MIT | T1, T2 |
-| brotli | 9.0.0 | crate | BSD-3-Clause AND MIT | T52, T316 |
+| brotli | 9.1.3 | crate | BSD-3-Clause AND MIT | T52, T316 |
 | brotli-decompressor | 5.0.3 | crate | BSD-3-Clause/MIT | T52 |
-| brotli-decompressor | 6.0.1 | crate | BSD-3-Clause/MIT | T52 |
+| brotli-decompressor | 6.3.2 | crate | BSD-3-Clause/MIT | T52 |
 | bs58 | 0.5.1 | crate | MIT/Apache-2.0 | T1, T327 |
 | bumpalo | 3.20.4 | crate | MIT OR Apache-2.0 | T1, T394 |
 | by_address | 1.2.1 | crate | MIT OR Apache-2.0 | T1, T606 |
@@ -114,7 +114,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | comemo | 0.5.1 | crate | MIT OR Apache-2.0 | T5, T24 |
 | comemo-macros | 0.5.1 | crate | MIT OR Apache-2.0 | requires review |
 | concurrent-queue | 2.5.0 | crate | Apache-2.0 OR MIT | T1, T2 |
-| const-oid | 0.10.2 | crate | Apache-2.0 OR MIT | T11, T146 |
+| const-oid | 0.10.3 | crate | Apache-2.0 OR MIT | T11, T146 |
 | cookie | 0.18.2 | crate | MIT OR Apache-2.0 | T274, T653 |
 | core-foundation | 0.10.1 | crate | MIT OR Apache-2.0 | T1, T38 |
 | core-foundation-sys | 0.8.7 | crate | MIT OR Apache-2.0 | T1, T38 |
@@ -202,7 +202,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | foreign-types | 0.5.0 | crate | MIT/Apache-2.0 | T12, T77 |
 | foreign-types-macros | 0.2.4 | crate | MIT/Apache-2.0 | T12, T77 |
 | foreign-types-shared | 0.3.1 | crate | MIT/Apache-2.0 | T12, T77 |
-| form_urlencoded | 1.2.2 | crate | MIT OR Apache-2.0 | T1, T253 |
+| form_urlencoded | 1.2.3 | crate | MIT OR Apache-2.0 | T1, T253 |
 | futures-channel | 0.3.34 | crate | MIT OR Apache-2.0 | T31, T35 |
 | futures-core | 0.3.34 | crate | MIT OR Apache-2.0 | T31, T35 |
 | futures-executor | 0.3.34 | crate | MIT OR Apache-2.0 | T31, T35 |
@@ -300,7 +300,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | indexmap | 2.14.2 | crate | Apache-2.0 OR MIT | T1, T190 |
 | infer | 0.19.0 | crate | MIT | T120 |
 | infer | 0.22.0 | crate | MIT | T120 |
-| inout | 0.2.2 | crate | MIT OR Apache-2.0 | T11, T516 |
+| inout | 0.2.6 | crate | MIT OR Apache-2.0 | T11, T516 |
 | insta | 1.49.0 | crate | Apache-2.0 | T1 |
 | ipnet | 2.12.1 | crate | MIT OR Apache-2.0 | T461, T342 |
 | is-docker | 0.2.0 | crate | MIT | T144 |
@@ -367,7 +367,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | num-traits | 0.2.19 | crate | MIT OR Apache-2.0 | T1, T30 |
 | num_enum | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T5, T107, T2 |
 | num_enum_derive | 0.7.6 | crate | BSD-3-Clause OR MIT OR Apache-2.0 | T5, T107, T2 |
-| num_threads | 0.1.7 | crate | MIT OR Apache-2.0 | T576, T549 |
+| num_threads | 0.1.8 | crate | MIT OR Apache-2.0 | T576, T549 |
 | objc2 | 0.6.5 | crate | MIT | requires review |
 | objc2-app-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
 | objc2-cloud-kit | 0.3.2 | crate | Zlib OR Apache-2.0 OR MIT | requires review |
@@ -447,7 +447,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | r-efi | 5.3.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T682 |
 | r-efi | 6.0.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T590 |
 | rand | 0.8.8 | crate | MIT OR Apache-2.0 | T64, T126, T55 |
-| rand | 0.10.3 | crate | MIT OR Apache-2.0 | T64, T126, T55 |
+| rand | 0.10.4 | crate | MIT OR Apache-2.0 | T64, T126, T55 |
 | rand_chacha | 0.3.1 | crate | MIT OR Apache-2.0 | T64, T67, T55 |
 | rand_core | 0.6.4 | crate | MIT OR Apache-2.0 | T64, T143, T55 |
 | rand_core | 0.10.1 | crate | MIT OR Apache-2.0 | T480, T143, T467 |
@@ -644,14 +644,14 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | unicode-math-class | 0.1.0 | crate | MIT OR Apache-2.0 | T5, T24 |
 | unicode-normalization | 0.1.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T73, T1, T39, T667 |
 | unicode-properties | 0.1.4 | crate | MIT/Apache-2.0 | T73, T1, T39 |
-| unicode-script | 0.5.8 | crate | MIT OR Apache-2.0 | T440, T437 |
+| unicode-script | 0.5.9 | crate | MIT OR Apache-2.0 | T440, T437 |
 | unicode-segmentation | 1.13.3 | crate | MIT OR Apache-2.0 | T73, T1, T39 |
 | unicode-vo | 0.1.0 | crate | MIT/Apache-2.0 | T1, T106 |
 | unsafe-libyaml | 0.2.11 | crate | MIT | T2 |
 | unscanny | 0.1.0 | crate | MIT OR Apache-2.0 | T5, T24 |
 | untrusted | 0.9.0 | crate | ISC | T436 |
 | ureq | 2.12.1 | crate | MIT OR Apache-2.0 | T9, T445 |
-| url | 2.5.8 | crate | MIT OR Apache-2.0 | T1, T68 |
+| url | 2.5.9 | crate | MIT OR Apache-2.0 | T1, T68 |
 | urlpattern | 0.6.0 | crate | MIT | T378 |
 | usvg | 0.47.0 | crate | Apache-2.0 OR MIT | T27, T196 |
 | utf16_iter | 1.0.5 | crate | Apache-2.0 OR MIT | T554, T20, T47 |
@@ -823,7 +823,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | @esbuild/win32-ia32 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/win32-x64 | 0.28.2 | npm | not declared | requires review |
 | @eslint-community/eslint-utils | 4.10.1 | npm | MIT | T198 |
-| @eslint-community/regexpp | 4.12.2 | npm | MIT | T198 |
+| @eslint-community/regexpp | 4.12.3 | npm | MIT | T198 |
 | @eslint/config-array | 0.23.6 | npm | Apache-2.0 | T9 |
 | @eslint/config-helpers | 0.7.0 | npm | Apache-2.0 | T9 |
 | @eslint/core | 1.2.1 | npm | Apache-2.0 | T9 |
@@ -981,7 +981,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | @zip.js/zip.js | 2.8.55 | npm | BSD-3-Clause | T242 |
 | abort-controller | 3.0.0 | npm | MIT | T611 |
 | acorn-jsx | 5.3.2 | npm | MIT | T589 |
-| acorn | 8.18.0 | npm | MIT | T428 |
+| acorn | 8.19.0 | npm | MIT | T428 |
 | agent-base | 7.1.4 | npm | MIT | T153 |
 | ajv | 6.15.0 | npm | MIT | T635 |
 | ansi-colors | 4.1.3 | npm | MIT | T486 |
@@ -1056,7 +1056,6 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | css-value | 0.0.1 | npm | not declared | requires review |
 | css-what | 6.2.2 | npm | BSD-2-Clause | T28 |
 | css.escape | 1.5.1 | npm | MIT | T33 |
-| cssesc | 3.0.0 | npm | MIT | T33 |
 | data-urls | 8.0.0 | npm | MIT | T49 |
 | debug | 4.4.3 | npm | MIT | T312 |
 | decamelize | 4.0.0 | npm | MIT | T13 |
@@ -1251,7 +1250,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | lru-cache | 11.5.3 | npm | BlueOak-1.0.0 | T61 |
 | lz-string | 1.5.0 | npm | MIT | T329 |
 | magic-string | 0.30.21 | npm | MIT | T114 |
-| magic-string | 1.4.3 | npm | MIT | T114 |
+| magic-string | 1.4.5 | npm | MIT | T114 |
 | magicast | 0.5.5 | npm | MIT | T433 |
 | mdn-data | 2.27.1 | npm | CC0-1.0 | T307 |
 | min-indent | 1.0.1 | npm | MIT | T491 |
@@ -1304,7 +1303,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | postcss-load-config | 3.1.4 | npm | MIT | T259 |
 | postcss-safe-parser | 7.0.1 | npm | MIT | T168 |
 | postcss-scss | 4.0.9 | npm | MIT | T168 |
-| postcss-selector-parser | 7.1.6 | npm | MIT | T278 |
+| postcss-selector-parser | 7.2.1 | npm | MIT | T278 |
 | postcss | 8.5.33 | npm | MIT | T134 |
 | prelude-ls | 1.2.1 | npm | MIT | T69 |
 | prettier-plugin-svelte | 4.1.1 | npm | MIT | T434 |
@@ -1658,7 +1657,7 @@ downloaded) or it ships no licence file. The declared licence, where known, is i
 
 ### T1
 
-SHA-256 `a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2`. Used by: arrayvec 0.7.8 (LICENSE-APACHE), async-channel 2.5.0 (LICENSE-APACHE), async-executor 1.14.1 (LICENSE-APACHE), async-io 2.6.0 (LICENSE-APACHE), async-lock 3.4.2 (LICENSE-APACHE), async-process 2.5.0 (LICENSE-APACHE), async-signal 0.2.14 (LICENSE-APACHE), async-task 4.7.1 (LICENSE-APACHE), atomic-waker 1.1.2 (LICENSE-APACHE), autocfg 1.5.1 (LICENSE-APACHE), az 1.3.0 (LICENSE-APACHE), base64 0.21.7 (LICENSE-APACHE), base64 0.22.1 (LICENSE-APACHE), base64 0.23.1 (LICENSE-APACHE), bitflags 1.3.2 (LICENSE-APACHE), bitflags 2.13.2 (LICENSE-APACHE), blocking 1.7.0 (LICENSE-APACHE), bs58 0.5.1 (LICENSE-APACHE), bumpalo 3.20.4 (LICENSE-APACHE), by_address 1.2.1 (LICENSE-APACHE), camino 1.2.6 (LICENSE-APACHE), cc 1.4.4 (LICENSE-APACHE), cfg-if 1.0.5 (LICENSE-APACHE), concurrent-queue 2.5.0 (LICENSE-APACHE), core-foundation 0.10.1 (LICENSE-APACHE), core-foundation-sys 0.8.7 (LICENSE-APACHE), core-graphics 0.25.0 (LICENSE-APACHE), core-graphics-types 0.2.0 (LICENSE-APACHE), crossbeam-channel 0.5.17 (LICENSE-APACHE), crossbeam-deque 0.8.8 (LICENSE-APACHE), crossbeam-epoch 0.9.21 (LICENSE-APACHE), crossbeam-utils 0.8.23 (LICENSE-APACHE), data-url 0.3.2 (LICENSE-APACHE), displaydoc 0.2.7 (LICENSE-APACHE), either 1.18.0 (LICENSE-APACHE), equivalent 1.0.3 (LICENSE-APACHE), errno 0.3.14 (LICENSE-APACHE), euclid 0.22.14 (LICENSE-APACHE), event-listener 5.4.2 (LICENSE-APACHE), event-listener-strategy 0.5.4 (LICENSE-APACHE), fastrand 2.5.0 (LICENSE-APACHE), find-msvc-tools 0.1.15 (LICENSE-APACHE), flate2 1.1.11 (LICENSE-APACHE), fnv 1.0.7 (LICENSE-APACHE), form_urlencoded 1.2.2 (LICENSE-APACHE), futures-lite 2.6.1 (LICENSE-APACHE), glob 0.3.4 (LICENSE-APACHE), hashbrown 0.12.3 (LICENSE-APACHE), hashbrown 0.17.1 (LICENSE-APACHE), heck 0.4.1 (LICENSE-APACHE), heck 0.5.0 (LICENSE-APACHE), hermit-abi 0.5.2 (LICENSE-APACHE), html5ever 0.39.0 (LICENSE-APACHE), html5ever 0.40.1 (LICENSE-APACHE), httparse 1.10.1 (LICENSE-APACHE), idna 1.1.0 (LICENSE-APACHE), idna_adapter 1.2.2 (LICENSE-APACHE), indexmap 1.9.3 (LICENSE-APACHE), indexmap 2.14.2 (LICENSE-APACHE), insta 1.49.0 (LICENSE), jni 0.21.1 (LICENSE-APACHE), js-sys 0.3.104 (LICENSE-APACHE), libappindicator 0.9.0 (LICENSE-APACHE), linux-raw-sys 0.12.1 (LICENSE-APACHE), lock_api 0.4.14 (LICENSE-APACHE), log 0.4.35 (LICENSE-APACHE), markup5ever 0.39.0 (LICENSE-APACHE), markup5ever 0.40.0 (LICENSE-APACHE), mime 0.3.18 (LICENSE-APACHE), muda 0.20.0 (LICENSE-APACHE), num-bigint 0.4.8 (LICENSE-APACHE), num-integer 0.1.47 (LICENSE-APACHE), num-traits 0.2.19 (LICENSE-APACHE), object 0.39.1 (LICENSE-APACHE), once_cell 1.21.4 (LICENSE-APACHE), ordered-stream 0.2.0 (LICENSE-APACHE), palette 0.7.7 (LICENSE-APACHE), palette_derive 0.7.7 (LICENSE-APACHE), palette_math 0.7.7 (LICENSE-APACHE), parking 2.2.1 (LICENSE-APACHE), parking_lot 0.12.5 (LICENSE-APACHE), parking_lot_core 0.9.12 (LICENSE-APACHE), percent-encoding 2.3.2 (LICENSE-APACHE), piper 0.2.5 (LICENSE-APACHE), pkg-config 0.3.34 (LICENSE-APACHE), png 0.18.1 (LICENSE-APACHE), polling 3.11.0 (LICENSE-APACHE), postcard 1.1.3 (LICENSE-APACHE), proc-macro-hack 0.5.20+deprecated (LICENSE-APACHE), rayon 1.12.0 (LICENSE-APACHE), rayon-core 1.13.0 (LICENSE-APACHE), regex 1.13.1 (LICENSE-APACHE), regex-automata 0.4.18 (LICENSE-APACHE), regex-syntax 0.8.11 (LICENSE-APACHE), roxmltree 0.20.0 (LICENSE-APACHE), roxmltree 0.21.2 (LICENSE-APACHE), rustc_version 0.4.1 (LICENSE-APACHE), rustix 1.1.6 (LICENSE-APACHE), rustls 0.23.46 (LICENSE-APACHE), scopeguard 1.2.0 (LICENSE-APACHE), serde_with 3.22.0 (LICENSE-APACHE), serde_with_macros 3.22.0 (LICENSE-APACHE), servo_arc 0.4.3 (LICENSE-APACHE), servo_arc 0.5.0 (LICENSE-APACHE), signal-hook-registry 1.4.8 (LICENSE-APACHE), similar 2.7.0 (LICENSE), simplecss 0.2.2 (LICENSE-APACHE), smallvec 1.16.5 (LICENSE-APACHE), socket2 0.6.5 (LICENSE-APACHE), stable_deref_trait 1.2.1 (LICENSE-APACHE), stacker 0.1.25 (LICENSE-APACHE), string_cache 0.9.0 (LICENSE-APACHE), string_cache 0.11.0 (LICENSE-APACHE), string_cache_codegen 0.6.1 (LICENSE-APACHE), string_cache_codegen 0.11.2 (LICENSE-APACHE), svgtypes 0.16.2 (LICENSE-APACHE), syn 1.0.109 (LICENSE-APACHE), system-deps 6.2.2 (LICENSE-APACHE), system-deps 7.0.8 (LICENSE-APACHE), tao-macros 0.1.4 (LICENSE-APACHE), tempfile 3.27.0 (LICENSE-APACHE), tendril 0.5.1 (LICENSE-APACHE), toml_datetime 0.6.3 (LICENSE-APACHE), tray-icon 0.25.1 (LICENSE-APACHE), ttf-parser 0.25.1 (LICENSE-APACHE), two-face 0.4.5 (LICENSE-APACHE), unic-langid 0.9.6 (LICENSE-APACHE), unic-langid-impl 0.9.6 (LICENSE-APACHE), unic-langid-macros 0.9.6 (LICENSE-APACHE), unic-langid-macros-impl 0.9.6 (LICENSE-APACHE), unicode-bidi 0.3.18 (LICENSE-APACHE), unicode-bidi-mirroring 0.4.0 (LICENSE-APACHE), unicode-ccc 0.4.0 (LICENSE-APACHE), unicode-normalization 0.1.26 (LICENSE-APACHE), unicode-properties 0.1.4 (LICENSE-APACHE), unicode-segmentation 1.13.3 (LICENSE-APACHE), unicode-vo 0.1.0 (LICENSE-APACHE), url 2.5.8 (LICENSE-APACHE), uuid 1.27.0 (LICENSE-APACHE), version_check 0.9.5 (LICENSE-APACHE), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-APACHE), wasip2 1.0.4+wasi-0.2.12 (LICENSE-APACHE), wasm-bindgen 0.2.127 (LICENSE-APACHE), wasm-bindgen-futures 0.4.77 (LICENSE-APACHE), wasm-bindgen-macro 0.2.127 (LICENSE-APACHE), wasm-bindgen-macro-support 0.2.127 (LICENSE-APACHE), wasm-bindgen-shared 0.2.127 (LICENSE-APACHE), web-sys 0.3.104 (LICENSE-APACHE), web_atoms 0.2.6 (LICENSE-APACHE), web_atoms 0.3.0 (LICENSE-APACHE), window-vibrancy 0.8.1 (LICENSE-APACHE), wit-bindgen 0.57.1 (LICENSE-APACHE), wry 0.57.2 (LICENSE-APACHE), yaml-rust 0.4.5 (LICENSE-APACHE).
+SHA-256 `a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2`. Used by: arrayvec 0.7.8 (LICENSE-APACHE), async-channel 2.5.0 (LICENSE-APACHE), async-executor 1.14.1 (LICENSE-APACHE), async-io 2.6.0 (LICENSE-APACHE), async-lock 3.4.2 (LICENSE-APACHE), async-process 2.5.0 (LICENSE-APACHE), async-signal 0.2.14 (LICENSE-APACHE), async-task 4.7.1 (LICENSE-APACHE), atomic-waker 1.1.2 (LICENSE-APACHE), autocfg 1.5.1 (LICENSE-APACHE), az 1.3.0 (LICENSE-APACHE), base64 0.21.7 (LICENSE-APACHE), base64 0.22.1 (LICENSE-APACHE), base64 0.23.1 (LICENSE-APACHE), bitflags 1.3.2 (LICENSE-APACHE), bitflags 2.13.2 (LICENSE-APACHE), blocking 1.7.0 (LICENSE-APACHE), bs58 0.5.1 (LICENSE-APACHE), bumpalo 3.20.4 (LICENSE-APACHE), by_address 1.2.1 (LICENSE-APACHE), camino 1.2.6 (LICENSE-APACHE), cc 1.4.4 (LICENSE-APACHE), cfg-if 1.0.5 (LICENSE-APACHE), concurrent-queue 2.5.0 (LICENSE-APACHE), core-foundation 0.10.1 (LICENSE-APACHE), core-foundation-sys 0.8.7 (LICENSE-APACHE), core-graphics 0.25.0 (LICENSE-APACHE), core-graphics-types 0.2.0 (LICENSE-APACHE), crossbeam-channel 0.5.17 (LICENSE-APACHE), crossbeam-deque 0.8.8 (LICENSE-APACHE), crossbeam-epoch 0.9.21 (LICENSE-APACHE), crossbeam-utils 0.8.23 (LICENSE-APACHE), data-url 0.3.2 (LICENSE-APACHE), displaydoc 0.2.7 (LICENSE-APACHE), either 1.18.0 (LICENSE-APACHE), equivalent 1.0.3 (LICENSE-APACHE), errno 0.3.14 (LICENSE-APACHE), euclid 0.22.14 (LICENSE-APACHE), event-listener 5.4.2 (LICENSE-APACHE), event-listener-strategy 0.5.4 (LICENSE-APACHE), fastrand 2.5.0 (LICENSE-APACHE), find-msvc-tools 0.1.15 (LICENSE-APACHE), flate2 1.1.11 (LICENSE-APACHE), fnv 1.0.7 (LICENSE-APACHE), form_urlencoded 1.2.3 (LICENSE-APACHE), futures-lite 2.6.1 (LICENSE-APACHE), glob 0.3.4 (LICENSE-APACHE), hashbrown 0.12.3 (LICENSE-APACHE), hashbrown 0.17.1 (LICENSE-APACHE), heck 0.4.1 (LICENSE-APACHE), heck 0.5.0 (LICENSE-APACHE), hermit-abi 0.5.2 (LICENSE-APACHE), html5ever 0.39.0 (LICENSE-APACHE), html5ever 0.40.1 (LICENSE-APACHE), httparse 1.10.1 (LICENSE-APACHE), idna 1.1.0 (LICENSE-APACHE), idna_adapter 1.2.2 (LICENSE-APACHE), indexmap 1.9.3 (LICENSE-APACHE), indexmap 2.14.2 (LICENSE-APACHE), insta 1.49.0 (LICENSE), jni 0.21.1 (LICENSE-APACHE), js-sys 0.3.104 (LICENSE-APACHE), libappindicator 0.9.0 (LICENSE-APACHE), linux-raw-sys 0.12.1 (LICENSE-APACHE), lock_api 0.4.14 (LICENSE-APACHE), log 0.4.35 (LICENSE-APACHE), markup5ever 0.39.0 (LICENSE-APACHE), markup5ever 0.40.0 (LICENSE-APACHE), mime 0.3.18 (LICENSE-APACHE), muda 0.20.0 (LICENSE-APACHE), num-bigint 0.4.8 (LICENSE-APACHE), num-integer 0.1.47 (LICENSE-APACHE), num-traits 0.2.19 (LICENSE-APACHE), object 0.39.1 (LICENSE-APACHE), once_cell 1.21.4 (LICENSE-APACHE), ordered-stream 0.2.0 (LICENSE-APACHE), palette 0.7.7 (LICENSE-APACHE), palette_derive 0.7.7 (LICENSE-APACHE), palette_math 0.7.7 (LICENSE-APACHE), parking 2.2.1 (LICENSE-APACHE), parking_lot 0.12.5 (LICENSE-APACHE), parking_lot_core 0.9.12 (LICENSE-APACHE), percent-encoding 2.3.2 (LICENSE-APACHE), piper 0.2.5 (LICENSE-APACHE), pkg-config 0.3.34 (LICENSE-APACHE), png 0.18.1 (LICENSE-APACHE), polling 3.11.0 (LICENSE-APACHE), postcard 1.1.3 (LICENSE-APACHE), proc-macro-hack 0.5.20+deprecated (LICENSE-APACHE), rayon 1.12.0 (LICENSE-APACHE), rayon-core 1.13.0 (LICENSE-APACHE), regex 1.13.1 (LICENSE-APACHE), regex-automata 0.4.18 (LICENSE-APACHE), regex-syntax 0.8.11 (LICENSE-APACHE), roxmltree 0.20.0 (LICENSE-APACHE), roxmltree 0.21.2 (LICENSE-APACHE), rustc_version 0.4.1 (LICENSE-APACHE), rustix 1.1.6 (LICENSE-APACHE), rustls 0.23.46 (LICENSE-APACHE), scopeguard 1.2.0 (LICENSE-APACHE), serde_with 3.22.0 (LICENSE-APACHE), serde_with_macros 3.22.0 (LICENSE-APACHE), servo_arc 0.4.3 (LICENSE-APACHE), servo_arc 0.5.0 (LICENSE-APACHE), signal-hook-registry 1.4.8 (LICENSE-APACHE), similar 2.7.0 (LICENSE), simplecss 0.2.2 (LICENSE-APACHE), smallvec 1.16.5 (LICENSE-APACHE), socket2 0.6.5 (LICENSE-APACHE), stable_deref_trait 1.2.1 (LICENSE-APACHE), stacker 0.1.25 (LICENSE-APACHE), string_cache 0.9.0 (LICENSE-APACHE), string_cache 0.11.0 (LICENSE-APACHE), string_cache_codegen 0.6.1 (LICENSE-APACHE), string_cache_codegen 0.11.2 (LICENSE-APACHE), svgtypes 0.16.2 (LICENSE-APACHE), syn 1.0.109 (LICENSE-APACHE), system-deps 6.2.2 (LICENSE-APACHE), system-deps 7.0.8 (LICENSE-APACHE), tao-macros 0.1.4 (LICENSE-APACHE), tempfile 3.27.0 (LICENSE-APACHE), tendril 0.5.1 (LICENSE-APACHE), toml_datetime 0.6.3 (LICENSE-APACHE), tray-icon 0.25.1 (LICENSE-APACHE), ttf-parser 0.25.1 (LICENSE-APACHE), two-face 0.4.5 (LICENSE-APACHE), unic-langid 0.9.6 (LICENSE-APACHE), unic-langid-impl 0.9.6 (LICENSE-APACHE), unic-langid-macros 0.9.6 (LICENSE-APACHE), unic-langid-macros-impl 0.9.6 (LICENSE-APACHE), unicode-bidi 0.3.18 (LICENSE-APACHE), unicode-bidi-mirroring 0.4.0 (LICENSE-APACHE), unicode-ccc 0.4.0 (LICENSE-APACHE), unicode-normalization 0.1.26 (LICENSE-APACHE), unicode-properties 0.1.4 (LICENSE-APACHE), unicode-segmentation 1.13.3 (LICENSE-APACHE), unicode-vo 0.1.0 (LICENSE-APACHE), url 2.5.9 (LICENSE-APACHE), uuid 1.27.0 (LICENSE-APACHE), version_check 0.9.5 (LICENSE-APACHE), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-APACHE), wasip2 1.0.4+wasi-0.2.12 (LICENSE-APACHE), wasm-bindgen 0.2.127 (LICENSE-APACHE), wasm-bindgen-futures 0.4.77 (LICENSE-APACHE), wasm-bindgen-macro 0.2.127 (LICENSE-APACHE), wasm-bindgen-macro-support 0.2.127 (LICENSE-APACHE), wasm-bindgen-shared 0.2.127 (LICENSE-APACHE), web-sys 0.3.104 (LICENSE-APACHE), web_atoms 0.2.6 (LICENSE-APACHE), web_atoms 0.3.0 (LICENSE-APACHE), window-vibrancy 0.8.1 (LICENSE-APACHE), wit-bindgen 0.57.1 (LICENSE-APACHE), wry 0.57.2 (LICENSE-APACHE), yaml-rust 0.4.5 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -2801,7 +2800,7 @@ SHA-256 `0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594`. Used
 
 ### T11
 
-SHA-256 `a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5`. Used by: aes 0.9.3 (LICENSE-APACHE), block-buffer 0.10.4 (LICENSE-APACHE), block-buffer 0.12.1 (LICENSE-APACHE), block-padding 0.4.2 (LICENSE-APACHE), cbc 0.2.1 (LICENSE-APACHE), chacha20 0.10.2 (LICENSE-APACHE), cipher 0.5.2 (LICENSE-APACHE), const-oid 0.10.2 (LICENSE-APACHE), cpubits 0.1.1 (LICENSE-APACHE), cpufeatures 0.2.17 (LICENSE-APACHE), cpufeatures 0.3.1 (LICENSE-APACHE), crypto-common 0.1.7 (LICENSE-APACHE), crypto-common 0.2.2 (LICENSE-APACHE), digest 0.10.7 (LICENSE-APACHE), digest 0.11.3 (LICENSE-APACHE), ecb 0.2.1 (LICENSE-APACHE), hybrid-array 0.4.15 (LICENSE-APACHE), inout 0.2.2 (LICENSE-APACHE), md-5 0.11.0 (LICENSE-APACHE), sha2 0.10.9 (LICENSE-APACHE), sha2 0.11.1 (LICENSE-APACHE).
+SHA-256 `a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5`. Used by: aes 0.9.4 (LICENSE-APACHE), block-buffer 0.10.4 (LICENSE-APACHE), block-buffer 0.12.1 (LICENSE-APACHE), block-padding 0.4.2 (LICENSE-APACHE), cbc 0.2.1 (LICENSE-APACHE), chacha20 0.10.2 (LICENSE-APACHE), cipher 0.5.2 (LICENSE-APACHE), const-oid 0.10.3 (LICENSE-APACHE), cpubits 0.1.1 (LICENSE-APACHE), cpufeatures 0.2.17 (LICENSE-APACHE), cpufeatures 0.3.1 (LICENSE-APACHE), crypto-common 0.1.7 (LICENSE-APACHE), crypto-common 0.2.2 (LICENSE-APACHE), digest 0.10.7 (LICENSE-APACHE), digest 0.11.3 (LICENSE-APACHE), ecb 0.2.1 (LICENSE-APACHE), hybrid-array 0.4.15 (LICENSE-APACHE), inout 0.2.6 (LICENSE-APACHE), md-5 0.11.0 (LICENSE-APACHE), sha2 0.10.9 (LICENSE-APACHE), sha2 0.11.1 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -4398,7 +4397,7 @@ SOFTWARE.
 
 ### T33
 
-SHA-256 `483acb265f182907d1caf6cff9c16c96f31325ed23792832cc5d8b12d5f88c8a`. Used by: css.escape 1.5.1 (LICENSE-MIT.txt), cssesc 3.0.0 (LICENSE-MIT.txt), emoji-regex 10.6.0 (LICENSE-MIT.txt), emoji-regex 8.0.0 (LICENSE-MIT.txt), emoji-regex 9.2.2 (LICENSE-MIT.txt), he 1.2.0 (LICENSE-MIT.txt), is-potential-custom-element-name 1.0.1 (LICENSE-MIT.txt), punycode 2.3.1 (LICENSE-MIT.txt).
+SHA-256 `483acb265f182907d1caf6cff9c16c96f31325ed23792832cc5d8b12d5f88c8a`. Used by: css.escape 1.5.1 (LICENSE-MIT.txt), emoji-regex 10.6.0 (LICENSE-MIT.txt), emoji-regex 8.0.0 (LICENSE-MIT.txt), emoji-regex 9.2.2 (LICENSE-MIT.txt), he 1.2.0 (LICENSE-MIT.txt), is-potential-custom-element-name 1.0.1 (LICENSE-MIT.txt), punycode 2.3.1 (LICENSE-MIT.txt).
 
 ```text
 Copyright Mathias Bynens <https://mathiasbynens.be/>
@@ -5666,7 +5665,7 @@ limitations under the License.
 
 ### T52
 
-SHA-256 `c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae`. Used by: alloc-no-stdlib 2.0.4 (LICENSE), alloc-no-stdlib 3.0.0 (LICENSE), brotli 9.0.0 (LICENSE.BSD-3-Clause), brotli-decompressor 5.0.3 (LICENSE), brotli-decompressor 6.0.1 (LICENSE).
+SHA-256 `c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae`. Used by: alloc-no-stdlib 2.0.4 (LICENSE), alloc-no-stdlib 3.0.0 (LICENSE), brotli 9.1.3 (LICENSE.BSD-3-Clause), brotli-decompressor 5.0.3 (LICENSE), brotli-decompressor 6.3.2 (LICENSE).
 
 ```text
 Copyright (c) 2016 Dropbox, Inc.
@@ -5767,7 +5766,7 @@ SOFTWARE.
 
 ### T55
 
-SHA-256 `209fbbe0ad52d9235e37badf9cadfe4dbdc87203179c0899e738b39ade42177b`. Used by: rand 0.8.8 (LICENSE-MIT), rand 0.10.3 (LICENSE-MIT), rand_chacha 0.3.1 (LICENSE-MIT), rand_core 0.6.4 (LICENSE-MIT).
+SHA-256 `209fbbe0ad52d9235e37badf9cadfe4dbdc87203179c0899e738b39ade42177b`. Used by: rand 0.8.8 (LICENSE-MIT), rand 0.10.4 (LICENSE-MIT), rand_chacha 0.3.1 (LICENSE-MIT), rand_core 0.6.4 (LICENSE-MIT).
 
 ```text
 Copyright 2018 Developers of the Rand project
@@ -6059,7 +6058,7 @@ THE SOFTWARE.
 
 ### T64
 
-SHA-256 `90eb64f0279b0d9432accfa6023ff803bc4965212383697eee27a0f426d5f8d5`. Used by: rand 0.8.8 (COPYRIGHT), rand 0.10.3 (COPYRIGHT), rand_chacha 0.3.1 (COPYRIGHT), rand_core 0.6.4 (COPYRIGHT).
+SHA-256 `90eb64f0279b0d9432accfa6023ff803bc4965212383697eee27a0f426d5f8d5`. Used by: rand 0.8.8 (COPYRIGHT), rand 0.10.4 (COPYRIGHT), rand_chacha 0.3.1 (COPYRIGHT), rand_core 0.6.4 (COPYRIGHT).
 
 ```text
 Copyrights in the Rand project are retained by their contributors. No
@@ -6388,7 +6387,7 @@ limitations under the License.
 
 ### T68
 
-SHA-256 `b38f11f6096706e6de553dabe2a7ed142d59b6fa8c97e290c67496154745cdd5`. Used by: data-url 0.3.2 (LICENSE-MIT), idna 1.1.0 (LICENSE-MIT), percent-encoding 2.3.2 (LICENSE-MIT), url 2.5.8 (LICENSE-MIT).
+SHA-256 `b38f11f6096706e6de553dabe2a7ed142d59b6fa8c97e290c67496154745cdd5`. Used by: data-url 0.3.2 (LICENSE-MIT), idna 1.1.0 (LICENSE-MIT), percent-encoding 2.3.2 (LICENSE-MIT), url 2.5.9 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2013-2025 The rust-url developers
@@ -8630,7 +8629,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T114
 
-SHA-256 `1cbe51b907662f6cb1492b16c359384a595180bf0e4d101603ed525e75c4e484`. Used by: magic-string 0.30.21 (LICENSE), magic-string 1.4.3 (LICENSE).
+SHA-256 `1cbe51b907662f6cb1492b16c359384a595180bf0e4d101603ed525e75c4e484`. Used by: magic-string 0.30.21 (LICENSE), magic-string 1.4.5 (LICENSE).
 
 ```text
 Copyright 2018 Rich Harris
@@ -8999,7 +8998,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T126
 
-SHA-256 `35242e7a83f69875e6edeff02291e688c97caafe2f8902e4e19b49d3e78b4cab`. Used by: rand 0.8.8 (LICENSE-APACHE), rand 0.10.3 (LICENSE-APACHE).
+SHA-256 `35242e7a83f69875e6edeff02291e688c97caafe2f8902e4e19b49d3e78b4cab`. Used by: rand 0.8.8 (LICENSE-APACHE), rand 0.10.4 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -10804,7 +10803,7 @@ THE SOFTWARE.
 
 ### T146
 
-SHA-256 `73b9dc2e79c7308998dd30296e073aefaefb944a68fb89aa412c23c0edcabcaa`. Used by: const-oid 0.10.2 (LICENSE-MIT), cpufeatures 0.3.1 (LICENSE-MIT).
+SHA-256 `73b9dc2e79c7308998dd30296e073aefaefb944a68fb89aa412c23c0edcabcaa`. Used by: const-oid 0.10.3 (LICENSE-MIT), cpufeatures 0.3.1 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2020-2026 The RustCrypto Project Developers
@@ -12940,7 +12939,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ### T198
 
-SHA-256 `fcf6eabf68ca96988a6b506b4fdc6cc32535d80eb2e11c79724af5ac6f50262b`. Used by: @eslint-community/eslint-utils 4.10.1 (LICENSE), @eslint-community/regexpp 4.12.2 (LICENSE).
+SHA-256 `fcf6eabf68ca96988a6b506b4fdc6cc32535d80eb2e11c79724af5ac6f50262b`. Used by: @eslint-community/eslint-utils 4.10.1 (LICENSE), @eslint-community/regexpp 4.12.3 (LICENSE).
 
 ```text
 MIT License
@@ -15754,7 +15753,7 @@ IN THE SOFTWARE.
 
 ### T253
 
-SHA-256 `20c7855c364d57ea4c97889a5e8d98470a9952dade37bd9248b9a54431670e5e`. Used by: form_urlencoded 1.2.2 (LICENSE-MIT).
+SHA-256 `20c7855c364d57ea4c97889a5e8d98470a9952dade37bd9248b9a54431670e5e`. Used by: form_urlencoded 1.2.3 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2013-2016 The rust-url developers
@@ -16174,7 +16173,7 @@ SOFTWARE.
 
 ### T269
 
-SHA-256 `25f77efa393854f7c15eaf6a2589a2071db2d7337642742763adb12bdecf0445`. Used by: aes 0.9.3 (LICENSE-MIT).
+SHA-256 `25f77efa393854f7c15eaf6a2589a2071db2d7337642742763adb12bdecf0445`. Used by: aes 0.9.4 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2018-2024 The RustCrypto Project Developers
@@ -16611,7 +16610,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T278
 
-SHA-256 `2998094b38f7ace25f141fb36f334d8338f65a1812978d618b1161f4d77ae10e`. Used by: postcss-selector-parser 7.1.6 (LICENSE-MIT).
+SHA-256 `2998094b38f7ace25f141fb36f334d8338f65a1812978d618b1161f4d77ae10e`. Used by: postcss-selector-parser 7.2.1 (LICENSE-MIT).
 
 ```text
 Copyright (c) Ben Briggs <beneb.info@gmail.com> (http://beneb.info)
@@ -18142,7 +18141,7 @@ THE SOFTWARE.
 
 ### T316
 
-SHA-256 `3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94`. Used by: brotli 9.0.0 (LICENSE.MIT).
+SHA-256 `3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94`. Used by: brotli 9.1.3 (LICENSE.MIT).
 
 ```text
 Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors.
@@ -25071,7 +25070,7 @@ SOFTWARE.
 
 ### T428
 
-SHA-256 `76a876cf886ff9be2a8b5e2e86514fed06223c8c9f0c1e9ee9606e93841e00b7`. Used by: acorn 8.18.0 (LICENSE).
+SHA-256 `76a876cf886ff9be2a8b5e2e86514fed06223c8c9f0c1e9ee9606e93841e00b7`. Used by: acorn 8.19.0 (LICENSE).
 
 ```text
 MIT License
@@ -26466,7 +26465,7 @@ SHA-256 `7abd9b6960dcf7d4d0a48606a5b71bfe37d472db68d70637f3a58a56785f1621`. Used
 
 ### T437
 
-SHA-256 `7ad3ea8ca3caf894db98c3f31d5d4949173ffa93c883ef19a9e529ad48960f8c`. Used by: unicode-script 0.5.8 (LICENSE-MIT).
+SHA-256 `7ad3ea8ca3caf894db98c3f31d5d4949173ffa93c883ef19a9e529ad48960f8c`. Used by: unicode-script 0.5.9 (LICENSE-MIT).
 
 ```text
 MIT License
@@ -26726,7 +26725,7 @@ SOFTWARE.
 
 ### T440
 
-SHA-256 `7cbb56d1b5d83d735056b363ab20958524120afafc4ad8206e6be98cdec5d737`. Used by: unicode-script 0.5.8 (LICENSE-APACHE).
+SHA-256 `7cbb56d1b5d83d735056b363ab20958524120afafc4ad8206e6be98cdec5d737`. Used by: unicode-script 0.5.9 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -32381,7 +32380,7 @@ THE SOFTWARE.
 
 ### T516
 
-SHA-256 `a07fcacc3c60de4dc0fab10ac9d6aaba7379974e28451c99da7f7df09c25b28c`. Used by: inout 0.2.2 (LICENSE-MIT).
+SHA-256 `a07fcacc3c60de4dc0fab10ac9d6aaba7379974e28451c99da7f7df09c25b28c`. Used by: inout 0.2.6 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2022-2025 The RustCrypto Project Developers
@@ -36339,7 +36338,7 @@ SOFTWARE.
 
 ### T549
 
-SHA-256 `b4bf94a9fceb8846320fda938ee53fc16b506572609da5cf1d2d289a5597a8f8`. Used by: num_threads 0.1.7 (LICENSE-MIT).
+SHA-256 `b4bf94a9fceb8846320fda938ee53fc16b506572609da5cf1d2d289a5597a8f8`. Used by: num_threads 0.1.8 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2021 Jacob Pratt
@@ -37240,7 +37239,7 @@ SOFTWARE.
 
 ### T576
 
-SHA-256 `c69b72788ec261765e460532016b4bb78372f238e449b5e70e3268ec1e18fd15`. Used by: num_threads 0.1.7 (LICENSE-Apache).
+SHA-256 `c69b72788ec261765e460532016b4bb78372f238e449b5e70e3268ec1e18fd15`. Used by: num_threads 0.1.8 (LICENSE-Apache).
 
 ```text
 

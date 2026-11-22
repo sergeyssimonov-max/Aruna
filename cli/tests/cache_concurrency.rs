@@ -21,9 +21,12 @@
 mod support;
 
 use aruna::cache::Archive;
-use aruna::job::Job;
-use aruna::md5::md5_hex;
+use aruna::error::ArunaError;
+use aruna::job::{Cancel, Job, Phase};
+use aruna::md5::{md5_file, md5_hex};
+use aruna::progress::{Event, Progress};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, SystemTime};
 use support::{obtain_archive, open_descriptors, Origin};
@@ -72,11 +75,100 @@ fn body() -> Vec<u8> {
 fn entries(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .expect("read cache")
-        .flatten()
-        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .map(|e| {
+            e.expect("read cache entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
         .collect();
     names.sort();
     names
+}
+
+/// A cancellation between body reads must clean the cache before a retry starts.
+#[test]
+fn cancelling_a_streaming_download_leaves_the_cache_empty_and_allows_a_retry() {
+    struct CancelOnFirstTick<'a> {
+        cancel: &'a Cancel,
+        size: u64,
+        resume: mpsc::Sender<()>,
+    }
+
+    impl Progress for CancelOnFirstTick<'_> {
+        fn report(&self, event: Event<'_>) {
+            if let Event::Downloading { bytes, total } = event {
+                assert_eq!(total, Some(self.size));
+                assert!(
+                    (1..self.size).contains(&bytes),
+                    "expected a partial transfer, got {bytes}/{}",
+                    self.size
+                );
+                assert!(
+                    !self.cancel.is_cancelled(),
+                    "another tick followed cancellation"
+                );
+                self.cancel.cancel();
+                self.resume
+                    .send(())
+                    .expect("release the rest of the response");
+            }
+        }
+    }
+
+    let _guard = cache_lock();
+    let (_dir, cache) = cache_dir();
+    let payload = body();
+    let size = payload.len() as u64;
+    assert!(
+        size >= 512 * 1024,
+        "the streaming fixture must be at least 512 KiB"
+    );
+    let digest = md5_hex(&payload);
+    let (resume, first_tick) = mpsc::channel();
+    let origin = Origin::streaming_first(payload, first_tick);
+    let url = origin.url();
+    let cancel = Cancel::new();
+    let sink = CancelOnFirstTick {
+        cancel: &cancel,
+        size,
+        resume,
+    };
+
+    let stopped = obtain_archive(&url, &digest, &Job::new(&sink, &cancel));
+    assert!(cancel.is_cancelled(), "no download tick reached the sink");
+    assert!(
+        matches!(
+            stopped,
+            Err(ArunaError::Cancelled {
+                phase: Phase::Obtaining
+            })
+        ),
+        "expected cancellation while obtaining, got {:?}",
+        stopped.err()
+    );
+    let leftovers = entries(&cache);
+    assert!(
+        leftovers.is_empty(),
+        "cancelled download left {leftovers:?} in the cache"
+    );
+    assert_eq!(origin.requests(), 1, "cancellation started another request");
+
+    let Archive::Cached(path) = obtain_archive(&url, &digest, &Job::unattended()).expect("retry")
+    else {
+        panic!("the retry did not populate the cache");
+    };
+    assert_eq!(path.parent(), Some(cache.as_path()));
+    assert_eq!(md5_file(&path).expect("hash the cached file"), digest);
+    assert_eq!(origin.requests(), 2, "the retry must fetch a fresh copy");
+
+    let hit = obtain_archive(&url, &digest, &Job::unattended()).expect("warm lookup");
+    assert_eq!(hit.path(), path);
+    assert_eq!(
+        origin.requests(),
+        2,
+        "the warm lookup went back to the network"
+    );
 }
 
 /// Six runs racing for one archive all end up with the archive.

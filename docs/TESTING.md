@@ -361,9 +361,9 @@ thing jsdom cannot answer for.
 | `tests/failure-texts.test.ts` | every failure code `app::Failure::of` can send has a Russian sentence in the window, the failures the shell raises itself are Russian too, and all of them keep the project's typography — the guard that stops a new core code reaching the reader in English |
 | `tests/ipc-shape.test.ts` | the sample `src-tauri/stats-sample.json` is what Rust serialises, and empty places arrive as `null` rather than as missing fields |
 | `tests/column-order.test.ts` | the column the narrow screen hides by its number in `screen.css` is the editor's column of `COLUMNS` in `cli/src/html.rs` |
-| `tests/audit-exception.test.ts` | the four persistent `audit.ignore` identifiers cover the reviewed braces, deepmerge, glob and minimatch paths, versions, expiry conditions and absence from shipped bundles; serialize-javascript and undici fixes remain enforced |
-| `tests/picomatch-security.test.ts` | owner-authorized local repair of GHSA-fc5q-39xc-vjpf (18.11.2026): exact patch and installed-code digests for 2.3.2 / 4.0.7, the complete active installed graph, unsafe extglob rejection, legitimate matching and killable regression probes; no blanket workspace ignore |
-| `tests/audit-runner.test.ts` | both project audit commands run the Picomatch checks before a single-invocation advisory exception; guard failures and signals block the audit, strict mode preserves npm failures, and only bounded mode retains the existing explicit registry-timeout notice |
+| `tests/audit-exception.test.ts` | pnpm reads exactly the two temporary WebdriverIO exceptions for glob and minimatch. Tests enforce their expiry, affected versions and development paths. They also check both production bundles for braces, deepmerge, glob and minimatch, and keep the serialize-javascript and undici version floors |
+| `tests/picomatch-security.test.ts` | nine checks cover both local picomatch patches (2.3.2 and 4.0.7), installed file digests, the active dependency graph, ordinary matching and known regressions |
+| `tests/audit-runner.test.ts` | both audit commands run the picomatch checks before passing the project policy and lockfile to pnpm. A guard error or signal stops the audit. Strict mode propagates the registry result. Bounded mode reports a registry timeout |
 | `tests/third-party-notices.test.ts` | `THIRD-PARTY-NOTICES.md` names every package of the three lock files once, and nothing else |
 | `tests/reference-images.test.ts` | the gate of tree cleanliness on the reference images in `cli/releases/`, run on inputs of its own |
 | `tests/e2e-isolation.test.ts` | the E2E contour's guard against the real `~/Library`, shown on a `Library` and a temporary directory of its own |
@@ -543,11 +543,10 @@ Baselines are in `PERFORMANCE.md`.
 
 ### Tests that go to loopback
 
-No test leaves the machine, but 43 open a socket on 127.0.0.1: a local server
-the download is pointed at, a local proxy, or a port where nothing listens so
-that the download fails. All 43 are in the ordinary run of 727 and none is
-behind `#[ignore]`; all are in the `aruna` crate, the shell has none. Counted
-on 2026-10-15 at `7f0ae50`.
+The ordinary suite has 44 tests that open a socket on 127.0.0.1. They use a
+local HTTP server, a local proxy, or a closed port to exercise connection
+failure. All run in the `aruna` crate. At `7f0ae50` on 2026-10-15, 43 of
+the 727 ordinary tests used loopback.
 
 `frontend/tests/loopback-record.test.ts` holds the two tables below to the
 sources, and fails naming the tests that are missing from them, the ones they
@@ -564,7 +563,7 @@ closed port and are in the first table, five never open a socket and are in the
 second. Moving a test from one table to the other is the one mistake the guard
 cannot see.
 
-**43 tests open a socket on loopback.**
+**44 tests open a socket on loopback.**
 
 | binary | test | file | opens | through |
 |---|---|---|---|---|
@@ -597,6 +596,7 @@ cannot see.
 | `aruna` | `download::tests::failed_download_leaves_no_files_behind` | `cli/src/download.rs` | the download connects to `127.0.0.1:1`, where nothing listens | `download_file` |
 | `aruna` | `download::tests::failed_download_preserves_previous_file` | `cli/src/download.rs` | the download connects to `127.0.0.1:1`, where nothing listens | `download_file` |
 | `aruna` | `tests::an_unusable_proxy_is_said_before_the_download` | `cli/src/lib.rs` | the download connects to `127.0.0.1:9`, where nothing listens | `download_archive` |
+| `aruna::cache_concurrency` | `cancelling_a_streaming_download_leaves_the_cache_empty_and_allows_a_retry` | `cli/tests/cache_concurrency.rs` | cancels on the first partial download tick, fetches the archive on retry, then reads it from cache | `Origin`, `cli/tests/support/mod.rs` |
 | `aruna::cache_concurrency` | `runs_racing_for_one_archive_all_get_a_whole_one` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
 | `aruna::cache_concurrency` | `a_second_wave_is_served_entirely_from_the_cache` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
 | `aruna::cache_concurrency` | `repeated_downloads_do_not_accumulate_connections_or_descriptors` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |

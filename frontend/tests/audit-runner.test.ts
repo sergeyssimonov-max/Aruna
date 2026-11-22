@@ -5,7 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -21,7 +21,7 @@ const WORKSPACE = 'audit:\n  ignore:\n    - GHSA-aaaa-bbbb-cccc\n'
 
 // Exercise the actual shell entry point at its process boundary. The fake pnpm
 // records calls; it does not run or pretend to replace the real security tests.
-describe('the conditional audit entry point', { timeout: 15_000 }, () => {
+describe('the audit entry point', { timeout: 15_000 }, () => {
   let root: string
   let bin: string
 
@@ -30,8 +30,6 @@ describe('the conditional audit entry point', { timeout: 15_000 }, () => {
     bin = join(root, 'bin')
     mkdirSync(bin)
     mkdirSync(join(root, 'scripts'))
-    mkdirSync(join(root, 'patches'))
-    mkdirSync(join(root, 'tmp'))
     writeFileSync(join(root, 'package.json'), '{"name":"audit-fixture","private":true}\n')
     writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n')
     writeFileSync(join(root, 'pnpm-workspace.yaml'), WORKSPACE)
@@ -41,17 +39,16 @@ describe('the conditional audit entry point', { timeout: 15_000 }, () => {
       `#!/bin/bash
 set -eu
 printf '%s\\n' "$*" >> "$ARUNA_TEST_CALLS"
-pwd > "$ARUNA_TEST_CWD"
+pwd -P >> "$ARUNA_TEST_CWD"
 case "$1" in
   exec)
     if [[ \${ARUNA_TEST_GUARD_SIGNAL:-0} == 1 ]]; then kill -TERM $$; fi
     exit "\${ARUNA_TEST_GUARD_CODE:-0}"
     ;;
-  --dir)
-    [[ "$3" == audit && $# == 3 ]] || exit 99
-    printf '%s\\n' "$2" > "$ARUNA_TEST_AUDITDIR"
-    cp "$2/pnpm-workspace.yaml" "$ARUNA_TEST_VIEW"
-    cp "$2/pnpm-lock.yaml" "$ARUNA_TEST_LOCK"
+  audit)
+    [[ $# == 1 ]] || exit 99
+    cp pnpm-workspace.yaml "$ARUNA_TEST_VIEW"
+    cp pnpm-lock.yaml "$ARUNA_TEST_LOCK"
     if [[ \${ARUNA_TEST_AUDIT_SLEEP:-0} == 1 ]]; then exec /bin/sleep 2; fi
     exit "\${ARUNA_TEST_AUDIT_CODE:-0}"
     ;;
@@ -72,10 +69,8 @@ esac
       env: {
         ...process.env,
         PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
-        TMPDIR: join(root, 'tmp'),
         ARUNA_TEST_CALLS: join(root, 'calls'),
         ARUNA_TEST_CWD: join(root, 'cwd'),
-        ARUNA_TEST_AUDITDIR: join(root, 'auditdir'),
         ARUNA_TEST_VIEW: join(root, 'audit-workspace.yaml'),
         ARUNA_TEST_LOCK: join(root, 'audit-lock.yaml'),
         ARUNA_AUDIT_TIMEOUT: '30',
@@ -90,17 +85,17 @@ esac
       : []
   }
 
-  function verifiedAudit() {
-    const dir = readFileSync(join(root, 'auditdir'), 'utf8').trim()
-    expect(calls()).toEqual([GUARD, `--dir ${dir} audit`])
-    expect(readFileSync(join(root, 'audit-workspace.yaml'), 'utf8')).toBe(
-      WORKSPACE.replace('  ignore:\n', '  ignore:\n    - GHSA-fc5q-39xc-vjpf\n'),
-    )
-    expect(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')).toBe(WORKSPACE)
+  function verifiedAudit(policy = WORKSPACE) {
+    expect(calls()).toEqual([GUARD, 'audit'])
+    expect(readFileSync(join(root, 'cwd'), 'utf8').trim().split('\n')).toEqual([
+      realpathSync(root),
+      realpathSync(root),
+    ])
+    expect(readFileSync(join(root, 'audit-workspace.yaml'), 'utf8')).toBe(policy)
+    expect(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')).toBe(policy)
     expect(readFileSync(join(root, 'audit-lock.yaml'))).toEqual(
       readFileSync(join(root, 'pnpm-lock.yaml')),
     )
-    expect(existsSync(dir)).toBe(false)
   }
 
   it('keeps both package scripts connected to the guarded entry point', () => {
@@ -110,13 +105,12 @@ esac
   })
 
   it.each([{ mode: [] }, { mode: ['--strict'] }])(
-    'verifies before granting only the named exception: $mode',
+    'verifies the patches before auditing the workspace policy: $mode',
     ({ mode }) => {
       const result = run(mode)
       expect(result.error).toBeUndefined()
       expect(result.status, result.stderr).toBe(0)
       verifiedAudit()
-      expect(readFileSync(join(root, 'cwd'), 'utf8').trim()).toBe(root)
     },
   )
 
@@ -134,7 +128,7 @@ esac
     )
   }
 
-  it('does not grant an exception when the guard is terminated', () => {
+  it('stops before the audit when the guard is terminated', () => {
     const result = run(['--strict'], { ARUNA_TEST_GUARD_SIGNAL: '1' })
     expect(result.status).not.toBe(0)
     expect(calls()).toEqual([GUARD])
@@ -180,11 +174,11 @@ esac
     expect(calls()).toEqual([GUARD])
   })
 
-  it('refuses an unexpected workspace policy and removes the temporary directory', () => {
-    writeFileSync(join(root, 'pnpm-workspace.yaml'), 'audit: {}\n')
+  it('passes an empty ignore list to pnpm unchanged', () => {
+    const policy = 'audit:\n  ignore: []\n'
+    writeFileSync(join(root, 'pnpm-workspace.yaml'), policy)
     const result = run(['--strict'])
-    expect(result.status).not.toBe(0)
-    expect(calls()).toEqual([GUARD])
-    expect(readdirSync(join(root, 'tmp'))).toEqual([])
+    expect(result.status, result.stderr).toBe(0)
+    verifiedAudit(policy)
   })
 })

@@ -5,8 +5,8 @@
 //! manifest, inside the staging directory: a cancelled or failed run leaves
 //! the reader's folder as it was by the same mechanism as every other phase.
 //! Each document is read back from the staging directory, not held in memory
-//! from its writing, so memory stays bounded; the cache of Typst is emptied
-//! after each one ([`crate::pdf::render`]).
+//! from its writing, so memory stays bounded. The batch shares the parsed
+//! template and clears the Typst compilation cache after each render.
 //!
 //! A document Typst refuses, or one the model refuses, gets no PDF and a
 //! record in the manifest, and the build goes on (`PDF-ACCEPTANCE.md` §5) –
@@ -21,7 +21,7 @@ use crate::document::Document;
 use crate::error::{ArunaError, Result};
 use crate::job::{Job, Phase};
 use crate::parse::{group_label, ManuscriptRecord};
-use crate::pdf::{Fonts, PdfError};
+use crate::pdf::{self, Fonts, PdfError, Template};
 use crate::progress::Event;
 
 use super::naming::{dir_component, pdf_path};
@@ -32,7 +32,7 @@ use super::Placed;
 pub enum PdfState {
     /// Written, at this path relative to the package root.
     Built(PathBuf),
-    /// Not written, and why: the model refused the document, or Typst did.
+    /// The document model or Typst refused this manuscript, or its text clusters overlap.
     Refused(String),
 }
 
@@ -56,25 +56,28 @@ pub(super) fn write_pdfs(
     staging: &Path,
     documents: Vec<super::Document>,
     fonts: &Fonts,
-    package_bytes: &mut u64,
+    package_bytes: &mut super::PackageBytes,
     job: &Job<'_>,
 ) -> Result<super::PackageDocuments> {
     let total = documents.len();
     job.report(Event::WritingPdfs { documents: total });
     let mut package = super::PackageDocuments::with_capacity(total);
     let mut built = 0usize;
+    let template = Template::new(pdf::TEMPLATE);
     for (n, document) in documents.into_iter().enumerate() {
         // Between documents, as the XML phase asks: stopping here leaves the
         // staging directory to remove itself.
         job.check(Phase::Exporting)?;
-        let state = one(staging, &document.record, &document.place, fonts)?;
-        if let PdfState::Built(relative) = &state {
+        let state = one(
+            staging,
+            &document.record,
+            &document.place,
+            fonts,
+            &template,
+            package_bytes,
+        )?;
+        if matches!(state, PdfState::Built(_)) {
             built += 1;
-            let bytes = fs::metadata(staging.join(relative))
-                .map_err(ArunaError::io(staging.join(relative)))?
-                .len();
-            *package_bytes = package_bytes.saturating_add(bytes);
-            super::within_package_ceiling(*package_bytes, super::MAX_PACKAGE)?;
         }
         package.push(document, state);
         let done = n + 1;
@@ -102,6 +105,8 @@ fn one(
     record: &ManuscriptRecord,
     place: &Placed,
     fonts: &Fonts,
+    template: &Template<'_>,
+    package_bytes: &mut super::PackageBytes,
 ) -> Result<PdfState> {
     let xml_path = staging.join(&place.relative);
     let bytes = fs::read(&xml_path).map_err(ArunaError::io(&xml_path))?;
@@ -112,17 +117,21 @@ fn one(
     let relative = pdf_path(&place.relative);
     let ident = relative.to_string_lossy();
     let group = dir_component(group_label(record));
-    match crate::pdf::render(&doc, &group, &place.label, &ident, fonts) {
+    match pdf::render_with_template(&doc, &group, &place.label, &ident, fonts, template) {
         Ok(rendered) => {
             let out = staging.join(&relative);
-            // `create_new`, as the XML phase writes: two documents never share
-            // a PDF, because two never share an XML path (`place`).
-            let mut handle = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&out)
-                .map_err(ArunaError::io(&out))?;
-            std::io::Write::write_all(&mut handle, &rendered.pdf).map_err(ArunaError::io(&out))?;
+            // Against the ceiling by the bytes in hand, before the file is
+            // there: a PDF the package has no room for is not created.
+            package_bytes.write(rendered.pdf.len(), || {
+                // `create_new`, as the XML phase writes: two documents never
+                // share a PDF, because two never share an XML path (`place`).
+                let mut handle = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&out)
+                    .map_err(ArunaError::io(&out))?;
+                std::io::Write::write_all(&mut handle, &rendered.pdf).map_err(ArunaError::io(&out))
+            })?;
             Ok(PdfState::Built(relative))
         }
         Err(error) => not_built(&place.relative, error),

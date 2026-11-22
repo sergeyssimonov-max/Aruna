@@ -33,9 +33,7 @@
     manuscripts = '',
     groups = '',
     legend = '',
-    colgroup = '',
-    thead = '',
-    rows = '',
+    tables = '',
   }: {
     /** The whole stylesheet, three sections joined in `style.rs`. */
     style?: string
@@ -61,12 +59,8 @@
     groups?: string
     /** One `<li>` per column, from the crate's single list of them. */
     legend?: string
-    /** The `<col>` elements, same list. */
-    colgroup?: string
-    /** The `<th>` elements, same list. */
-    thead?: string
-    /** Every group heading and every manuscript, in order. */
-    rows?: string
+    /** The CTH tables, in corpus order. */
+    tables?: string
   } = $props()
 </script>
 
@@ -112,15 +106,7 @@
         >
         <span class="hint" id="hint"></span>
       </div>
-      <table id="inv">
-        <colgroup>{@html colgroup}</colgroup>
-        <thead>
-          <tr>{@html thead}</tr>
-        </thead>
-        <tbody>
-          {@html rows}
-        </tbody>
-      </table>
+      <div id="inv">{@html tables}</div>
     </main>
     <svelte:element this={"script"}>{@html script}</svelte:element>
   </body>

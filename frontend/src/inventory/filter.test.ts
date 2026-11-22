@@ -11,6 +11,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import documentHtml from '../../../cli/src/generated/document.html?raw'
+import inventoryBodyHtml from '../../../cli/src/generated/inventory_body.html?raw'
+import groupTableHtml from '../../../cli/src/generated/group_table.html?raw'
 import groupHeadingHtml from '../../../cli/src/generated/group_heading.html?raw'
 import manuscriptLinkHtml from '../../../cli/src/generated/manuscript_link.html?raw'
 import manuscriptRowHtml from '../../../cli/src/generated/manuscript_row.html?raw'
@@ -74,7 +76,15 @@ function inventory(
           YEAR: row.year ?? '2020',
         })
       })
-      return [head, ...rows].join('\n')
+      return fill(artifact(groupTableHtml), {
+        LABEL: group.label,
+        COLGROUP: '',
+        THEAD: '',
+        BODIES: fill(artifact(inventoryBodyHtml), {
+          ROWS: [head, ...rows].join('\n'),
+          HEADINGS: '',
+        }),
+      })
     })
     .join('\n')
 
@@ -90,9 +100,7 @@ function inventory(
     MANUSCRIPTS: String(n),
     GROUPS: String(groups.length),
     LEGEND: '',
-    COLGROUP: '',
-    THEAD: '',
-    ROWS: body,
+    TABLES: body,
   })
   const main = page.slice(page.indexOf('<main>'), page.indexOf('</main>') + '</main>'.length)
 
@@ -105,8 +113,10 @@ const hint = () => document.getElementById('hint') as HTMLElement
 const foldAll = () => document.getElementById('fold-all') as HTMLButtonElement
 const headings = () => Array.from(document.querySelectorAll<HTMLElement>('tr.group'))
 const items = () =>
-  Array.from(document.querySelectorAll<HTMLTableRowElement>('#inv tbody tr:not(.group)'))
-const shown = () => items().filter((tr) => !tr.hidden)
+  Array.from(
+    document.querySelectorAll<HTMLTableRowElement>('#inv tbody tr:not(.group):not(.print-columns)'),
+  )
+const shown = () => items().filter((tr) => !tr.closest('[hidden]'))
 
 function type(query: string): void {
   search().value = query
@@ -131,6 +141,28 @@ describe('the controls only appear once the script has run', () => {
     expect(() => attachInventoryFilter(document)).not.toThrow()
     expect(document.body.classList.contains('filter-on')).toBe(false)
   })
+})
+
+it('searches and folds documents across print sections without counting their headers', () => {
+  inventory([{ label: 'CTH 547', rows: [{ siglum: '72_r' }, { siglum: '247_q' }] }])
+  const table = document.querySelector('table')!
+  const secondBody = table.createTBody()
+  const printHeader = table.querySelector('.print-columns')!
+  printHeader.innerHTML = '<th scope="col">Editor</th>'
+  secondBody.append(items()[1], printHeader.cloneNode(true))
+  attachInventoryFilter(document)
+
+  type('247_q')
+  expect(hint().textContent).toBe('Match: 1')
+  expect(shown().map((row) => row.cells[1].textContent)).toEqual(['247_q'])
+  type('Editor')
+  expect(hint().textContent).toBe('No matches')
+  type('cth 547')
+  expect(hint().textContent).toBe('Match: 2')
+  foldAll().click()
+  expect(shown()).toHaveLength(0)
+  foldAll().click()
+  expect(shown().map((row) => row.cells[1].textContent)).toEqual(['72_r', '247_q'])
 })
 
 describe('search', () => {
@@ -182,7 +214,7 @@ describe('search', () => {
     // And the group it is not, whose label only differs by the tally beside
     // it, stays shut: `CTH 1` with one manuscript reads `CTH 11` in its own
     // `textContent`.
-    expect(headings().filter((tr) => !tr.hidden)).toHaveLength(1)
+    expect(headings().filter((tr) => !tr.closest('[hidden]'))).toHaveLength(1)
   })
 
   it('does not search the ordinal, which is typography', () => {
@@ -233,7 +265,7 @@ describe('folding', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(headings()[1].classList.contains('folded')).toBe(true)
     // The heading itself stays: a folded group still says how much is inside.
-    expect(headings()[1].hidden).toBe(false)
+    expect(headings()[1].closest('[hidden]')).toBeNull()
 
     toggle.click()
     expect(shown()).toHaveLength(3)
@@ -348,18 +380,18 @@ describe('catalogue titles', () => {
   it('leaves the search reading the number, as before', () => {
     type('cth 409')
     expect(shown()).toHaveLength(2)
-    expect(headings().filter((tr) => !tr.hidden)).toHaveLength(1)
+    expect(headings().filter((tr) => !tr.closest('[hidden]'))).toHaveLength(1)
     // Since 2026-10-04 the title is searched as well (owner's decision): the
     // number still finds its group exactly as it did, and nothing else.
     type('cth 231')
     expect(shown().map((tr) => tr.cells[1].textContent)).toEqual(['KUB 31.1'])
-    expect(headings().filter((tr) => !tr.hidden)).toHaveLength(1)
+    expect(headings().filter((tr) => !tr.closest('[hidden]'))).toHaveLength(1)
   })
 
   /** The labels of the headings left on screen. */
   const visibleGroups = () =>
     headings()
-      .filter((tr) => !tr.hidden)
+      .filter((tr) => !tr.closest('[hidden]'))
       .map((tr) => (tr.querySelector('.group-label') as HTMLElement).textContent)
 
   it('finds a group by a word of its title', () => {
@@ -460,7 +492,7 @@ describe('diacritics', () => {
 
   const visibleGroups = () =>
     headings()
-      .filter((tr) => !tr.hidden)
+      .filter((tr) => !tr.closest('[hidden]'))
       .map((tr) => (tr.querySelector('.group-label') as HTMLElement).textContent)
 
   it('finds Ḫattušili written without its marks, in any case', () => {

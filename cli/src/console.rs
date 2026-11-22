@@ -102,7 +102,7 @@ pub(crate) fn headline(err: &ArunaError) -> String {
             format!("в архиве {entries} записей, больше предела в {limit}")
         }
         ExportPackageTooLarge { written, limit } => {
-            format!("пакет вырос до {written} байт, больше предела в {limit}")
+            format!("следующий файл увеличил бы размер пакета до {written} Б при лимите {limit} Б")
         }
         ExportInvalid { root, count, first } => format!(
             "{} не прошел проверку: расхождений {count}, первое – {}",
