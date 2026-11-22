@@ -981,7 +981,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | @zip.js/zip.js | 2.8.55 | npm | BSD-3-Clause | T242 |
 | abort-controller | 3.0.0 | npm | MIT | T611 |
 | acorn-jsx | 5.3.2 | npm | MIT | T589 |
-| acorn | 8.18.0 | npm | MIT | T428 |
+| acorn | 8.19.0 | npm | MIT | T428 |
 | agent-base | 7.1.4 | npm | MIT | T153 |
 | ajv | 6.15.0 | npm | MIT | T635 |
 | ansi-colors | 4.1.3 | npm | MIT | T486 |
@@ -25071,7 +25071,7 @@ SOFTWARE.
 
 ### T428
 
-SHA-256 `76a876cf886ff9be2a8b5e2e86514fed06223c8c9f0c1e9ee9606e93841e00b7`. Used by: acorn 8.18.0 (LICENSE).
+SHA-256 `76a876cf886ff9be2a8b5e2e86514fed06223c8c9f0c1e9ee9606e93841e00b7`. Used by: acorn 8.19.0 (LICENSE).
 
 ```text
 MIT License
