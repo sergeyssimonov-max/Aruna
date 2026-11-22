@@ -77,6 +77,111 @@ fn a_shared_template_recovers_after_refusing_one_document() {
     assert!(first.pdf == again.pdf, "the refusal changed A's PDF");
 }
 
+fn render_manuscript(
+    doc: &Document<'_>,
+    name: &str,
+    template: &Template<'_>,
+) -> Result<Rendered, PdfError> {
+    let ident = format!("CTH 746/{name}.pdf");
+    render_with_template(doc, "CTH 746", name, &ident, fonts(), template)
+}
+
+#[test]
+fn alternating_templates_preserves_each_manuscripts_pdf() {
+    let a = Document::read(
+        concat!(
+            "<r><lb cu=\"\u{12000}\u{100009}\u{12000}\"/> <w>a\u{100009}b</w>",
+            "<note c=\"a note\"/> <w>MEŠ\u{0303}</w></r>"
+        )
+        .as_bytes(),
+    )
+    .expect("manuscript with labels");
+    let b = Document::read("<r><lb/> <w>nu</w> <w>zi-ik</w> <lb/> <w>ta-ma-iš</w></r>".as_bytes())
+        .expect("manuscript without a label");
+    let standard = Template::new(TEMPLATE);
+    let wider_text = TEMPLATE.replace("margin: 2cm", "margin: 3cm");
+    assert_ne!(
+        wider_text, TEMPLATE,
+        "the alternate margins must take effect"
+    );
+    let wider = Template::new(&wider_text);
+
+    let first = render_manuscript(&a, "KBo 52.182", &standard).expect("A builds");
+    let between = render_manuscript(&b, "KUB 1.1", &wider).expect("B builds");
+    let again = render_manuscript(&a, "KBo 52.182", &standard).expect("A builds again");
+    assert!(first.pdf == again.pdf, "B changed the next PDF of A");
+    assert_eq!(first.labels, [0x100009, 0x100009]);
+    assert_eq!(again.labels, first.labels);
+    assert!(between.labels.is_empty());
+    assert_eq!(first.asked, between.asked);
+    assert_eq!(first.asked, again.asked);
+
+    let page_text = |rendered: &Rendered| {
+        let pdf = lopdf::Document::load_mem(&rendered.pdf).expect("readable PDF");
+        let page = pdf.page_iter().next().expect("first page");
+        post::scan_page(&pdf, page)
+            .expect("page text")
+            .text
+            .replace(char::is_whitespace, "")
+    };
+    let text_a = page_text(&again);
+    let text_b = page_text(&between);
+    assert!(
+        text_a.contains("KBo52.182") && !text_a.contains("KUB1.1"),
+        "{text_a}"
+    );
+    assert!(
+        text_b.contains("KUB1.1") && !text_b.contains("KBo52.182"),
+        "{text_b}"
+    );
+    assert!(
+        text_a.contains("a\u{100009}b") && !text_a.contains("ta-ma-iš"),
+        "{text_a}"
+    );
+    assert!(
+        text_b.contains("ta-ma-iš") && !text_b.contains("a\u{100009}b"),
+        "{text_b}"
+    );
+
+    // Keep the manuscript and its PDF identifier fixed while changing only the margins.
+    let plain_b = render_manuscript(&b, "KUB 1.1", &standard).expect("B with standard margins");
+    let wider_a = render_manuscript(&a, "KBo 52.182", &wider).expect("A with wider margins");
+    assert!(plain_b.pdf != between.pdf, "B ignored its template");
+    assert!(wider_a.pdf != first.pdf, "A ignored its template");
+
+    let fresh = render(
+        &a,
+        "CTH 746",
+        "KBo 52.182",
+        "CTH 746/KBo 52.182.pdf",
+        fonts(),
+    )
+    .expect("A builds with a fresh template");
+    assert!(fresh.pdf == first.pdf, "reusing the template changed A");
+}
+
+#[test]
+fn a_cluster_refusal_leaves_the_next_pdf_unchanged() {
+    let good = Document::read("<r><lb/>nu MEŠ\u{0303}</r>".as_bytes()).expect("one cluster");
+    let overlap =
+        Document::read("<r><lb/>Š\u{0303}Š\u{0303}</r>".as_bytes()).expect("two adjacent clusters");
+    let template = Template::new(TEMPLATE);
+
+    let before = render_manuscript(&good, "KBo 0.2", &template).expect("good manuscript builds");
+    let Err(refusal) = render_manuscript(&overlap, "KBo 0.1", &template) else {
+        panic!("the overlapping clusters were accepted");
+    };
+    assert!(matches!(refusal, PdfError::Clusters { .. }), "{refusal}");
+    assert!(!refusal.is_invariant());
+    let after =
+        render_manuscript(&good, "KBo 0.2", &template).expect("good manuscript still builds");
+    assert_eq!(after.clusters, 1, "the good cluster is still wrapped");
+    assert!(
+        after.pdf == before.pdf,
+        "the cluster refusal changed the next PDF"
+    );
+}
+
 #[test]
 fn a_warning_refuses_the_document() {
     let e = error("a", &format!("{QUIET}#text(font: \"No Such Face\")[x]"));
