@@ -35,6 +35,7 @@ const EXPAND = 'Expand fragments'
  * them is searched by (see [`fold`]), and whether the group is folded shut.
  */
 interface Group {
+  readonly table: HTMLTableElement
   readonly tr: HTMLElement
   readonly text: string
   readonly items: HTMLElement[]
@@ -139,13 +140,10 @@ function count(n: number): string {
  */
 export function attachInventoryFilter(doc: Document): void {
   const input = doc.getElementById('q') as HTMLInputElement | null
-  const table = doc.getElementById('inv') as HTMLTableElement | null
+  const inventory = doc.getElementById('inv')
   const hint = doc.getElementById('hint')
   const foldAll = doc.getElementById('fold-all')
-  if (!input || !table) return
-
-  const tbody = table.tBodies[0]
-  const rows = Array.prototype.slice.call(tbody.rows) as HTMLTableRowElement[]
+  if (!input || !inventory) return
 
   // The controls work from here on, so this is where they earn their place on
   // the page.
@@ -155,15 +153,18 @@ export function attachInventoryFilter(doc: Document): void {
   // query, and never reads the DOM to find out what is on screen — the two
   // controls would otherwise disagree about rows they had each hidden.
   const groups: Group[] = []
-  let current: Group | null = null
-  for (const tr of rows) {
-    if (tr.classList.contains('group')) {
-      current = { tr, text: groupText(tr), items: [], texts: [], folded: false }
-      groups.push(current)
-    } else if (current) {
-      current.items.push(tr)
-      current.texts.push(rowText(tr))
-    }
+  for (const table of inventory.querySelectorAll('table')) {
+    const rows = Array.from(table.tBodies[0].rows)
+    const heading = rows.shift()
+    if (!heading) continue
+    groups.push({
+      table,
+      tr: heading,
+      text: groupText(heading),
+      items: rows,
+      texts: rows.map(rowText),
+      folded: false,
+    })
   }
 
   /** The toolbar button folds everything, or opens everything back up. */
@@ -193,7 +194,7 @@ export function attachInventoryFilter(doc: Document): void {
       }
 
       const groupVisible = q === '' || anyHit
-      group.tr.hidden = !groupVisible
+      group.table.hidden = !groupVisible
 
       for (let j = 0; j < group.items.length; j++) {
         const show = groupVisible && hits[j]
@@ -238,8 +239,8 @@ export function attachInventoryFilter(doc: Document): void {
     })
   }
 
-  // One listener on the table rather than 663 on the headings.
-  tbody.addEventListener('click', (event: Event) => {
+  // All group buttons bubble to the inventory.
+  inventory.addEventListener('click', (event: Event) => {
     const target = event.target as Element | null
     const button = target && target.closest ? target.closest('.group-toggle') : null
     if (!button) return
