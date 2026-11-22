@@ -17,7 +17,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires review: 143.
+Packages: 1443 – crates 751, npm 692. Distinct licence texts: 691. Requires review: 143.
 
 ## Packages
 
@@ -1056,7 +1056,6 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | css-value | 0.0.1 | npm | not declared | requires review |
 | css-what | 6.2.2 | npm | BSD-2-Clause | T28 |
 | css.escape | 1.5.1 | npm | MIT | T33 |
-| cssesc | 3.0.0 | npm | MIT | T33 |
 | data-urls | 8.0.0 | npm | MIT | T49 |
 | debug | 4.4.3 | npm | MIT | T312 |
 | decamelize | 4.0.0 | npm | MIT | T13 |
@@ -1304,7 +1303,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | postcss-load-config | 3.1.4 | npm | MIT | T259 |
 | postcss-safe-parser | 7.0.1 | npm | MIT | T168 |
 | postcss-scss | 4.0.9 | npm | MIT | T168 |
-| postcss-selector-parser | 7.1.6 | npm | MIT | T278 |
+| postcss-selector-parser | 7.2.1 | npm | MIT | T278 |
 | postcss | 8.5.33 | npm | MIT | T134 |
 | prelude-ls | 1.2.1 | npm | MIT | T69 |
 | prettier-plugin-svelte | 4.1.1 | npm | MIT | T434 |
@@ -4398,7 +4397,7 @@ SOFTWARE.
 
 ### T33
 
-SHA-256 `483acb265f182907d1caf6cff9c16c96f31325ed23792832cc5d8b12d5f88c8a`. Used by: css.escape 1.5.1 (LICENSE-MIT.txt), cssesc 3.0.0 (LICENSE-MIT.txt), emoji-regex 10.6.0 (LICENSE-MIT.txt), emoji-regex 8.0.0 (LICENSE-MIT.txt), emoji-regex 9.2.2 (LICENSE-MIT.txt), he 1.2.0 (LICENSE-MIT.txt), is-potential-custom-element-name 1.0.1 (LICENSE-MIT.txt), punycode 2.3.1 (LICENSE-MIT.txt).
+SHA-256 `483acb265f182907d1caf6cff9c16c96f31325ed23792832cc5d8b12d5f88c8a`. Used by: css.escape 1.5.1 (LICENSE-MIT.txt), emoji-regex 10.6.0 (LICENSE-MIT.txt), emoji-regex 8.0.0 (LICENSE-MIT.txt), emoji-regex 9.2.2 (LICENSE-MIT.txt), he 1.2.0 (LICENSE-MIT.txt), is-potential-custom-element-name 1.0.1 (LICENSE-MIT.txt), punycode 2.3.1 (LICENSE-MIT.txt).
 
 ```text
 Copyright Mathias Bynens <https://mathiasbynens.be/>
@@ -16611,7 +16610,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T278
 
-SHA-256 `2998094b38f7ace25f141fb36f334d8338f65a1812978d618b1161f4d77ae10e`. Used by: postcss-selector-parser 7.1.6 (LICENSE-MIT).
+SHA-256 `2998094b38f7ace25f141fb36f334d8338f65a1812978d618b1161f4d77ae10e`. Used by: postcss-selector-parser 7.2.1 (LICENSE-MIT).
 
 ```text
 Copyright (c) Ben Briggs <beneb.info@gmail.com> (http://beneb.info)
