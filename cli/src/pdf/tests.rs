@@ -49,6 +49,35 @@ fn a_template_that_fails_refuses_the_document_and_only_it() {
 }
 
 #[test]
+fn successive_document_worlds_share_the_parsed_template() {
+    use typst::World;
+
+    let template = Template::new(TEMPLATE);
+    let main_source = |json: &str| {
+        let world = world::PdfWorld::new(fonts(), &template, json.to_owned()).expect("world");
+        world.source(world.main()).expect("main.typ")
+    };
+    let first = main_source(r#"{"name":"A"}"#);
+    let second = main_source(r#"{"name":"B"}"#);
+    assert!(std::ptr::eq(first.root(), second.root()));
+}
+
+#[test]
+fn a_shared_template_recovers_after_refusing_one_document() {
+    let text = format!("{TEMPLATE}\n#if d.plain-name == \"B\" {{ panic(\"B refused\") }}");
+    let template = Template::new(&text);
+    let doc = Document::read(b"<r><lb/>a-na</r>").expect("well-formed text");
+    let render = |name| render_with_template(&doc, "CTH 1", name, name, fonts(), &template);
+
+    let first = render("A").expect("A builds");
+    let refusal = render("B").expect_err("Typst refuses B");
+    assert!(matches!(refusal, PdfError::Document(ref messages)
+        if messages.iter().any(|message| message.contains("B refused"))));
+    let again = render("A").expect("A still builds");
+    assert!(first.pdf == again.pdf, "the refusal changed A's PDF");
+}
+
+#[test]
 fn a_warning_refuses_the_document() {
     let e = error("a", &format!("{QUIET}#text(font: \"No Such Face\")[x]"));
     assert!(

@@ -356,6 +356,29 @@ fn two_builds_are_the_same_package() {
     );
 }
 
+#[test]
+fn five_argument_render_matches_the_pdfs_in_a_package() {
+    let dir = tempdir().expect("tempdir");
+    let zip = corpus(dir.path(), &[]);
+    let out = dir.path().join("out");
+    let built = build(&zip, &out).expect("builds");
+    assert_eq!(built.pdfs.refused, 1);
+    let root = out.join(PACKAGE);
+
+    // These two documents lie on either side of the refused CTH 9 manuscript.
+    for (group, name) in [("CTH 5", "KBo 1.2"), ("CTH 12", "IBoT 1.1")] {
+        let ident = format!("{group}/{name}.pdf");
+        let xml = std::fs::read(root.join(format!("{group}/{name}.xml"))).expect("published XML");
+        let doc = aruna::document::Document::read(&xml).expect("well-formed manuscript");
+        let rendered = aruna::pdf::render(&doc, group, name, &ident, fonts()).expect("renders");
+        let packaged = std::fs::read(root.join(&ident)).expect("published PDF");
+        assert!(
+            rendered.pdf == packaged,
+            "standalone and packaged PDF differ for {ident}"
+        );
+    }
+}
+
 /// Stops the run the first time the PDF phase reports.
 struct StopInPdfs<'a>(&'a Cancel, std::sync::Mutex<Vec<String>>);
 
