@@ -32,7 +32,7 @@ use super::Placed;
 pub enum PdfState {
     /// Written, at this path relative to the package root.
     Built(PathBuf),
-    /// Not written, and why: the model refused the document, or Typst did.
+    /// The document model or Typst refused this manuscript, or its text clusters overlap.
     Refused(String),
 }
 

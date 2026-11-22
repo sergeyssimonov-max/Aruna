@@ -142,23 +142,18 @@ pub(crate) const MAX_PACKAGE: u64 = 8 * 1024 * 1024 * 1024;
 /// document would be 23 936 round trips, which the same section forbids by name.
 const DOCUMENTS_PER_TICK: usize = 500;
 
-/// Whether the package has outgrown its ceiling, as its own function so the
-/// only two sizes that matter can be tested without writing eight gibibytes.
-fn within_package_ceiling(written: u64, limit: u64) -> Result<()> {
-    if written > limit {
-        return Err(ArunaError::ExportPackageTooLarge { written, limit });
+/// The size including the next file may equal the limit.
+fn within_package_ceiling(projected: u64, limit: u64) -> Result<()> {
+    if projected > limit {
+        return Err(ArunaError::ExportPackageTooLarge {
+            written: projected,
+            limit,
+        });
     }
     Ok(())
 }
 
-/// The bytes of the package as it is written, against the most it may hold.
-///
-/// One counter for every file of the package – the documents, their PDFs, the
-/// inventory, the font and the terms, the manifest – and asked **before** a
-/// file is created, with the length of the buffer about to be written: the
-/// point of the ceiling is to stop before the disk is full, and a check after
-/// the write is a check after the damage. A file the package has no room for
-/// is not created, and one that failed to be written is not counted.
+/// Counts bytes written across all XML, PDF and root files in one package.
 struct PackageBytes {
     written: u64,
     limit: u64,
@@ -171,25 +166,20 @@ impl PackageBytes {
         PackageBytes { written: 0, limit }
     }
 
-    /// Writes one file of `len` bytes through `write`, if the package has room
-    /// for it, and counts it once it is written.
-    ///
-    /// Exactly the limit is room. One byte more is
-    /// [`ArunaError::ExportPackageTooLarge`], naming the size the package would
-    /// have reached, and `write` is not called. A sum past `u64` is past any
-    /// limit and is refused as the largest size there is.
-    fn write<T>(&mut self, len: usize, write: impl FnOnce() -> Result<T>) -> Result<T> {
-        let total = u64::try_from(len)
+    /// Checks the projected size before calling `write` to create the file.
+    /// Counts the file only after a successful write. Overflow is reported as `u64::MAX`.
+    fn write(&mut self, len: usize, write: impl FnOnce() -> Result<()>) -> Result<()> {
+        let projected = u64::try_from(len)
             .ok()
             .and_then(|len| self.written.checked_add(len))
             .ok_or(ArunaError::ExportPackageTooLarge {
                 written: u64::MAX,
                 limit: self.limit,
             })?;
-        within_package_ceiling(total, self.limit)?;
-        let done = write()?;
-        self.written = total;
-        Ok(done)
+        within_package_ceiling(projected, self.limit)?;
+        write()?;
+        self.written = projected;
+        Ok(())
     }
 }
 
@@ -1451,19 +1441,6 @@ mod tests {
             "three documents must occupy three paths even where case does not distinguish them: {:?}",
             placed.iter().map(|p| p.relative.clone()).collect::<Vec<_>>()
         );
-    }
-
-    /// A ceiling on the package as a whole, at the only two sizes where it can
-    /// be wrong. Eight gibibytes are not written to test eight gibibytes.
-    #[test]
-    fn the_package_ceiling_admits_its_own_limit_and_refuses_one_byte_more() {
-        assert!(within_package_ceiling(1024, 1024).is_ok());
-        match within_package_ceiling(1025, 1024) {
-            Err(ArunaError::ExportPackageTooLarge { written, limit }) => {
-                assert_eq!((written, limit), (1025, 1024));
-            }
-            other => panic!("expected a refusal, got {other:?}"),
-        }
     }
 
     /// The corpus files one group under several folders, so a group's fragments

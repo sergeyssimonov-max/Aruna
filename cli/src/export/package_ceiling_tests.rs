@@ -205,6 +205,17 @@ fn assert_stopped_before(run: &Run, whole: &Run, order: &[(PathBuf, u64)], stop:
 }
 
 #[test]
+fn the_package_ceiling_admits_its_own_limit_and_refuses_one_byte_more() {
+    assert!(within_package_ceiling(1024, 1024).is_ok());
+    match within_package_ceiling(1025, 1024) {
+        Err(ArunaError::ExportPackageTooLarge { written, limit }) => {
+            assert_eq!((written, limit), (1025, 1024));
+        }
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+}
+
+#[test]
 fn the_counter_admits_its_limit_and_does_not_write_one_byte_more() {
     let mut package = PackageBytes::within(10);
     package.write(4, || Ok(())).expect("four of ten");
@@ -232,7 +243,7 @@ fn the_counter_admits_its_limit_and_does_not_write_one_byte_more() {
 #[test]
 fn a_file_that_failed_to_be_written_is_not_counted_and_its_error_is_the_same() {
     let mut package = PackageBytes::within(10);
-    let failure: Result<()> = package.write(4, || {
+    let failure = package.write(4, || {
         Err(ArunaError::io("/nowhere")(std::io::Error::other(
             "disk failure",
         )))
