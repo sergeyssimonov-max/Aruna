@@ -447,7 +447,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | r-efi | 5.3.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T682 |
 | r-efi | 6.0.0 | crate | MIT OR Apache-2.0 OR LGPL-2.1-or-later | T590 |
 | rand | 0.8.8 | crate | MIT OR Apache-2.0 | T64, T126, T55 |
-| rand | 0.10.3 | crate | MIT OR Apache-2.0 | T64, T126, T55 |
+| rand | 0.10.4 | crate | MIT OR Apache-2.0 | T64, T126, T55 |
 | rand_chacha | 0.3.1 | crate | MIT OR Apache-2.0 | T64, T67, T55 |
 | rand_core | 0.6.4 | crate | MIT OR Apache-2.0 | T64, T143, T55 |
 | rand_core | 0.10.1 | crate | MIT OR Apache-2.0 | T480, T143, T467 |
@@ -5767,7 +5767,7 @@ SOFTWARE.
 
 ### T55
 
-SHA-256 `209fbbe0ad52d9235e37badf9cadfe4dbdc87203179c0899e738b39ade42177b`. Used by: rand 0.8.8 (LICENSE-MIT), rand 0.10.3 (LICENSE-MIT), rand_chacha 0.3.1 (LICENSE-MIT), rand_core 0.6.4 (LICENSE-MIT).
+SHA-256 `209fbbe0ad52d9235e37badf9cadfe4dbdc87203179c0899e738b39ade42177b`. Used by: rand 0.8.8 (LICENSE-MIT), rand 0.10.4 (LICENSE-MIT), rand_chacha 0.3.1 (LICENSE-MIT), rand_core 0.6.4 (LICENSE-MIT).
 
 ```text
 Copyright 2018 Developers of the Rand project
@@ -6059,7 +6059,7 @@ THE SOFTWARE.
 
 ### T64
 
-SHA-256 `90eb64f0279b0d9432accfa6023ff803bc4965212383697eee27a0f426d5f8d5`. Used by: rand 0.8.8 (COPYRIGHT), rand 0.10.3 (COPYRIGHT), rand_chacha 0.3.1 (COPYRIGHT), rand_core 0.6.4 (COPYRIGHT).
+SHA-256 `90eb64f0279b0d9432accfa6023ff803bc4965212383697eee27a0f426d5f8d5`. Used by: rand 0.8.8 (COPYRIGHT), rand 0.10.4 (COPYRIGHT), rand_chacha 0.3.1 (COPYRIGHT), rand_core 0.6.4 (COPYRIGHT).
 
 ```text
 Copyrights in the Rand project are retained by their contributors. No
@@ -8999,7 +8999,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T126
 
-SHA-256 `35242e7a83f69875e6edeff02291e688c97caafe2f8902e4e19b49d3e78b4cab`. Used by: rand 0.8.8 (LICENSE-APACHE), rand 0.10.3 (LICENSE-APACHE).
+SHA-256 `35242e7a83f69875e6edeff02291e688c97caafe2f8902e4e19b49d3e78b4cab`. Used by: rand 0.8.8 (LICENSE-APACHE), rand 0.10.4 (LICENSE-APACHE).
 
 ```text
                               Apache License
