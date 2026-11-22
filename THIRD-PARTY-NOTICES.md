@@ -823,7 +823,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | @esbuild/win32-ia32 | 0.28.2 | npm | not declared | requires review |
 | @esbuild/win32-x64 | 0.28.2 | npm | not declared | requires review |
 | @eslint-community/eslint-utils | 4.10.1 | npm | MIT | T198 |
-| @eslint-community/regexpp | 4.12.2 | npm | MIT | T198 |
+| @eslint-community/regexpp | 4.12.3 | npm | MIT | T198 |
 | @eslint/config-array | 0.23.6 | npm | Apache-2.0 | T9 |
 | @eslint/config-helpers | 0.7.0 | npm | Apache-2.0 | T9 |
 | @eslint/core | 1.2.1 | npm | Apache-2.0 | T9 |
@@ -12940,7 +12940,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ### T198
 
-SHA-256 `fcf6eabf68ca96988a6b506b4fdc6cc32535d80eb2e11c79724af5ac6f50262b`. Used by: @eslint-community/eslint-utils 4.10.1 (LICENSE), @eslint-community/regexpp 4.12.2 (LICENSE).
+SHA-256 `fcf6eabf68ca96988a6b506b4fdc6cc32535d80eb2e11c79724af5ac6f50262b`. Used by: @eslint-community/eslint-utils 4.10.1 (LICENSE), @eslint-community/regexpp 4.12.3 (LICENSE).
 
 ```text
 MIT License
