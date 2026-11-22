@@ -300,7 +300,7 @@ Packages: 1444 – crates 751, npm 693. Distinct licence texts: 691. Requires re
 | indexmap | 2.14.2 | crate | Apache-2.0 OR MIT | T1, T190 |
 | infer | 0.19.0 | crate | MIT | T120 |
 | infer | 0.22.0 | crate | MIT | T120 |
-| inout | 0.2.2 | crate | MIT OR Apache-2.0 | T11, T516 |
+| inout | 0.2.6 | crate | MIT OR Apache-2.0 | T11, T516 |
 | insta | 1.49.0 | crate | Apache-2.0 | T1 |
 | ipnet | 2.12.1 | crate | MIT OR Apache-2.0 | T461, T342 |
 | is-docker | 0.2.0 | crate | MIT | T144 |
@@ -2801,7 +2801,7 @@ SHA-256 `0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594`. Used
 
 ### T11
 
-SHA-256 `a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5`. Used by: aes 0.9.3 (LICENSE-APACHE), block-buffer 0.10.4 (LICENSE-APACHE), block-buffer 0.12.1 (LICENSE-APACHE), block-padding 0.4.2 (LICENSE-APACHE), cbc 0.2.1 (LICENSE-APACHE), chacha20 0.10.2 (LICENSE-APACHE), cipher 0.5.2 (LICENSE-APACHE), const-oid 0.10.2 (LICENSE-APACHE), cpubits 0.1.1 (LICENSE-APACHE), cpufeatures 0.2.17 (LICENSE-APACHE), cpufeatures 0.3.1 (LICENSE-APACHE), crypto-common 0.1.7 (LICENSE-APACHE), crypto-common 0.2.2 (LICENSE-APACHE), digest 0.10.7 (LICENSE-APACHE), digest 0.11.3 (LICENSE-APACHE), ecb 0.2.1 (LICENSE-APACHE), hybrid-array 0.4.15 (LICENSE-APACHE), inout 0.2.2 (LICENSE-APACHE), md-5 0.11.0 (LICENSE-APACHE), sha2 0.10.9 (LICENSE-APACHE), sha2 0.11.1 (LICENSE-APACHE).
+SHA-256 `a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5`. Used by: aes 0.9.3 (LICENSE-APACHE), block-buffer 0.10.4 (LICENSE-APACHE), block-buffer 0.12.1 (LICENSE-APACHE), block-padding 0.4.2 (LICENSE-APACHE), cbc 0.2.1 (LICENSE-APACHE), chacha20 0.10.2 (LICENSE-APACHE), cipher 0.5.2 (LICENSE-APACHE), const-oid 0.10.2 (LICENSE-APACHE), cpubits 0.1.1 (LICENSE-APACHE), cpufeatures 0.2.17 (LICENSE-APACHE), cpufeatures 0.3.1 (LICENSE-APACHE), crypto-common 0.1.7 (LICENSE-APACHE), crypto-common 0.2.2 (LICENSE-APACHE), digest 0.10.7 (LICENSE-APACHE), digest 0.11.3 (LICENSE-APACHE), ecb 0.2.1 (LICENSE-APACHE), hybrid-array 0.4.15 (LICENSE-APACHE), inout 0.2.6 (LICENSE-APACHE), md-5 0.11.0 (LICENSE-APACHE), sha2 0.10.9 (LICENSE-APACHE), sha2 0.11.1 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -32381,7 +32381,7 @@ THE SOFTWARE.
 
 ### T516
 
-SHA-256 `a07fcacc3c60de4dc0fab10ac9d6aaba7379974e28451c99da7f7df09c25b28c`. Used by: inout 0.2.2 (LICENSE-MIT).
+SHA-256 `a07fcacc3c60de4dc0fab10ac9d6aaba7379974e28451c99da7f7df09c25b28c`. Used by: inout 0.2.6 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2022-2025 The RustCrypto Project Developers
