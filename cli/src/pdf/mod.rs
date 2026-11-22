@@ -39,6 +39,7 @@ use crate::error::ArunaError;
 
 pub use fonts::Fonts;
 pub use layout::Page;
+pub(crate) use world::Template;
 
 /// The template, compiled in.
 pub const TEMPLATE: &str = include_str!("template.typ");
@@ -153,8 +154,20 @@ pub fn render(
     ident: &str,
     fonts: &Fonts,
 ) -> Result<Rendered, PdfError> {
+    render_with_template(doc, group, name, ident, fonts, &Template::new(TEMPLATE))
+}
+
+/// The batch entry point reuses one template across all documents.
+pub(crate) fn render_with_template(
+    doc: &Document<'_>,
+    group: &str,
+    name: &str,
+    ident: &str,
+    fonts: &Fonts,
+    template: &Template<'_>,
+) -> Result<Rendered, PdfError> {
     let page = Page::of(doc, group, name);
-    let rendered = render_page(&page, ident, fonts, TEMPLATE);
+    let rendered = render_page_with_template(&page, ident, fonts, template);
     // The cache of Typst holds every document compiled so far: without this
     // the whole set takes 8 GB, with it 94 MiB, the PDFs the same (4.10).
     typst::comemo::evict(0);
@@ -167,6 +180,15 @@ pub fn render_page(
     ident: &str,
     fonts: &Fonts,
     template: &str,
+) -> Result<Rendered, PdfError> {
+    render_page_with_template(page, ident, fonts, &Template::new(template))
+}
+
+fn render_page_with_template(
+    page: &Page,
+    ident: &str,
+    fonts: &Fonts,
+    template: &Template<'_>,
 ) -> Result<Rendered, PdfError> {
     let credit = page.uses_credited_face(fonts);
     let labels = page.labels(fonts);
