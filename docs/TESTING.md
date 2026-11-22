@@ -543,11 +543,10 @@ Baselines are in `PERFORMANCE.md`.
 
 ### Tests that go to loopback
 
-No test leaves the machine, but 43 open a socket on 127.0.0.1: a local server
-the download is pointed at, a local proxy, or a port where nothing listens so
-that the download fails. All 43 are in the ordinary run of 727 and none is
-behind `#[ignore]`; all are in the `aruna` crate, the shell has none. Counted
-on 2026-10-15 at `7f0ae50`.
+The ordinary suite has 44 tests that open a socket on 127.0.0.1. They use a
+local HTTP server, a local proxy, or a closed port to exercise connection
+failure. All run in the `aruna` crate. At `7f0ae50` on 2026-10-15, 43 of
+the 727 ordinary tests used loopback.
 
 `frontend/tests/loopback-record.test.ts` holds the two tables below to the
 sources, and fails naming the tests that are missing from them, the ones they
@@ -564,7 +563,7 @@ closed port and are in the first table, five never open a socket and are in the
 second. Moving a test from one table to the other is the one mistake the guard
 cannot see.
 
-**43 tests open a socket on loopback.**
+**44 tests open a socket on loopback.**
 
 | binary | test | file | opens | through |
 |---|---|---|---|---|
@@ -597,6 +596,7 @@ cannot see.
 | `aruna` | `download::tests::failed_download_leaves_no_files_behind` | `cli/src/download.rs` | the download connects to `127.0.0.1:1`, where nothing listens | `download_file` |
 | `aruna` | `download::tests::failed_download_preserves_previous_file` | `cli/src/download.rs` | the download connects to `127.0.0.1:1`, where nothing listens | `download_file` |
 | `aruna` | `tests::an_unusable_proxy_is_said_before_the_download` | `cli/src/lib.rs` | the download connects to `127.0.0.1:9`, where nothing listens | `download_archive` |
+| `aruna::cache_concurrency` | `cancelling_a_streaming_download_leaves_the_cache_empty_and_allows_a_retry` | `cli/tests/cache_concurrency.rs` | cancels on the first partial download tick, fetches the archive on retry, then reads it from cache | `Origin`, `cli/tests/support/mod.rs` |
 | `aruna::cache_concurrency` | `runs_racing_for_one_archive_all_get_a_whole_one` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
 | `aruna::cache_concurrency` | `a_second_wave_is_served_entirely_from_the_cache` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
 | `aruna::cache_concurrency` | `repeated_downloads_do_not_accumulate_connections_or_descriptors` | `cli/tests/cache_concurrency.rs` | listens; the runs connect; `Drop` connects to wake `accept` and joins its thread | `Origin`, `cli/tests/support/mod.rs` |
