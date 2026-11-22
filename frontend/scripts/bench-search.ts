@@ -2,7 +2,7 @@
  * How long the inventory's search takes, in the browsers a reader opens it in.
  *
  * ```text
- * node scripts/bench-search.ts <package-dir> [chrome|webkit|both]
+ * node scripts/bench-search.ts <package-dir> [chrome|webkit|both] [--verify-order]
  * ```
  *
  * `<package-dir>` is a `TLHdig_Beta_0.3` folder built for the purpose —
@@ -42,7 +42,7 @@ const DEADLINE_MS = 30 * 60 * 1000
  * Runs inside the page, after the inventory's own script has attached the
  * filter. Serialised with `toString()`, so it may use nothing from this module.
  */
-function harness(): void {
+function harness(verifyOrder: boolean): void {
   // The five queries the retired site was measured with, and the two its
   // commit added (`daf6d14`).
   const QUERIES = ['k', 'kbo', 'hit', 'schwemer', '2021', 'cth 547', 'zzzznope']
@@ -130,6 +130,36 @@ function harness(): void {
     if (document.readyState !== 'complete') {
       await new Promise((loaded) => addEventListener('load', loaded, { once: true }))
     }
+    if (verifyOrder) {
+      // Separate from timing: reading client rects forces layout. Hash the visible
+      // sequence in DOM order, including cell boundaries and relative link targets.
+      const order = []
+      for (const query of ['', ...QUERIES, '']) {
+        input.value = query
+        input.dispatchEvent(new Event('input'))
+        const rows = Array.from(
+          document.querySelectorAll<HTMLTableRowElement>('#inv tbody tr'),
+        ).filter((row) => row.getClientRects().length > 0)
+        const entries = rows.map((row) => [
+          row.classList.contains('group') ? 'group' : 'document',
+          Array.from(row.cells, (cell) => cell.textContent),
+          Array.from(row.querySelectorAll('a'), (link) => link.getAttribute('href')),
+        ])
+        const bytes = new TextEncoder().encode(JSON.stringify(entries))
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+        const sha256 = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
+        const groups = rows.filter((row) => row.classList.contains('group')).length
+        order.push({
+          query,
+          groups,
+          documents: rows.length - groups,
+          hint: hint?.textContent,
+          sha256,
+        })
+      }
+      send({ done: true, order })
+      return
+    }
     const nav = performance.getEntriesByType('navigation')[0] as
       PerformanceNavigationTiming | undefined
     const clears: Sample[] = []
@@ -147,7 +177,9 @@ function harness(): void {
       results.push({
         query,
         hint: hint ? hint.textContent : null,
-        groups: document.querySelectorAll('#inv tbody tr.group:not([hidden])').length,
+        groups: Array.from(document.querySelectorAll('#inv tbody tr.group')).filter(
+          (row) => !row.closest('[hidden]'),
+        ).length,
         rows: document.querySelectorAll('#inv tbody tr:not(.group):not([hidden])').length,
         ...summary(samples),
       })
@@ -166,12 +198,19 @@ function harness(): void {
       clear: summary(clears),
     })
   }
-  void run()
+  void run().catch((error: unknown) => send({ done: true, error: String(error) }))
 }
 
-type Report = {
+type Report = TimingReport | { done: true; error: string } | { done: true; order: OrderRow[] }
+type OrderRow = {
+  query: string
+  groups: number
+  documents: number
+  hint: string | null
+  sha256: string
+}
+type TimingReport = {
   done: true
-  error?: string
   userAgent: string
   resolution: number
   readyAt: number
@@ -238,7 +277,14 @@ function runChrome(page: string): Promise<Report> {
     '--v=0',
     pathToFileURL(page).href,
   ])
+  // Crash helpers can inherit a pipe beyond the browser's lifetime. Wait for
+  // the browser process itself before removing the profile it was writing.
+  const stopped = new Promise<void>((resolve) => {
+    child.once('exit', () => resolve())
+    child.once('error', () => resolve())
+  })
   return new Promise<Report>((done, fail) => {
+    child.once('error', fail)
     const deadline = setTimeout(() => fail(new Error('chrome: no result in time')), DEADLINE_MS)
     lines(child.stderr, (line) => {
       // [..:INFO:CONSOLE(n)] "BENCH {...}", source: file:///... (n)
@@ -248,9 +294,12 @@ function runChrome(page: string): Promise<Report> {
       settle(JSON.parse(line.slice(from + 7, to)) as Report | Progress, deadline, done)
     })
     child.on('exit', (code) => fail(new Error(`chrome exited with ${code} before a result`)))
-  }).finally(() => {
+  }).finally(async () => {
     child.kill()
-    rmSync(profile, { recursive: true, force: true })
+    await stopped
+    child.stdout.destroy()
+    child.stderr.destroy()
+    rmSync(profile, { recursive: true, force: true, maxRetries: 3 })
   })
 }
 
@@ -270,8 +319,9 @@ function runWebKit(page: string): Promise<Report> {
 const ms = (x: number) => x.toFixed(1).padStart(7)
 
 function print(engine: string, report: Report): void {
-  if (report.error) {
-    console.log(`${engine}: ${report.error}`)
+  if ('error' in report) throw new Error(`${engine}: ${report.error}`)
+  if ('order' in report) {
+    for (const row of report.order) console.log(`${engine} order ${JSON.stringify(row)}`)
     return
   }
   console.log(`\n${engine}: ${report.userAgent}`)
@@ -307,9 +357,16 @@ function print(engine: string, report: Report): void {
 }
 
 async function main(): Promise<number> {
-  const [dirArg, engineArg = 'both'] = process.argv.slice(2)
-  if (!dirArg || !['chrome', 'webkit', 'both'].includes(engineArg)) {
-    console.error('usage: node scripts/bench-search.ts <package-dir> [chrome|webkit|both]')
+  const [dirArg, engineArg = 'both', mode, ...extra] = process.argv.slice(2)
+  if (
+    !dirArg ||
+    !['chrome', 'webkit', 'both'].includes(engineArg) ||
+    (mode && mode !== '--verify-order') ||
+    extra.length
+  ) {
+    console.error(
+      'usage: node scripts/bench-search.ts <package-dir> [chrome|webkit|both] [--verify-order]',
+    )
     return 2
   }
   const dir = resolve(dirArg)
@@ -332,7 +389,9 @@ async function main(): Promise<number> {
   const page = join(dir, BENCH_PAGE)
   writeFileSync(
     page,
-    html.slice(0, end) + `<script>(${harness.toString()})()</script>\n` + html.slice(end),
+    html.slice(0, end) +
+      `<script>(${harness.toString()})(${mode === '--verify-order'})</script>\n` +
+      html.slice(end),
   )
   try {
     if (engineArg !== 'webkit') print('chrome', await runChrome(page))
