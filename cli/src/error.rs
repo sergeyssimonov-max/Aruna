@@ -181,14 +181,14 @@ pub enum ArunaError {
     #[error("archive holds {entries} entries, more than the {limit} this program will read")]
     ArchiveTooManyEntries { entries: usize, limit: usize },
 
-    /// A package that would be larger than any corpus this program is for.
-    ///
-    /// The companion to [`Self::ExportDocumentTooLarge`]: that one bounds a
-    /// document, this one bounds their sum. An archive of many documents each
-    /// just under the per-document limit passed both the entry count and the
-    /// size check and still filled a disk.
-    #[error("the package reached {written} bytes, more than the {limit} this program will write")]
-    ExportPackageTooLarge { written: u64, limit: u64 },
+    /// Writing the next file would exceed the package size limit.
+    #[error("writing the next file would bring the package to {written} bytes, exceeding the limit of {limit} bytes")]
+    ExportPackageTooLarge {
+        /// Projected package size in bytes including the refused file, capped at `u64::MAX`.
+        written: u64,
+        /// Maximum allowed package size in bytes.
+        limit: u64,
+    },
 
     /// A finished package does not match the model it was built from. The count
     /// is the whole tally; the text is the first few, because a package with
