@@ -11,6 +11,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import documentHtml from '../../../cli/src/generated/document.html?raw'
+import inventoryBodyHtml from '../../../cli/src/generated/inventory_body.html?raw'
 import groupTableHtml from '../../../cli/src/generated/group_table.html?raw'
 import groupHeadingHtml from '../../../cli/src/generated/group_heading.html?raw'
 import manuscriptLinkHtml from '../../../cli/src/generated/manuscript_link.html?raw'
@@ -79,7 +80,10 @@ function inventory(
         LABEL: group.label,
         COLGROUP: '',
         THEAD: '',
-        ROWS: [head, ...rows].join('\n'),
+        BODIES: fill(artifact(inventoryBodyHtml), {
+          ROWS: [head, ...rows].join('\n'),
+          HEADINGS: '',
+        }),
       })
     })
     .join('\n')
@@ -109,7 +113,9 @@ const hint = () => document.getElementById('hint') as HTMLElement
 const foldAll = () => document.getElementById('fold-all') as HTMLButtonElement
 const headings = () => Array.from(document.querySelectorAll<HTMLElement>('tr.group'))
 const items = () =>
-  Array.from(document.querySelectorAll<HTMLTableRowElement>('#inv tbody tr:not(.group)'))
+  Array.from(
+    document.querySelectorAll<HTMLTableRowElement>('#inv tbody tr:not(.group):not(.print-columns)'),
+  )
 const shown = () => items().filter((tr) => !tr.closest('[hidden]'))
 
 function type(query: string): void {
@@ -135,6 +141,28 @@ describe('the controls only appear once the script has run', () => {
     expect(() => attachInventoryFilter(document)).not.toThrow()
     expect(document.body.classList.contains('filter-on')).toBe(false)
   })
+})
+
+it('searches and folds documents across print sections without counting their headers', () => {
+  inventory([{ label: 'CTH 547', rows: [{ siglum: '72_r' }, { siglum: '247_q' }] }])
+  const table = document.querySelector('table')!
+  const secondBody = table.createTBody()
+  const printHeader = table.querySelector('.print-columns')!
+  printHeader.innerHTML = '<th scope="col">Editor</th>'
+  secondBody.append(items()[1], printHeader.cloneNode(true))
+  attachInventoryFilter(document)
+
+  type('247_q')
+  expect(hint().textContent).toBe('Match: 1')
+  expect(shown().map((row) => row.cells[1].textContent)).toEqual(['247_q'])
+  type('Editor')
+  expect(hint().textContent).toBe('No matches')
+  type('cth 547')
+  expect(hint().textContent).toBe('Match: 2')
+  foldAll().click()
+  expect(shown()).toHaveLength(0)
+  foldAll().click()
+  expect(shown().map((row) => row.cells[1].textContent)).toEqual(['72_r', '247_q'])
 })
 
 describe('search', () => {

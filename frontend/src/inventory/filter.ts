@@ -154,7 +154,9 @@ export function attachInventoryFilter(doc: Document): void {
   // controls would otherwise disagree about rows they had each hidden.
   const groups: Group[] = []
   for (const table of inventory.querySelectorAll('table')) {
-    const rows = Array.from(table.tBodies[0].rows)
+    const rows = Array.from(
+      table.querySelectorAll<HTMLTableRowElement>('tbody > tr:not(.print-columns)'),
+    )
     const heading = rows.shift()
     if (!heading) continue
     groups.push({

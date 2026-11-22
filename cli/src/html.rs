@@ -103,6 +103,11 @@ const DOCUMENT: &str = include_str!("generated/document.html");
 /// One independently laid out table, named for its CTH group.
 const GROUP_TABLE: &str = include_str!("generated/group_table.html");
 
+const INVENTORY_BODY: &str = include_str!("generated/inventory_body.html");
+/// Short sections leave room for wrapped cells on a portrait printout.
+/// The browser can fit several sections on the same sheet.
+const PRINT_SECTION_ROWS: usize = 12;
+
 /// A CTH section heading, and the control that folds the manuscripts under it.
 ///
 /// The whole heading is a `<button>` rather than a row with a click handler, so
@@ -288,7 +293,7 @@ fn render_tables(corpus: &CorpusPresentation<'_>) -> String {
     let columns = colgroup();
     let headings = thead();
     let mut tables = String::new();
-    let mut append = |label: &str, rows: &str| {
+    let mut append = |label: &str, bodies: &str| {
         fill(
             &mut tables,
             trimmed(GROUP_TABLE),
@@ -296,27 +301,38 @@ fn render_tables(corpus: &CorpusPresentation<'_>) -> String {
                 ("LABEL", &escape_html(label)),
                 ("COLGROUP", &columns),
                 ("THEAD", &headings),
-                ("ROWS", rows),
+                ("BODIES", bodies),
             ],
         );
     };
+    let body = |rows: &str| {
+        filled(
+            trimmed(INVENTORY_BODY),
+            &[("ROWS", rows), ("HEADINGS", &headings)],
+        )
+    };
     // The empty inventory still shows its column headings.
     if corpus.groups.is_empty() {
-        append("Inventory", "");
+        append("Inventory", &body(""));
     }
 
-    let between = separator(GROUP_TABLE, "ROWS");
+    let between = separator(INVENTORY_BODY, "ROWS");
     let catalog = crate::cth_titles::Catalog::compiled();
     let mut row_n = 0;
     for group in &corpus.groups {
+        let mut bodies = String::new();
         let mut rows = String::new();
         write_group_row(&mut rows, group.label, group.fragments.len(), &catalog);
-        for fragment in &group.fragments {
-            row_n += 1;
-            rows.push_str(&between);
-            write_item_row(&mut rows, row_n, fragment, fragment.href.as_deref());
+        for section in group.fragments.chunks(PRINT_SECTION_ROWS) {
+            for fragment in section {
+                row_n += 1;
+                rows.push_str(&between);
+                write_item_row(&mut rows, row_n, fragment, fragment.href.as_deref());
+            }
+            bodies.push_str(&body(&rows));
+            rows.clear();
         }
-        append(group.label, &rows);
+        append(group.label, &bodies);
     }
     tables
 }
@@ -501,7 +517,10 @@ fn colgroup() -> String {
 /// The column headings.
 fn thead() -> String {
     per_column(GROUP_TABLE, "THEAD", |column| {
-        filled(trimmed(COLUMN_HEADING), &[("HEAD", column.head)])
+        filled(
+            trimmed(COLUMN_HEADING),
+            &[("HEAD", column.head), ("CLASSNAME", column.class)],
+        )
     })
 }
 
@@ -818,7 +837,11 @@ mod tests {
         {
             let (table, _) = table.split_once("</table>").expect("complete CTH table");
             assert!(table.starts_with(&format!("aria-label=\"{label}\"")));
-            assert_eq!(table.matches("<th scope=\"col\">").count(), COLUMNS.len());
+            let (screen_table_head, _) = table.split_once("</thead>").expect("complete header");
+            assert_eq!(
+                screen_table_head.matches("<th scope=\"col\"").count(),
+                COLUMNS.len()
+            );
             assert_eq!(table.matches("class=\"group\"").count(), 1);
             let actual: Vec<_> = table
                 .split("<td class=\"num\">")
@@ -830,6 +853,43 @@ mod tests {
                 numbers.iter().map(usize::to_string).collect::<Vec<_>>()
             );
         }
+    }
+
+    #[test]
+    fn long_groups_keep_each_print_section_labeled_and_each_document_in_order() {
+        let count = PRINT_SECTION_ROWS * 2 + 1;
+        let records: Vec<_> = (1..=count)
+            .map(|n| {
+                rec(
+                    &format!("KBo {n:03}"),
+                    Some("CTH 547"),
+                    547,
+                    "Editor",
+                    "2023",
+                )
+            })
+            .collect();
+        let html = render_html(&records, "src", "");
+        let mut next = 1;
+        let mut sizes = Vec::new();
+        for body in html.split("<tbody>").skip(1) {
+            let (rows, _) = body.split_once("</tbody>").expect("complete section");
+            let (documents, headings) = rows
+                .split_once("<tr class=\"print-columns\"")
+                .expect("print headings");
+            assert!(headings.contains(&thead()));
+            let start = next;
+            for cell in documents.split("<td class=\"num\">").skip(1) {
+                assert_eq!(
+                    cell.split_once('<').expect("ordinal cell").0,
+                    next.to_string()
+                );
+                next += 1;
+            }
+            sizes.push(next - start);
+        }
+        assert_eq!(sizes, [PRINT_SECTION_ROWS, PRINT_SECTION_ROWS, 1]);
+        assert_eq!(next - 1, count);
     }
 
     #[test]
@@ -1009,7 +1069,10 @@ mod tests {
         let html = render_html(&[], "src", "now");
         for column in &COLUMNS {
             assert!(
-                html.contains(&format!("<th scope=\"col\">{}</th>", column.head)),
+                html.contains(&format!(
+                    "<th scope=\"col\" class=\"{}\">{}</th>",
+                    column.class, column.head
+                )),
                 "no heading for {}",
                 column.head
             );
