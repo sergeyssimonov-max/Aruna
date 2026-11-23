@@ -20,7 +20,10 @@ const CANCELLED: Record<string, string | undefined> = {
 
 export function explain(failure: BuildFailure): string {
   if (!failure.cancelled) {
-    return sentences[failure.code] ?? failure.message
+    // Эти три команды оболочки уже возвращают утвержденные русские фразы.
+    if (['busy', 'interrupted', 'destination_missing'].includes(failure.code))
+      return failure.message
+    return sentences[failure.code] ?? 'Сборка остановилась. Программа не смогла объяснить причину.'
   }
   return (failure.phase === null ? undefined : CANCELLED[failure.phase]) ?? CANCELLED_ANYWHERE
 }

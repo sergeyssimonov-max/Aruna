@@ -78,7 +78,7 @@ fn a_progress_event_never_carries_a_filesystem_path() {
 /// Ошибка, которую ядро отдает вместе с путем, доходит до окна без него.
 ///
 /// Пятый носитель пути – `DownloadRetrying`, и он единственный, чей текст
-/// до окна доходит: сообщение берется у `app::Failure`, где путь уже убран.
+/// до окна доходит: окно объясняет повтор по виду ошибки.
 #[test]
 fn a_retry_says_why_without_saying_where() {
     use aruna::progress::Event as Core;
@@ -96,7 +96,48 @@ fn a_retry_says_why_without_saying_where() {
     let progress = BuildProgress::of(7, &event);
     let note = progress.note.expect("повтор объясняет себя");
     assert!(!note.contains("Secrets"), "в тексте повтора оказался путь");
-    assert!(!note.is_empty());
+    assert_eq!(note, "Не удалось прочитать или записать архив.");
+}
+
+#[test]
+fn metadata_and_download_failures_do_not_expose_network_diagnostics() {
+    use aruna::{error::ArunaError, progress::Event};
+
+    let cause = "connection reset by peer";
+    let unreadable = BuildProgress::of(1, &Event::ZenodoUnreachable { cause });
+    assert_eq!(unreadable.note.as_deref(), Some("Не удалось проверить сведения об издании. Продолжаю загрузку проверенной версии корпуса."));
+    for (error, expected) in [
+        (
+            ArunaError::Network {
+                url: "private".into(),
+                source: cause.into(),
+            },
+            "Не удалось связаться с Hethitologie-Portal Mainz (запись на Zenodo).",
+        ),
+        (
+            ArunaError::Http {
+                url: "private".into(),
+                status: 503,
+                retry_after: None,
+            },
+            "Сервер вернул ошибку HTTP 503.",
+        ),
+        (
+            ArunaError::Truncated {
+                url: "private".into(),
+                expected: 10,
+                got: 3,
+            },
+            "Загрузка оборвалась: получено 3 из 10 байт.",
+        ),
+    ] {
+        let event = Event::DownloadRetrying {
+            attempt: 2,
+            delay: std::time::Duration::from_secs(4),
+            error: &error,
+        };
+        assert_eq!(BuildProgress::of(1, &event).note.as_deref(), Some(expected));
+    }
 }
 
 /// Стадия объявляет знаменатель, тик заполняет числитель.

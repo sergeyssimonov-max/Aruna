@@ -15,8 +15,8 @@ describe('failure text shown in the window', () => {
     expect(text).not.toMatch(/[ёЁ—]/)
   })
 
-  it('keeps the wire message for shell and unknown failures', () => {
-    for (const code of ['busy', 'destination_missing', 'interrupted', 'future']) {
+  it('keeps the wire message for known shell failures', () => {
+    for (const code of ['busy', 'destination_missing', 'interrupted']) {
       expect(explain(failure(code, 'сообщение оболочки'))).toBe('сообщение оболочки')
       expect(detailed.has(code)).toBe(false)
     }

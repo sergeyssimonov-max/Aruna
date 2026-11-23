@@ -19,8 +19,8 @@ export function windowActions(state: WindowState) {
           unlisten = stop
         }
       })
-      .catch((error: unknown) => {
-        state.trouble = String(error)
+      .catch(() => {
+        state.trouble = 'Не удалось получать сообщения о ходе сборки.'
       })
 
     return () => {
@@ -64,8 +64,8 @@ export function windowActions(state: WindowState) {
         inventory: located.data.inventory_exists ? located.data.inventory : null,
         markup: parsed.status === 'ok' ? parsed.data : null,
       }
-    } catch (error: unknown) {
-      state.trouble = String(error)
+    } catch {
+      state.trouble = 'Не удалось прочитать сведения о пакете.'
       state.screen = { kind: 'unreadable', inventory: null }
     }
   }
@@ -76,18 +76,21 @@ export function windowActions(state: WindowState) {
       const built = await commands.buildCorpus(chosen)
       if (built.status === 'ok') {
         state.finish(built.data.job)
-        // Только при отказах PDF окно сверяет их число с отказами модели,
-        // чтобы не показывать читателю один и тот же итог дважды.
-        let objected: number | null = null
-        if (built.data.pdfs.refused > 0) {
-          try {
-            const parsed = await commands.corpusXml(built.data.package)
-            objected = parsed.status === 'ok' ? parsed.data.objected_to : null
-          } catch {
-            objected = null
-          }
+        // Итоги сборки дает отчет. Разбивку и пояснения читаем из того пакета,
+        // который только что опубликован, в том числе при выборе другой папки.
+        const [stats, xml] = await Promise.allSettled([
+          commands.corpusStats(built.data.package),
+          commands.corpusXml(built.data.package),
+        ])
+        state.screen = {
+          kind: 'built',
+          report: built.data,
+          spread:
+            stats.status === 'fulfilled' && stats.value.status === 'ok'
+              ? stats.value.data.spread
+              : null,
+          markup: xml.status === 'fulfilled' && xml.value.status === 'ok' ? xml.value.data : null,
         }
-        state.screen = { kind: 'built', report: built.data, objected }
       } else {
         state.finish()
         state.screen = { kind: 'failed', failure: built.error }
@@ -118,8 +121,8 @@ export function windowActions(state: WindowState) {
         return
       }
       await build(chosen)
-    } catch (error: unknown) {
-      state.trouble = String(error)
+    } catch {
+      state.trouble = 'Не удалось открыть окно выбора папки.'
     }
   }
 
@@ -136,12 +139,12 @@ export function windowActions(state: WindowState) {
     state.stopping = true
     try {
       await commands.cancelBuild()
-    } catch (error: unknown) {
+    } catch {
       // `cancel_build` в Rust возвращает unit и отказать не может, так что
       // сюда попадает только сорванный вызов – а значит, никто ничего не
       // просил, и кнопка обязана вернуться.
       state.stopping = false
-      state.trouble = String(error)
+      state.trouble = 'Не удалось передать просьбу об остановке. Нажмите «Отменить» еще раз.'
     }
   }
 
@@ -164,8 +167,8 @@ export function windowActions(state: WindowState) {
       if (opened.status === 'error') {
         state.trouble = opened.error
       }
-    } catch (error: unknown) {
-      state.trouble = String(error)
+    } catch {
+      state.trouble = 'Не удалось открыть опись. Попробуйте еще раз.'
     }
   }
 

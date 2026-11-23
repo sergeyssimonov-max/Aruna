@@ -451,6 +451,7 @@ describe('пакет есть', () => {
 
     expect(about).toContain('Программа их не читает')
     expect(about).toContain('лежат в пакете вместе с остальными')
+    expect(about).toContain('такая разметка мешает переводу в PDF, а не хранению.')
     // Составляющих на экране нет – ни списка, ни его чисел, ни отсылки к
     // манифесту, которая была при них.
     expect(container.querySelectorAll('.markup-parts')).toHaveLength(0)
@@ -877,9 +878,9 @@ describe('идет сборка', () => {
 
   it('возвращает кнопку отмены после обрыва IPC и позволяет попросить еще раз', async () => {
     await building()
-    cancelBuild.mockRejectedValueOnce(new Error('связь оборвалась'))
+    cancelBuild.mockRejectedValueOnce(new Error('IPC connection closed'))
     await fireEvent.click(screen.getByRole('button', { name: 'Отменить' }))
-    expect(await screen.findByText(/связь оборвалась/)).toBeInTheDocument()
+    expect(await screen.findByText(/Не удалось передать просьбу об остановке/)).toBeInTheDocument()
     await fireEvent.click(screen.getByRole('button', { name: 'Отменить' }))
     expect(cancelBuild).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('button', { name: 'Останавливаю…' })).toBeDisabled()
@@ -958,15 +959,17 @@ describe('кончилось', () => {
     const container = await ran(ok(report({ documents: 24001, groups: 664 })))
 
     await screen.findByText(/Документов/)
-    const counts = Array.from(container.querySelectorAll('.count')).map((node) => node.textContent)
+    const counts = Array.from(container.querySelectorAll('.metrics .count')).map(
+      (node) => node.textContent,
+    )
     expect(counts).toEqual(['24 001', '664', '23 936'])
     expect(screen.queryByText(/Рукописей/)).toBeNull()
-    // Один раз, при открытии окна: после сборки числа берутся у отчета.
-    expect(corpusStats).toHaveBeenCalledTimes(1)
+    // Оболочка читает разбивку этого пакета, но главные итоги дает сам прогон.
+    expect(corpusStats).toHaveBeenLastCalledWith(PACKAGE)
   })
 
   /**
-   * **Отчет говорит, где пакет, и двумя числами кончается.**
+   * **Отчет говорит, где пакет. Технические счетчики в нем скрыты.**
    *
    * Проверка перевернута 08.09.2026, а не удалена: до того дня она требовала,
    * чтобы оба младших счетчика стояли на экране, – теперь требует, чтобы их
@@ -983,7 +986,9 @@ describe('кончилось', () => {
     expect(await screen.findByText(`Пакет – ${PACKAGE}`)).toBeInTheDocument()
     expect(screen.queryByText(/Переименовано из-за совпадения/)).toBeNull()
     expect(screen.queryByText(/С лишней ссылкой на оформление/)).toBeNull()
-    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    const counts = Array.from(container.querySelectorAll('.metrics .count')).map(
+      (n) => n.textContent,
+    )
     expect(counts).toEqual(['23 936', '663', '23 936'])
   })
 
@@ -996,12 +1001,21 @@ describe('кончилось', () => {
    * повторила бы известное.
    */
   it('с PDF показывает их число, а отказы модели не повторяет', async () => {
-    const container = await ran(ok(report({ pdfs: { built: 23713, refused: 223 } })))
+    const container = await ran(
+      ok(report({ pdfs: { built: 23713, refused: 223 } })),
+      STATS_SAMPLE.manifest,
+    )
 
     await screen.findByText(/^PDF –/)
-    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    const counts = Array.from(container.querySelectorAll('.metrics .count')).map(
+      (n) => n.textContent,
+    )
     expect(counts).toEqual(['23 936', '663', '23 713'])
     expect(screen.queryByText(/Без PDF/)).toBeNull()
+    expect(screen.getByText(/Самая большая группа/)).toHaveTextContent('CTH 832')
+    expect(screen.getByText(/Групп из одной рукописи/)).toHaveTextContent('116')
+    expect(screen.getByText(/Не могут быть преобразованы/)).toHaveTextContent('223 из 23 936')
+    expect(aboutText(container)).toContain('В описи ссылка на такой документ открывает его XML.')
     expect(corpusXml).toHaveBeenLastCalledWith(PACKAGE)
   })
 
@@ -1013,8 +1027,10 @@ describe('кончилось', () => {
     expect(line.closest('p')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
       'Без PDF – 230: причины записаны в манифесте пакета',
     )
-    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
-    expect(counts).toEqual(['23 936', '663', '23 706', '230'])
+    const counts = Array.from(container.querySelectorAll('.metrics .count')).map(
+      (n) => n.textContent,
+    )
+    expect(counts).toEqual(['23 936', '663', '23 706'])
   })
 
   /**
@@ -1023,20 +1039,38 @@ describe('кончилось', () => {
    */
   it('без сведений о разметке называет любой отказ PDF', async () => {
     buildCorpus.mockResolvedValue(ok(report({ pdfs: { built: 23935, refused: 1 } })))
-    await overPackage()
+    await overPackage(STATS_SAMPLE.manifest)
     corpusXml.mockResolvedValue(bad('манифест пакета не содержит сведений о разметке'))
     await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
 
     expect(await screen.findByText(/Без PDF/)).toBeInTheDocument()
+    expect(screen.getByText(/Самая большая группа/)).toHaveTextContent('CTH 832')
   })
 
-  /** PDF построены все: спрашивать о разметке незачем, строки нет. */
-  it('без отказов PDF не спрашивает о разметке', async () => {
-    await ran(ok(report({ pdfs: { built: 23936, refused: 0 } })))
-
+  it('когда все документы прочитаны и переведены, сообщает об этом без пояснения об отказах', async () => {
+    buildCorpus.mockResolvedValue(ok(report()))
+    await overPackage()
+    corpusXml.mockResolvedValue(ok({ ...markup, unread: 0, objected_to: 0 }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
     await screen.findByText(/^PDF –/)
-    expect(screen.queryByText(/Без PDF/)).toBeNull()
-    expect(corpusXml).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(/Прочитаны все/)).toHaveTextContent('23 936')
+    expect(screen.queryByText(/Без PDF|ссылка на такой документ/)).toBeNull()
+  })
+
+  it('сохраняет отчет и объяснение PDF, если разбивку из новой папки прочитать не удалось', async () => {
+    const other = '/другая папка/TLHdig_Beta_0.3'
+    buildCorpus.mockResolvedValue(
+      ok(report({ package: other, pdfs: { built: 23713, refused: 223 } })),
+    )
+    await overPackage(STATS_SAMPLE.manifest)
+    corpusStats.mockRejectedValueOnce(new Error('read failed'))
+    await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
+    await screen.findByText(`Пакет – ${other}`)
+    expect(corpusStats).toHaveBeenLastCalledWith(other)
+    expect(corpusXml).toHaveBeenLastCalledWith(other)
+    expect(screen.queryByText(/Самая большая группа/)).toBeNull()
+    expect(screen.getByText(/Не могут быть преобразованы/)).toHaveTextContent('223 из 23 936')
+    expect(screen.getByRole('button', { name: 'Открыть опись' })).toBeEnabled()
   })
 
   /**
@@ -1059,7 +1093,9 @@ describe('кончилось', () => {
     const container = await ran(ok(report()))
 
     expect(await screen.findByText(/^PDF –/)).toBeInTheDocument()
-    const counts = Array.from(container.querySelectorAll('.count')).map((n) => n.textContent)
+    const counts = Array.from(container.querySelectorAll('.metrics .count')).map(
+      (n) => n.textContent,
+    )
     expect(counts).toEqual(['23\u00a0936', '663', '23\u00a0936'])
   })
 
@@ -1221,16 +1257,10 @@ describe('кончилось', () => {
     expect(screen.queryByText('core said this in English')).toBeNull()
   })
 
-  /**
-   * **Код, которого окно еще не знает, показывает фразу ядра, а не пустое место.**
-   *
-   * Запасной путь намеренный: ядро может завести новый код, и тогда английская
-   * строка на экране – это видно и это чинится, а пустой абзац молчит.
-   */
-  it('на незнакомом коде показывает фразу ядра как есть', async () => {
+  it('на незнакомом коде показывает русское пояснение', async () => {
     await ran(bad(failure({ code: 'quantum_flux', message: 'the core says something new' })))
-
-    expect(await screen.findByText('the core says something new')).toBeInTheDocument()
+    expect(await screen.findByText(/Программа не смогла объяснить причину/)).toBeInTheDocument()
+    expect(screen.queryByText('the core says something new')).toBeNull()
   })
 
   /**

@@ -143,32 +143,36 @@
         папкам в загрузках и создаст опись – один файл HTML, который открывается в браузере без
         сети. Сборка занимает около двух минут.
       </p>
-    {:else if screen.kind === 'present'}
+    {:else if screen.kind === 'present' || screen.kind === 'built'}
+      {@const spread = screen.kind === 'present' ? screen.stats.spread : screen.spread}
+      {@const markup = screen.markup}
+      {#if screen.kind === 'present'}
+        <p class="metrics">
+          <span>Рукописей – <span class="count">{spaced(screen.stats.manuscripts)}</span></span>
+          <span>Групп CTH – <span class="count">{spaced(screen.stats.groups)}</span></span>
+        </p>
+      {:else}
+        <p class="metrics">
+          <span>Документов – <span class="count">{spaced(screen.report.documents)}</span></span>
+          <span>Групп CTH – <span class="count">{spaced(screen.report.groups)}</span></span>
+          <span>PDF – <span class="count">{spaced(screen.report.pdfs.built)}</span></span>
+        </p>
+      {/if}
       <!--
-        Окно русское целиком – заголовок, стадии, кнопки, – и эти числа
-        оставались в нем последним английским. Оставались наследством описи,
-        документа англоязычного, который сам их нигде не показывает: общего
-        текста, с которым их пришлось бы держать в согласии, тут нет.
-      -->
-      <p class="metrics">
-        <span>Рукописей – <span class="count">{spaced(screen.stats.manuscripts)}</span></span>
-        <span>Групп CTH – <span class="count">{spaced(screen.stats.groups)}</span></span>
-      </p>
-      <!--
-        Разбивка стоит отдельной строкой: два итога выше – это ответ на вопрос
+        Разбивка стоит отдельной строкой: итоги выше – это ответ на вопрос
         «что собрано», а эти две – на вопрос «как оно устроено», который задают
         вторым. Строки нет вовсе, когда групп нет: нулями она сказала бы о
         пустом пакете больше, чем о нем известно.
       -->
-      {#if screen.stats.spread.largest}
+      {#if spread?.largest}
         <p class="spread">
           <span>
-            Самая большая группа – <span class="count">{screen.stats.spread.largest.label}</span>
-            ({spaced(screen.stats.spread.largest.fragments)})
+            Самая большая группа – <span class="count">{spread.largest.label}</span>
+            ({spaced(spread.largest.fragments)})
           </span>
           <span>
             Групп из одной рукописи –
-            <span class="count">{spaced(screen.stats.spread.singletons)}</span>
+            <span class="count">{spaced(spread.singletons)}</span>
           </span>
         </p>
       {/if}
@@ -197,14 +201,14 @@
         – и без последствия для PDF: приписать его этому числу значило бы
         повторить ту самую подмену.
       -->
-      {#if screen.markup}
+      {#if markup}
         <div class="markup">
-          {#if screen.markup.objected_to > 0}
+          {#if markup.objected_to > 0}
             <p class="spread">
               <span>
                 Не могут быть преобразованы в PDF –
-                <span class="count">{spaced(screen.markup.objected_to)}</span>
-                из {spaced(screen.markup.documents)}
+                <span class="count">{spaced(markup.objected_to)}</span>
+                из {spaced(markup.documents)}
               </span>
             </p>
             <p class="markup-about">
@@ -214,19 +218,22 @@
             <p class="markup-about">
               Все они лежат в пакете вместе с остальными и открываются как обычно – такая разметка
               мешает переводу в PDF, а не хранению.
+              {#if screen.kind === 'built'}
+                В описи ссылка на такой документ открывает его XML.
+              {/if}
             </p>
-          {:else if screen.markup.unread === 0}
+          {:else if markup.unread === 0}
             <p class="spread">
               <span>
-                Прочитаны все – <span class="count">{spaced(screen.markup.documents)}</span>
+                Прочитаны все – <span class="count">{spaced(markup.documents)}</span>
               </span>
             </p>
           {:else}
             <p class="spread">
               <span>
                 Программа не прочитала –
-                <span class="count">{spaced(screen.markup.unread)}</span>
-                из {spaced(screen.markup.documents)}
+                <span class="count">{spaced(markup.unread)}</span>
+                из {spaced(markup.documents)}
               </span>
             </p>
             <p class="markup-about">
@@ -236,6 +243,17 @@
             </p>
           {/if}
         </div>
+      {/if}
+      {#if screen.kind === 'built'}
+        {#if screen.report.pdfs.refused > (markup?.objected_to ?? 0)}
+          <p class="spread">
+            <span>
+              Без PDF – <span class="count">{spaced(screen.report.pdfs.refused)}</span>: причины
+              записаны в манифесте пакета
+            </span>
+          </p>
+        {/if}
+        <p class="where">Пакет – {screen.report.package}</p>
       {/if}
     {:else if screen.kind === 'building'}
       <p class="stage">{stage}</p>
@@ -286,43 +304,6 @@
       {#if screen.note}
         <p class="note">{screen.note}</p>
       {/if}
-    {:else if screen.kind === 'built'}
-      <p class="metrics">
-        <span>Документов – <span class="count">{spaced(screen.report.documents)}</span></span>
-        <span>Групп CTH – <span class="count">{spaced(screen.report.groups)}</span></span>
-        <span>PDF – <span class="count">{spaced(screen.report.pdfs.built)}</span></span>
-      </p>
-      {#if screen.report.pdfs.refused > (screen.objected ?? 0)}
-        <p class="spread">
-          <span>
-            Без PDF – <span class="count">{spaced(screen.report.pdfs.refused)}</span>: причины
-            записаны в манифесте пакета
-          </span>
-        </p>
-      {/if}
-      <!--
-        Экран называет три числа – документы, группы CTH и «PDF – N», а два
-        счетчика, снятые с него решением владельца 08.09.2026, на него не
-        возвращаются.
-        «Переименовано из-за совпадения» и «С лишней ссылкой на оформление»
-        стояли здесь семнадцать часов: 07.09 подписи переписали для читателя и сняли
-        правило показывать их только ненулевыми, а на следующий день сняли и
-        сами строки. Экран отвечает на вопрос «что получилось», и на него
-        отвечают документы и группы; починка имен и снятая ссылка на
-        оформление – это то, как шла сборка, а не то, что из нее вышло.
-
-        Числа не потеряны, а только не показаны: `disambiguated` и
-        `stylesheet_dropped` идут по проводу по-прежнему и лежат в отчете
-        ядра. Ровно так же сняты счетчики письма 06.09.2026 – с экрана, но не
-        с провода, и последняя проверка их обоих – в `App.test.ts`.
-
-        Третье число – «PDF – N», сколько документов стали PDF (решение 4.3),
-        и под итогами строка «Без PDF», когда отказов перевода больше, чем
-        документов, которые не принимает модель (`objected_to` из манифеста
-        этого пакета, неизвестное – нулем): иначе строка повторила бы то, что
-        экран пакета и так называет.
-      -->
-      <p class="where">Пакет – {screen.report.package}</p>
     {:else if screen.kind === 'failed'}
       <p class="about">{explain(screen.failure)}</p>
       <!--

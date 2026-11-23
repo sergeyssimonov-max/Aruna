@@ -1,4 +1,11 @@
-import type { BuildFailure, BuildProgress, BuildReport, CorpusStats, XmlSummary } from './bindings'
+import type {
+  BuildFailure,
+  BuildProgress,
+  BuildReport,
+  CorpusStats,
+  Spread,
+  XmlSummary,
+} from './bindings'
 
 type Screen =
   | { kind: 'reading' }
@@ -12,7 +19,7 @@ type Screen =
       groups: number | null
       note: string | null
     }
-  | { kind: 'built'; report: BuildReport; objected: number | null }
+  | { kind: 'built'; report: BuildReport; spread: Spread | null; markup: XmlSummary | null }
   | { kind: 'failed'; failure: BuildFailure }
 
 export class WindowState {

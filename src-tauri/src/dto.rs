@@ -231,6 +231,21 @@ pub(crate) struct BuildProgress {
     pub note: Option<String>,
 }
 
+pub(super) fn zenodo_notice_text(notice: &aruna::zenodo::Notice<'_>) -> String {
+    use aruna::zenodo::Notice;
+    match notice {
+        Notice::NewEdition { record, published, file, pinned } => format!(
+            "Вышло новое издание корпуса: запись {record} на Zenodo ({}), файл {file}. \
+             Aruna продолжит сборку по записи {pinned}: чтение документов проверено на этом издании.",
+            published.unwrap_or("дата не указана"),
+        ),
+        Notice::DigestMismatch { record, published, expected } => format!(
+            "Для записи {record} на Zenodo указана контрольная сумма MD5 {published}. \
+             Aruna ожидает {expected}. Если сумма скачанного архива с ней не совпадет, сборка остановится."
+        ),
+    }
+}
+
 impl BuildProgress {
     /// Событие ядра, переложенное на провод.
     ///
@@ -258,8 +273,8 @@ impl BuildProgress {
                 progress.note = Some((*message).to_string());
                 Stage::ZenodoNotice
             }
-            Core::ZenodoUnreachable { cause } => {
-                progress.note = Some((*cause).to_string());
+            Core::ZenodoUnreachable { .. } => {
+                progress.note = Some("Не удалось проверить сведения об издании. Продолжаю загрузку проверенной версии корпуса.".into());
                 Stage::ZenodoUnreachable
             }
             Core::ProxyUnusable { variable } => {
@@ -281,10 +296,22 @@ impl BuildProgress {
                 progress.total = total.and_then(|total| u32::try_from(total).ok());
                 Stage::Downloading
             }
-            // Сообщение берется у `Failure`, а не у самой ошибки: только там из
-            // него убран путь.
             Core::DownloadRetrying { error, .. } => {
-                progress.note = Some(aruna::app::Failure::of(error).message);
+                use aruna::error::ArunaError;
+                progress.note = Some(match error {
+                    ArunaError::Http { status, .. } => {
+                        format!("Сервер вернул ошибку HTTP {status}.")
+                    }
+                    ArunaError::Truncated { expected, got, .. } => {
+                        format!("Загрузка оборвалась: получено {got} из {expected} байт.")
+                    }
+                    ArunaError::Io { .. } => "Не удалось прочитать или записать архив.".into(),
+                    ArunaError::Network { .. } => {
+                        "Не удалось связаться с Hethitologie-Portal Mainz (запись на Zenodo)."
+                            .into()
+                    }
+                    _ => "Не удалось завершить загрузку архива.".into(),
+                });
                 Stage::DownloadRetrying
             }
             Core::ArchiveKept { .. } => Stage::ArchiveKept,

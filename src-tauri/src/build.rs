@@ -9,23 +9,26 @@ use crate::FONT_RESOURCES;
 /// отсюда прошла бы сквозь `export::build` и вернулась бы обломком задания без
 /// объяснения. Поэтому отказ отправки проглатывается: окно, которое закрыли на
 /// середине сборки – это не сбой сборки.
-struct WindowProgress {
-    app: tauri::AppHandle,
+struct WindowProgress<F> {
+    emit: F,
     job: u32,
     /// Последнее число построенных PDF этого прогона ([`BuildProgress::carrying`]).
     built: std::sync::Mutex<Option<u32>>,
 }
 
-impl aruna::progress::Progress for WindowProgress {
+impl<F: Fn(BuildProgress) + Send + Sync> aruna::progress::Progress for WindowProgress<F> {
+    fn report_zenodo_notice(&self, notice: &aruna::zenodo::Notice<'_>) {
+        self.report(aruna::progress::Event::ZenodoNotice {
+            message: &crate::dto::zenodo_notice_text(notice),
+        });
+    }
+
     fn report(&self, event: aruna::progress::Event<'_>) {
-        use tauri_specta::Event as _;
         let mut last = self
             .built
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let _ = BuildProgress::of(self.job, &event)
-            .carrying(&mut last)
-            .emit(&self.app);
+        (self.emit)(BuildProgress::of(self.job, &event).carrying(&mut last));
     }
 }
 
@@ -182,7 +185,10 @@ pub(super) async fn start(
     in_slot(state, cancel, move || {
         let id = aruna::job::JobId::next();
         let sink = WindowProgress {
-            app: handle,
+            emit: |progress: BuildProgress| {
+                use tauri_specta::Event as _;
+                let _ = progress.emit(&handle);
+            },
             job: counted(id.get()),
             built: std::sync::Mutex::new(None),
         };
@@ -281,5 +287,43 @@ mod tests {
         let _next = building
             .claim(aruna::job::Cancel::new())
             .expect("после отравления место свободно");
+    }
+}
+
+#[cfg(test)]
+mod notice_tests {
+    use super::*;
+    use aruna::{progress::Progress, zenodo::Notice};
+
+    #[test]
+    fn the_window_emits_russian_notices_for_each_release_advisory() {
+        let notes = std::sync::Mutex::new(Vec::new());
+        let sink = WindowProgress {
+            emit: |event: BuildProgress| {
+                assert_eq!(event.stage, crate::dto::Stage::ZenodoNotice);
+                assert_eq!(event.job, 7);
+                notes.lock().unwrap().push(event.note.unwrap());
+            },
+            job: 7,
+            built: Default::default(),
+        };
+        for published in [Some("2026-11-19"), None] {
+            sink.report_zenodo_notice(&Notice::NewEdition {
+                record: 24373727,
+                published,
+                file: "TLHbasisONLINE25_1_ZENODO_Beta_04.zip",
+                pinned: 20328284,
+            });
+        }
+        sink.report_zenodo_notice(&Notice::DigestMismatch {
+            record: 20328284,
+            published: "abc",
+            expected: "def",
+        });
+        let notes = notes.into_inner().unwrap();
+        for (text, date) in notes[..2].iter().zip(["2026-11-19", "дата не указана"]) {
+            assert_eq!(text, &format!("Вышло новое издание корпуса: запись 24373727 на Zenodo ({date}), файл TLHbasisONLINE25_1_ZENODO_Beta_04.zip. Aruna продолжит сборку по записи 20328284: чтение документов проверено на этом издании."));
+        }
+        assert_eq!(notes[2], "Для записи 20328284 на Zenodo указана контрольная сумма MD5 abc. Aruna ожидает def. Если сумма скачанного архива с ней не совпадет, сборка остановится.");
     }
 }
