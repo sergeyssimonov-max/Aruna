@@ -416,7 +416,9 @@ destination and a label. Neither needs a window.
 Four things are missing, and each is a real piece of work rather than a
 formality.
 
-### 2.1 No `serde`
+### 2.1 Serialization at the boundary
+
+Since the edition-selection change of 2026-11-24, the core also uses the same locked serde and serde_json as the shell for publisher metadata and provenance in a saved package. Manuscript and presentation types continue to be independent of IPC. The rationale below records the earlier design.
 
 ~~Dependencies are `dirs`, `memchr`, `thiserror`, `ureq`, `zip`.~~ *Corrected
 2026-10-19:* the core's dependencies are `dirs`, `memchr`, `quick-xml`,
@@ -653,10 +655,7 @@ three headline totals come from the build report. If either read fails, the
 other details and the inventory action remain available. The separate «Без PDF»
 line appears only when refusals exceed the known XML objections.
 
-Download advisories reach the window in Russian. A newer record is identified
-by date (when known), record and archive name, alongside the record Aruna will
-use. A digest mismatch identifies both checksums. A failed metadata lookup is
-advisory, and a retry explains the failure without exposing a transport diagnostic.
+The window reads the installed edition with `corpus_edition` and queries the permanent TLHdig collection with `corpus_update`. Rust retains the verified record and its destination for `build_update`. The saved inventory remains available throughout the update. A failed or cancelled update returns to its summary. The published inventory identifies the verified archive actually opened. See [corpus editions](CORPUS-EDITIONS.md).
 
 **The types are generated, not written twice.** `frontend/src/bindings.ts` comes
 out of the same declarations that register the commands — specta 2.0.0-rc.25,
