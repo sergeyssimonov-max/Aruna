@@ -11,11 +11,9 @@
     "digest of the artifact that was published from it. Those are the facts a fallback point",
     "is actually made of, and they live here.",
     "",
-    "Five references. v1.0.5 is the floor, v1.0.9 closes the 1.x line, v2.5.11 and v2.6.3 are",
-    "the previous references, and v3.0.2 is the current one, published on 2026-10-28, the",
-    "first with the full text of editorial notes and the signs of the edition. v2.6.3 and",
-    "v2.5.11 stay beside it by the owner's decision of 2026-10-24 (part3-6): the references",
-    "are v3.0.2, v2.6.3 and v2.5.11.",
+    "Six references. v3.1.1 is the current reference. All five earlier entries are kept.",
+    "The descriptions below record why each release was selected at the time.",
+    "v3.1.0 was never a reference; its historical tag is retained.",
     "",
     "v3.0.1, a service build with the behaviour of v3.0.0, was published on 2026-10-26 and left",
     "the list on 2026-10-28 by the owner's decision (release-3.0.2): v3.0.2 takes its place as",
@@ -87,6 +85,13 @@
       "published": "2026-10-28T07:32:24Z",
       "dmg_sha256": "8e091d885996b5f97c555fd5687d5536b3de35981aee80f1e4e7ade3fcd4f334",
       "why": "The current release, the first whose PDFs show a document by the rules of the portal rather than its markup: editorial notes in full, the line of cuneiform read by the same parser as the text, the line number at the head of each line, the signs of the edition by HPMxml.css and, where it is silent, by the owner's decisions, the join signs in the header. The package it builds hashes to 37193d2a…acea over 47 654 files; against the package of v3.0.1, f5cf1c24…c109, its XML, inventory and other files are equal and it differs in manifest.json (run and pdfs.template) and the 23 713 PDFs, now 36 500 pages against 35 534. No PDF shows markup or an entity in its text or its document information; the text of 23 695 is equal to an expectation built from the source XML apart from the code, and the other 18 are read by the gate's own reader. The median PDF phase is 126.4 s against a limit of 145 s. The application the runner built, 0867ecde…c45b, is byte-for-byte the one the owner's machine built twice from the same commit, and diff -rq of the whole Aruna.app is empty. Revisions 174–177."
+    },
+    {
+      "tag": "v3.1.1",
+      "commit": "49c6f9ada805a192b9f8363b71d65d13015df281",
+      "published": "2026-11-23T06:56:18Z",
+      "dmg_sha256": "f2dd160a682f116c321722b13ea41aafb75bc779281054e1406b84de4100dc2e",
+      "why": "Preserves the previous corpus on publication and rollback errors. The universal disk image is reproducible and matches the release asset."
     }
   ]
 }

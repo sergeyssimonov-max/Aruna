@@ -20,9 +20,12 @@
 
 | В репозитории | Выпуск | Сумма образа |
 |---|---|---|
-| `Aruna_3.0.2-macos-universal.dmg` | v3.0.2, действующий | `8e091d885996b5f97c555fd5687d5536b3de35981aee80f1e4e7ade3fcd4f334` |
+| `Aruna_3.1.1-macos-universal.dmg` | v3.1.1, действующий | `f2dd160a682f116c321722b13ea41aafb75bc779281054e1406b84de4100dc2e` |
+| `Aruna_3.0.2-macos-universal.dmg` | v3.0.2 | `8e091d885996b5f97c555fd5687d5536b3de35981aee80f1e4e7ade3fcd4f334` |
 | `Aruna_2.6.3-macos-universal.dmg` | v2.6.3 | `e3137106d3af0354e318096d075b8bb01838e50750b13067df9df0d7250952c9` |
 | `Aruna_2.5.11-macos-universal.dmg` | v2.5.11 | `cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410` |
+
+Для [выпуска v3.1.1](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v3.1.1) сохранены образ и опубликованный файл сумм.
 
 Опорные v1.0.5 и v1.0.9 старше правила, их образы есть только на странице
 Releases.

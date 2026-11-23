@@ -4,8 +4,8 @@ What exists, how to run it, and what each profile is for.
 
 For the current development and release commands, follow [AGENTS.md](../AGENTS.md).
 The dated counts and timings below describe earlier measurements; the
-[3.1.0 acceptance report](CODEX-TRANSITION-3.1.0.md) records the current suite,
-coverage, corpus, native E2E and release artifacts. Run snapshot checks with
+[3.1.0 acceptance report](CODEX-TRANSITION-3.1.0.md) records the coverage, corpus, native E2E and artifacts for that version.
+The [3.1.1 release](https://github.com/sergeyssimonov-max/Aruna/releases/tag/v3.1.1) includes the published DMG and its checksum. Run snapshot checks with
 `INSTA_UPDATE=no`; dependency-resolving Cargo commands use `--locked`.
 From the repository root, native E2E is `pnpm --dir frontend test:e2e` and the
 universal release is `pnpm build --locked`. Both use the pinned local Tauri CLI.

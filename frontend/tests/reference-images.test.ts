@@ -216,6 +216,7 @@ describe('reference images', () => {
  * v2.6.3 and v2.5.11, with the digests of `Aruna-macos-universal.dmg` on
  * GitHub, read 2026-10-28; v3.0.1 left that day, replaced by v3.0.2, as
  * v3.0.0 had left on 2026-10-26.
+ * v3.1.1 adds a fourth published image; all three earlier copies are retained.
  * Compared by name: a copy that comes or goes without its own change here
  * fails, and so does a record that names another digest.
  */
@@ -223,10 +224,11 @@ const REFERENCES: Record<string, string> = {
   'v2.5.11': 'cfd92abe41ad8b0dc9d7665144a15675e54a346a7c86fee2079838ab92f32410',
   'v2.6.3': V263,
   'v3.0.2': '8e091d885996b5f97c555fd5687d5536b3de35981aee80f1e4e7ade3fcd4f334',
+  'v3.1.1': 'f2dd160a682f116c321722b13ea41aafb75bc779281054e1406b84de4100dc2e',
 }
 
 describe('the references kept in cli/releases/', () => {
-  it('are exactly v2.5.11, v2.6.3 and v3.0.2, each with its checksum file', () => {
+  it('are exactly v2.5.11, v2.6.3, v3.0.2 and v3.1.1, each with its checksum file', () => {
     const names = readdirSync(join(ROOT, 'cli', 'releases'))
       .filter((name) => name.startsWith('Aruna_'))
       .sort()
