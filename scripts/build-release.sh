@@ -50,29 +50,38 @@ fi
 export VITE_E2E=
 
 tauri_args=()
+bundles_selected=0
+want_dmg=0
+skip_bundle=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --ci|--no-bundle|--skip-stapling|--verbose|-v|-vv|-vvv|--help|-h|--version|-V)
+    --ci|--skip-stapling|--verbose|-v|-vv|-vvv)
+      tauri_args+=("$1")
+      shift
+      ;;
+    --no-bundle|--help|-h|--version|-V)
+      skip_bundle=1
       tauri_args+=("$1")
       shift
       ;;
     --bundles|-b)
-      tauri_args+=("$1")
       shift
-      bundles=0
+      case "${1:-}" in
+        app|dmg|app,dmg|dmg,app) ;;
+        *) echo "build-release: --bundles requires app, dmg, or both." >&2; exit 1 ;;
+      esac
+      bundles_selected=1
       while [ "$#" -gt 0 ]; do
         case "$1" in
-          app|dmg|app,dmg|dmg,app) tauri_args+=("$1"); shift; bundles=$((bundles + 1)) ;;
+          app) shift ;;
+          dmg|app,dmg|dmg,app) want_dmg=1; shift ;;
           *) break ;;
         esac
       done
-      if [ "$bundles" -eq 0 ]; then
-        echo "build-release: --bundles requires app, dmg, or both." >&2
-        exit 1
-      fi
       ;;
     --bundles=app|--bundles=dmg|--bundles=app,dmg|--bundles=dmg,app)
-      tauri_args+=("$1")
+      bundles_selected=1
+      case "$1" in *dmg*) want_dmg=1 ;; esac
       shift
       ;;
     --locked)
@@ -132,7 +141,70 @@ CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$root=/aruna${sep}--remap-path-pref
 export CARGO_ENCODED_RUSTFLAGS
 
 echo "build-release: $want_xcode, SDK $sdk, Node $node, rustc $commit"
-# --locked belongs to Cargo, not to Tauri's options. Keep it after the
-# separator so --bundles/--ci remain Tauri options and Cargo cannot rewrite the
-# release's dependency graph.
-exec tauri build --target universal-apple-darwin ${tauri_args[@]+"${tauri_args[@]}"} -- --locked
+# Tauri signs the universal app. Package that exact app with the same image
+# builder locally and in CI. The image has its own reproducibility contract.
+if [ "$skip_bundle" -eq 1 ]; then
+  exec tauri build --target universal-apple-darwin ${tauri_args[@]+"${tauri_args[@]}"} -- --locked
+fi
+if [ "$bundles_selected" -eq 0 ]; then
+  want_dmg=1
+fi
+if [ "$want_dmg" -eq 1 ]; then
+  # git archive omits .git. Its caller supplies the archived commit's epoch.
+  epoch=${SOURCE_DATE_EPOCH:-}
+  if [ -e "$root/.git" ]; then
+    commit_epoch=$(git -C "$root" show -s --format=%ct HEAD)
+    if [ -n "$epoch" ] && [ "$epoch" != "$commit_epoch" ]; then
+      echo "build-release: SOURCE_DATE_EPOCH differs from the commit timestamp." >&2
+      exit 1
+    fi
+    epoch=$commit_epoch
+  fi
+  # The timestamp belongs to the image. Keep the compiler environment identical
+  # whether the timestamp came from Git or was supplied for an archive.
+  unset SOURCE_DATE_EPOCH
+  case "$epoch" in
+    ''|*[!0-9]*) echo "build-release: DMG packaging requires the Git commit timestamp in SOURCE_DATE_EPOCH." >&2; exit 1 ;;
+  esac
+fi
+
+# Cargo resolves a relative target directory against its working directory.
+# Give Tauri and the packager the same absolute path when the caller sets one.
+case "${CARGO_TARGET_DIR:-}" in
+  ''|/*) ;;
+  *) export CARGO_TARGET_DIR="$root/$CARGO_TARGET_DIR" ;;
+esac
+tauri build --target universal-apple-darwin ${tauri_args[@]+"${tauri_args[@]}"} --bundles app -- --locked
+if [ "$want_dmg" -eq 0 ]; then
+  exit 0
+fi
+
+bundle="${CARGO_TARGET_DIR:-$root/target}/universal-apple-darwin/release/bundle"
+app="$bundle/macos/Aruna.app"
+version=$(/usr/bin/python3 -IB -c '
+import plistlib, sys
+with open(sys.argv[1], "rb") as stream:
+    print(plistlib.load(stream)["CFBundleShortVersionString"])
+' "$app/Contents/Info.plist")
+if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]; then
+  echo "build-release: invalid bundle version for the image filename." >&2
+  exit 1
+fi
+image="Aruna_${version}_universal.dmg"
+mkdir -p "$bundle/dmg"
+stage=$(mktemp -d "$bundle/dmg/.aruna-dmg.XXXXXXXX")
+trap 'rm -f "$stage/$image"; rmdir "$stage"' EXIT
+SOURCE_DATE_EPOCH="$epoch" /usr/bin/python3 -IB "$root/scripts/build-repro-dmg.py" "$app" "$stage/$image"
+
+# Publish only the verified, complete image. os.replace never moves a source
+# into an unexpected directory, and the temporary file is on the same volume.
+/usr/bin/python3 -IB -c '
+import os, stat, sys
+source, destination = sys.argv[1:]
+if not stat.S_ISREG(os.lstat(source).st_mode) or os.stat(source).st_size == 0:
+    sys.exit("build-release: the packager produced no regular, nonempty image.")
+if os.path.lexists(destination) and not stat.S_ISREG(os.lstat(destination).st_mode):
+    sys.exit("build-release: unexpected output type at " + destination)
+os.replace(source, destination)
+' "$stage/$image" "$bundle/dmg/$image"
+echo "build-release: verified $bundle/dmg/$image"

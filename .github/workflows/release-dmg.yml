@@ -678,18 +678,14 @@ jobs:
       # self-hosted runners) — on a machine that is not thrown away after the
       # job that is rustup's own proxies.
 
-      # `pnpm build` in the root is `tauri build --target universal-apple-darwin`
-      # — the same command a developer runs, so what CI publishes is what the
-      # machine that made it produced. It builds the frontend first through
-      # `beforeBuildCommand`, packs `Aruna.app`, and writes the DMG beside it.
-      # Signing is ad hoc and declared in `tauri.conf.json`; no `codesign` call
-      # belongs here, because a second mechanism is a second thing to keep in
-      # step.
+      # The same entry point runs locally and here. Tauri signs the universal
+      # application with the configured ad hoc identity. The release script
+      # packages it in a reproducible UDZO and verifies the mounted result.
       - name: Build .app + DMG
         run: pnpm build
 
       # The published asset keeps the name readers and `reference-release.json`
-      # already know. Tauri names the image after the product and its version;
+      # already know. The local image name includes the product and its version;
       # renaming it here rather than teaching every reader a new name is the
       # smaller change, and the digest is taken after the rename so it describes
       # the file that is actually attached to the release.
@@ -713,6 +709,24 @@ jobs:
           lipo -info "$bundle/macos/Aruna.app/Contents/MacOS/aruna-desktop"
           lipo -info "$bundle/macos/Aruna.app/Contents/MacOS/aruna-desktop" | grep -q x86_64
           lipo -info "$bundle/macos/Aruna.app/Contents/MacOS/aruna-desktop" | grep -q arm64
+
+      # An annotated release tag can pin the exact image accepted before
+      # tagging. Refuse publication if this independent tag build differs.
+      - name: Verify the image checksum recorded on the release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          ref="refs/tags/$GITHUB_REF_NAME"
+          if [ "$(git cat-file -t "$ref")" = tag ]; then
+            checksum=$(git for-each-ref --format='%(contents:trailers:key=DMG-SHA256,valueonly)' "$ref")
+            if [ -n "$checksum" ]; then
+              if ! [[ "$checksum" =~ ^[a-f0-9]{64}$ ]]; then
+                echo "::error::Invalid DMG-SHA256 in the release tag."
+                exit 1
+              fi
+              (cd releases && printf '%s  Aruna-macos-universal.dmg\n' "$checksum" | shasum -a 256 -c -)
+            fi
+          fi
 
       # Handed to the publish job below and wanted by nothing afterwards: what a
       # release keeps is the DMG attached to it, not this. At the default
