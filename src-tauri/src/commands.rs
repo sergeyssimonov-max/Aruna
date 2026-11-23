@@ -1,4 +1,4 @@
-//! Шесть команд окна и единая регистрация для IPC и генерации bindings.
+//! Команды окна и единая регистрация для IPC и генерации bindings.
 
 use crate::build::{self, Building};
 use crate::dto::{
@@ -20,11 +20,20 @@ pub(super) fn said(error: impl std::fmt::Display) -> String {
 
 #[tauri::command]
 #[specta::specta]
-fn corpus_location() -> Result<CorpusLocation, String> {
+fn corpus_location(app: tauri::AppHandle) -> Result<CorpusLocation, String> {
     let downloads = aruna::paths::downloads_dir().map_err(|_| said(CommandError::Downloads))?;
-    let package = downloads.join(aruna::export::PACKAGE);
-    let inventory = package.join(aruna::paths::OUTPUT_FILE_NAME);
+    use tauri::Manager as _;
+    let chosen = app
+        .path()
+        .app_config_dir()
+        .ok()
+        .and_then(|dir| build::last_library(&dir));
+    let parent = chosen.as_deref().unwrap_or(&downloads);
+    let (package, inventory) = aruna::editions::library_paths(parent);
     Ok(CorpusLocation {
+        destination: chosen
+            .filter(|p| p != &downloads)
+            .map(|p| p.display().to_string()),
         downloads: downloads.display().to_string(),
         package: package.display().to_string(),
         inventory: inventory.display().to_string(),
@@ -75,7 +84,11 @@ fn open_inventory(app: tauri::AppHandle, path: String) -> Result<(), String> {
 /// папки или из отчета сборки – а нажимают на кнопку позже, и между тем и
 /// другим файл могли убрать.
 pub(super) fn named_inventory(path: &std::path::Path) -> Result<(), CommandError> {
-    if path.file_name() != Some(std::ffi::OsStr::new(aruna::paths::OUTPUT_FILE_NAME)) {
+    if !matches!(
+        path.file_name().and_then(|s| s.to_str()),
+        Some(aruna::paths::OUTPUT_FILE_NAME | aruna::paths::LEGACY_INVENTORY)
+    ) || path.parent().is_some_and(is_link)
+    {
         return Err(CommandError::NotInventory);
     }
     // Ссылка под именем описи – не опись: opener открыл бы то, на что она
@@ -87,6 +100,40 @@ pub(super) fn named_inventory(path: &std::path::Path) -> Result<(), CommandError
         return Err(CommandError::InventoryGone);
     }
     Ok(())
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+fn corpus_edition(path: String) -> Result<Option<String>, String> {
+    let path = std::path::Path::new(&path);
+    named_package(path).map_err(said)?;
+    aruna::editions::installed_caption(path)
+        .map_err(|_| "Не удалось прочитать сведения об издании.".to_owned())
+}
+
+#[derive(Default)]
+pub(super) struct PendingUpdate(std::sync::Mutex<Option<aruna::editions::Update>>);
+
+impl PendingUpdate {
+    fn slot(&self) -> std::sync::MutexGuard<'_, Option<aruna::editions::Update>> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+fn corpus_update(path: String, pending: tauri::State<'_, PendingUpdate>) -> Result<bool, String> {
+    let path = std::path::Path::new(&path);
+    named_package(path).map_err(said)?;
+    let update = aruna::editions::check_update(path).map_err(|e| match e {
+        aruna::error::ArunaError::Edition(issue) => issue.russian().to_owned(),
+        _ => "Не удалось проверить новые издания на Zenodo. Сохраненная опись доступна.".into(),
+    })?;
+    let available = update.is_some();
+    *pending.slot() = update;
+    Ok(available)
 }
 
 /// Числа о пакете, который лежит по этому пути.
@@ -127,9 +174,8 @@ fn corpus_xml(path: String) -> Result<XmlSummary, String> {
 
 /// Собрать корпус и сказать, что вышло.
 ///
-/// Две оси, и они разные. **Источник один** – закрепленная запись Zenodo через
-/// кеш, то есть ровно то, что делает консольный бинарь: архива команда не
-/// принимает вовсе, решением владельца 06.09.2026. **Назначение выбирается:**
+/// Ядро выбирает текущее издание TLHdig на Zenodo, как при сборке из консоли.
+/// Команда не принимает путь к архиву. **Назначение выбирается:**
 /// `destination` – папка, названная человеком, `null` – папка загрузок. Ядро
 /// умело это с самого начала, `app::build_corpus_into`; окно до него не
 /// дотягивалось. Путь приходит строкой и проверяется здесь: окно файловых ручек
@@ -150,7 +196,20 @@ async fn build_corpus(
     state: tauri::State<'_, Building>,
     destination: Option<String>,
 ) -> Result<BuildReport, BuildFailure> {
-    build::start(app, state.inner(), destination).await
+    build::start(app, state.inner(), destination, None).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn build_update(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Building>,
+    pending: tauri::State<'_, PendingUpdate>,
+) -> Result<BuildReport, BuildFailure> {
+    let update = pending.slot().take().ok_or_else(|| {
+        BuildFailure::shell("edition", "Нет подтвержденного нового издания.", false)
+    })?;
+    build::start(app, state.inner(), None, Some(update)).await
 }
 
 /// Попросить текущую сборку остановиться.
@@ -181,6 +240,9 @@ pub(super) fn contract() -> tauri_specta::Builder<tauri::Wry> {
         .commands(tauri_specta::collect_commands![
             corpus_location,
             corpus_stats,
+            corpus_edition,
+            corpus_update,
+            build_update,
             corpus_xml,
             open_inventory,
             build_corpus,

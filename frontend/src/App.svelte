@@ -25,12 +25,12 @@
    * строкой: она показала бы читателю пустое место вместо забытого имени.
    */
   const STAGES: Record<Stage, string> = {
-    'cache-unusable': 'Кеш загрузок не годится – беру архив заново',
-    'cached-archive-rejected': 'Архив из кеша не подошел – скачиваю заново',
-    'archive-from-cache': 'Архив нашелся в кеше',
-    'zenodo-notice': 'Hethitologie-Portal Mainz просит передать',
-    'zenodo-unreachable': 'Hethitologie-Portal Mainz не отвечает',
-    'proxy-unusable': 'Прокси из окружения не годится – соединяюсь напрямую',
+    'cache-unusable': 'Сохранить архив для повторной сборки не удалось',
+    'cached-archive-rejected': 'Сохраненная копия архива не прошла проверку',
+    'archive-from-cache': 'Использую сохраненную копию архива',
+    'zenodo-notice': 'Сведения об издании корпуса',
+    'zenodo-unreachable': 'Сведения Zenodo сейчас недоступны',
+    'proxy-unusable': 'Подключаюсь к Zenodo напрямую',
     downloading: 'Скачиваю архив',
     'download-retrying': 'Повторяю загрузку',
     'archive-kept': 'Архив сохранен',
@@ -114,15 +114,17 @@
   const heading: string = $derived.by(() => {
     switch (screen.kind) {
       case 'reading':
-        return `Смотрю, что уже собрано`
+        return `Проверка библиотеки`
       case 'absent':
         return `Библиотеки ${CORPUS} здесь еще нет`
       case 'present':
         return `Библиотека ${CORPUS} готова к работе`
       case 'unreadable':
-        return `О библиотеке ${CORPUS} сказать нечего`
+        return `Не удалось прочитать сведения о библиотеке ${CORPUS}`
       case 'building':
-        return `Собираю библиотеку ${CORPUS}`
+        return screen.previousInventory === null
+          ? `Собираю библиотеку ${CORPUS}`
+          : `Обновляю библиотеку ${CORPUS}`
       case 'built':
         return `Библиотека ${CORPUS} собрана`
       case 'failed':
@@ -136,16 +138,17 @@
     <h1>{heading}</h1>
 
     {#if screen.kind === 'reading'}
-      <p class="about">Читаю, что собрано…</p>
+      <p class="about">Читаю сведения о сохраненной описи…</p>
     {:else if screen.kind === 'absent'}
       <p class="about">
-        Программа возьмет TLHdig с Hethitologie-Portal Mainz (запись на Zenodo), разложит корпус по
-        папкам в загрузках и создаст опись – один файл HTML, который открывается в браузере без
-        сети. Сборка занимает около двух минут.
+        Aruna проверит, какое издание TLHdig опубликовано Hethitologie-Portal Mainz на Zenodo, и
+        соберет библиотеку рукописей. Опись и документы можно читать без подключения к сети. Сборка
+        обычно занимает несколько минут.
       </p>
     {:else if screen.kind === 'present' || screen.kind === 'built'}
       {@const spread = screen.kind === 'present' ? screen.stats.spread : screen.spread}
       {@const markup = screen.markup}
+      {#if state.edition}<p class="where">{state.edition}</p>{/if}
       {#if screen.kind === 'present'}
         <p class="metrics">
           <span>Рукописей – <span class="count">{spaced(screen.stats.manuscripts)}</span></span>
@@ -212,12 +215,10 @@
               </span>
             </p>
             <p class="markup-about">
-              Программа их не читает: разметка каждого нарушает правила XML или правила пространств
-              имен.
+              Из-за особенностей исходной разметки Aruna не может подготовить для них PDF.
             </p>
             <p class="markup-about">
-              Все они лежат в пакете вместе с остальными и открываются как обычно – такая разметка
-              мешает переводу в PDF, а не хранению.
+              Все эти рукописи сохранены в библиотеке в формате XML.
               {#if screen.kind === 'built'}
                 В описи ссылка на такой документ открывает его XML.
               {/if}
@@ -253,7 +254,7 @@
             </span>
           </p>
         {/if}
-        <p class="where">Пакет – {screen.report.package}</p>
+        <p class="where">Папка библиотеки – {screen.report.package}</p>
       {/if}
     {:else if screen.kind === 'building'}
       <p class="stage">{stage}</p>
@@ -330,6 +331,12 @@
   <div class="foot">
     <div class="controls">
       {#if screen.kind === 'building'}
+        {@const inventory = screen.previousInventory}
+        {#if inventory !== null}
+          <button type="button" class="control" onclick={() => void reveal(inventory)}>
+            Открыть опись
+          </button>
+        {/if}
         <button
           type="button"
           class="control"
@@ -360,7 +367,11 @@
           >
             Открыть опись
           </button>
-          <button type="button" class="control control-quiet" onclick={() => void build(null)}>
+          <button
+            type="button"
+            class="control control-quiet"
+            onclick={() => void build(state.destination)}
+          >
             Пересобрать
           </button>
         {:else}
@@ -368,7 +379,7 @@
             type="button"
             class="control"
             data-testid="primary"
-            onclick={() => void build(null)}
+            onclick={() => void build(state.destination)}
           >
             Пересобрать
           </button>
@@ -386,7 +397,11 @@
         >
           Открыть опись
         </button>
-        <button type="button" class="control control-quiet" onclick={() => void build(null)}>
+        <button
+          type="button"
+          class="control control-quiet"
+          onclick={() => void build(state.destination)}
+        >
           Пересобрать
         </button>
         <button type="button" class="control control-quiet" onclick={() => void pickFolder()}>
@@ -419,9 +434,7 @@
         </button>
       {:else if screen.kind === 'failed' && screen.failure.retryable}
         <!--
-          Повтор повторяет тот же прогон: ту же закрепленную запись Zenodo – и
-          ту же папку, если ее выбирали. Кнопка, которая после отказа делает не
-          то же самое, ответила бы не на тот вопрос.
+          Повтор проверяет издание заново и сохраняет выбранную папку.
         -->
         <button
           type="button"
@@ -498,8 +511,8 @@
     </div>
     {#if state.stopping}
       <p class="patience">
-        Это может занять несколько секунд: запрос к Hethitologie-Portal Mainz и подсчет контрольной
-        суммы архива прервать нельзя, сборка остановится на ближайшем документе.
+        Это может занять несколько секунд: запрос к Zenodo и подсчет контрольной суммы архива
+        прервать нельзя, сборка остановится на ближайшем документе.
       </p>
     {/if}
   </div>

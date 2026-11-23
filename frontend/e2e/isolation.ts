@@ -85,12 +85,12 @@ export async function freePort(): Promise<number> {
 
 /** The processes this one started whose command is `binary`. */
 export function childrenRunning(binary: string): number[] {
-  const out = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,args='], { encoding: 'utf8' })
+  const out = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,comm='], { encoding: 'utf8' })
   return out
     .split('\n')
     .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/))
     .filter((m): m is RegExpMatchArray => m !== null)
-    .filter((m) => Number(m[2]) === process.pid && m[3].split(' ')[0].endsWith(binary))
+    .filter((m) => Number(m[2]) === process.pid && (m[3] === binary || m[3].endsWith('/' + binary)))
     .map((m) => Number(m[1]))
 }
 

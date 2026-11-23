@@ -27,6 +27,9 @@ import type { BuildFailure, BuildProgress, BuildReport, CorpusStats, XmlSummary 
  */
 const {
   corpusLocation,
+  corpusEdition,
+  corpusUpdate,
+  buildUpdate,
   corpusStats,
   corpusXml,
   buildCorpus,
@@ -37,6 +40,9 @@ const {
   openInventory,
 } = vi.hoisted(() => ({
   corpusLocation: vi.fn(),
+  corpusEdition: vi.fn(),
+  corpusUpdate: vi.fn(),
+  buildUpdate: vi.fn(),
   corpusStats: vi.fn(),
   corpusXml: vi.fn(),
   buildCorpus: vi.fn(),
@@ -48,7 +54,17 @@ const {
 }))
 
 vi.mock('./bindings', () => ({
-  commands: { corpusLocation, corpusStats, corpusXml, openInventory, buildCorpus, cancelBuild },
+  commands: {
+    corpusEdition,
+    corpusUpdate,
+    buildUpdate,
+    corpusLocation,
+    corpusStats,
+    corpusXml,
+    openInventory,
+    buildCorpus,
+    cancelBuild,
+  },
   events: { buildProgress: { listen } },
 }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open }))
@@ -261,6 +277,8 @@ async function primary(): Promise<HTMLElement> {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  corpusEdition.mockReset().mockResolvedValue(ok(null))
+  corpusUpdate.mockReset().mockResolvedValue(ok(false))
   listen.mockImplementation((callback: (event: { payload: BuildProgress }) => void) => {
     emit = (payload: BuildProgress) => {
       callback({ payload })
@@ -418,7 +436,9 @@ describe('пакет есть', () => {
     expect(await screen.findByText(/Не могут быть преобразованы/)).toBeInTheDocument()
     expect(screen.getByText('223')).toBeInTheDocument()
     // Не только числа: экран обязан сказать словами, что документы на месте.
-    expect(screen.getByText(/лежат в пакете вместе с остальными/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/все эти рукописи сохранены в библиотеке в формате XML/i),
+    ).toBeInTheDocument()
     // Ни одного слова, приписывающего документу то, чего с ним не делали.
     // Список русский с 06.09.2026, вместе с самим экраном: английские слова
     // после перевода не встретились бы никогда и проверку обессмыслили бы.
@@ -449,9 +469,9 @@ describe('пакет есть', () => {
 
     const about = aboutText(container)
 
-    expect(about).toContain('Программа их не читает')
-    expect(about).toContain('лежат в пакете вместе с остальными')
-    expect(about).toContain('такая разметка мешает переводу в PDF, а не хранению.')
+    expect(about).toContain('исходной разметки')
+    expect(about).toContain('не может подготовить для них PDF')
+    expect(about).toContain('Все эти рукописи сохранены в библиотеке в формате XML.')
     // Составляющих на экране нет – ни списка, ни его чисел, ни отсылки к
     // манифесту, которая была при них.
     expect(container.querySelectorAll('.markup-parts')).toHaveLength(0)
@@ -612,7 +632,7 @@ describe('ничего не собрано', () => {
     const container = await overNothing()
 
     const about = container.querySelector('.about')?.textContent?.replace(/\s+/g, ' ')
-    expect(about).toContain('Сборка занимает около двух минут.')
+    expect(about).toContain('Сборка обычно занимает несколько минут.')
     expect(about).not.toContain('с небольшим')
   })
 
@@ -983,7 +1003,7 @@ describe('кончилось', () => {
   it('называет пакет, и младших счетчиков на экране нет', async () => {
     const container = await ran(ok(report({ disambiguated: 4, stylesheet_dropped: 7 })))
 
-    expect(await screen.findByText(`Пакет – ${PACKAGE}`)).toBeInTheDocument()
+    expect(await screen.findByText(`Папка библиотеки – ${PACKAGE}`)).toBeInTheDocument()
     expect(screen.queryByText(/Переименовано из-за совпадения/)).toBeNull()
     expect(screen.queryByText(/С лишней ссылкой на оформление/)).toBeNull()
     const counts = Array.from(container.querySelectorAll('.metrics .count')).map(
@@ -1065,7 +1085,7 @@ describe('кончилось', () => {
     await overPackage(STATS_SAMPLE.manifest)
     corpusStats.mockRejectedValueOnce(new Error('read failed'))
     await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
-    await screen.findByText(`Пакет – ${other}`)
+    await screen.findByText(`Папка библиотеки – ${other}`)
     expect(corpusStats).toHaveBeenLastCalledWith(other)
     expect(corpusXml).toHaveBeenLastCalledWith(other)
     expect(screen.queryByText(/Самая большая группа/)).toBeNull()
@@ -1156,9 +1176,7 @@ describe('кончилось', () => {
   it('на retryable-отказе предлагает «Повторить» и повторяет тот же прогон', async () => {
     await ran(bad(failure()))
 
-    expect(
-      await screen.findByText(/Не удалось связаться с Hethitologie-Portal Mainz/),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/Не удалось связаться с Zenodo/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Собрать не удалось')
 
     buildCorpus.mockClear()
@@ -1222,15 +1240,15 @@ describe('кончилось', () => {
    * обрывается мост.
    */
   it.each([
-    ['network', /Не удалось связаться с Hethitologie-Portal Mainz \(запись на Zenodo\)/],
-    ['server_busy', /Hethitologie-Portal Mainz \(запись на Zenodo\) сейчас не успевает отвечать/],
-    ['http', /Hethitologie-Portal Mainz \(запись на Zenodo\) отказался отдать файл/],
+    ['network', /Не удалось связаться с Zenodo/],
+    ['server_busy', /Zenodo временно недоступен/],
+    ['http', /Zenodo не предоставил архив этого издания/],
     ['truncated', /Загрузка оборвалась на полпути/],
     ['oversized', /Ответ оказался длиннее, чем сервер сам объявил/],
-    ['checksum', /Архив скачался целиком, но его контрольная сумма не совпала/],
+    ['checksum', /Полученный архив отличается от архива, указанного издателем/],
     ['archive_unreadable', /Архив не читается: он поврежден/],
     ['archive_empty', /В архиве нет ни одного документа XML/],
-    ['archive_too_many_entries', /В архиве больше записей, чем программа готова прочитать/],
+    ['archive_too_many_entries', /В архиве больше записей, чем Aruna может безопасно обработать/],
     ['document_too_large', /Один документ в архиве больше допустимого предела/],
     ['distorted', /Документ изменился при обработке сверх допустимого/],
     [
@@ -1451,4 +1469,84 @@ it('снимает подписку даже при регистрации по�
   expect(unlisten).not.toHaveBeenCalled()
   pending.settle(unlisten)
   await vi.waitFor(() => expect(unlisten).toHaveBeenCalledTimes(1))
+})
+
+describe('проверка издания при открытии библиотеки', () => {
+  const previous = 'Издание корпуса – Beta 0.3 (2026-05-21).'
+  const current = 'Издание корпуса – Beta 0.4 (2026-11-19).'
+
+  it('дает открыть прежнюю опись во время проверки и собирает только подтвержденное новое издание', async () => {
+    const answer = deferred<ReturnType<typeof ok<boolean>>>()
+    const updating = deferred<ReturnType<typeof ok<BuildReport>>>()
+    corpusEdition.mockResolvedValueOnce(ok(previous)).mockResolvedValue(ok(current))
+    corpusUpdate.mockReturnValue(answer.promise)
+    buildUpdate.mockReturnValue(updating.promise)
+    await overPackage()
+    await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
+    expect(openInventory).toHaveBeenCalledWith(INVENTORY)
+    expect(screen.getByText(previous)).toBeInTheDocument()
+    answer.settle(ok(true))
+    await screen.findByRole('heading', { name: /Обновляю библиотеку/ })
+    await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
+    expect(openInventory).toHaveBeenCalledTimes(2)
+    expect(openInventory).toHaveBeenLastCalledWith(INVENTORY)
+    updating.settle(ok(report()))
+    expect(await screen.findByText(current)).toBeInTheDocument()
+    expect(buildUpdate).toHaveBeenCalledTimes(1)
+    expect(buildCorpus).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { code: 'checksum', cancelled: false },
+    { code: 'cancelled', cancelled: true },
+  ])(
+    'возвращается к прежней описи после автоматического обновления с исходом $code',
+    async (cause) => {
+      const answer = deferred<ReturnType<typeof ok<boolean>>>()
+      corpusEdition.mockResolvedValue(ok(previous))
+      corpusUpdate.mockReturnValue(answer.promise)
+      buildUpdate.mockResolvedValue(bad(failure({ ...cause, retryable: false })))
+      await overPackage()
+      answer.settle(ok(true))
+      expect(await screen.findByText(/Можно открыть прежнюю опись/)).toBeInTheDocument()
+      await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
+      expect(openInventory).toHaveBeenCalledWith(INVENTORY)
+      expect(screen.getByText(previous)).toBeInTheDocument()
+    },
+  )
+
+  it('пересобирает библиотеку в последней успешно выбранной папке', async () => {
+    open.mockResolvedValue(FOLDER)
+    buildCorpus.mockResolvedValue(ok(report({ package: FOLDER + '/TLHdig' })))
+    await overNothing()
+    await fireEvent.click(screen.getByRole('button', { name: 'Собрать в папку…' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Пересобрать' }))
+    expect(buildCorpus.mock.calls).toEqual([[FOLDER], [FOLDER]])
+  })
+
+  it('не запускает вторую сборку по запоздалому ответу после ручного выбора', async () => {
+    const answer = deferred<ReturnType<typeof ok<boolean>>>()
+    corpusEdition.mockResolvedValue(ok(previous))
+    corpusUpdate.mockReturnValue(answer.promise)
+    buildCorpus.mockReturnValue(deferred<unknown>().promise)
+    await overPackage()
+    await fireEvent.click(screen.getByRole('button', { name: 'Пересобрать' }))
+    answer.settle(ok(true))
+    await tick()
+    expect(buildCorpus).toHaveBeenCalledTimes(1)
+    expect(buildUpdate).not.toHaveBeenCalled()
+  })
+
+  it.each([ok(false), bad('Проверка Zenodo временно недоступна.')])(
+    'сохраняет доступ к прежнему изданию без обновления',
+    async (result) => {
+      corpusEdition.mockResolvedValue(ok(previous))
+      corpusUpdate.mockResolvedValue(result)
+      await overPackage()
+      expect(buildUpdate).not.toHaveBeenCalled()
+      expect(screen.getByText(previous)).toBeInTheDocument()
+      if (result.status === 'error')
+        expect(await screen.findByText(result.error)).toBeInTheDocument()
+    },
+  )
 })

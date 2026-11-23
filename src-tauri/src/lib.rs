@@ -107,6 +107,7 @@ pub fn run() {
         // защиту логгера ниже текстовым поиском относительно `tauri_plugin_log`,
         // и вставка в `setup` сдвинула бы то, что он ищет.
         .manage(Building::default())
+        .manage(commands::PendingUpdate::default())
         .manage(FontResources::default())
         .invoke_handler(contract.invoke_handler())
         .setup(move |app| {

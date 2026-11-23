@@ -8,6 +8,7 @@
 /// реализации, расходящиеся при первой же правке ядра.
 #[derive(serde::Serialize, specta::Type)]
 pub(crate) struct CorpusLocation {
+    pub(super) destination: Option<String>,
     pub(super) downloads: String,
     pub(super) package: String,
     pub(super) inventory: String,
@@ -234,6 +235,8 @@ pub(crate) struct BuildProgress {
 pub(super) fn zenodo_notice_text(notice: &aruna::zenodo::Notice<'_>) -> String {
     use aruna::zenodo::Notice;
     match notice {
+        Notice::Selected { title, published } => format!("Издание корпуса – {} ({published}).", title.replace("Beta Version ", "Beta ")),
+        Notice::Offline { title, published } => format!("Связи с Zenodo нет. Для сборки используется сохраненное издание {} ({published}).", title.replace("Beta Version ", "Beta ")),
         Notice::NewEdition { record, published, file, pinned } => format!(
             "Вышло новое издание корпуса: запись {record} на Zenodo ({}), файл {file}. \
              Aruna продолжит сборку по записи {pinned}: чтение документов проверено на этом издании.",

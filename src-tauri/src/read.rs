@@ -50,7 +50,10 @@ pub(crate) enum XmlSummaryError {
 /// Есть ли каталог на месте, здесь не спрашивается: на это у читателей свой
 /// отказ, `Missing`, и окно различает «не пакет» и «пакета нет».
 pub(crate) fn named_package(path: &std::path::Path) -> Result<(), CommandError> {
-    if path.file_name() != Some(std::ffi::OsStr::new(aruna::export::PACKAGE)) {
+    if !matches!(
+        path.file_name().and_then(|s| s.to_str()),
+        Some(aruna::export::PACKAGE | aruna::export::LEGACY_PACKAGE)
+    ) {
         return Err(CommandError::NotPackage);
     }
     // И не ссылка под этим именем: она увела бы чтение манифеста куда угодно.
