@@ -140,8 +140,37 @@ fn read_archive<P: Probe>(
     probe: &mut P,
     job: &Job<'_>,
 ) -> Result<Vec<ManuscriptRecord>> {
-    let mut archive = open_archive(zip_path)?;
+    read_open(open_archive(zip_path)?, probe, job)
+}
 
+/// The legacy standalone inventory also attributes the bytes behind one open handle.
+pub(crate) fn parse_identified(
+    path: &Path,
+    job: &Job<'_>,
+    edition: Option<&crate::editions::Edition>,
+) -> Result<(Vec<ManuscriptRecord>, Option<crate::editions::Edition>)> {
+    let mut file = open_zip_file(path)?;
+    let digest = crate::md5::md5_stream(&mut file).map_err(ArunaError::io(path))?;
+    let edition = match edition {
+        Some(e) => {
+            e.verify_bytes(
+                path,
+                &digest,
+                file.metadata().map_err(ArunaError::io(path))?.len(),
+            )?;
+            Some(e.clone())
+        }
+        None => crate::editions::known_digest(&digest),
+    };
+    let records = read_open(zip_from_handle(file, path)?, &mut Untimed, job)?;
+    Ok((records, edition))
+}
+
+fn read_open<P: Probe>(
+    mut archive: ZipArchive<BufReader<File>>,
+    probe: &mut P,
+    job: &Job<'_>,
+) -> Result<Vec<ManuscriptRecord>> {
     let mut records = Vec::new();
     let mut skipped = Skipped::default();
     let mut scratch = Scratch {

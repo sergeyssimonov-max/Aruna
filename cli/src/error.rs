@@ -5,6 +5,8 @@ use std::path::PathBuf;
 /// Application-level error with enough context for the CLI and tests.
 #[derive(Debug, thiserror::Error)]
 pub enum ArunaError {
+    #[error("{0}")]
+    Edition(#[from] crate::editions::EditionIssue),
     #[error("network error while downloading {url}: {source}")]
     Network {
         url: String,

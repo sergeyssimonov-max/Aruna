@@ -33,7 +33,7 @@ use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
 /// What the CLI names its output, from `paths::OUTPUT_FILE_NAME`.
-const OUTPUT: &str = "TLHdig_Beta_0.3.html";
+const OUTPUT: &str = "TLHdig.html";
 
 /// A manuscript in the shape the corpus writes them.
 fn manuscript(siglum: &str) -> String {
@@ -65,7 +65,7 @@ impl Sandbox {
     /// The inventory a reader opens — inside the package since 2.3.0.
     ///
     /// There used to be a second one beside it, under the same name and
-    /// without links. Two files called `TLHdig_Beta_0.3.html` in one folder,
+    /// without links. Two files called `TLHdig.html` in one folder,
     /// one of them linkless, is the file a reader opens first and the reason
     /// they conclude the links are missing. There is one now.
     fn output(&self) -> PathBuf {

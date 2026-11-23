@@ -1,18 +1,6 @@
-//! Asking Zenodo about the record before downloading from it.
-//!
-//! The archive itself is fetched as one file — see [`crate::download`] — and
-//! that is the right shape: the record holds a single 71 MiB ZIP and no
-//! per-document access, so reading it in pieces would mean 23 937 range
-//! requests against a 133-per-minute rate limit, three hours to save 29 MiB.
-//!
-//! What the API is good for is the two things the program otherwise guesses at:
-//! the digest the archive is published with, and whether a newer edition of the
-//! corpus exists. Both come from one request.
-//!
-//! Nothing here is required. The metadata request is made only when the archive
-//! is about to be downloaded anyway, and a failure is reported rather than
-//! raised: a repository that will not answer questions about a file can still
-//! serve it.
+//! Advisories for callers explicitly requesting the historical Beta 0.3 archive,
+//! and typed publication notices shared by the CLI and desktop. The normal
+//! build selects and validates the current edition in [`crate::editions`].
 
 use crate::error::{ArunaError, Result};
 use std::time::Duration;
@@ -78,6 +66,14 @@ fn parse_release(body: &str) -> Option<Release> {
 /// Differences between the published record and the archive used by this build.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Notice<'a> {
+    Selected {
+        title: &'a str,
+        published: &'a str,
+    },
+    Offline {
+        title: &'a str,
+        published: &'a str,
+    },
     NewEdition {
         record: u64,
         published: Option<&'a str>,
@@ -94,6 +90,8 @@ pub enum Notice<'a> {
 impl std::fmt::Display for Notice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Selected { title, published } => write!(f, "Corpus edition: {title} ({published})."),
+            Self::Offline { title, published } => write!(f, "Zenodo is unavailable. Using the verified archive of {title} ({published})."),
             Self::NewEdition { record, published, file, pinned } => write!(
                 f,
                 "A newer edition of the corpus is published: Zenodo record {record} ({}), file {file}.\n\

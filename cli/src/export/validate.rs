@@ -34,7 +34,7 @@ const MAX_INVENTORY: u64 = 256 * 1024 * 1024;
 /// The most a manifest may be. The real one is 8.3 MiB; the same reasoning as
 /// [`MAX_INVENTORY`], and the same defence against being pointed at a file this
 /// program did not write.
-const MAX_MANIFEST: u64 = 64 * 1024 * 1024;
+pub(crate) const MAX_MANIFEST: u64 = 64 * 1024 * 1024;
 
 /// Read the inventory, refusing one too large to be one.
 ///
@@ -1586,10 +1586,7 @@ mod tests {
         fs::create_dir_all(&named).expect("mkdir");
         fs::write(named.join("thesis.docx"), b"years of work").expect("write");
         let err = check_destination(&named).expect_err("must refuse");
-        assert!(
-            format!("{err}").contains("no TLHdig_Beta_0.3.html"),
-            "{err}"
-        );
+        assert!(format!("{err}").contains("no TLHdig.html"), "{err}");
 
         // One that looks like ours until something of theirs is found in it.
         let mixed = dir.path().join("mixed").join(PACKAGE);

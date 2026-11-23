@@ -117,7 +117,7 @@ fn the_package_holds_exactly_what_the_inventory_promises() {
             "CTH 5",
             "CTH 9",
             "CTH-TITLES-TERMS.txt",
-            "TLHdig_Beta_0.3.html",
+            "TLHdig.html",
             "UllikummiA-TERMS.txt",
             "UllikummiA.ttf",
             "manifest.json"

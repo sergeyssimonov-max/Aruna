@@ -68,7 +68,9 @@ use target_metadata_tests::read_target_metadata;
 use zip::ZipArchive;
 
 /// What the package is called, in the folder and in the inventory's file name.
-pub const PACKAGE: &str = "TLHdig_Beta_0.3";
+pub const PACKAGE: &str = "TLHdig";
+/// Name used by Aruna through 3.1.1, still openable in place.
+pub const LEGACY_PACKAGE: &str = "TLHdig_Beta_0.3";
 
 /// The machine-readable model of the package.
 pub const MANIFEST: &str = "manifest.json";
@@ -443,12 +445,34 @@ pub fn build(
     build_within(zip, destination, source_label, fonts, job, MAX_PACKAGE)
 }
 
-/// [`build`], with the most the package may hold given: [`MAX_PACKAGE`] for
-/// every build there is, and a few bytes where a test stands at the edge.
-fn build_within(
+/// Export a local archive with provenance determined from the bytes opened for the build.
+pub fn build_local(
     zip: &Path,
     destination: &Path,
-    source_label: &str,
+    fonts: &crate::pdf::Fonts,
+    job: &Job<'_>,
+) -> Result<Built> {
+    build_within(zip, destination, Origin::Local, fonts, job, MAX_PACKAGE)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum Origin<'a> {
+    Label(&'a str),
+    Local,
+    Zenodo(&'a crate::editions::Edition),
+}
+impl<'a> From<&'a str> for Origin<'a> {
+    fn from(label: &'a str) -> Self {
+        Self::Label(label)
+    }
+}
+
+/// [`build`], with the most the package may hold given: [`MAX_PACKAGE`] for
+/// every build there is, and a few bytes where a test stands at the edge.
+pub(crate) fn build_within<'a>(
+    zip: &Path,
+    destination: &Path,
+    origin: impl Into<Origin<'a>>,
     fonts: &crate::pdf::Fonts,
     job: &Job<'_>,
     limit: u64,
@@ -458,12 +482,33 @@ fn build_within(
 
     validate::check_destination(&final_root)?;
 
+    let origin = origin.into();
     let Headers {
         mut archive,
         digest: archive_digest,
+        bytes,
         mut fragments,
         not_manuscripts,
-    } = read_headers(zip, job)?;
+    } = read_headers(zip, job, matches!(origin, Origin::Zenodo(_)))?;
+    let local;
+    let edition = match origin {
+        Origin::Zenodo(edition) => {
+            edition.verify_bytes(zip, &archive_digest, bytes)?;
+            Some(edition)
+        }
+        Origin::Local => {
+            local = crate::editions::known_digest(&archive_digest);
+            local.as_ref()
+        }
+        Origin::Label(_) => None,
+    };
+    let label = match origin {
+        Origin::Label(s) => s.to_owned(),
+        _ => edition.map_or_else(
+            || "Local archive; edition not identified".into(),
+            |e| e.citation(),
+        ),
+    };
     sort_by_display_order(&mut fragments, |f| &f.record);
     let documents = Document::place_all(fragments)?;
     let disambiguated = documents
@@ -477,7 +522,7 @@ fn build_within(
     let staging = Staging::fresh(staging)?;
 
     let source = manifest::Source {
-        label: source_label,
+        label: &label,
         archive_md5: &archive_digest,
         not_manuscripts: &not_manuscripts,
     };
@@ -488,7 +533,7 @@ fn build_within(
         staging.path(),
         &mut archive,
         documents,
-        &source,
+        (&source, edition),
         fonts,
         job,
         &mut PackageBytes::within(limit),
@@ -499,7 +544,15 @@ fn build_within(
     job.check(Phase::Validating)?;
     job.report(Event::CheckingPackage);
     let staged = documents.validate(staging.path())?;
-    let published = publish(destination, final_root, staging, &documents, staged, job)?;
+    let published = publish(
+        destination,
+        final_root,
+        staging,
+        &documents,
+        staged,
+        job,
+        edition,
+    )?;
 
     Ok(Built {
         groups: documents.groups(),
@@ -526,11 +579,12 @@ fn stage(
     staging: &Path,
     archive: &mut ZipArchive<BufReader<File>>,
     mut documents: Vec<Document>,
-    source: &manifest::Source<'_>,
+    provenance: (&manifest::Source<'_>, Option<&crate::editions::Edition>),
     fonts: &crate::pdf::Fonts,
     job: &Job<'_>,
     package: &mut PackageBytes,
 ) -> Result<Staged> {
+    let (source, edition) = provenance;
     job.report(Event::WritingDocuments {
         documents: documents.len(),
     });
@@ -553,14 +607,14 @@ fn stage(
     write_root_file(
         staging,
         crate::paths::OUTPUT_FILE_NAME,
-        documents.inventory(source.label).as_bytes(),
+        documents.inventory(source.label, edition).as_bytes(),
         package,
     )?;
     write_root_files(staging, package)?;
     write_root_file(
         staging,
         MANIFEST,
-        documents.manifest(source, &tallies).as_bytes(),
+        documents.manifest(source, &tallies, edition).as_bytes(),
         package,
     )?;
     Ok(Staged {
@@ -574,12 +628,13 @@ fn stage(
 struct Headers {
     archive: ZipArchive<BufReader<File>>,
     digest: String,
+    bytes: u64,
     fragments: Vec<Fragment>,
     not_manuscripts: Vec<String>,
 }
 
 /// Pass 1 and the archive's digest, from one open file.
-fn read_headers(zip: &Path, job: &Job<'_>) -> Result<Headers> {
+fn read_headers(zip: &Path, job: &Job<'_>, protect_edition: bool) -> Result<Headers> {
     job.report(Event::ReadingHeaders);
     // **One open file for the whole build, and every answer taken from it.**
     // The two passes used to open the path themselves and the digest opened it
@@ -604,9 +659,10 @@ fn read_headers(zip: &Path, job: &Job<'_>) -> Result<Headers> {
     // counted and refused. That is a read of a local file and no allocation —
     // the ceiling exists to stop a million records being built in memory, and
     // that half still happens before the parse.
+    let bytes = file.metadata().map_err(ArunaError::io(zip))?.len();
     let archive_digest = crate::md5::md5_stream(&mut file).map_err(ArunaError::io(zip))?;
     let mut archive = crate::archive::zip_from_handle(file, zip)?;
-    let (fragments, not_manuscripts) = collect_fragments_from(&mut archive, job)?;
+    let (fragments, not_manuscripts) = collect_fragments_from(&mut archive, job, protect_edition)?;
     job.report(Event::HeadersRead {
         manuscripts: fragments.len(),
         groups: distinct_groups(&fragments),
@@ -614,6 +670,7 @@ fn read_headers(zip: &Path, job: &Job<'_>) -> Result<Headers> {
     Ok(Headers {
         archive,
         digest: archive_digest,
+        bytes,
         fragments,
         not_manuscripts,
     })
@@ -683,6 +740,7 @@ fn publish(
     documents: &PackageDocuments,
     staged: Validation,
     job: &Job<'_>,
+    edition: Option<&crate::editions::Edition>,
 ) -> Result<Validation> {
     // The last moment at which stopping costs the reader nothing. Past this
     // line the existing package is moved aside and a new one takes its name,
@@ -708,11 +766,21 @@ fn publish(
     // публикацией не может вклиниться другой прогон Aruna.
     validate::check_destination(&final_root)?;
 
+    if let Some(candidate) = edition {
+        if let Some(installed) = crate::editions::installed(&final_root)? {
+            candidate.follows(&installed)?;
+        }
+    }
     let previous = Replaced::aside(&final_root, destination)?;
     let (published, leftovers) =
         previous.publish(staging, destination, publication.exclusive, || {
             job.report(Event::CheckingPublished);
             let published = documents.validate(&final_root)?;
+            if let Some(expected) = edition {
+                if crate::editions::installed(&final_root)?.as_ref() != Some(expected) {
+                    return Err(crate::editions::EditionIssue::Installed.into());
+                }
+            }
             if published != staged {
                 return Err(ArunaError::ExportInvalid {
                     root: final_root,
@@ -757,7 +825,7 @@ pub fn collect_fragments(zip: &Path) -> Result<Vec<Fragment>> {
 /// `collect_fragments` is public and a caller that has no job should not have
 /// to invent one.
 pub(crate) fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fragment>> {
-    collect_fragments_from(&mut open(zip)?, job).map(|(fragments, _)| fragments)
+    collect_fragments_from(&mut open(zip)?, job, false).map(|(fragments, _)| fragments)
 }
 
 /// The same scan over an archive already open.
@@ -773,6 +841,7 @@ pub(crate) fn collect_fragments_with(zip: &Path, job: &Job<'_>) -> Result<Vec<Fr
 fn collect_fragments_from(
     archive: &mut ZipArchive<BufReader<File>>,
     job: &Job<'_>,
+    protect_edition: bool,
 ) -> Result<(Vec<Fragment>, Vec<String>)> {
     let mut fragments = Vec::new();
     let mut not_manuscripts = Vec::new();
@@ -795,6 +864,18 @@ fn collect_fragments_from(
             .map_err(ArunaError::io(&path))?;
         let text = String::from_utf8_lossy(&window);
         if !looks_like_manuscript(&text) {
+            // Both reference editions contain this same non-XML placeholder. A
+            // different unreadable entry inside a CTH group may be a manuscript
+            // in a new format, including one using another encoding.
+            if protect_edition
+                && path.split('/').any(|part| part.starts_with("CTH "))
+                && !(path.ends_with("/CTH 813_XML_TLH/KUB 37.25.xml")
+                    && entry.size() == 8192
+                    && crate::sha256::sha256_hex(&window)
+                        == "74e0f88c455d5228b115d97620a162777243b0f0a5b60141c0e5f09aa1a2e48d")
+            {
+                return Err(crate::editions::EditionIssue::Markup.into());
+            }
             not_manuscripts.push(path.clone());
             continue;
         }
@@ -1243,7 +1324,7 @@ mod tests {
             write_root_files(root, &mut PackageBytes::within(MAX_PACKAGE)).expect("root files");
             fs::write(
                 root.join(crate::paths::OUTPUT_FILE_NAME),
-                documents.inventory(label),
+                documents.inventory(label, None),
             )
             .expect("inventory");
             let source = manifest::Source {
@@ -1253,7 +1334,7 @@ mod tests {
             };
             fs::write(
                 root.join(MANIFEST),
-                documents.manifest(&source, &Tallies::default()),
+                documents.manifest(&source, &Tallies::default(), None),
             )
             .expect("manifest");
         }
@@ -1270,6 +1351,7 @@ mod tests {
             &documents,
             staged,
             &Job::unattended(),
+            None,
         )
         .expect_err("the counts disagree");
         assert!(

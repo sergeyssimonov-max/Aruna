@@ -1,10 +1,10 @@
-//! Build the standalone TLHdig Beta 0.3 package.
+//! Build the standalone TLHdig package.
 //!
 //! ```text
 //! cargo run --release --example export_beta -- <archive.zip> [destination]
 //! ```
 //!
-//! Produces `<destination>/TLHdig_Beta_0.3` — an inventory beside one directory
+//! Produces `<destination>/TLHdig` — an inventory beside one directory
 //! per CTH group, each holding the normalised documents of that group. It opens
 //! by double-clicking and needs no server: every link is relative, so moving the
 //! folder keeps them working.
@@ -41,13 +41,7 @@ fn main() -> ExitCode {
         }
     };
     eprintln!("Building {PACKAGE} from {}…", zip.display());
-    match export::build(
-        &zip,
-        &destination,
-        aruna::SOURCE_LABEL,
-        &fonts,
-        &aruna::job::Job::unattended(),
-    ) {
+    match export::build_local(&zip, &destination, &fonts, &aruna::job::Job::unattended()) {
         Ok(built) => {
             println!();
             println!("package:          {}", destination.join(PACKAGE).display());

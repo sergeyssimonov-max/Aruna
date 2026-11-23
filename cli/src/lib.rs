@@ -21,6 +21,7 @@ pub mod cth_titles;
 mod diagnostics;
 pub mod document;
 pub mod download;
+pub mod editions;
 pub mod error;
 pub mod export;
 pub mod fonts;
@@ -47,26 +48,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Zenodo record this build is pinned to.
-///
-/// Derived from nothing: it is written here and checked against
-/// `download::ZENODO_ZIP_URL` by `the_pinned_record_is_the_one_downloaded`,
-/// so the two cannot name different records.
+/// The Beta 0.3 reference record for callers explicitly requesting the historical archive.
 pub const ZENODO_RECORD: u64 = 20328284;
 
-/// Human-readable Zenodo source attribution.
-///
-/// This is the line the generated HTML prints, the line the package's inventory
-/// carries, and the `s` field of the catalog `catalog.rs` emits — so it is what
-/// every reader is told the data came from. It used to go on from there into an
-/// ARUN container the React site downloaded; the site was retired on
-/// 2026-08-23, and this attribution is what outlived it.
-///
-/// It names the record and the edition, not the file: the ZIP's name told a
-/// reader nothing they could act on — the record number is what identifies the
-/// data and what a citation needs. `source_label_names_the_record_it_downloads`
-/// keeps it and `download::ZENODO_ZIP_URL` from drifting apart when the
-/// archive is republished.
+/// Historical provenance label for Beta 0.3 fixtures and explicit low-level exports.
 pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 
 /// The people credited with the corpus, in the order the record names them,
@@ -87,24 +72,13 @@ pub const SOURCE_LABEL: &str = "Zenodo record 20328284 — TLHdig Beta 0.3";
 /// Pinned rather than fetched. The site never talks to Zenodo, and a run served
 /// from the cache stays offline by design — a credit that arrived over the
 /// network would be missing in exactly the places it has to appear.
+#[cfg(test)]
 pub(crate) const CORPUS_AUTHORS: [(&str, &str); 4] = [
     ("Gerfrid Müller", "Würzburg"),
     ("Doris Prechel", "Mainz"),
     ("Elisabeth Rieken", "Marburg"),
     ("Daniel Schwemer", "Würzburg"),
 ];
-
-/// [`CORPUS_AUTHORS`] as the one line both inventories print.
-///
-/// Built in one place because both halves show it and this project keeps
-/// finding out what it costs when they each build their own.
-pub(crate) fn corpus_authors_line() -> String {
-    CORPUS_AUTHORS
-        .iter()
-        .map(|(name, city)| format!("{name} ({city})"))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
 
 /// Full pipeline: download → parse → write HTML → return output path.
 ///
@@ -122,20 +96,31 @@ pub fn run(local_zip: Option<&Path>, job: &Job<'_>) -> Result<PathBuf> {
     let out = paths::output_html_path()?;
     paths::check_output_writable(&out)?;
 
-    let source = match local_zip {
-        Some(p) => cache::Archive::Cached(p.to_path_buf()),
-        None => obtain_archive(download::ZENODO_ZIP_URL, download::ZENODO_ZIP_MD5, job)?,
+    let (source, edition) = match local_zip {
+        Some(p) => (cache::Archive::Cached(p.to_path_buf()), None),
+        None => {
+            let (archive, selected) = editions::obtain(None, job, None)?;
+            (archive, Some(selected))
+        }
     };
 
     let written = (|| -> Result<()> {
         job.report(Event::ParsingArchive);
-        let records = archive::parse_zip(source.path(), job)?;
+        let (records, edition) = archive::parse_identified(source.path(), job, edition.as_ref())?;
         job.report(Event::Indexed {
             manuscripts: records.len(),
         });
 
         let generated_at = format_now_utc();
-        let html = html::render_html(&records, SOURCE_LABEL, &generated_at);
+        let label = edition.as_ref().map_or_else(
+            || "Local archive; edition not identified".into(),
+            editions::Edition::citation,
+        );
+        let html = html::render(
+            &presentation::CorpusPresentation::plain(&records, &label),
+            &generated_at,
+            edition.as_ref(),
+        );
 
         // Atomic: a failure here must not destroy the inventory an earlier run
         // left in place — see `paths::write_atomic`.
@@ -174,7 +159,11 @@ pub fn run(local_zip: Option<&Path>, job: &Job<'_>) -> Result<PathBuf> {
 /// two-second run and a one-minute one — was the least tested code in the
 /// program. Its parts each had tests; nothing exercised the wiring.
 pub fn obtain_archive(url: &str, md5: &str, job: &Job<'_>) -> Result<cache::Archive> {
-    obtain_archive_advised_by(url, md5, job, zenodo::latest_release)
+    if url == download::ZENODO_ZIP_URL && md5.eq_ignore_ascii_case(download::ZENODO_ZIP_MD5) {
+        obtain_archive_advised_by(url, md5, job, zenodo::latest_release)
+    } else {
+        cached_download(url, md5, job, None)
+    }
 }
 
 /// Where a run learns what Zenodo publishes.
@@ -200,6 +189,15 @@ pub fn obtain_archive_advised_by(
     job: &Job<'_>,
     releases: ReleaseLookup,
 ) -> Result<cache::Archive> {
+    cached_download(url, md5, job, Some(releases))
+}
+
+fn cached_download(
+    url: &str,
+    md5: &str,
+    job: &Job<'_>,
+    releases: Option<ReleaseLookup>,
+) -> Result<cache::Archive> {
     let Some(dir) = cache_for_run(job) else {
         return download_unkept(url, md5, job, releases);
     };
@@ -224,7 +222,10 @@ pub fn obtain_archive_advised_by(
     let dest = dir.join(cache::archive_name(url, md5));
     download_archive(url, md5, &dest, job, releases)?;
     job.report(Event::ArchiveKept { path: &dest });
-    cache::prune(&dir, &dest);
+    // A new edition may reuse the previous archive name. Keep its verified bytes for offline use.
+    if releases.is_some() {
+        cache::prune(&dir, &dest);
+    }
     Ok(cache::Archive::Cached(dest))
 }
 
@@ -255,7 +256,7 @@ fn download_unkept(
     url: &str,
     md5: &str,
     job: &Job<'_>,
-    releases: ReleaseLookup,
+    releases: Option<ReleaseLookup>,
 ) -> Result<cache::Archive> {
     let work_dir = work_dir_for_process();
     fs::create_dir_all(&work_dir).map_err(ArunaError::io(&work_dir))?;
@@ -290,12 +291,14 @@ fn download_archive(
     md5: &str,
     dest: &Path,
     job: &Job<'_>,
-    releases: ReleaseLookup,
+    releases: Option<ReleaseLookup>,
 ) -> Result<()> {
     if let Some(variable) = download::unusable_proxy() {
         job.report(Event::ProxyUnusable { variable });
     }
-    announce_release(job, releases);
+    if let Some(lookup) = releases {
+        announce_release(job, lookup);
+    }
     job.report(Event::DownloadStarted);
     // The download lands through a scratch file and a rename, so an interrupted
     // run cannot leave half an archive under a name that promises a whole one.
@@ -404,7 +407,7 @@ mod tests {
             "0",
             &dir.path().join("a.zip"),
             &Job::new(&told, &cancel),
-            unreachable,
+            Some(unreachable),
         );
         std::env::remove_var("ALL_PROXY");
         let told = told.0.into_inner().expect("told");
@@ -480,7 +483,9 @@ mod tests {
     #[test]
     fn corpus_authors_line_names_each_author_with_their_city() {
         assert_eq!(
-            corpus_authors_line(),
+            editions::known_digest(download::ZENODO_ZIP_MD5)
+                .expect("reference edition")
+                .authors(),
             "Gerfrid Müller (Würzburg), Doris Prechel (Mainz), \
              Elisabeth Rieken (Marburg), Daniel Schwemer (Würzburg)"
         );

@@ -564,7 +564,7 @@ fn the_binary_still_runs_to_completion() {
     assert!(home
         .path()
         .join("Downloads")
-        .join("TLHdig_Beta_0.3")
-        .join("TLHdig_Beta_0.3.html")
+        .join("TLHdig")
+        .join("TLHdig.html")
         .is_file());
 }

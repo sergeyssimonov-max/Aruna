@@ -13,6 +13,9 @@ categories = ["command-line-utilities", "text-processing"]
 [dependencies]
 dirs = "5"
 memchr = "2"
+# Already used by the desktop shell; also read and preserve the edition cited by the corpus.
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
 # Pinned exactly, and without default features: the XML parser candidate of
 # specification 4.13, here for the classification step and nothing else. The
 # rule that nothing is ever expanded — entities, DTDs, XInclude — is kept by

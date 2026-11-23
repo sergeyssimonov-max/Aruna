@@ -102,7 +102,8 @@ fn stage_within(zip: &Path, fonts: &crate::pdf::Fonts, limit: u64) -> Run {
         digest,
         mut fragments,
         not_manuscripts,
-    } = read_headers(zip, &job).expect("headers");
+        ..
+    } = read_headers(zip, &job, false).expect("headers");
     sort_by_display_order(&mut fragments, |f| &f.record);
     let documents = Document::place_all(fragments).expect("placed");
     let xml = ENTRIES
@@ -130,7 +131,7 @@ fn stage_within(zip: &Path, fonts: &crate::pdf::Fonts, limit: u64) -> Run {
         &staging,
         &mut archive,
         documents,
-        &source,
+        (&source, None),
         fonts,
         &job,
         &mut PackageBytes::within(limit),

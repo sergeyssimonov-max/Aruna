@@ -76,8 +76,8 @@
     <main>
       <h1>Thesaurus Linguarum Hethaeorum Digitalis</h1>
       <p class="meta">
-        <span>Source: {source}</span>
-        <span>Corpus authors: {authors}</span>
+        <span>Corpus edition: {source}</span>
+        <span>Corpus creators: {authors}</span>
         <span class="font-credit">{fonts}</span>
         {@html generated}
         <span class="counts"

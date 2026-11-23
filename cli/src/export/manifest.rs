@@ -534,6 +534,27 @@ pub fn render_manifest(
     sums: &[Sums],
     pdfs: &[super::PdfState],
 ) -> String {
+    render_with_edition(
+        records,
+        placed,
+        source,
+        (normalisation, fonts, xml),
+        sums,
+        pdfs,
+        None,
+    )
+}
+
+pub(super) fn render_with_edition(
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    source: &Source<'_>,
+    checks: (&BTreeMap<String, usize>, &FontContract, &XmlReport),
+    sums: &[Sums],
+    pdfs: &[super::PdfState],
+    edition: Option<&crate::editions::Edition>,
+) -> String {
+    let (normalisation, fonts, xml) = checks;
     // The real manifest averaged about 350 bytes per document; 1 MiB for an
     // 8.3 MB result meant four reallocations and settling at 16 MiB. The two
     // digests of schema 3 add about 170 more.
@@ -551,7 +572,7 @@ pub fn render_manifest(
     render_run(&mut out, source.archive_md5);
 
     render_pdfs(&mut out, pdfs);
-    render_source(&mut out, source);
+    render_source(&mut out, source, edition);
     let _ = writeln!(out, "  \"counts\": {{");
     let _ = writeln!(out, "    \"groups\": {groups},");
     let _ = writeln!(out, "    \"documents\": {}", placed.len());
@@ -607,10 +628,17 @@ fn render_pdfs(out: &mut String, states: &[super::PdfState]) {
 
 /// Where the documents came from: the edition, the digest of the archive,
 /// and the entries named like a manuscript that are not one.
-fn render_source(out: &mut String, source: &Source<'_>) {
+fn render_source(
+    out: &mut String,
+    source: &Source<'_>,
+    edition: Option<&crate::editions::Edition>,
+) {
     let _ = writeln!(out, "  \"source\": {{");
     let _ = writeln!(out, "    \"label\": {},", string(source.label));
     let _ = writeln!(out, "    \"archive_md5\": {},", string(source.archive_md5));
+    if let Some(edition) = edition {
+        let _ = writeln!(out, "    \"zenodo\": {},", serde_json::json!(edition));
+    }
     out.push_str("    \"not_manuscripts\": {\n");
     let _ = writeln!(
         out,
