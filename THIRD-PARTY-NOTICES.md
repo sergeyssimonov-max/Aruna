@@ -17,7 +17,7 @@ under that heading. Identical texts are given once. The file is written by
 files is checked by `frontend/tests/third-party-notices.test.ts`. It ships inside the
 application, in `Aruna.app/Contents/Resources/`, and is not part of the package Aruna builds.
 
-Packages: 1443 – crates 751, npm 692. Distinct licence texts: 691. Requires review: 143.
+Packages: 1443 – crates 751, npm 692. Distinct licence texts: 692. Requires review: 143.
 
 ## Packages
 
@@ -643,7 +643,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 691. Requires re
 | unicode-ident | 1.0.27 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T5, T2, T667 |
 | unicode-math-class | 0.1.0 | crate | MIT OR Apache-2.0 | T5, T24 |
 | unicode-normalization | 0.1.26 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T73, T1, T39, T667 |
-| unicode-properties | 0.1.4 | crate | MIT/Apache-2.0 | T73, T1, T39 |
+| unicode-properties | 0.1.5 | crate | (MIT OR Apache-2.0) AND Unicode-3.0 | T73, T1, T39, T692 |
 | unicode-script | 0.5.9 | crate | MIT OR Apache-2.0 | T440, T437 |
 | unicode-segmentation | 1.13.3 | crate | MIT OR Apache-2.0 | T73, T1, T39 |
 | unicode-vo | 0.1.0 | crate | MIT/Apache-2.0 | T1, T106 |
@@ -1657,7 +1657,7 @@ downloaded) or it ships no licence file. The declared licence, where known, is i
 
 ### T1
 
-SHA-256 `a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2`. Used by: arrayvec 0.7.8 (LICENSE-APACHE), async-channel 2.5.0 (LICENSE-APACHE), async-executor 1.14.1 (LICENSE-APACHE), async-io 2.6.0 (LICENSE-APACHE), async-lock 3.4.2 (LICENSE-APACHE), async-process 2.5.0 (LICENSE-APACHE), async-signal 0.2.14 (LICENSE-APACHE), async-task 4.7.1 (LICENSE-APACHE), atomic-waker 1.1.2 (LICENSE-APACHE), autocfg 1.5.1 (LICENSE-APACHE), az 1.3.0 (LICENSE-APACHE), base64 0.21.7 (LICENSE-APACHE), base64 0.22.1 (LICENSE-APACHE), base64 0.23.1 (LICENSE-APACHE), bitflags 1.3.2 (LICENSE-APACHE), bitflags 2.13.2 (LICENSE-APACHE), blocking 1.7.0 (LICENSE-APACHE), bs58 0.5.1 (LICENSE-APACHE), bumpalo 3.20.4 (LICENSE-APACHE), by_address 1.2.1 (LICENSE-APACHE), camino 1.2.6 (LICENSE-APACHE), cc 1.4.4 (LICENSE-APACHE), cfg-if 1.0.5 (LICENSE-APACHE), concurrent-queue 2.5.0 (LICENSE-APACHE), core-foundation 0.10.1 (LICENSE-APACHE), core-foundation-sys 0.8.7 (LICENSE-APACHE), core-graphics 0.25.0 (LICENSE-APACHE), core-graphics-types 0.2.0 (LICENSE-APACHE), crossbeam-channel 0.5.17 (LICENSE-APACHE), crossbeam-deque 0.8.8 (LICENSE-APACHE), crossbeam-epoch 0.9.21 (LICENSE-APACHE), crossbeam-utils 0.8.23 (LICENSE-APACHE), data-url 0.3.2 (LICENSE-APACHE), displaydoc 0.2.7 (LICENSE-APACHE), either 1.18.0 (LICENSE-APACHE), equivalent 1.0.3 (LICENSE-APACHE), errno 0.3.14 (LICENSE-APACHE), euclid 0.22.14 (LICENSE-APACHE), event-listener 5.4.2 (LICENSE-APACHE), event-listener-strategy 0.5.4 (LICENSE-APACHE), fastrand 2.5.0 (LICENSE-APACHE), find-msvc-tools 0.1.15 (LICENSE-APACHE), flate2 1.1.11 (LICENSE-APACHE), fnv 1.0.7 (LICENSE-APACHE), form_urlencoded 1.2.3 (LICENSE-APACHE), futures-lite 2.6.1 (LICENSE-APACHE), glob 0.3.4 (LICENSE-APACHE), hashbrown 0.12.3 (LICENSE-APACHE), hashbrown 0.17.1 (LICENSE-APACHE), heck 0.4.1 (LICENSE-APACHE), heck 0.5.0 (LICENSE-APACHE), hermit-abi 0.5.2 (LICENSE-APACHE), html5ever 0.39.0 (LICENSE-APACHE), html5ever 0.40.1 (LICENSE-APACHE), httparse 1.10.1 (LICENSE-APACHE), idna 1.1.0 (LICENSE-APACHE), idna_adapter 1.2.2 (LICENSE-APACHE), indexmap 1.9.3 (LICENSE-APACHE), indexmap 2.14.2 (LICENSE-APACHE), insta 1.49.0 (LICENSE), jni 0.21.1 (LICENSE-APACHE), js-sys 0.3.104 (LICENSE-APACHE), libappindicator 0.9.0 (LICENSE-APACHE), linux-raw-sys 0.12.1 (LICENSE-APACHE), lock_api 0.4.14 (LICENSE-APACHE), log 0.4.35 (LICENSE-APACHE), markup5ever 0.39.0 (LICENSE-APACHE), markup5ever 0.40.0 (LICENSE-APACHE), mime 0.3.18 (LICENSE-APACHE), muda 0.20.0 (LICENSE-APACHE), num-bigint 0.4.8 (LICENSE-APACHE), num-integer 0.1.47 (LICENSE-APACHE), num-traits 0.2.19 (LICENSE-APACHE), object 0.39.1 (LICENSE-APACHE), once_cell 1.21.4 (LICENSE-APACHE), ordered-stream 0.2.0 (LICENSE-APACHE), palette 0.7.7 (LICENSE-APACHE), palette_derive 0.7.7 (LICENSE-APACHE), palette_math 0.7.7 (LICENSE-APACHE), parking 2.2.1 (LICENSE-APACHE), parking_lot 0.12.5 (LICENSE-APACHE), parking_lot_core 0.9.12 (LICENSE-APACHE), percent-encoding 2.3.2 (LICENSE-APACHE), piper 0.2.5 (LICENSE-APACHE), pkg-config 0.3.34 (LICENSE-APACHE), png 0.18.1 (LICENSE-APACHE), polling 3.11.0 (LICENSE-APACHE), postcard 1.1.3 (LICENSE-APACHE), proc-macro-hack 0.5.20+deprecated (LICENSE-APACHE), rayon 1.12.0 (LICENSE-APACHE), rayon-core 1.13.0 (LICENSE-APACHE), regex 1.13.1 (LICENSE-APACHE), regex-automata 0.4.18 (LICENSE-APACHE), regex-syntax 0.8.11 (LICENSE-APACHE), roxmltree 0.20.0 (LICENSE-APACHE), roxmltree 0.21.2 (LICENSE-APACHE), rustc_version 0.4.1 (LICENSE-APACHE), rustix 1.1.6 (LICENSE-APACHE), rustls 0.23.46 (LICENSE-APACHE), scopeguard 1.2.0 (LICENSE-APACHE), serde_with 3.22.0 (LICENSE-APACHE), serde_with_macros 3.22.0 (LICENSE-APACHE), servo_arc 0.4.3 (LICENSE-APACHE), servo_arc 0.5.0 (LICENSE-APACHE), signal-hook-registry 1.4.8 (LICENSE-APACHE), similar 2.7.0 (LICENSE), simplecss 0.2.2 (LICENSE-APACHE), smallvec 1.16.5 (LICENSE-APACHE), socket2 0.6.5 (LICENSE-APACHE), stable_deref_trait 1.2.1 (LICENSE-APACHE), stacker 0.1.25 (LICENSE-APACHE), string_cache 0.9.0 (LICENSE-APACHE), string_cache 0.11.0 (LICENSE-APACHE), string_cache_codegen 0.6.1 (LICENSE-APACHE), string_cache_codegen 0.11.2 (LICENSE-APACHE), svgtypes 0.16.2 (LICENSE-APACHE), syn 1.0.109 (LICENSE-APACHE), system-deps 6.2.2 (LICENSE-APACHE), system-deps 7.0.8 (LICENSE-APACHE), tao-macros 0.1.4 (LICENSE-APACHE), tempfile 3.27.0 (LICENSE-APACHE), tendril 0.5.1 (LICENSE-APACHE), toml_datetime 0.6.3 (LICENSE-APACHE), tray-icon 0.25.1 (LICENSE-APACHE), ttf-parser 0.25.1 (LICENSE-APACHE), two-face 0.4.5 (LICENSE-APACHE), unic-langid 0.9.6 (LICENSE-APACHE), unic-langid-impl 0.9.6 (LICENSE-APACHE), unic-langid-macros 0.9.6 (LICENSE-APACHE), unic-langid-macros-impl 0.9.6 (LICENSE-APACHE), unicode-bidi 0.3.18 (LICENSE-APACHE), unicode-bidi-mirroring 0.4.0 (LICENSE-APACHE), unicode-ccc 0.4.0 (LICENSE-APACHE), unicode-normalization 0.1.26 (LICENSE-APACHE), unicode-properties 0.1.4 (LICENSE-APACHE), unicode-segmentation 1.13.3 (LICENSE-APACHE), unicode-vo 0.1.0 (LICENSE-APACHE), url 2.5.9 (LICENSE-APACHE), uuid 1.27.0 (LICENSE-APACHE), version_check 0.9.5 (LICENSE-APACHE), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-APACHE), wasip2 1.0.4+wasi-0.2.12 (LICENSE-APACHE), wasm-bindgen 0.2.127 (LICENSE-APACHE), wasm-bindgen-futures 0.4.77 (LICENSE-APACHE), wasm-bindgen-macro 0.2.127 (LICENSE-APACHE), wasm-bindgen-macro-support 0.2.127 (LICENSE-APACHE), wasm-bindgen-shared 0.2.127 (LICENSE-APACHE), web-sys 0.3.104 (LICENSE-APACHE), web_atoms 0.2.6 (LICENSE-APACHE), web_atoms 0.3.0 (LICENSE-APACHE), window-vibrancy 0.8.1 (LICENSE-APACHE), wit-bindgen 0.57.1 (LICENSE-APACHE), wry 0.57.2 (LICENSE-APACHE), yaml-rust 0.4.5 (LICENSE-APACHE).
+SHA-256 `a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2`. Used by: arrayvec 0.7.8 (LICENSE-APACHE), async-channel 2.5.0 (LICENSE-APACHE), async-executor 1.14.1 (LICENSE-APACHE), async-io 2.6.0 (LICENSE-APACHE), async-lock 3.4.2 (LICENSE-APACHE), async-process 2.5.0 (LICENSE-APACHE), async-signal 0.2.14 (LICENSE-APACHE), async-task 4.7.1 (LICENSE-APACHE), atomic-waker 1.1.2 (LICENSE-APACHE), autocfg 1.5.1 (LICENSE-APACHE), az 1.3.0 (LICENSE-APACHE), base64 0.21.7 (LICENSE-APACHE), base64 0.22.1 (LICENSE-APACHE), base64 0.23.1 (LICENSE-APACHE), bitflags 1.3.2 (LICENSE-APACHE), bitflags 2.13.2 (LICENSE-APACHE), blocking 1.7.0 (LICENSE-APACHE), bs58 0.5.1 (LICENSE-APACHE), bumpalo 3.20.4 (LICENSE-APACHE), by_address 1.2.1 (LICENSE-APACHE), camino 1.2.6 (LICENSE-APACHE), cc 1.4.4 (LICENSE-APACHE), cfg-if 1.0.5 (LICENSE-APACHE), concurrent-queue 2.5.0 (LICENSE-APACHE), core-foundation 0.10.1 (LICENSE-APACHE), core-foundation-sys 0.8.7 (LICENSE-APACHE), core-graphics 0.25.0 (LICENSE-APACHE), core-graphics-types 0.2.0 (LICENSE-APACHE), crossbeam-channel 0.5.17 (LICENSE-APACHE), crossbeam-deque 0.8.8 (LICENSE-APACHE), crossbeam-epoch 0.9.21 (LICENSE-APACHE), crossbeam-utils 0.8.23 (LICENSE-APACHE), data-url 0.3.2 (LICENSE-APACHE), displaydoc 0.2.7 (LICENSE-APACHE), either 1.18.0 (LICENSE-APACHE), equivalent 1.0.3 (LICENSE-APACHE), errno 0.3.14 (LICENSE-APACHE), euclid 0.22.14 (LICENSE-APACHE), event-listener 5.4.2 (LICENSE-APACHE), event-listener-strategy 0.5.4 (LICENSE-APACHE), fastrand 2.5.0 (LICENSE-APACHE), find-msvc-tools 0.1.15 (LICENSE-APACHE), flate2 1.1.11 (LICENSE-APACHE), fnv 1.0.7 (LICENSE-APACHE), form_urlencoded 1.2.3 (LICENSE-APACHE), futures-lite 2.6.1 (LICENSE-APACHE), glob 0.3.4 (LICENSE-APACHE), hashbrown 0.12.3 (LICENSE-APACHE), hashbrown 0.17.1 (LICENSE-APACHE), heck 0.4.1 (LICENSE-APACHE), heck 0.5.0 (LICENSE-APACHE), hermit-abi 0.5.2 (LICENSE-APACHE), html5ever 0.39.0 (LICENSE-APACHE), html5ever 0.40.1 (LICENSE-APACHE), httparse 1.10.1 (LICENSE-APACHE), idna 1.1.0 (LICENSE-APACHE), idna_adapter 1.2.2 (LICENSE-APACHE), indexmap 1.9.3 (LICENSE-APACHE), indexmap 2.14.2 (LICENSE-APACHE), insta 1.49.0 (LICENSE), jni 0.21.1 (LICENSE-APACHE), js-sys 0.3.104 (LICENSE-APACHE), libappindicator 0.9.0 (LICENSE-APACHE), linux-raw-sys 0.12.1 (LICENSE-APACHE), lock_api 0.4.14 (LICENSE-APACHE), log 0.4.35 (LICENSE-APACHE), markup5ever 0.39.0 (LICENSE-APACHE), markup5ever 0.40.0 (LICENSE-APACHE), mime 0.3.18 (LICENSE-APACHE), muda 0.20.0 (LICENSE-APACHE), num-bigint 0.4.8 (LICENSE-APACHE), num-integer 0.1.47 (LICENSE-APACHE), num-traits 0.2.19 (LICENSE-APACHE), object 0.39.1 (LICENSE-APACHE), once_cell 1.21.4 (LICENSE-APACHE), ordered-stream 0.2.0 (LICENSE-APACHE), palette 0.7.7 (LICENSE-APACHE), palette_derive 0.7.7 (LICENSE-APACHE), palette_math 0.7.7 (LICENSE-APACHE), parking 2.2.1 (LICENSE-APACHE), parking_lot 0.12.5 (LICENSE-APACHE), parking_lot_core 0.9.12 (LICENSE-APACHE), percent-encoding 2.3.2 (LICENSE-APACHE), piper 0.2.5 (LICENSE-APACHE), pkg-config 0.3.34 (LICENSE-APACHE), png 0.18.1 (LICENSE-APACHE), polling 3.11.0 (LICENSE-APACHE), postcard 1.1.3 (LICENSE-APACHE), proc-macro-hack 0.5.20+deprecated (LICENSE-APACHE), rayon 1.12.0 (LICENSE-APACHE), rayon-core 1.13.0 (LICENSE-APACHE), regex 1.13.1 (LICENSE-APACHE), regex-automata 0.4.18 (LICENSE-APACHE), regex-syntax 0.8.11 (LICENSE-APACHE), roxmltree 0.20.0 (LICENSE-APACHE), roxmltree 0.21.2 (LICENSE-APACHE), rustc_version 0.4.1 (LICENSE-APACHE), rustix 1.1.6 (LICENSE-APACHE), rustls 0.23.46 (LICENSE-APACHE), scopeguard 1.2.0 (LICENSE-APACHE), serde_with 3.22.0 (LICENSE-APACHE), serde_with_macros 3.22.0 (LICENSE-APACHE), servo_arc 0.4.3 (LICENSE-APACHE), servo_arc 0.5.0 (LICENSE-APACHE), signal-hook-registry 1.4.8 (LICENSE-APACHE), similar 2.7.0 (LICENSE), simplecss 0.2.2 (LICENSE-APACHE), smallvec 1.16.5 (LICENSE-APACHE), socket2 0.6.5 (LICENSE-APACHE), stable_deref_trait 1.2.1 (LICENSE-APACHE), stacker 0.1.25 (LICENSE-APACHE), string_cache 0.9.0 (LICENSE-APACHE), string_cache 0.11.0 (LICENSE-APACHE), string_cache_codegen 0.6.1 (LICENSE-APACHE), string_cache_codegen 0.11.2 (LICENSE-APACHE), svgtypes 0.16.2 (LICENSE-APACHE), syn 1.0.109 (LICENSE-APACHE), system-deps 6.2.2 (LICENSE-APACHE), system-deps 7.0.8 (LICENSE-APACHE), tao-macros 0.1.4 (LICENSE-APACHE), tempfile 3.27.0 (LICENSE-APACHE), tendril 0.5.1 (LICENSE-APACHE), toml_datetime 0.6.3 (LICENSE-APACHE), tray-icon 0.25.1 (LICENSE-APACHE), ttf-parser 0.25.1 (LICENSE-APACHE), two-face 0.4.5 (LICENSE-APACHE), unic-langid 0.9.6 (LICENSE-APACHE), unic-langid-impl 0.9.6 (LICENSE-APACHE), unic-langid-macros 0.9.6 (LICENSE-APACHE), unic-langid-macros-impl 0.9.6 (LICENSE-APACHE), unicode-bidi 0.3.18 (LICENSE-APACHE), unicode-bidi-mirroring 0.4.0 (LICENSE-APACHE), unicode-ccc 0.4.0 (LICENSE-APACHE), unicode-normalization 0.1.26 (LICENSE-APACHE), unicode-properties 0.1.5 (LICENSE-APACHE), unicode-segmentation 1.13.3 (LICENSE-APACHE), unicode-vo 0.1.0 (LICENSE-APACHE), url 2.5.9 (LICENSE-APACHE), uuid 1.27.0 (LICENSE-APACHE), version_check 0.9.5 (LICENSE-APACHE), wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-APACHE), wasip2 1.0.4+wasi-0.2.12 (LICENSE-APACHE), wasm-bindgen 0.2.127 (LICENSE-APACHE), wasm-bindgen-futures 0.4.77 (LICENSE-APACHE), wasm-bindgen-macro 0.2.127 (LICENSE-APACHE), wasm-bindgen-macro-support 0.2.127 (LICENSE-APACHE), wasm-bindgen-shared 0.2.127 (LICENSE-APACHE), web-sys 0.3.104 (LICENSE-APACHE), web_atoms 0.2.6 (LICENSE-APACHE), web_atoms 0.3.0 (LICENSE-APACHE), window-vibrancy 0.8.1 (LICENSE-APACHE), wit-bindgen 0.57.1 (LICENSE-APACHE), wry 0.57.2 (LICENSE-APACHE), yaml-rust 0.4.5 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -4766,7 +4766,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T39
 
-SHA-256 `7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0`. Used by: heck 0.4.1 (LICENSE-MIT), heck 0.5.0 (LICENSE-MIT), linked-hash-map 0.5.6 (LICENSE-MIT), unicode-bidi 0.3.18 (LICENSE-MIT), unicode-normalization 0.1.26 (LICENSE-MIT), unicode-properties 0.1.4 (LICENSE-MIT), unicode-segmentation 1.13.3 (LICENSE-MIT).
+SHA-256 `7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0`. Used by: heck 0.4.1 (LICENSE-MIT), heck 0.5.0 (LICENSE-MIT), linked-hash-map 0.5.6 (LICENSE-MIT), unicode-bidi 0.3.18 (LICENSE-MIT), unicode-normalization 0.1.26 (LICENSE-MIT), unicode-properties 0.1.5 (LICENSE-MIT), unicode-segmentation 1.13.3 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2015 The Rust Project Developers
@@ -6688,7 +6688,7 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
 ### T73
 
-SHA-256 `23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d`. Used by: unicode-normalization 0.1.26 (COPYRIGHT), unicode-properties 0.1.4 (COPYRIGHT), unicode-segmentation 1.13.3 (COPYRIGHT).
+SHA-256 `23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d`. Used by: unicode-normalization 0.1.26 (COPYRIGHT), unicode-properties 0.1.5 (COPYRIGHT), unicode-segmentation 1.13.3 (COPYRIGHT).
 
 ```text
 Licensed under the Apache License, Version 2.0
@@ -43233,4 +43233,50 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### T692
+
+SHA-256 `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`. Used by: unicode-properties 0.1.5 (LICENSE-UNICODE).
+
+```text
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2026 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
 ```
