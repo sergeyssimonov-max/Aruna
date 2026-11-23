@@ -646,8 +646,17 @@ their own sentence and the usual actions of a refusal, like any other code.
 The number the window compares refused PDFs with, `objected_to`, does not
 cross in `BuildReport`: the core's `PackageReport::pdfs` carries built and
 refused and nothing finer, and the split lives only in the manifest's `xml`
-section. So after a build with refusals the window asks `corpus_xml` for the
-package it has just built, the one extra call, and only then.
+section. After every successful build the window reads `corpus_stats` and
+`corpus_xml` for the published path in the report. Group distribution and XML
+explanations also appear immediately after building into a chosen folder. The
+three headline totals come from the build report. If either read fails, the
+other details and the inventory action remain available. The separate «Без PDF»
+line appears only when refusals exceed the known XML objections.
+
+Download advisories reach the window in Russian. A newer record is identified
+by date (when known), record and archive name, alongside the record Aruna will
+use. A digest mismatch identifies both checksums. A failed metadata lookup is
+advisory, and a retry explains the failure without exposing a transport diagnostic.
 
 **The types are generated, not written twice.** `frontend/src/bindings.ts` comes
 out of the same declarations that register the commands — specta 2.0.0-rc.25,
