@@ -310,9 +310,8 @@ fn download_archive(
 fn announce_release(job: &Job<'_>, releases: ReleaseLookup) {
     match releases(ZENODO_RECORD) {
         Ok(latest) => {
-            if let Some(message) = zenodo::advice(ZENODO_RECORD, download::ZENODO_ZIP_MD5, &latest)
-            {
-                job.report(Event::ZenodoNotice { message: &message });
+            if let Some(notice) = zenodo::advice(ZENODO_RECORD, download::ZENODO_ZIP_MD5, &latest) {
+                job.progress().report_zenodo_notice(&notice);
             }
         }
         Err(err) => {
