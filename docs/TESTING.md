@@ -10,6 +10,22 @@ coverage, corpus, native E2E and release artifacts. Run snapshot checks with
 From the repository root, native E2E is `pnpm --dir frontend test:e2e` and the
 universal release is `pnpm build --locked`. Both use the pinned local Tauri CLI.
 
+For 3.1.1 onward, build the same commit twice in independent clean source and
+target directories. Compare the complete DMG files with `cmp` and `shasum -a 256`.
+Download the workflow-dispatch DMG and compare its SHA-256 before tagging. Mount
+the image read-only, verify the signed app, and run the reader scenario using
+the installed copy after ejecting the disk image.
+
+Tauri creates the ad hoc signed universal app. `scripts/build-repro-dmg.py`
+creates a compressed HFS+ image on Ventura using that app, the recorded Finder
+layout and the commit timestamp. The five Finder records in
+`scripts/dmg-finder-layout.bin` come from both stock 3.1.1 installers at
+`130fdea`. The packager checks the mounted app against the signed original.
+Run `/usr/bin/python3 -IB scripts/test-repro-dmg.py /path/A/Aruna.app /path/B/Aruna.app`
+on Ventura to check filesystem integrity, equal image bytes and refusal cases.
+A `DMG-SHA256: <digest>` trailer on the annotated release tag lets CI verify
+the tag build against the accepted image before publication.
+
 Console diagnostics have three complementary guards: the catalogue's exhaustive
 Russian match, template arity/uniqueness and the source scan of remaining literal
 producers. `console::tests::phrase_wording_and_order_stay_unchanged` compares all

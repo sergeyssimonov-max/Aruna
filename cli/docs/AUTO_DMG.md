@@ -30,9 +30,10 @@
 # ручной запуск: соберет артефакт, но релиза не выпустит
 gh workflow run release-dmg.yml
 
-# релиз: тег обязан совпадать с version в cli/Cargo.toml — CI это проверяет
-git tag v2.5.11
-git push origin v2.5.11
+# После приемки укажите номер и проверенную сумму DMG.
+# CI проверит версию и сумму своей независимой сборки до публикации.
+git tag -a "$tag" -m "Aruna ${tag#v}" -m "DMG-SHA256: $digest"
+git push origin "refs/tags/$tag"
 ```
 
 ## Локально
@@ -44,7 +45,7 @@ pnpm build   # scripts/build-release.sh → tauri build --target universal-apple
 open target/universal-apple-darwin/release/bundle/dmg/Aruna_*_universal.dmg
 ```
 
-`cli/scripts/make_release.sh` в выпуск больше не входит.
+Tauri собирает подписанное приложение. Для DMG скрипт упаковки использует время коммита и сохраненное оформление окна Finder. Порядок проверки двух чистых сборок описан в [руководстве по приемке](../../docs/TESTING.md).
 
 ## Подпись (опционально)
 
