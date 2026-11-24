@@ -416,7 +416,9 @@ destination and a label. Neither needs a window.
 Four things are missing, and each is a real piece of work rather than a
 formality.
 
-### 2.1 No `serde`
+### 2.1 Serialization at the boundary
+
+Since the edition-selection change of 2026-11-24, the core also uses the same locked serde and serde_json as the shell for publisher metadata and provenance in a saved package. Manuscript and presentation types continue to be independent of IPC. The rationale below records the earlier design.
 
 ~~Dependencies are `dirs`, `memchr`, `thiserror`, `ureq`, `zip`.~~ *Corrected
 2026-10-19:* the core's dependencies are `dirs`, `memchr`, `quick-xml`,
@@ -646,8 +648,14 @@ their own sentence and the usual actions of a refusal, like any other code.
 The number the window compares refused PDFs with, `objected_to`, does not
 cross in `BuildReport`: the core's `PackageReport::pdfs` carries built and
 refused and nothing finer, and the split lives only in the manifest's `xml`
-section. So after a build with refusals the window asks `corpus_xml` for the
-package it has just built, the one extra call, and only then.
+section. After every successful build the window reads `corpus_stats` and
+`corpus_xml` for the published path in the report. Group distribution and XML
+explanations also appear immediately after building into a chosen folder. The
+three headline totals come from the build report. If either read fails, the
+other details and the inventory action remain available. The separate «Без PDF»
+line appears only when refusals exceed the known XML objections.
+
+The window reads the installed edition with `corpus_edition` and queries the permanent TLHdig collection with `corpus_update`. Rust retains the verified record and its destination for `build_update`. The saved inventory remains available throughout the update. A failed or cancelled update returns to its summary. The published inventory identifies the verified archive actually opened. See [corpus editions](CORPUS-EDITIONS.md).
 
 **The types are generated, not written twice.** `frontend/src/bindings.ts` comes
 out of the same declarations that register the commands — specta 2.0.0-rc.25,

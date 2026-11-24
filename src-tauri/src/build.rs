@@ -9,23 +9,26 @@ use crate::FONT_RESOURCES;
 /// отсюда прошла бы сквозь `export::build` и вернулась бы обломком задания без
 /// объяснения. Поэтому отказ отправки проглатывается: окно, которое закрыли на
 /// середине сборки – это не сбой сборки.
-struct WindowProgress {
-    app: tauri::AppHandle,
+struct WindowProgress<F> {
+    emit: F,
     job: u32,
     /// Последнее число построенных PDF этого прогона ([`BuildProgress::carrying`]).
     built: std::sync::Mutex<Option<u32>>,
 }
 
-impl aruna::progress::Progress for WindowProgress {
+impl<F: Fn(BuildProgress) + Send + Sync> aruna::progress::Progress for WindowProgress<F> {
+    fn report_zenodo_notice(&self, notice: &aruna::zenodo::Notice<'_>) {
+        self.report(aruna::progress::Event::ZenodoNotice {
+            message: &crate::dto::zenodo_notice_text(notice),
+        });
+    }
+
     fn report(&self, event: aruna::progress::Event<'_>) {
-        use tauri_specta::Event as _;
         let mut last = self
             .built
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let _ = BuildProgress::of(self.job, &event)
-            .carrying(&mut last)
-            .emit(&self.app);
+        (self.emit)(BuildProgress::of(self.job, &event).carrying(&mut last));
     }
 }
 
@@ -163,10 +166,29 @@ pub(super) fn chosen_destination(
     }
 }
 
+// Remember only the parent of a successfully published library. A disconnected
+// external volume must never be created or populated automatically.
+pub(super) fn last_library(config: &std::path::Path) -> Option<std::path::PathBuf> {
+    let file = config.join("last-library.json");
+    let metadata = std::fs::symlink_metadata(&file).ok()?;
+    if !metadata.is_file() || metadata.len() > 16 * 1024 {
+        return None;
+    }
+    let path: std::path::PathBuf = serde_json::from_slice(&std::fs::read(file).ok()?).ok()?;
+    if !path.is_absolute() || !path.is_dir() {
+        return None;
+    }
+    let (root, inventory) = aruna::editions::library_paths(&path);
+    (crate::read::named_package(&root).is_ok()
+        && crate::commands::named_inventory(&inventory).is_ok())
+    .then_some(path)
+}
+
 pub(super) async fn start(
     app: tauri::AppHandle,
     state: &Building,
     destination: Option<String>,
+    update: Option<aruna::editions::Update>,
 ) -> Result<BuildReport, BuildFailure> {
     use tauri::Manager as _;
 
@@ -182,20 +204,39 @@ pub(super) async fn start(
     in_slot(state, cancel, move || {
         let id = aruna::job::JobId::next();
         let sink = WindowProgress {
-            app: handle,
+            emit: |progress: BuildProgress| {
+                use tauri_specta::Event as _;
+                let _ = progress.emit(&handle);
+            },
             job: counted(id.get()),
             built: std::sync::Mutex::new(None),
         };
-        build_once(id, &request, chosen.as_deref(), &flag, &sink)
+        let report = if let Some(update) = update {
+            let job = aruna::job::Job::with_id(id, &sink, &flag);
+            build_report(update.build(&request, &job))
+        } else {
+            build_once(id, &request, chosen.as_deref(), &flag, &sink)
+        }?;
+        if let (Ok(dir), Some(parent)) = (
+            handle.path().app_config_dir(),
+            std::path::Path::new(&report.package).parent(),
+        ) {
+            if let Ok(bytes) = serde_json::to_vec(parent) {
+                let file = dir.join("last-library.json");
+                let _ = aruna::paths::ensure_output_parent(&file)
+                    .and_then(|()| aruna::paths::write_atomic(&file, &bytes));
+            }
+        }
+        Ok(report)
     })
     .await
 }
 
-/// Что окно просит у ядра: пакет из закрепленной записи Zenodo, с PDF каждого
+/// Что окно просит у ядра: пакет по выбранному изданию Zenodo, с PDF каждого
 /// документа.
 ///
 /// Ядро умеет читать архив с диска, окно этой возможностью не пользуется:
-/// `None` – закрепленная запись Zenodo через кеш.
+/// `None` поручает ядру выбрать издание TLHdig.
 ///
 /// Шрифты – каталог `resources/FONT_RESOURCES`. `resources` – каталог
 /// ресурсов приложения, который команда берет у Tauri в момент сборки. Нет его
@@ -232,24 +273,30 @@ pub(super) fn build_once(
     // Две ветки, а не одна с подстановкой умолчания: место, где спрашивают
     // у платформы про папку загрузок, обязано остаться единственным, и оно
     // внутри `app::build_corpus`.
-    match chosen {
+    build_report(match chosen {
         Some(folder) => aruna::app::build_corpus_into(request, folder, &job),
         None => aruna::app::build_corpus(request, &job),
-    }
-    .map(|report| BuildReport {
-        job: counted(report.job.get()),
-        package: report.package.root.display().to_string(),
-        inventory: report.inventory.display().to_string(),
-        documents: counted(report.package.documents),
-        groups: counted(report.package.groups),
-        disambiguated: counted(report.package.disambiguated),
-        stylesheet_dropped: counted(report.package.stylesheet_dropped),
-        pdfs: PdfReport {
-            built: counted(report.package.pdfs.built),
-            refused: counted(report.package.pdfs.refused),
-        },
     })
-    .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
+}
+
+fn build_report(
+    result: aruna::error::Result<aruna::app::CorpusReport>,
+) -> Result<BuildReport, BuildFailure> {
+    result
+        .map(|report| BuildReport {
+            job: counted(report.job.get()),
+            package: report.package.root.display().to_string(),
+            inventory: report.inventory.display().to_string(),
+            documents: counted(report.package.documents),
+            groups: counted(report.package.groups),
+            disambiguated: counted(report.package.disambiguated),
+            stylesheet_dropped: counted(report.package.stylesheet_dropped),
+            pdfs: PdfReport {
+                built: counted(report.package.pdfs.built),
+                refused: counted(report.package.pdfs.refused),
+            },
+        })
+        .map_err(|error| BuildFailure::of(&aruna::app::Failure::of(&error)))
 }
 
 #[cfg(test)]
@@ -281,5 +328,43 @@ mod tests {
         let _next = building
             .claim(aruna::job::Cancel::new())
             .expect("после отравления место свободно");
+    }
+}
+
+#[cfg(test)]
+mod notice_tests {
+    use super::*;
+    use aruna::{progress::Progress, zenodo::Notice};
+
+    #[test]
+    fn the_window_emits_russian_notices_for_each_release_advisory() {
+        let notes = std::sync::Mutex::new(Vec::new());
+        let sink = WindowProgress {
+            emit: |event: BuildProgress| {
+                assert_eq!(event.stage, crate::dto::Stage::ZenodoNotice);
+                assert_eq!(event.job, 7);
+                notes.lock().unwrap().push(event.note.unwrap());
+            },
+            job: 7,
+            built: Default::default(),
+        };
+        for published in [Some("2026-11-19"), None] {
+            sink.report_zenodo_notice(&Notice::NewEdition {
+                record: 24373727,
+                published,
+                file: "TLHbasisONLINE25_1_ZENODO_Beta_04.zip",
+                pinned: 20328284,
+            });
+        }
+        sink.report_zenodo_notice(&Notice::DigestMismatch {
+            record: 20328284,
+            published: "abc",
+            expected: "def",
+        });
+        let notes = notes.into_inner().unwrap();
+        for (text, date) in notes[..2].iter().zip(["2026-11-19", "дата не указана"]) {
+            assert_eq!(text, &format!("Вышло новое издание корпуса: запись 24373727 на Zenodo ({date}), файл TLHbasisONLINE25_1_ZENODO_Beta_04.zip. Aruna продолжит сборку по записи 20328284: чтение документов проверено на этом издании."));
+        }
+        assert_eq!(notes[2], "Для записи 20328284 на Zenodo указана контрольная сумма MD5 abc. Aruna ожидает def. Если сумма скачанного архива с ней не совпадет, сборка остановится.");
     }
 }

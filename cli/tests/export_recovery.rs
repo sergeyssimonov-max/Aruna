@@ -5,8 +5,8 @@
 //! leaves nothing beside the package. What neither covers is the case `Drop`
 //! cannot: a process that is killed. `SIGKILL`, a lost power supply, a laptop
 //! lid closed on a 389 MB rename — none of them run a destructor, and each can
-//! leave the destination holding a half-built `.TLHdig_Beta_0.3.build`, an
-//! aside `.TLHdig_Beta_0.3.previous` that was never put back, or a `.part`
+//! leave the destination holding a half-built `.TLHdig.build`, an
+//! aside `.TLHdig.previous` that was never put back, or a `.part`
 //! file beside the inventory.
 //!
 //! The question these ask is the one a user actually has: *does it work if I
@@ -213,7 +213,7 @@ fn a_staging_directory_whose_owner_is_gone_is_removed_by_the_next_build() {
 
 /// A package moved aside by a run that was killed before it could be put back.
 ///
-/// `Replaced::aside` moves the existing package to `.TLHdig_Beta_0.3.previous`
+/// `Replaced::aside` moves the existing package to `.TLHdig.previous`
 /// so the swap is one rename wide, and `Drop` puts it back if the publish
 /// fails. A kill in that window leaves the aside copy with nothing to restore
 /// it — and the next build has to remove it before it can move the new package
@@ -371,7 +371,7 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
 
     // What a kill between the write and the rename leaves behind. The pid is
     // one that is not this process and not the child's.
-    let orphan = downloads.join("TLHdig_Beta_0.3.html.999999.0.part");
+    let orphan = downloads.join("TLHdig.html.999999.0.part");
     std::fs::write(&orphan, "<!DOCTYPE html><p>half an inventory").expect("orphan");
 
     let out = Command::new(env!("CARGO_BIN_EXE_aruna"))
@@ -392,7 +392,7 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
     assert!(out.status.success(), "the run failed:\n{stderr}");
     assert!(!stderr.contains("panicked"), "the run panicked:\n{stderr}");
 
-    let inventory = downloads.join(PACKAGE).join("TLHdig_Beta_0.3.html");
+    let inventory = downloads.join(PACKAGE).join("TLHdig.html");
     let written = std::fs::read_to_string(&inventory).expect("the inventory");
     assert!(
         written.trim_end().ends_with("</html>"),
@@ -412,9 +412,7 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
         .map(|e| e.file_name().to_string_lossy().into_owned())
         // The package is what the run is now *for*; the scratch file is the
         // orphan this test planted.
-        .filter(|n| {
-            n != "TLHdig_Beta_0.3.html" && n != "TLHdig_Beta_0.3.html.999999.0.part" && n != PACKAGE
-        })
+        .filter(|n| n != "TLHdig.html" && n != "TLHdig.html.999999.0.part" && n != PACKAGE)
         .collect();
     assert!(
         leftovers.is_empty(),
@@ -425,7 +423,7 @@ fn a_scratch_file_from_a_killed_run_is_not_the_inventory() {
 /// A build that fails does not cost the reader the orphan.
 ///
 /// The counterpart to the sweep above, and the reason it happens at the end of
-/// a build rather than the start. An orphaned `.TLHdig_Beta_0.3.previous` is
+/// a build rather than the start. An orphaned `.TLHdig.previous` is
 /// the only copy left of the package the reader had; clearing it before the
 /// work — the obvious place to put housekeeping — would mean a build that then
 /// failed had taken their last copy and given them nothing.

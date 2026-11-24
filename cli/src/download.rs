@@ -13,33 +13,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub(crate) const ZENODO_ZIP_URL: &str =
     "https://zenodo.org/records/20328284/files/TLHbasisONLINE25_1_ZENODO_Beta_03.zip?download=1";
 
-/// MD5 published by Zenodo for record 20328284, verified against the fixture.
-///
-/// If Zenodo ever republishes the archive this has to be updated together with
-/// `ZENODO_ZIP_URL`; the mismatch error prints both digests, so the diagnosis
-/// is immediate.
-///
-/// **What a republish costs, decided before it happens.** Every copy of this
-/// program already installed stops working on that day: a moved record answers
-/// 404 and a re-cut file fails this digest, and neither is recoverable on the
-/// reader's machine — the pin is compiled in. So the answer is a release, not a
-/// note in an issue:
-///
-/// 1. take the new URL and the MD5 Zenodo publishes beside it, and update both
-///    constants here in one commit — they are a pair, and a URL updated alone
-///    turns a clear 404 into a mismatch that looks like corruption;
-/// 2. replace `cli/fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip` with the new
-///    archive, so the corpus job and the fixture tests measure what readers get,
-///    and re-record any digest the tests carry;
-/// 3. expect the corpus numbers to move. 663 groups and 23 936 documents are
-///    asserted in several places, and a republished corpus is a different
-///    corpus; the numbers are updated deliberately, with the new ones read off
-///    a real run, and never loosened into ranges to avoid the work;
-/// 4. cut a release. `main.rs` sends both failures at the reader to
-///    `releases/latest`, which is the only fix they can apply.
-///
-/// A republish that changes only packaging (same documents, new digest) still
-/// takes all four steps; only step 3 comes back unchanged.
+/// Historical digest for explicit Beta 0.3 downloads and regression fixtures.
+/// Normal corpus builds verify the edition selected by [`crate::editions`].
 pub const ZENODO_ZIP_MD5: &str = "f9acbc8db3111cc7dd88d82f7819a912";
 
 /// Attempts per download before giving up.
@@ -82,7 +57,7 @@ const MAX_RETRY_AFTER: Duration = Duration::from_secs(30);
 /// one is held to what it stated. Fourteen times the archive as it stands
 /// (71 MiB), so a corpus that keeps growing does not walk into it, and far
 /// short of any volume it would be reasonable to fill.
-const MAX_DOWNLOAD: u64 = 1024 * 1024 * 1024;
+pub(crate) const MAX_DOWNLOAD: u64 = 1024 * 1024 * 1024;
 
 /// How often the transfer says how far it has got.
 ///
@@ -2415,40 +2390,17 @@ mod tests {
         assert!(leftovers.is_empty(), "scratch left behind: {leftovers:?}");
     }
 
-    /// Both READMEs point the reader at the Zenodo record, by hand.
-    ///
-    /// They are the fifth and sixth copies of a number that lives in
-    /// `ZENODO_ZIP_URL`, and the only ones a person reads before running
-    /// anything. `SOURCE_LABEL` is already checked against the URL; this covers
-    /// the documentation, so republishing the archive cannot leave the prose
-    /// sending people to the record the tool no longer downloads.
-    ///
-    /// Included at compile time, so a moved or renamed README is a build error
-    /// rather than a test that quietly stops checking anything.
+    /// Reader documentation and the resolver identify the same collection.
     #[test]
-    fn the_readmes_point_at_the_record_that_is_downloaded() {
-        let record = ZENODO_ZIP_URL
-            .split("/records/")
-            .nth(1)
-            .and_then(|rest| rest.split('/').next())
-            .expect("the Zenodo URL names a record");
-        let landing = format!("https://zenodo.org/records/{record}");
-        // The prose drops `?download=1`; the path before it is what must agree.
-        let file_url = ZENODO_ZIP_URL.split('?').next().expect("split yields one");
-
-        for (name, text) in [
-            ("cli/README.md", include_str!("../README.md")),
-            ("README.md", include_str!("../../README.md")),
+    fn both_readmes_link_the_collection_used_to_select_editions() {
+        let collection = crate::editions::COLLECTION;
+        let doi = format!("https://doi.org/10.5281/zenodo.{collection}");
+        for readme in [
+            include_str!("../README.md"),
+            include_str!("../../README.md"),
         ] {
-            assert!(
-                text.contains(&landing),
-                "{name} does not link {landing} — the record the CLI downloads"
-            );
+            assert!(readme.contains(&doi), "missing TLHdig collection DOI");
         }
-        assert!(
-            include_str!("../README.md").contains(file_url),
-            "cli/README.md names a different archive than {file_url}"
-        );
     }
 
     /// An existing archive stays intact when a later download fails.

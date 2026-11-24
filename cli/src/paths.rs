@@ -5,28 +5,13 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Canonical output file name.
-///
-/// Names the edition the inventory was built from rather than the work it
-/// catalogues: the title inside the document stays *Thesaurus Linguarum
-/// Hethaeorum Digitalis*, while the file says which release of TLHdig produced
-/// it — which is what tells two downloads apart in a Downloads folder.
-///
-/// No spaces, so it survives a shell, a URL and an email attachment unquoted.
-///
-/// **The one place the inventory is named.** The exporter used to write
-/// `format!("{PACKAGE}.html")` in four places while the window and the
-/// standalone path read this constant; the two agreed only because
-/// `PACKAGE` happens to be `TLHdig_Beta_0.3`, and nothing said they had to.
-/// The day the corpus edition moves to Beta 0.4, that arrangement would have
-/// renamed the file the exporter writes and left the window reporting
-/// `inventory_exists: false` about a package that was right there. Everything
-/// now joins this constant, and
-/// `the_inventory_is_named_after_the_package` holds the relationship the
-/// name still carries.
-pub const OUTPUT_FILE_NAME: &str = "TLHdig_Beta_0.3.html";
+/// Stable name shared by the exporter, the reader and the standalone inventory.
+/// The inventory and manifest identify the edition, so bookmarks survive an update.
+pub const OUTPUT_FILE_NAME: &str = "TLHdig.html";
+/// Historical inventory still opened in place during migration.
+pub const LEGACY_INVENTORY: &str = "TLHdig_Beta_0.3.html";
 
-/// Resolve `~/Downloads/TLHdig_Beta_0.3.html`.
+/// Resolve the standalone inventory inside the downloads directory.
 pub(crate) fn output_html_path() -> Result<PathBuf> {
     Ok(downloads_dir()?.join(OUTPUT_FILE_NAME))
 }

@@ -572,6 +572,7 @@ fn every_failure() -> Vec<ArunaError> {
     let secret = PathBuf::from("/Users/nobody/Downloads/secret-corpus");
     let io = || std::io::Error::other("busy");
     let all = vec![
+        ArunaError::Edition(aruna::editions::EditionIssue::Record),
         ArunaError::Network {
             url: "https://example.invalid/a.zip".into(),
             source: Box::new(io()),
@@ -705,7 +706,8 @@ fn every_failure() -> Vec<ArunaError> {
 fn covers(error: &ArunaError) {
     use ArunaError::*;
     match error {
-        Network { .. }
+        Edition(_)
+        | Network { .. }
         | Http { .. }
         | Truncated { .. }
         | Oversized { .. }
@@ -780,6 +782,8 @@ fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
         );
         assert!(
             failure.code == "cancelled"
+                || (failure.code == "edition"
+                    && matches!(&error, ArunaError::Edition(issue) if failure.message == issue.russian()))
                 || sentences.get(failure.code).and_then(Json::as_str).is_some(),
             "the window has no sentence for `{}`; it would show the core's English",
             failure.code
@@ -831,6 +835,7 @@ fn every_failure_reaches_the_window_as_a_russian_sentence_and_without_a_path() {
     // phase and the window itself supplies the broken-bridge failure.
     let mut expected: std::collections::BTreeSet<_> = codes.keys().copied().collect();
     expected.remove("cancelled");
+    expected.remove("edition"); // the typed reason supplies its own Russian sentence above
     expected.insert("broken");
     assert_eq!(
         sentences

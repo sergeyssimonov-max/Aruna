@@ -102,7 +102,7 @@ pub(crate) fn archive_name(url: &str, md5: &str) -> String {
         .unwrap_or(url)
         .rsplit('/')
         .next()
-        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .filter(|name| !name.is_empty() && name.len() <= 220 && *name != "." && *name != "..")
         .filter(|name| !name.contains(['/', '\\']))
         .unwrap_or("archive.zip");
     match file.rsplit_once('.') {

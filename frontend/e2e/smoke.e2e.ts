@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { editionUpgrade } from './edition-upgrade'
 import { corpusLifecycle } from './corpus.lifecycle'
 
 /**
@@ -22,7 +23,10 @@ function shellVersion(): string {
   return match[1]
 }
 
+const upgrading = Boolean(process.env.ARUNA_E2E_PREVIOUS_LIBRARY)
+
 describe('Aruna window', () => {
+  if (upgrading) return
   it('opens and shows the interface', async () => {
     const primary = await $('[data-testid="primary"]')
     await expect(primary).toExist()
@@ -116,4 +120,5 @@ describe('Aruna window', () => {
   })
 })
 
-if (process.env.ARUNA_E2E_CORPUS_CACHE) corpusLifecycle()
+if (upgrading) editionUpgrade()
+else if (process.env.ARUNA_E2E_CORPUS_CACHE) corpusLifecycle()

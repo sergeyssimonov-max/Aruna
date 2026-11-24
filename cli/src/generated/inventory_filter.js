@@ -101,6 +101,8 @@
 	}
 	function setFolded(group, folded) {
 		group.folded = folded;
+		const columns = group.table.tHead;
+		if (columns) columns.hidden = folded;
 		group.tr.classList.toggle("folded", folded);
 		const button = group.tr.querySelector(".group-toggle");
 		if (button) button.setAttribute("aria-expanded", folded ? "false" : "true");
@@ -173,7 +175,6 @@
 						if (!group.folded) onScreen++;
 					}
 				}
-				setFolded(group, group.folded);
 			}
 			if (hint) {
 				if (q === "") hint.textContent = "";

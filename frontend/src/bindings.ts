@@ -13,6 +13,9 @@ export const commands = {
 	 *  второй догадки о том, где лежит пакет, здесь нет.
 	 */
 	corpusStats: (path: string) => typedError<CorpusStats, string>(__TAURI_INVOKE("corpus_stats", { path })),
+	corpusEdition: (path: string) => typedError<string | null, string>(__TAURI_INVOKE("corpus_edition", { path })),
+	corpusUpdate: (path: string) => typedError<boolean, string>(__TAURI_INVOKE("corpus_update", { path })),
+	buildUpdate: () => typedError<BuildReport, BuildFailure>(__TAURI_INVOKE("build_update")),
 	/**
 	 *  Что разборщик сказал о документах пакета, лежащего по этому пути.
 	 * 
@@ -32,9 +35,8 @@ export const commands = {
 	/**
 	 *  Собрать корпус и сказать, что вышло.
 	 * 
-	 *  Две оси, и они разные. **Источник один** – закрепленная запись Zenodo через
-	 *  кеш, то есть ровно то, что делает консольный бинарь: архива команда не
-	 *  принимает вовсе, решением владельца 06.09.2026. **Назначение выбирается:**
+	 *  Ядро выбирает текущее издание TLHdig на Zenodo, как при сборке из консоли.
+	 *  Команда не принимает путь к архиву. **Назначение выбирается:**
 	 *  `destination` – папка, названная человеком, `null` – папка загрузок. Ядро
 	 *  умело это с самого начала, `app::build_corpus_into`; окно до него не
 	 *  дотягивалось. Путь приходит строкой и проверяется здесь: окно файловых ручек
@@ -188,6 +190,7 @@ export type BuildReport = {
  *  реализации, расходящиеся при первой же правке ядра.
  */
 export type CorpusLocation = {
+	destination: string | null,
 	downloads: string,
 	package: string,
 	inventory: string,

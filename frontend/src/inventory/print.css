@@ -99,7 +99,7 @@
   }
   /* The column headings repeat at the top of every page the table runs onto —
    * without this a 24 000-row table is unreadable from page two. */
-  thead {
+  thead:not([hidden]) {
     display: table-header-group;
   }
   tfoot {
@@ -108,8 +108,9 @@
 
   /* Safari 18 does not repeat a native thead when a table spans pages
    * (WebKit bug 17205). Each body can instead print as a short table.
-   * Keep the header after the rows in the DOM so a filtered-out section
-   * has no printable header. Table layout places that header first. */
+   * The header follows the rows in the DOM so it can depend on a visible
+   * manuscript. The group title alone needs no column labels. Table
+   * layout places the header first on paper. */
   @supports (font: -apple-system-body) {
     #inv > table:not([hidden]) {
       display: block;
@@ -125,7 +126,7 @@
       border-collapse: collapse;
       break-inside: avoid;
     }
-    tr:not([hidden]) ~ .print-columns,
+    tr:not(.group):not([hidden]) ~ .print-columns,
     .print-columns:only-child {
       display: table-header-group;
     }

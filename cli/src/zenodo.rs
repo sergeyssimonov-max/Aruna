@@ -1,18 +1,6 @@
-//! Asking Zenodo about the record before downloading from it.
-//!
-//! The archive itself is fetched as one file — see [`crate::download`] — and
-//! that is the right shape: the record holds a single 71 MiB ZIP and no
-//! per-document access, so reading it in pieces would mean 23 937 range
-//! requests against a 133-per-minute rate limit, three hours to save 29 MiB.
-//!
-//! What the API is good for is the two things the program otherwise guesses at:
-//! the digest the archive is published with, and whether a newer edition of the
-//! corpus exists. Both come from one request.
-//!
-//! Nothing here is required. The metadata request is made only when the archive
-//! is about to be downloaded anyway, and a failure is reported rather than
-//! raised: a repository that will not answer questions about a file can still
-//! serve it.
+//! Advisories for callers explicitly requesting the historical Beta 0.3 archive,
+//! and typed publication notices shared by the CLI and desktop. The normal
+//! build selects and validates the current edition in [`crate::editions`].
 
 use crate::error::{ArunaError, Result};
 use std::time::Duration;
@@ -75,29 +63,73 @@ fn parse_release(body: &str) -> Option<Release> {
     })
 }
 
+/// Differences between the published record and the archive used by this build.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Notice<'a> {
+    Selected {
+        title: &'a str,
+        published: &'a str,
+    },
+    Offline {
+        title: &'a str,
+        published: &'a str,
+    },
+    NewEdition {
+        record: u64,
+        published: Option<&'a str>,
+        file: &'a str,
+        pinned: u64,
+    },
+    DigestMismatch {
+        record: u64,
+        published: &'a str,
+        expected: &'a str,
+    },
+}
+
+impl std::fmt::Display for Notice<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Selected { title, published } => write!(f, "Corpus edition: {title} ({published})."),
+            Self::Offline { title, published } => write!(f, "Zenodo is unavailable. Using the verified archive of {title} ({published})."),
+            Self::NewEdition { record, published, file, pinned } => write!(
+                f,
+                "A newer edition of the corpus is published: Zenodo record {record} ({}), file {file}.\n\
+                 This build is pinned to record {pinned} and will keep using it — \
+                 the parser is tested against that edition.",
+                published.unwrap_or("date unknown"),
+            ),
+            Self::DigestMismatch { record, published, expected } => write!(
+                f,
+                "Zenodo publishes MD5 {published} for record {record}, but this build \
+                 expects {expected}.\n\
+                 The download will be checked against the expected digest and will fail."
+            ),
+        }
+    }
+}
+
 /// What is worth telling the reader, comparing what Zenodo publishes against
 /// what this build is pinned to. `None` when the two agree — silence is the
 /// right answer to no news.
-///
-/// A pure function so every branch can be tested. It composes the prose and
-/// hands it back; who says it, and to whom, is the caller's — see
-/// [`crate::progress::Event::ZenodoNotice`].
 ///
 /// Deliberately advisory. The pinned digest stays the authority — it records
 /// the archive this parser was tested against, and taking Zenodo's word for it
 /// instead would turn a check of *which* archive arrived into a check of
 /// whether the transfer corrupted it. A republished corpus would then be
 /// accepted in silence, which is the failure this pin exists to prevent.
-pub(crate) fn advice(pinned_record: u64, pinned_md5: &str, latest: &Release) -> Option<String> {
+pub(crate) fn advice<'a>(
+    pinned_record: u64,
+    pinned_md5: &'a str,
+    latest: &'a Release,
+) -> Option<Notice<'a>> {
     if latest.record_id != pinned_record {
-        return Some(format!(
-            "A newer edition of the corpus is published: Zenodo record {} ({}), file {}.\n\
-             This build is pinned to record {pinned_record} and will keep using it — \
-             the parser is tested against that edition.",
-            latest.record_id,
-            latest.published.as_deref().unwrap_or("date unknown"),
-            latest.file,
-        ));
+        return Some(Notice::NewEdition {
+            record: latest.record_id,
+            published: latest.published.as_deref(),
+            file: &latest.file,
+            pinned: pinned_record,
+        });
     }
 
     let published = latest.md5.as_deref()?;
@@ -110,11 +142,11 @@ pub(crate) fn advice(pinned_record: u64, pinned_md5: &str, latest: &Release) -> 
     // refusing to run whenever the API is wrong or this parser misreads it.
     // A false refusal is worse than a wasted minute, so the pin stays the only
     // thing that can stop a download.
-    Some(format!(
-        "Zenodo publishes MD5 {published} for record {pinned_record}, but this build \
-         expects {pinned_md5}.\n\
-         The download will be checked against the expected digest and will fail."
-    ))
+    Some(Notice::DigestMismatch {
+        record: pinned_record,
+        published,
+        expected: pinned_md5,
+    })
 }
 
 #[cfg(test)]
@@ -220,7 +252,9 @@ mod tests {
     /// getting — otherwise the message reads as a warning to act on now.
     #[test]
     fn a_newer_edition_is_announced_without_switching_to_it() {
-        let message = advice(7, "abc", &release(9, Some("zzz"))).expect("news");
+        let message = advice(7, "abc", &release(9, Some("zzz")))
+            .expect("news")
+            .to_string();
         assert!(message.contains("record 9"), "{message}");
         assert!(
             message.contains("2026-05-21"),
@@ -238,7 +272,7 @@ mod tests {
     fn a_newer_edition_without_a_date_still_reads() {
         let mut newer = release(9, None);
         newer.published = None;
-        let message = advice(7, "abc", &newer).expect("news");
+        let message = advice(7, "abc", &newer).expect("news").to_string();
         assert!(message.contains("date unknown"), "{message}");
     }
 
@@ -246,7 +280,9 @@ mod tests {
     /// failure, and the message has to say so — the download will refuse it.
     #[test]
     fn a_disagreeing_digest_warns_and_predicts_the_failure() {
-        let message = advice(7, "abc", &release(7, Some("def"))).expect("warning");
+        let message = advice(7, "abc", &release(7, Some("def")))
+            .expect("warning")
+            .to_string();
         assert!(
             message.contains("def") && message.contains("abc"),
             "both digests: {message}"
@@ -258,7 +294,9 @@ mod tests {
     /// differs, it describes a different archive. Saying both would be noise.
     #[test]
     fn a_newer_edition_is_not_also_reported_as_a_digest_mismatch() {
-        let message = advice(7, "abc", &release(9, Some("def"))).expect("news");
+        let message = advice(7, "abc", &release(9, Some("def")))
+            .expect("news")
+            .to_string();
         assert!(
             !message.contains("will fail"),
             "one story, not two: {message}"

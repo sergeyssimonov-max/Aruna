@@ -39,8 +39,7 @@ pub enum Event<'a> {
     /// The archive was already downloaded and still hashes as promised.
     ArchiveFromCache { path: &'a Path },
     /// Zenodo says something about the record that differs from what this build
-    /// expects. Prose, because `crate::zenodo::advice` composes it and its
-    /// wording is what the test suite pins.
+    /// expects. The reporting sink chooses the wording.
     ZenodoNotice { message: &'a str },
     /// The record could not be checked. Advisory: the download goes ahead.
     ZenodoUnreachable { cause: &'a str },
@@ -246,6 +245,14 @@ pub trait Progress: Send + Sync {
     /// Take one event. Must not fail: a run that has its data is not failed by
     /// having nowhere to say so.
     fn report(&self, event: Event<'_>);
+
+    /// Report a release advisory. Sinks can choose wording for their readers;
+    /// by default the event retains the CLI's diagnostic text.
+    fn report_zenodo_notice(&self, notice: &crate::zenodo::Notice<'_>) {
+        self.report(Event::ZenodoNotice {
+            message: &notice.to_string(),
+        });
+    }
 }
 
 /// The sink the CLI runs with: one line on stderr per stage.

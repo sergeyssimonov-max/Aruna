@@ -75,8 +75,15 @@ export function corpusLifecycle(): void {
       })
 
       await $('[data-testid="primary"]').click()
-      await browser.waitUntil(async () => (await heard()).length > 0, { timeout: 30_000 })
-      expect((await heard())[0]?.stage).toBe('archive-from-cache')
+      await browser.waitUntil(
+        async () => (await heard()).some(({ stage }) => stage === 'archive-from-cache'),
+        { timeout: 30_000 },
+      )
+      const first = (await heard()).slice(0, 2)
+      expect(first.map(({ stage }) => stage)).toEqual(['zenodo-notice', 'archive-from-cache'])
+      expect(first[0]?.note).toBe(
+        'Связи с Zenodo нет. Для сборки используется сохраненное издание Beta 0.3 (2026-05-21).',
+      )
       console.info('Corpus lifecycle: native build is reading the isolated cache')
       const busy = await browser.tauri.execute(({ core }) =>
         core.invoke('build_corpus', { destination: null }).then(
@@ -100,6 +107,37 @@ export function corpusLifecycle(): void {
         },
         { timeout: 300_000, interval: 500, timeoutMsg: 'The native build did not finish' },
       )
+      const summary = (await $('main').getText()).replace(/\s+/g, ' ')
+      for (const text of [
+        'Документов – 23 936',
+        'Групп CTH – 663',
+        'PDF – 23 713',
+        'Самая большая группа – CTH 832 (4 480)',
+        'Групп из одной рукописи – 116',
+        'Не могут быть преобразованы в PDF – 223 из 23 936',
+        'В описи ссылка на такой документ открывает его XML.',
+      ])
+        expect(summary).toContain(text)
+      expect(summary).not.toContain('Без PDF')
+      const fits = await browser.execute(() => {
+        const buttons = Array.from(document.querySelectorAll('button'))
+        const content = document.querySelector('.ready')?.getBoundingClientRect()
+        const footer = document.querySelector('.foot')?.getBoundingClientRect()
+        return (
+          !!content &&
+          !!footer &&
+          content.top >= 0 &&
+          content.bottom <= footer.top + 1 &&
+          buttons.length === 3 &&
+          buttons.every((button) => {
+            const box = button.getBoundingClientRect()
+            return (
+              box.top >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth
+            )
+          })
+        )
+      })
+      expect(fits).toBe(true)
       const completed = await heard()
       expect(new Set(completed.map(({ job }) => job)).size).toBe(1)
       expect(completed.some(({ stage }) => stage === 'downloading')).toBe(false)

@@ -141,7 +141,7 @@ pub fn href(path: &Path) -> String {
 }
 
 /// Percent-encode one path segment for a URL.
-fn encode_uri_component(segment: &str) -> String {
+pub(crate) fn encode_uri_component(segment: &str) -> String {
     // Escaping only grows a segment, and the corpus's spaces and brackets mean
     // most of them do grow.
     let mut out = String::with_capacity(segment.len() + 8);

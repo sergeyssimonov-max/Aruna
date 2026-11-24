@@ -18,7 +18,7 @@ document is about the Rust that runs underneath it.
 | | |
 |---|---|
 | `cli/` | package `aruna` — the program; its version is the current release named in the [README](../README.md#выпуски). A library (`aruna`) plus a binary (`aruna`) that is a thin adapter over it. |
-| `src-tauri/` | package `aruna-desktop` (its version is the core's since 2026-09-04), library `aruna_desktop_lib` — the desktop shell: the window, the permissions, and the bridge. Its six commands ask the core where the package went, read what is in it, open the inventory, and build or stop a build; the logic stays in `cli/`. `lib.rs` holds startup and plugins; `commands.rs` the six commands and their registration, `dto.rs` their types, and `build.rs` the running job. `read.rs` reads the finished package. The current module map is in §7. |
+| `src-tauri/` | Package `aruna-desktop`, library `aruna_desktop_lib`. The window locates and opens a library, reads its statistics and asks the core to check for a new edition, build or cancel. `lib.rs` holds startup and plugins, `commands.rs` registers IPC, `dto.rs` describes the messages, `build.rs` owns the running job and `read.rs` reads the published library. |
 
 They were independent crates with a `Cargo.lock` each until 2026-08-30, when
 they were joined: the root manifest lists both, **one lock file** sits beside it
@@ -103,6 +103,8 @@ Checked, not asserted:
   PDF library.
 
 ## 4. The pipeline
+
+For normal builds, `editions` checks the TLHdig collection before consulting the archive cache. The selected record, checksum and bibliographic data travel together into the exporter. It hashes the same file handle it parses, writes provenance into the inventory and manifest, checks for an older candidate under the publication lock and re-reads the installed provenance before releasing the previous package. The desktop retains the verified update with its destination while the reader uses the existing inventory. [Edition selection and migration](CORPUS-EDITIONS.md).
 
 ```
 Zenodo / local .zip
@@ -222,7 +224,7 @@ Current module boundaries, checked 2026-11-17:
 | module | responsibility |
 |---|---|
 | `src-tauri/src/lib.rs` | Application startup, plugins, managed state and startup font logging. |
-| `src-tauri/src/commands.rs` | The six IPC entry points and the one `contract()` used by both runtime registration and TypeScript export. |
+| `src-tauri/src/commands.rs` | The IPC entry points and the shared `contract()` used for runtime registration and TypeScript export. |
 | `src-tauri/src/dto.rs` | Response and event types, error presentation, bounded counters and pure projections of core data. No filesystem access or Tauri runtime calls. |
 | `src-tauri/src/build.rs` | Destination validation, the running-job slot and its guard, cancellation, blocking work and the progress sink. |
 | `src-tauri/src/read.rs` | Reading and validating a finished package, using the core's names and rules. |

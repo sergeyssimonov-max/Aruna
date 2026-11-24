@@ -180,7 +180,7 @@ fn the_same_run_without_a_press_builds_the_whole_package() {
     assert_eq!(report.groups, 663);
     assert_eq!(
         left,
-        vec!["TLHdig_Beta_0.3".to_string()],
+        vec!["TLHdig".to_string()],
         "пакет не встал под окончательным именем"
     );
 }

@@ -37,6 +37,8 @@ export default defineConfig({
         test: {
           name: 'component',
           environment: 'jsdom',
+          // Keep explicitly imported stylesheet text available to DOM tests.
+          css: { include: [/\.css\?raw$/] },
           setupFiles: ['./tests/setup.ts'],
           include: ['src/**/*.test.ts'],
         },

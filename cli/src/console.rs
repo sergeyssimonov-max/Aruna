@@ -64,6 +64,7 @@ pub(crate) fn headline(err: &ArunaError) -> String {
             format!("сумма архива {url} не сошлась: ожидался MD5 {expected}, получен {got}")
         }
         Zip(_) => "архив ZIP не читается".to_string(),
+        Edition(issue) => issue.russian().into(),
         EmptyArchive => "архив пуст или в нем нет XML-документов".to_string(),
         Cancelled { phase: stage } => format!("остановлено на этапе: {}", phase(*stage)),
         Io { path, .. } => format!("сбой ввода-вывода: {}", path.display()),

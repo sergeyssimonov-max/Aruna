@@ -51,26 +51,34 @@ use std::path::{Path, PathBuf};
 /// Build the package, and say what is in it.
 pub fn build_package(request: &PackageRequest, job: &Job<'_>) -> Result<PackageReport> {
     let fonts = load_fonts(request.fonts.as_deref())?;
-    build_package_with(request, &fonts, job)
+    build_package_with(
+        &request.archive,
+        &request.destination,
+        crate::export::Origin::Label(&request.source_label),
+        &fonts,
+        job,
+    )
 }
 
 /// [`build_package`] with the fonts already read.
 fn build_package_with(
-    request: &PackageRequest,
+    archive: &Path,
+    destination: &Path,
+    origin: crate::export::Origin<'_>,
     fonts: &Fonts,
     job: &Job<'_>,
 ) -> Result<PackageReport> {
-    let built = crate::export::build(
-        &request.archive,
-        &request.destination,
-        &request.source_label,
+    let built = crate::export::build_within(
+        archive,
+        destination,
+        origin,
         fonts,
         job,
+        crate::export::MAX_PACKAGE,
     )?;
-
     Ok(PackageReport {
         job: job.id(),
-        root: request.destination.join(crate::export::PACKAGE),
+        root: destination.join(crate::export::PACKAGE),
         documents: built.documents,
         groups: built.groups,
         disambiguated: built.disambiguated,
@@ -179,9 +187,8 @@ pub struct PackageReport {
 pub struct CorpusRequest {
     /// An archive to read instead of downloading one.
     ///
-    /// `None` means the pinned Zenodo record, through the cache. Tests and
-    /// offline runs pass a path; so will a window that lets someone choose a
-    /// file they already have.
+    /// `None` selects the current TLHdig edition on Zenodo, or a verified
+    /// local copy when the service is unavailable.
     pub local_archive: Option<PathBuf>,
     /// The directory of the fonts the PDFs are set in ([`load_fonts`]).
     pub fonts: Option<PathBuf>,
@@ -221,31 +228,31 @@ pub fn build_corpus_into(
     destination: &Path,
     job: &Job<'_>,
 ) -> Result<CorpusReport> {
-    let destination = destination.to_path_buf();
+    build_selected(request, destination, job, None)
+}
 
-    // The fonts before the archive: a PDF that cannot be set is refused
-    // before a byte is downloaded or written.
+pub(crate) fn build_selected(
+    request: &CorpusRequest,
+    destination: &Path,
+    job: &Job<'_>,
+    selected: Option<&crate::editions::Edition>,
+) -> Result<CorpusReport> {
     let fonts = load_fonts(request.fonts.as_deref())?;
-
-    let source = match &request.local_archive {
-        Some(path) => crate::cache::Archive::Cached(path.clone()),
-        None => crate::obtain_archive(
-            crate::download::ZENODO_ZIP_URL,
-            crate::download::ZENODO_ZIP_MD5,
-            job,
-        )?,
+    let edition;
+    let (source, origin) = match &request.local_archive {
+        Some(path) => (
+            crate::cache::Archive::Cached(path.clone()),
+            crate::export::Origin::Local,
+        ),
+        None => {
+            let (root, _) = crate::editions::library_paths(destination);
+            let installed = crate::editions::installed(&root)?;
+            let (archive, selected) = crate::editions::obtain(installed.as_ref(), job, selected)?;
+            edition = selected;
+            (archive, crate::export::Origin::Zenodo(&edition))
+        }
     };
-
-    let package = build_package_with(
-        &PackageRequest {
-            archive: source.path().to_path_buf(),
-            destination,
-            source_label: crate::SOURCE_LABEL.to_string(),
-            fonts: request.fonts.clone(),
-        },
-        &fonts,
-        job,
-    );
+    let package = build_package_with(source.path(), destination, origin, &fonts, job);
 
     // This run's own copy of the archive, if that is what it was — cleared
     // whether the build succeeded or not, because either way nothing else will
@@ -254,6 +261,11 @@ pub fn build_corpus_into(
     crate::cache::discard(&source);
 
     let package = package?;
+    if let (crate::export::Origin::Zenodo(edition), crate::cache::Archive::Cached(_), Some(dir)) =
+        (origin, &source, crate::cache::cache_dir())
+    {
+        crate::editions::remember(&dir, edition);
+    }
     let inventory = package.root.join(crate::paths::OUTPUT_FILE_NAME);
 
     Ok(CorpusReport {
@@ -303,6 +315,11 @@ impl Failure {
     pub fn of(error: &ArunaError) -> Failure {
         use ArunaError::*;
         let (code, phase, retryable) = match error {
+            Edition(issue) => (
+                "edition",
+                Some(Phase::Obtaining),
+                matches!(issue, crate::editions::EditionIssue::Offline),
+            ),
             Cancelled { phase } => ("cancelled", Some(*phase), false),
 
             // The network, and what a second attempt can fix — asked of the
@@ -413,6 +430,7 @@ fn file_name(path: &std::path::Path) -> std::borrow::Cow<'_, str> {
 fn message_of(error: &ArunaError) -> String {
     use ArunaError::*;
     match error {
+        Edition(issue) => issue.russian().into(),
         Io { source, .. } => format!("I/O error: {source}"),
         Replace { .. } => {
             "could not replace the inventory; the new one is complete and kept beside it"

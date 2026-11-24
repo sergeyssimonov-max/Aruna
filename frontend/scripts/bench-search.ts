@@ -32,7 +32,7 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const INVENTORY = 'TLHdig_Beta_0.3.html'
+const INVENTORY = 'TLHdig.html'
 const BENCH_PAGE = 'bench-search.html'
 const CHROME =
   process.env.ARUNA_CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
@@ -374,7 +374,8 @@ async function main(): Promise<number> {
     console.error(`${dir} is under ~/Downloads: build a package for this elsewhere`)
     return 2
   }
-  const inventory = join(dir, INVENTORY)
+  const current = join(dir, INVENTORY)
+  const inventory = existsSync(current) ? current : join(dir, 'TLHdig_Beta_0.3.html')
   if (!existsSync(inventory)) {
     console.error(`no ${INVENTORY} in ${dir}`)
     return 2

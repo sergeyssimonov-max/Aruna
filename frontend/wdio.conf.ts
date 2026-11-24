@@ -9,11 +9,27 @@ import {
 import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
 import { cpSync, lstatSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 // The full corpus scenario is explicit: it needs a prepared cache and several
 // minutes. The application receives a copy inside this run's isolated home.
 const corpusCache = process.env.ARUNA_E2E_CORPUS_CACHE
+const previousLibrary = process.env.ARUNA_E2E_PREVIOUS_LIBRARY
+
+function copyTree(source: string, destination: string): void {
+  if (!lstatSync(source).isDirectory()) throw new Error('Expected a regular fixture directory')
+  cpSync(source, destination, {
+    recursive: true,
+    force: false,
+    errorOnExist: true,
+    filter: (path) => {
+      const entry = lstatSync(path)
+      if (!entry.isDirectory() && !entry.isFile())
+        throw new Error('Fixtures may contain only regular files and directories')
+      return true
+    },
+  })
+}
 
 // Where the application under test keeps what it writes. macOS takes WebKit
 // data, caches and saved window state from CoreFoundation's home directory,
@@ -36,7 +52,9 @@ let run: Isolation | undefined
 let activity: ChildProcess | undefined
 
 // The binary the service starts, as `ps` shows it.
-const application = '../target/debug/aruna-desktop'
+const application = process.env.CARGO_TARGET_DIR
+  ? resolve(process.env.CARGO_TARGET_DIR, 'debug', 'aruna-desktop')
+  : '../target/debug/aruna-desktop'
 
 // How long the window may take to answer once the service has its driver, and
 // the sentence a run that waits that long ends with. The service polls the
@@ -87,25 +105,18 @@ export const config: WebdriverIO.Config = {
     run = isolate(appEnv)
     if (corpusCache) {
       appEnv.ARUNA_CACHE_DIR = join(run.root, 'cache')
-      // A copied link could send writes back to the source cache. Accept only
-      // ordinary directories and files before the application is started.
-      if (!lstatSync(corpusCache).isDirectory()) {
-        throw new Error('The E2E corpus cache must be a regular directory')
+      copyTree(corpusCache, appEnv.ARUNA_CACHE_DIR)
+      if (!previousLibrary) {
+        // The historical Beta 0.3 regression suite must stay independent of Zenodo's latest record.
+        appEnv.HTTPS_PROXY = 'http://127.0.0.1:1'
+        appEnv.ALL_PROXY = appEnv.HTTPS_PROXY
+        appEnv.NO_PROXY = ''
       }
-      cpSync(corpusCache, appEnv.ARUNA_CACHE_DIR, {
-        recursive: true,
-        force: false,
-        errorOnExist: true,
-        filter: (source) => {
-          const entry = lstatSync(source)
-          if (!entry.isDirectory() && !entry.isFile()) {
-            throw new Error('The E2E corpus cache must contain only regular files and directories')
-          }
-          return true
-        },
-      })
-      process.env.ARUNA_E2E_ROOT = run.root
     }
+    if (previousLibrary) {
+      copyTree(previousLibrary, join(appEnv.HOME, 'Downloads', 'TLHdig_Beta_0.3'))
+    }
+    if (corpusCache || previousLibrary) process.env.ARUNA_E2E_ROOT = run.root
     // A port nothing holds, rather than the service's fixed one: a run that
     // starts while the last one's application is still going away would
     // otherwise meet its driver.
@@ -115,7 +126,7 @@ export const config: WebdriverIO.Config = {
     await windowAnswers()
   },
   onWorkerStart: async () => {
-    if (!corpusCache) return
+    if (!corpusCache && !previousLibrary) return
     // The full PDF scenario needs the native process to remain active even
     // when its window is behind another application. This assertion belongs
     // only to the test process and ends with it; it changes no user setting.

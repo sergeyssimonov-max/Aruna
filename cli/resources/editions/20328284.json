@@ -1,0 +1,54 @@
+{
+  "id": 20328284,
+  "conceptrecid": "15459133",
+  "doi": "10.5281/zenodo.20328284",
+  "status": "published",
+  "metadata": {
+    "title": "Thesaurus Linguarum Hethaeorum digitalis (TLHdig) Beta Version 0.3",
+    "publication_date": "2026-05-21",
+    "access_right": "open",
+    "license": {
+      "id": "cc-by-4.0"
+    },
+    "relations": {
+      "version": [
+        {
+          "index": 1,
+          "is_last": false,
+          "parent": {
+            "pid_type": "recid",
+            "pid_value": "15459133"
+          }
+        }
+      ]
+    },
+    "creators": [
+      {
+        "name": "Müller, Gerfrid",
+        "affiliation": "University of Würzburg",
+        "orcid": "0000-0003-2466-367X"
+      },
+      {
+        "name": "Prechel, Doris",
+        "affiliation": "Johannes Gutenberg University Mainz"
+      },
+      {
+        "name": "Rieken, Elisabeth",
+        "affiliation": "Philipps University of Marburg",
+        "orcid": "0009-0004-1214-763X"
+      },
+      {
+        "name": "Schwemer, Daniel",
+        "affiliation": "University of Würzburg",
+        "orcid": "0000-0001-9341-6344"
+      }
+    ]
+  },
+  "files": [
+    {
+      "key": "TLHbasisONLINE25_1_ZENODO_Beta_03.zip",
+      "size": 74449198,
+      "checksum": "md5:f9acbc8db3111cc7dd88d82f7819a912"
+    }
+  ]
+}

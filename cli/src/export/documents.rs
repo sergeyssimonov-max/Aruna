@@ -71,20 +71,34 @@ impl PackageDocuments {
         PdfCount::of(&self.pdfs)
     }
 
-    pub(super) fn inventory(&self, source: &str) -> String {
-        super::render_package_inventory(&self.records, &self.placed, source, &self.pdfs)
-    }
-
-    pub(super) fn manifest(&self, source: &manifest::Source<'_>, tallies: &Tallies) -> String {
-        super::render_manifest(
+    pub(super) fn inventory(
+        &self,
+        source: &str,
+        edition: Option<&crate::editions::Edition>,
+    ) -> String {
+        super::inventory::inventory_with_edition(
             &self.records,
             &self.placed,
             source,
-            &tallies.applied,
-            &tallies.fonts,
-            &tallies.xml,
+            &self.pdfs,
+            edition,
+        )
+    }
+
+    pub(super) fn manifest(
+        &self,
+        source: &manifest::Source<'_>,
+        tallies: &Tallies,
+        edition: Option<&crate::editions::Edition>,
+    ) -> String {
+        manifest::render_with_edition(
+            &self.records,
+            &self.placed,
+            source,
+            (&tallies.applied, &tallies.fonts, &tallies.xml),
             &self.sums,
             &self.pdfs,
+            edition,
         )
     }
 

@@ -107,8 +107,8 @@ fn usage() -> String {
     format!(
         "Aruna {} – опись корпуса TLHdig (Zenodo) в HTML.\n\
          \n\
-         Запускается без аргументов: берет архив из кеша или скачивает его\n\
-         с Zenodo (71 МиБ), собирает пакет с описью в папке Downloads.\n\
+         Запускается без аргументов: проверяет, какое издание TLHdig опубликовано\n\
+         на Zenodo, и собирает библиотеку с описью в папке Downloads.\n\
          \n\
          ARUNA_ZIP=/путь/к/архиву.zip – взять готовый архив вместо загрузки.\n\
          ARUNA_FONTS=/путь/к/шрифтам – каталог семи шрифтов docs/FONTS.md для PDF.\n",
@@ -200,30 +200,10 @@ fn advice(err: &ArunaError) -> Option<String> {
              назван прокси (HTTPS_PROXY, ALL_PROXY, HTTP_PROXY) – и его."
                 .to_string()
         }
-        // A republished record is not something the reader can fix, and this
-        // used to tell them to edit a source file they may well not have:
-        // the advice reaches a reader who installed a .app just as often as one
-        // with the repository checked out. The new release is the fix; the
-        // constants are how it is made, and that line is for whoever makes it.
-        ArunaError::Http {
-            status: 404 | 410, ..
-        } => "Zenodo больше не отдает этот файл – вероятно, запись перевыпущена.\n\
-              Поставьте свежий выпуск Aruna: он приходит с новым адресом и новой суммой.\n\
-                https://github.com/sergeyssimonov-max/Aruna/releases/latest\n\
-              Если вы собираете из исходников – это ZENODO_ZIP_URL и ZENODO_ZIP_MD5\n\
-              в cli/src/download.rs."
-            .to_string(),
+        ArunaError::Edition(_) => return None,
+        ArunaError::Http { status: 404 | 410, .. } => "Архив из этой записи Zenodo недоступен. Проверьте страницу издания и повторите сборку позже.".to_string(),
         ArunaError::Http { .. } => "Zenodo сейчас недоступен. Попробуйте позже.".to_string(),
-        ArunaError::ChecksumMismatch { .. } => {
-            "Архив скачался целиком, но его MD5 не совпал с ожидаемым.\n\
-             Скорее всего, Zenodo перевыпустил архив. Повторный запуск не поможет –\n\
-             сумма не изменится.\n\
-             Поставьте свежий выпуск Aruna: он приходит с новой суммой.\n\
-               https://github.com/sergeyssimonov-max/Aruna/releases/latest\n\
-             Если вы собираете из исходников – сверьте сумму на странице записи\n\
-             и обновите ZENODO_ZIP_MD5 в cli/src/download.rs."
-                .to_string()
-        }
+        ArunaError::ChecksumMismatch { .. } => "Полученный архив отличается от архива, указанного издателем. Сборка остановлена до замены библиотеки.".to_string(),
         ArunaError::EmptyArchive | ArunaError::Zip(_) => {
             "Архив поврежден или не содержит XML-документов.".to_string()
         }
@@ -299,10 +279,7 @@ fn advice(err: &ArunaError) -> Option<String> {
         // a whole; both mean the same thing to a reader, and neither is
         // answered by trying again.
         ArunaError::ArchiveTooManyEntries { .. } => {
-            "В архиве больше записей, чем эта программа готова прочитать.\n\
-             Корпус TLHdig – около 24 500; архив такого размера собран не из него.\n\
-             Ничего не распаковано и не записано."
-                .to_string()
+            "Число записей в архиве превышает допустимый предел. Сборка остановлена до записи документов.".to_string()
         }
         ArunaError::ExportPackageTooLarge { .. } => {
             "Сборка остановлена до записи этого файла. Прежний пакет, если он был, сохранен."
@@ -467,12 +444,7 @@ mod tests {
             retry_after: None,
         })
         .expect("404 has advice");
-        assert!(gone.contains("ZENODO_ZIP_URL"));
-        assert!(
-            gone.contains("releases/latest"),
-            "the fix a reader can apply is a new release, and it has to be named \
-             before the constants, which most readers cannot reach: {gone}"
-        );
+        assert!(gone.contains("страницу издания"), "{gone}");
 
         let busy = advice(&ArunaError::Http {
             url: "u".into(),
@@ -483,22 +455,17 @@ mod tests {
         assert!(busy.contains("Попробуйте позже"));
     }
 
-    /// A stale digest is a republished record, and the reader's copy of this
-    /// program cannot be repaired — the pin is compiled in. The advice has to
-    /// say so, say that retrying is pointless, and point at the release that
-    /// carries the new sum. See the note on `ZENODO_ZIP_MD5`.
     #[test]
-    fn a_checksum_mismatch_sends_the_reader_to_a_new_release() {
-        let stale = advice(&ArunaError::ChecksumMismatch {
+    fn a_checksum_mismatch_explains_that_the_library_was_not_replaced() {
+        let warning = advice(&ArunaError::ChecksumMismatch {
             url: "u".into(),
             expected: "a".into(),
             got: "b".into(),
         })
-        .expect("a mismatch has advice");
-        assert!(stale.contains("releases/latest"), "{stale}");
+        .expect("advice");
         assert!(
-            stale.contains("не поможет"),
-            "retrying is ruled out: {stale}"
+            warning.contains("остановлена до замены библиотеки"),
+            "{warning}"
         );
     }
 

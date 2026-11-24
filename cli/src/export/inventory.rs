@@ -38,13 +38,23 @@ pub fn render_package_inventory(
     source: &str,
     pdfs: &[PdfState],
 ) -> String {
+    inventory_with_edition(records, placed, source, pdfs, None)
+}
+
+pub(super) fn inventory_with_edition(
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    source: &str,
+    pdfs: &[PdfState],
+    edition: Option<&crate::editions::Edition>,
+) -> String {
     // Where every link points is [`crate::presentation`]'s decision, made once
     // for the package rather than once per document. At the XML file itself –
     // never at a folder, which Safari renders as a blank page for a `file://`
     // URL, and never at a page about the folder, which is the thing this
     // stopped producing.
     let corpus = CorpusPresentation::linked(records, placed, source).with_pdfs(placed, pdfs);
-    render_linked_html(&corpus, "")
+    render_linked_html(&corpus, "", edition)
 }
 
 /// The `href="…"` values of an inventory, in the order it lists them.
@@ -191,7 +201,7 @@ mod tests {
         assert!(html.contains("type=\"search\" id=\"q\""), "search field");
         assert!(html.contains("group-toggle"), "the fold control");
         assert!(html.contains("id=\"fold-all\""), "fold everything");
-        assert!(html.contains("Corpus authors:"), "attribution");
+        assert!(html.contains("Corpus creators:"), "attribution");
         assert!(html.contains("Manuscripts:"), "the counts");
         assert!(html.contains("legend"), "the column legend");
         assert!(

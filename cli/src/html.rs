@@ -238,7 +238,11 @@ fn separator(template: &str, name: &str) -> String {
 /// `render_linked_html` — which links at the documents around it. This one
 /// remains as a library capability, exercised by `tests/integration.rs`.
 pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &str) -> String {
-    render(&CorpusPresentation::plain(records, source), generated_at)
+    render(
+        &CorpusPresentation::plain(records, source),
+        generated_at,
+        None,
+    )
 }
 
 /// The same inventory, with every manuscript a link to its own PDF, or to
@@ -251,11 +255,19 @@ pub fn render_html(records: &[ManuscriptRecord], source: &str, generated_at: &st
 ///
 /// The difference between the two is entirely in the presentation it is handed:
 /// one has hrefs and the other does not, and this renderer never asks why.
-pub(crate) fn render_linked_html(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
-    render(corpus, generated_at)
+pub(crate) fn render_linked_html(
+    corpus: &CorpusPresentation<'_>,
+    generated_at: &str,
+    edition: Option<&crate::editions::Edition>,
+) -> String {
+    render(corpus, generated_at, edition)
 }
 
-fn render(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
+pub(crate) fn render(
+    corpus: &CorpusPresentation<'_>,
+    generated_at: &str,
+    edition: Option<&crate::editions::Edition>,
+) -> String {
     // The stylesheet is assembled in [`crate::style`] rather than held here.
     // It was shared with the CTH group pages until those were given up on
     // 2026-08-23; the seam stays because the print and screen rules are still
@@ -264,7 +276,9 @@ fn render(corpus: &CorpusPresentation<'_>, generated_at: &str) -> String {
     // Not the `Editor` column, which says who edited one manuscript. These four
     // are credited with the corpus itself, and the label has to keep the two
     // apart on a page that shows both.
-    let authors = escape_html(&crate::corpus_authors_line());
+    let authors = escape_html(
+        &edition.map_or_else(|| "Not specified for this archive".into(), |e| e.authors()),
+    );
     filled(
         DOCUMENT,
         &[
@@ -793,7 +807,7 @@ mod tests {
             }],
         };
 
-        let html = render_linked_html(&corpus, "2026-09-08 00:00:00");
+        let html = render_linked_html(&corpus, "2026-09-08 00:00:00", None);
 
         assert!(
             !html.contains("onload=\"boom"),
@@ -809,11 +823,17 @@ mod tests {
     /// inventory of nothing just as much as for a full one.
     #[test]
     fn the_corpus_authors_are_credited_under_the_title() {
-        let html = render_html(&[], "src", "now");
+        let edition =
+            crate::editions::known_digest(crate::download::ZENODO_ZIP_MD5).expect("reference");
+        let html = render(
+            &CorpusPresentation::plain(&[], &edition.citation()),
+            "now",
+            Some(&edition),
+        );
         assert!(
             html.contains(&format!(
-                "<span>Corpus authors: {}</span>",
-                crate::corpus_authors_line()
+                "<span>Corpus creators: {}</span>",
+                edition.authors()
             )),
             "the summary block does not credit the corpus authors"
         );
