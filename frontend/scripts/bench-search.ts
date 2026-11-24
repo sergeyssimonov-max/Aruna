@@ -29,10 +29,9 @@
 import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const INVENTORY = 'TLHdig.html'
 const BENCH_PAGE = 'bench-search.html'
 const CHROME =
   process.env.ARUNA_CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
@@ -374,17 +373,23 @@ async function main(): Promise<number> {
     console.error(`${dir} is under ~/Downloads: build a package for this elsewhere`)
     return 2
   }
-  const current = join(dir, INVENTORY)
-  const inventory = existsSync(current) ? current : join(dir, 'TLHdig_Beta_0.3.html')
+  const manifest = join(dir, 'manifest.json')
+  const name = existsSync(manifest)
+    ? JSON.parse(readFileSync(manifest, 'utf8')).inventory
+    : basename(dir) + '.html'
+  if (typeof name !== 'string' || basename(name) !== name || !name.endsWith('.html')) {
+    throw new Error('Invalid inventory name in manifest.json')
+  }
+  const inventory = join(dir, name)
   if (!existsSync(inventory)) {
-    console.error(`no ${INVENTORY} in ${dir}`)
+    console.error(`no ${name} in ${dir}`)
     return 2
   }
 
   const html = readFileSync(inventory, 'utf8')
   const end = html.lastIndexOf('</body>')
   if (end < 0) {
-    console.error(`${INVENTORY} has no </body>`)
+    console.error(`${name} has no </body>`)
     return 2
   }
   const page = join(dir, BENCH_PAGE)
