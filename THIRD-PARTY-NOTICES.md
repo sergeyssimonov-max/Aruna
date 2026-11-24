@@ -420,7 +420,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 691. Requires re
 | pin-project-lite | 0.2.17 | crate | Apache-2.0 OR MIT | T10, T2 |
 | piper | 0.2.5 | crate | MIT OR Apache-2.0 | T1, T2 |
 | pkg-config | 0.3.34 | crate | MIT OR Apache-2.0 | T1, T17 |
-| plist | 1.10.3 | crate | MIT | T371 |
+| plist | 1.10.4 | crate | MIT | T371 |
 | png | 0.18.1 | crate | MIT OR Apache-2.0 | T1, T637 |
 | polling | 3.11.0 | crate | Apache-2.0 OR MIT | T1, T2 |
 | polycool | 0.4.0 | crate | MIT OR Apache-2.0 | T20, T56 |
@@ -21829,7 +21829,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### T371
 
-SHA-256 `5b0ae40d1a35f7ae6591a28e44771240e6a88cb03a66c9189a45b9681639b466`. Used by: plist 1.10.3 (LICENCE).
+SHA-256 `5b0ae40d1a35f7ae6591a28e44771240e6a88cb03a66c9189a45b9681639b466`. Used by: plist 1.10.4 (LICENCE).
 
 ```text
 Copyright (c) 2015 Edward Barnard
