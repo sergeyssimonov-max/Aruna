@@ -102,6 +102,10 @@ impl PackageDocuments {
         )
     }
 
+    pub(super) fn validate_named(&self, root: &Path, inventory: &str) -> Result<Validation> {
+        super::validate::validate_named(root, &self.records, &self.placed, &self.pdfs, inventory)
+    }
+
     pub(super) fn validate(&self, root: &Path) -> Result<Validation> {
         super::validate(root, &self.records, &self.placed, &self.pdfs)
     }

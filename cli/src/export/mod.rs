@@ -67,7 +67,7 @@ use std::path::{Path, PathBuf};
 use target_metadata_tests::read_target_metadata;
 use zip::ZipArchive;
 
-/// What the package is called, in the folder and in the inventory's file name.
+/// Neutral name for an unidentified local archive and previously unversioned libraries.
 pub const PACKAGE: &str = "TLHdig";
 /// Name used by Aruna through 3.1.1, still openable in place.
 pub const LEGACY_PACKAGE: &str = "TLHdig_Beta_0.3";
@@ -86,8 +86,8 @@ pub const MANIFEST: &str = "manifest.json";
 /// distributed under. The font is here because the page is read on a machine
 /// that has never heard of it — see [`crate::fonts`] — and the terms are here
 /// because they are a condition of carrying it, not a courtesy.
-pub(crate) fn is_root_file(name: &str) -> bool {
-    ROOT_FILES.contains(&name)
+pub(crate) fn is_root_file(name: &str, inventory: &str) -> bool {
+    root_files(inventory).contains(&name)
 }
 
 /// Те же пять файлов списком.
@@ -96,13 +96,17 @@ pub(crate) fn is_root_file(name: &str) -> bool {
 /// список, потому что «терпеть файл» и «требовать файл» – два разных вопроса,
 /// и второго до 18.09.2026 не задавал никто: пакет без шрифта и без текста его
 /// условий читался заново как целый.
-pub const ROOT_FILES: [&str; 5] = [
-    crate::paths::OUTPUT_FILE_NAME,
-    MANIFEST,
-    crate::fonts::PACKAGED_FONT,
-    crate::fonts::PACKAGED_TERMS,
-    crate::cth_titles::PACKAGED_TERMS,
-];
+pub const ROOT_FILES: [&str; 5] = root_files(crate::paths::OUTPUT_FILE_NAME);
+
+const fn root_files(inventory: &str) -> [&str; 5] {
+    [
+        inventory,
+        MANIFEST,
+        crate::fonts::PACKAGED_FONT,
+        crate::fonts::PACKAGED_TERMS,
+        crate::cth_titles::PACKAGED_TERMS,
+    ]
+}
 
 /// The most one document may be, inflated.
 ///
@@ -442,7 +446,7 @@ pub fn build(
     fonts: &crate::pdf::Fonts,
     job: &Job<'_>,
 ) -> Result<Built> {
-    build_within(zip, destination, source_label, fonts, job, MAX_PACKAGE)
+    build_within(zip, destination, source_label, fonts, job, MAX_PACKAGE).map(|(built, _)| built)
 }
 
 /// Export a local archive with provenance determined from the bytes opened for the build.
@@ -452,6 +456,16 @@ pub fn build_local(
     fonts: &crate::pdf::Fonts,
     job: &Job<'_>,
 ) -> Result<Built> {
+    build_local_with_path(zip, destination, fonts, job).map(|(built, _)| built)
+}
+
+/// Return the exact directory published by this invocation, including when other editions coexist.
+pub fn build_local_with_path(
+    zip: &Path,
+    destination: &Path,
+    fonts: &crate::pdf::Fonts,
+    job: &Job<'_>,
+) -> Result<(Built, PathBuf)> {
     build_within(zip, destination, Origin::Local, fonts, job, MAX_PACKAGE)
 }
 
@@ -476,13 +490,12 @@ pub(crate) fn build_within<'a>(
     fonts: &crate::pdf::Fonts,
     job: &Job<'_>,
     limit: u64,
-) -> Result<Built> {
-    let final_root = destination.join(PACKAGE);
-    let staging = destination.join(staging_name());
-
-    validate::check_destination(&final_root)?;
-
+) -> Result<(Built, PathBuf)> {
     let origin = origin.into();
+    let staging = destination.join(staging_name());
+    if let Origin::Zenodo(e) = origin {
+        validate::check_destination(&destination.join(e.package_name()))?;
+    }
     let Headers {
         mut archive,
         digest: archive_digest,
@@ -496,12 +509,16 @@ pub(crate) fn build_within<'a>(
             edition.verify_bytes(zip, &archive_digest, bytes)?;
             Some(edition)
         }
-        Origin::Local => {
+        Origin::Local | Origin::Label(_) => {
             local = crate::editions::known_digest(&archive_digest);
             local.as_ref()
         }
-        Origin::Label(_) => None,
     };
+    let final_root = destination.join(crate::editions::package_name(edition));
+    // A local file is identified by its contents, including when its caller supplied a label.
+    if !matches!(origin, Origin::Zenodo(_)) {
+        validate::check_destination(&final_root)?;
+    }
     let label = match origin {
         Origin::Label(s) => s.to_owned(),
         _ => edition.map_or_else(
@@ -543,10 +560,13 @@ pub(crate) fn build_within<'a>(
     // the write should not spend six more seconds proving it was written.
     job.check(Phase::Validating)?;
     job.report(Event::CheckingPackage);
-    let staged = documents.validate(staging.path())?;
+    let staged = documents.validate_named(
+        staging.path(),
+        &crate::editions::inventory_name(&final_root),
+    )?;
     let published = publish(
         destination,
-        final_root,
+        final_root.clone(),
         staging,
         &documents,
         staged,
@@ -554,14 +574,17 @@ pub(crate) fn build_within<'a>(
         edition,
     )?;
 
-    Ok(Built {
-        groups: documents.groups(),
-        documents: documents.len(),
-        document_links: published.document_links,
-        disambiguated,
-        stylesheet_dropped,
-        pdfs: documents.pdf_count(),
-    })
+    Ok((
+        Built {
+            groups: documents.groups(),
+            documents: documents.len(),
+            document_links: published.document_links,
+            disambiguated,
+            stylesheet_dropped,
+            pdfs: documents.pdf_count(),
+        },
+        final_root,
+    ))
 }
 
 /// What [`stage`] leaves: the documents as the package holds them, and how
@@ -606,7 +629,7 @@ fn stage(
     let documents = pdf::write_pdfs(staging, documents, fonts, package, job)?;
     write_root_file(
         staging,
-        crate::paths::OUTPUT_FILE_NAME,
+        &crate::editions::edition_inventory(edition),
         documents.inventory(source.label, edition).as_bytes(),
         package,
     )?;
@@ -767,6 +790,12 @@ fn publish(
     validate::check_destination(&final_root)?;
 
     if let Some(candidate) = edition {
+        let (latest, _) = crate::editions::library_paths(destination);
+        if latest != final_root {
+            if let Some(other) = crate::editions::installed(&latest)? {
+                candidate.follows(&other)?;
+            }
+        }
         if let Some(installed) = crate::editions::installed(&final_root)? {
             candidate.follows(&installed)?;
         }

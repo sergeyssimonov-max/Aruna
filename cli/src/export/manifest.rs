@@ -26,7 +26,7 @@ use crate::xml_wellformed::{beyond_the_parser, Beyond, Finding, Limit, Reason};
 
 use super::naming::href;
 use super::verify::{self, ADD_DECLARATION, DROP_BOM, REFLOW_PROLOGUE};
-use super::{Placed, PACKAGE};
+use super::Placed;
 use crate::parse::{group_runs, ManuscriptRecord};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -563,11 +563,12 @@ pub(super) fn render_with_edition(
 
     out.push_str("{\n");
     let _ = writeln!(out, "  \"schema\": {SCHEMA},");
-    let _ = writeln!(out, "  \"package\": {},", string(PACKAGE));
+    let package = crate::editions::package_name(edition);
+    let _ = writeln!(out, "  \"package\": {},", string(&package));
     let _ = writeln!(
         out,
         "  \"inventory\": {},",
-        string(crate::paths::OUTPUT_FILE_NAME)
+        string(&format!("{package}.html"))
     );
     render_run(&mut out, source.archive_md5);
 

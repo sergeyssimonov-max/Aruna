@@ -68,7 +68,7 @@ fn build_package_with(
     fonts: &Fonts,
     job: &Job<'_>,
 ) -> Result<PackageReport> {
-    let built = crate::export::build_within(
+    let (built, root) = crate::export::build_within(
         archive,
         destination,
         origin,
@@ -78,7 +78,7 @@ fn build_package_with(
     )?;
     Ok(PackageReport {
         job: job.id(),
-        root: destination.join(crate::export::PACKAGE),
+        root,
         documents: built.documents,
         groups: built.groups,
         disambiguated: built.disambiguated,
@@ -266,7 +266,9 @@ pub(crate) fn build_selected(
     {
         crate::editions::remember(&dir, edition);
     }
-    let inventory = package.root.join(crate::paths::OUTPUT_FILE_NAME);
+    let inventory = package
+        .root
+        .join(crate::editions::inventory_name(&package.root));
 
     Ok(CorpusReport {
         job: job.id(),

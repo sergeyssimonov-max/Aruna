@@ -408,7 +408,8 @@ fn a_build_refused_at_the_ceiling_keeps_the_package_and_the_next_one_succeeds() 
         assert_eq!(left, [std::ffi::OsString::from(PACKAGE)], "{left:?}");
     }
 
-    let built = build_within(&zip, &out, LABEL, &fonts, &job, total).expect("exactly the limit");
+    let (built, _) =
+        build_within(&zip, &out, LABEL, &fonts, &job, total).expect("exactly the limit");
     assert_eq!(
         (built.documents, built.pdfs),
         (

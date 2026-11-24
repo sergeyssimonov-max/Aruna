@@ -24,6 +24,8 @@ fn the_two_deposits_are_editions_of_the_same_collection_and_their_references_are
     assert_eq!(new.md5, "a31a1ac9808ac77432466a910ed85969");
     assert_eq!(new.caption(), "Издание корпуса – Beta 0.4 (2026-11-19).");
     assert!(new.citation().contains("10.5281/zenodo.24373727"));
+    assert_eq!(old.package_name(), "TLHdig_Beta_0.3");
+    assert_eq!(new.package_name(), "TLHdig_Beta_0.4");
     assert!(new.follows(&old).is_ok());
     assert!(matches!(
         old.follows(&new),
@@ -199,13 +201,20 @@ fn after_an_update_the_manifest_inventory_and_pdf_agree_and_failed_updates_leave
             crate::export::MAX_PACKAGE,
         )
     };
-    let report = build(&e).unwrap();
+    let (report, published) = build(&e).unwrap();
+    assert_eq!(
+        published,
+        dir.path().join("TLHdig_Edition_3_Zenodo_19000000")
+    );
     assert_eq!((report.documents, report.pdfs.built), (1, 1));
     let (root, inventory) = library_paths(dir.path());
+    assert_eq!(root, published);
     assert_eq!(installed(&root).unwrap(), Some(e.clone()));
     let html = fs::read_to_string(&inventory).unwrap();
     assert!(
-        html.contains("DOI 10.5281/zenodo.19000000")
+        !html.contains("DOI 10.5281/zenodo.19000000")
+            && !html.contains("CC BY 4.0")
+            && html.contains("2027-01-15")
             && html.contains("Example &lt;Editor&gt;")
             && !html.contains("Beta 0.3")
     );
@@ -228,6 +237,21 @@ fn after_an_update_the_manifest_inventory_and_pdf_agree_and_failed_updates_leave
     }
     let mut before = std::collections::BTreeMap::new();
     snapshot(&root, &root, &mut before);
+    let mut next = e.clone();
+    next.record += 2;
+    next.index += 1;
+    next.title = "Beta Version 0.5".into();
+    let (_, next_root) = build(&next).unwrap();
+    assert_eq!(
+        next_root,
+        dir.path().join("TLHdig_Beta_0.5_Zenodo_19000002")
+    );
+    assert_eq!(library_paths(dir.path()).0, next_root);
+    let manifest: Value =
+        serde_json::from_slice(&fs::read(next_root.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["package"], next.package_name());
+    assert_eq!(manifest["inventory"], edition_inventory(Some(&next)));
+    assert!(next_root.join(edition_inventory(Some(&next))).is_file());
     let mut stale = e.clone();
     stale.index -= 1;
     stale.record += 1;
@@ -268,6 +292,46 @@ fn after_an_update_the_manifest_inventory_and_pdf_agree_and_failed_updates_leave
     let mut after = std::collections::BTreeMap::new();
     snapshot(&root, &root, &mut after);
     assert_eq!(before, after);
+}
+
+#[test]
+fn only_recognized_versions_can_be_used_as_path_components() {
+    let mut e = future(b"test");
+    for (title, name) in [
+        ("Beta Version 0.12", "TLHdig_Beta_0.12_Zenodo_19000000"),
+        ("Version 1.0", "TLHdig_Version_1.0_Zenodo_19000000"),
+        ("Beta Version ../bad", "TLHdig_Edition_3_Zenodo_19000000"),
+    ] {
+        e.title = title.into();
+        assert_eq!(e.package_name(), name);
+        assert!(is_package_name(name));
+    }
+    for name in [
+        "TLHdig_Beta_../bad_Zenodo_7",
+        "TLHdig_Beta_0..5_Zenodo_7",
+        "TLHdig_Edition_0_Zenodo_7",
+        "TLHdig_Version_1_Zenodo_0",
+    ] {
+        assert!(!is_package_name(name));
+    }
+}
+
+#[test]
+fn a_versioned_copy_takes_precedence_over_the_same_edition_in_the_neutral_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let edition = reference().unwrap();
+    for name in [crate::export::PACKAGE.to_owned(), edition.package_name()] {
+        let root = dir.path().join(&name);
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join(inventory_name(&root)), b"inventory").unwrap();
+        fs::write(
+            root.join(crate::export::MANIFEST),
+            json!({"source":{"archive_md5": edition.md5, "zenodo":edition}}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(library_paths(dir.path()).0, root);
+    }
+    assert!(dir.path().join("TLHdig/TLHdig.html").is_file());
 }
 
 #[test]
