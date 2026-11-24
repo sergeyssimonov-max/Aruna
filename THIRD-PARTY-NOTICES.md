@@ -82,7 +82,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 692. Requires re
 | bytemuck_derive | 1.12.1 | crate | Zlib OR Apache-2.0 OR MIT | T100, T160, T88 |
 | byteorder | 1.5.0 | crate | Unlicense OR MIT | T21, T23, T18 |
 | byteorder-lite | 0.1.0 | crate | Unlicense OR MIT | T23, T18 |
-| bytes | 1.12.1 | crate | MIT | T338 |
+| bytes | 1.12.2 | crate | MIT | T338 |
 | cairo-rs | 0.18.5 | crate | MIT | T22, T7 |
 | cairo-sys-rs | 0.18.2 | crate | MIT | T7 |
 | camino | 1.2.6 | crate | MIT OR Apache-2.0 | T1, T2 |
@@ -18955,7 +18955,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T338
 
-SHA-256 `45f522cacecb1023856e46df79ca625dfc550c94910078bd8aec6e02880b3d42`. Used by: bytes 1.12.1 (LICENSE).
+SHA-256 `45f522cacecb1023856e46df79ca625dfc550c94910078bd8aec6e02880b3d42`. Used by: bytes 1.12.2 (LICENSE).
 
 ```text
 Copyright (c) 2018 Carl Lerche
