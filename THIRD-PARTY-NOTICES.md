@@ -115,7 +115,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 691. Requires re
 | comemo-macros | 0.5.1 | crate | MIT OR Apache-2.0 | requires review |
 | concurrent-queue | 2.5.0 | crate | Apache-2.0 OR MIT | T1, T2 |
 | const-oid | 0.10.3 | crate | Apache-2.0 OR MIT | T11, T146 |
-| cookie | 0.18.2 | crate | MIT OR Apache-2.0 | T274, T653 |
+| cookie | 0.18.3 | crate | MIT OR Apache-2.0 | T274, T653 |
 | core-foundation | 0.10.1 | crate | MIT OR Apache-2.0 | T1, T38 |
 | core-foundation-sys | 0.8.7 | crate | MIT OR Apache-2.0 | T1, T38 |
 | core-graphics | 0.25.0 | crate | MIT OR Apache-2.0 | T189, T1, T38 |
@@ -16316,7 +16316,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T274
 
-SHA-256 `2773e20df8f4c52a026b5b578c7f2457341f5aa3fb6612fd87e1d2e1bd8f48ad`. Used by: cookie 0.18.2 (LICENSE-APACHE).
+SHA-256 `2773e20df8f4c52a026b5b578c7f2457341f5aa3fb6612fd87e1d2e1bd8f48ad`. Used by: cookie 0.18.3 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -40561,7 +40561,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### T653
 
-SHA-256 `f28420c1906af38be726cd7842798f0194b27c41d6051c0d1e9ee348b8a4a0ea`. Used by: cookie 0.18.2 (LICENSE-MIT).
+SHA-256 `f28420c1906af38be726cd7842798f0194b27c41d6051c0d1e9ee348b8a4a0ea`. Used by: cookie 0.18.3 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2017 Sergio Benitez
