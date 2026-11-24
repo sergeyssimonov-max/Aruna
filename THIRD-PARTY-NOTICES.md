@@ -762,7 +762,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 692. Requires re
 | zerocopy-derive | 0.8.63 | crate | BSD-2-Clause OR Apache-2.0 OR MIT | T159, T150, T113 |
 | zerofrom | 0.1.8 | crate | Unicode-3.0 | T8 |
 | zerofrom-derive | 0.1.8 | crate | Unicode-3.0 | T8 |
-| zeroize | 1.9.1 | crate | Apache-2.0 OR MIT | T20, T469 |
+| zeroize | 1.9.2 | crate | Apache-2.0 OR MIT | T20, T469 |
 | zerotrie | 0.2.5 | crate | Unicode-3.0 | T8 |
 | zerovec | 0.11.8 | crate | Unicode-3.0 | T8 |
 | zerovec-derive | 0.11.6 | crate | Unicode-3.0 | T8 |
@@ -3565,7 +3565,7 @@ SOFTWARE.
 
 ### T20
 
-SHA-256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`. Used by: embed_plist 1.2.2 (LICENSE-APACHE), encoding_rs 0.8.44 (LICENSE-APACHE), kurbo 0.13.1 (LICENSE-APACHE), multiversion_no_op 1.0.0 (LICENSE-APACHE), polycool 0.4.0 (LICENSE-APACHE), siphasher 1.0.4 (LICENSE-APACHE), tinyvec 1.13.3 (LICENSE-APACHE.md), utf16_iter 1.0.5 (LICENSE-APACHE), utf8_iter 1.0.4 (LICENSE-APACHE), write16 1.0.0 (LICENSE-APACHE), zeroize 1.9.1 (LICENSE-APACHE), ejs 3.1.10 (LICENSE), spdx-correct 3.2.0 (LICENSE), validate-npm-package-license 3.0.4 (LICENSE).
+SHA-256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`. Used by: embed_plist 1.2.2 (LICENSE-APACHE), encoding_rs 0.8.44 (LICENSE-APACHE), kurbo 0.13.1 (LICENSE-APACHE), multiversion_no_op 1.0.0 (LICENSE-APACHE), polycool 0.4.0 (LICENSE-APACHE), siphasher 1.0.4 (LICENSE-APACHE), tinyvec 1.13.3 (LICENSE-APACHE.md), utf16_iter 1.0.5 (LICENSE-APACHE), utf8_iter 1.0.4 (LICENSE-APACHE), write16 1.0.0 (LICENSE-APACHE), zeroize 1.9.2 (LICENSE-APACHE), ejs 3.1.10 (LICENSE), spdx-correct 3.2.0 (LICENSE), validate-npm-package-license 3.0.4 (LICENSE).
 
 ```text
 
@@ -29837,7 +29837,7 @@ limitations under the License.
 
 ### T469
 
-SHA-256 `8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b`. Used by: zeroize 1.9.1 (LICENSE-MIT).
+SHA-256 `8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b`. Used by: zeroize 1.9.2 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2018-2026 The RustCrypto Project Developers
