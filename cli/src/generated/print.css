@@ -62,7 +62,7 @@
     break-inside: avoid;
   }
 
-  thead {
+  thead:not([hidden]) {
     display: table-header-group;
   }
 
@@ -87,7 +87,7 @@
       display: table;
     }
 
-    tr:not([hidden]) ~ .print-columns, .print-columns:only-child {
+    tr:not(.group):not([hidden]) ~ .print-columns, .print-columns:only-child {
       display: table-header-group;
     }
 

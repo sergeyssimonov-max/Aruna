@@ -116,6 +116,8 @@ function groupText(tr: HTMLElement): string {
 
 function setFolded(group: Group, folded: boolean): void {
   group.folded = folded
+  const columns = group.table.tHead
+  if (columns) columns.hidden = folded
   group.tr.classList.toggle('folded', folded)
   const button = group.tr.querySelector('.group-toggle')
   if (button) button.setAttribute('aria-expanded', folded ? 'false' : 'true')
@@ -208,8 +210,6 @@ export function attachInventoryFilter(doc: Document): void {
           if (!group.folded) onScreen++
         }
       }
-
-      setFolded(group, group.folded)
     }
 
     if (hint) {

@@ -16,6 +16,7 @@ import groupTableHtml from '../../../cli/src/generated/group_table.html?raw'
 import groupHeadingHtml from '../../../cli/src/generated/group_heading.html?raw'
 import manuscriptLinkHtml from '../../../cli/src/generated/manuscript_link.html?raw'
 import manuscriptRowHtml from '../../../cli/src/generated/manuscript_row.html?raw'
+import printCss from '../../../cli/src/generated/print.css?raw'
 import { attachInventoryFilter } from './filter'
 
 interface Row {
@@ -143,15 +144,19 @@ describe('the controls only appear once the script has run', () => {
   })
 })
 
-it('searches and folds documents across print sections without counting their headers', () => {
+function inventoryWithTwoPrintSections() {
   inventory([{ label: 'CTH 547', rows: [{ siglum: '72_r' }, { siglum: '247_q' }] }])
   const table = document.querySelector('table')!
-  const secondBody = table.createTBody()
-  const printHeader = table.querySelector('.print-columns')!
-  printHeader.innerHTML = '<th scope="col">Editor</th>'
-  secondBody.append(items()[1], printHeader.cloneNode(true))
+  const first = table.querySelector<HTMLTableRowElement>('.print-columns')!
+  first.innerHTML = '<th scope="col">Editor</th>'
+  const second = first.cloneNode(true) as HTMLTableRowElement
+  table.createTBody().append(items()[1], second)
   attachInventoryFilter(document)
+  return { table, first, second }
+}
 
+it('searches and folds documents across print sections without counting their headers', () => {
+  inventoryWithTwoPrintSections()
   type('247_q')
   expect(hint().textContent).toBe('Match: 1')
   expect(shown().map((row) => row.cells[1].textContent)).toEqual(['247_q'])
@@ -164,6 +169,43 @@ it('searches and folds documents across print sections without counting their he
   foldAll().click()
   expect(shown().map((row) => row.cells[1].textContent)).toEqual(['72_r', '247_q'])
 })
+
+it.each([false, true])(
+  'prints headings beside visible manuscripts (WebKit sections: %s)',
+  (webkit) => {
+    const { table, first, second } = inventoryWithTwoPrintSections()
+
+    // jsdom has no print medium. Exercise the actual print rules in both browser modes.
+    const sheet = new CSSStyleSheet()
+    sheet.replaceSync(printCss)
+    const print = Array.from(sheet.cssRules).find(
+      (rule): rule is CSSMediaRule =>
+        rule instanceof CSSMediaRule && rule.conditionText === 'print',
+    )!
+    const rules = Array.from(print.cssRules).flatMap((rule) => {
+      if (rule instanceof CSSSupportsRule) return webkit ? Array.from(rule.cssRules) : []
+      return [rule]
+    })
+    const style = document.createElement('style')
+    style.textContent = rules.map((rule) => rule.cssText).join('\n')
+    document.head.append(style)
+    try {
+      const visible = () =>
+        Object.entries({ table: table.tHead!, first, second })
+          .filter(([, header]) => getComputedStyle(header).display !== 'none')
+          .map(([name]) => name)
+      expect(visible()).toEqual(webkit ? ['first', 'second'] : ['table'])
+      type('247_q')
+      expect(visible()).toEqual(webkit ? ['second'] : ['table'])
+      foldAll().click()
+      expect(visible()).toEqual([])
+      foldAll().click()
+      expect(visible()).toEqual(webkit ? ['second'] : ['table'])
+    } finally {
+      style.remove()
+    }
+  },
+)
 
 describe('search', () => {
   beforeEach(() => {
@@ -282,6 +324,30 @@ describe('folding', () => {
     foldAll().click()
     expect(shown()).toHaveLength(3)
     expect(foldAll().textContent).toBe('Collapse fragments')
+  })
+
+  it('shows column headings only for open groups visible in the search results', () => {
+    const [first, second] = document.querySelectorAll('thead')
+    const secondToggle = headings()[1].querySelector('button')!
+
+    secondToggle.click()
+    expect(first).toBeVisible()
+    expect(second).not.toBeVisible()
+    expect(secondToggle).toBeVisible()
+
+    foldAll().click()
+    expect(first).not.toBeVisible()
+    expect(second).not.toBeVisible()
+    type('kub')
+    expect(second).not.toBeVisible()
+    expect(secondToggle).toBeVisible()
+
+    foldAll().click()
+    expect(first).not.toBeVisible()
+    expect(second).toBeVisible()
+    type('')
+    expect(first).toBeVisible()
+    expect(second).toBeVisible()
   })
 
   it('one press makes a mixture uniform', () => {
