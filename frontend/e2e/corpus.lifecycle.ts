@@ -75,8 +75,15 @@ export function corpusLifecycle(): void {
       })
 
       await $('[data-testid="primary"]').click()
-      await browser.waitUntil(async () => (await heard()).length > 0, { timeout: 30_000 })
-      expect((await heard())[0]?.stage).toBe('archive-from-cache')
+      await browser.waitUntil(
+        async () => (await heard()).some(({ stage }) => stage === 'archive-from-cache'),
+        { timeout: 30_000 },
+      )
+      const first = (await heard()).slice(0, 2)
+      expect(first.map(({ stage }) => stage)).toEqual(['zenodo-notice', 'archive-from-cache'])
+      expect(first[0]?.note).toBe(
+        'Связи с Zenodo нет. Для сборки используется сохраненное издание Beta 0.3 (2026-05-21).',
+      )
       console.info('Corpus lifecycle: native build is reading the isolated cache')
       const busy = await browser.tauri.execute(({ core }) =>
         core.invoke('build_corpus', { destination: null }).then(
