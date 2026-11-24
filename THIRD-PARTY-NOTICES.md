@@ -477,7 +477,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 692. Requires re
 | rustc_version | 0.4.1 | crate | MIT OR Apache-2.0 | T1, T70 |
 | rustix | 1.1.6 | crate | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | T308, T1, T37, T2 |
 | rustls | 0.23.46 | crate | Apache-2.0 OR ISC OR MIT | T1, T443, T417 |
-| rustls-pki-types | 1.15.1 | crate | MIT OR Apache-2.0 | T339, T479 |
+| rustls-pki-types | 1.16.0 | crate | MIT OR Apache-2.0 | T339, T479 |
 | rustls-webpki | 0.103.16 | crate | ISC | T374 |
 | rustversion | 1.0.23 | crate | MIT OR Apache-2.0 | T5, T2 |
 | rustybuzz | 0.20.1 | crate | MIT | T313 |
@@ -18987,7 +18987,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T339
 
-SHA-256 `45fd05c4865e7c350b98ad7ac50e1b15462d49af4a91e9b0c9dd933dc9a69742`. Used by: rustls-pki-types 1.15.1 (LICENSE-APACHE).
+SHA-256 `45fd05c4865e7c350b98ad7ac50e1b15462d49af4a91e9b0c9dd933dc9a69742`. Used by: rustls-pki-types 1.16.0 (LICENSE-APACHE).
 
 ```text
                               Apache License
@@ -30441,7 +30441,7 @@ Chad Brokaw
 
 ### T479
 
-SHA-256 `9117d922e667125508dde62b02c1f57ed22f5ad21eb536aa2e2d99e1c796e639`. Used by: rustls-pki-types 1.15.1 (LICENSE-MIT).
+SHA-256 `9117d922e667125508dde62b02c1f57ed22f5ad21eb536aa2e2d99e1c796e639`. Used by: rustls-pki-types 1.16.0 (LICENSE-MIT).
 
 ```text
 Copyright (c) 2023 Dirkjan Ochtman <dirkjan@ochtman.nl>
