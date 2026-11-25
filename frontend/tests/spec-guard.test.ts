@@ -53,7 +53,7 @@ const WINDOW_SOURCES = [text('../src/App.svelte'), text('../src/window-ipc.ts')]
 
 describe('the package manager is pnpm, pinned, and alone', () => {
   it('is pinned by the root manifest, which corepack reads', () => {
-    expect(ROOT_PKG.packageManager).toMatch(/^pnpm@11\.28\.12(\+|$)/)
+    expect(ROOT_PKG.packageManager).toMatch(/^pnpm@11\.28\.13(\+|$)/)
   })
 
   it('leaves no trace of npm as a project manager', () => {
