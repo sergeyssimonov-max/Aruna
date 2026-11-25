@@ -3,8 +3,8 @@
 # Licensed CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/ – see CTH-TITLES-TERMS.txt.
 # Written by `cargo run --locked --release -p aruna --example cth_titles`; do not edit by hand.
 # source: https://hethport.net/CTH/index.php?lang=EN
-# fetched: 2026-09-22 04:54:05 UTC
-# sha256: 31310a4e8dcd81140fa33f3a89bb820d05d48ca3c591c5fd4e74ef453ff2db86
+# fetched: 2026-11-25 01:30:13 UTC
+# sha256: caf7b50890762a2e4baf7f22a5e525cb055687e1064b2d864c3cfeed4b17c778
 # entries: 837
 CTH 1	title	Proclamation of Anitta
 CTH 2	title	Fragments referring to Anum-Ḫirbi and the city of Zalpa
@@ -577,7 +577,7 @@ CTH 568	title	Oracles concerning the celebration of various festivals
 CTH 569	title	Oracles concerning Arma-Tarḫunta und Šaušgatti
 CTH 570	title	Liver (SU) oracles
 CTH 571	title	Liver (SU) oracles with unabbreviated terms
-CTH 572	title	Lot (KIN) oracles
+CTH 572	title	KIN oracles
 CTH 573	title	Bird (MUŠEN) oracles
 CTH 574	title	MUŠEN ḪURRI oracles
 CTH 575	title	Snake oracles
