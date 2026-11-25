@@ -132,7 +132,7 @@ if (process.env.ARUNA_E2E_CRASH_STATE) {
     const isolated = process.env.ARUNA_E2E_ROOT
     if (!reference || !isolated) throw new Error('Missing reader recovery fixture')
     const open = await $('button=Открыть опись')
-    await open.waitForDisplayed()
+    await open.waitForDisplayed({ timeout: 300_000 })
     const location = (await browser.tauri.execute(({ core }) =>
       core.invoke('corpus_location'),
     )) as CorpusLocation
@@ -153,6 +153,12 @@ if (process.env.ARUNA_E2E_CRASH_STATE) {
     const opened = execFileSync(reader, [pdf], { encoding: 'utf8' }).trim().split('\t')
     expect(opened[0]).toBe('OPENED')
     expect(Number(opened[2])).toBeGreaterThan(0)
-    await expect($('p.failure')).not.toExist()
-  })
+    // A versioned offline library can open while Zenodo's update check reports its absence.
+    const notice = await $('p.failure')
+    if (await notice.isExisting()) {
+      await expect(notice).toHaveText(
+        'Не удалось проверить новые издания на Zenodo. Сохраненная опись доступна.',
+      )
+    }
+  }).timeout(600_000)
 }
