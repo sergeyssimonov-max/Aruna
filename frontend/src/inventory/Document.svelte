@@ -81,7 +81,7 @@
         <span class="font-credit">{fonts}</span>
         {@html generated}
         <span class="counts"
-          ><span class="count">Manuscripts: {manuscripts}</span><span class="count"
+          ><span class="count">TLHdig documents: {manuscripts}</span><span class="count"
             >Groups (CTH): {groups}</span
           ></span
         >

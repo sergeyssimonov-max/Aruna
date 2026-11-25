@@ -652,7 +652,7 @@ mod tests {
         assert!(html.contains("KBo 1"));
         assert!(html.contains("&lt;script&gt;"));
         assert!(!html.contains("<script>alert"));
-        assert!(html.contains("Manuscripts: 2"));
+        assert!(html.contains("TLHdig documents: 2"));
         assert!(html.contains("Zenodo 20328284"));
         assert!(html.contains("class=\"num\">1</td>"));
     }
@@ -920,7 +920,7 @@ mod tests {
     #[test]
     fn empty_table_still_valid() {
         let html = render_html(&[], "src", "now");
-        assert!(html.contains("Manuscripts: 0"));
+        assert!(html.contains("TLHdig documents: 0"));
         assert!(html.contains("<tbody>"));
         assert!(html.contains("Groups (CTH): 0"));
     }
