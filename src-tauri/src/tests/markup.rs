@@ -210,7 +210,9 @@ fn every_link_carries_its_name(
     refused: &[String],
 ) {
     use std::os::unix::ffi::OsStrExt as _;
-    let html = fs::read_to_string(package.join(aruna::paths::OUTPUT_FILE_NAME)).unwrap();
+    let name = package.file_name().unwrap().to_str().unwrap();
+    assert!(aruna::editions::is_package_name(name), "имя пакета: {name}");
+    let html = fs::read_to_string(package.join(format!("{name}.html"))).unwrap();
     let links = aruna::export::hrefs(&html);
     let mut wanted: Vec<String> = Vec::new();
     for group in manifest["groups"].as_array().unwrap() {
@@ -389,10 +391,9 @@ fn every_name_of_a_real_package_reaches_the_window_byte_for_byte() {
                 return;
             };
             built = tempfile::tempdir().unwrap();
-            aruna::export::build(
+            let (_, package) = aruna::export::build_local_with_path(
                 &zip,
                 built.path(),
-                "test",
                 &aruna::app::load_fonts(Some(
                     &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                         .join("../cli/resources/fonts"),
@@ -401,7 +402,8 @@ fn every_name_of_a_real_package_reaches_the_window_byte_for_byte() {
                 &aruna::job::Job::unattended(),
             )
             .unwrap();
-            built.path().join(aruna::export::PACKAGE)
+            assert_eq!(package, built.path().join(aruna::export::LEGACY_PACKAGE));
+            package
         }
     };
     wire_carries_every_name(&package, "CTH 565/C\u{327}orum 6-1-96.xml");
