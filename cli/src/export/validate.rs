@@ -56,7 +56,7 @@ fn read_inventory(path: &Path) -> Result<String> {
 ///
 /// `limit + 1` is the whole of the fix: read one byte past the cap, and having
 /// got it is proof the file is over.
-fn read_bounded(path: &Path, limit: u64) -> Result<String> {
+pub(super) fn read_bounded(path: &Path, limit: u64) -> Result<String> {
     use std::io::Read as _;
 
     let file = fs::File::open(path).map_err(ArunaError::io(path))?;
@@ -112,6 +112,18 @@ pub(super) fn validate_named(
     pdfs: &[super::PdfState],
     inventory: &str,
 ) -> Result<Validation> {
+    let groups = group_runs(records).map(|run| PathBuf::from(dir_component(group_label(&run[0]))));
+    validate_layout(root, placed, pdfs, inventory, groups, false)
+}
+
+pub(super) fn validate_layout(
+    root: &Path,
+    placed: &[Placed],
+    pdfs: &[super::PdfState],
+    inventory: &str,
+    groups: impl Iterator<Item = PathBuf>,
+    from_disk: bool,
+) -> Result<Validation> {
     let expected_pdfs: HashSet<PathBuf> = pdfs
         .iter()
         .filter_map(|s| s.built().map(Path::to_path_buf))
@@ -135,6 +147,7 @@ pub(super) fn validate_named(
         root,
         MAX_DEPTH,
         &mut Found {
+            allow_finder_metadata: from_disk,
             inventory,
             files: &mut on_disk,
             pdfs: &mut pdfs_on_disk,
@@ -198,11 +211,8 @@ pub(super) fn validate_named(
     // more, so this is checked against the filesystem rather than against the
     // links — a group whose folder never appeared would otherwise be reported
     // only as its documents going missing one by one.
-    let groups: HashSet<PathBuf> = group_runs(records)
-        .map(|run| PathBuf::from(dir_component(group_label(&run[0]))))
-        .collect();
-    for group in &groups {
-        if !root.join(group).is_dir() {
+    for group in groups {
+        if !root.join(&group).is_dir() {
             errors.push(format!(text!(MissingGroupFolder), group.display()));
         }
     }
@@ -501,6 +511,7 @@ fn check_manifest(
 /// What a walk collects.
 struct Found<'a> {
     inventory: &'a str,
+    allow_finder_metadata: bool,
     files: &'a mut HashSet<PathBuf>,
     /// The PDFs beside the documents.
     pdfs: &'a mut HashSet<PathBuf>,
@@ -545,6 +556,9 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
         // `lstat` itself only when the filesystem leaves it unknown. Measured
         // 26.09.2026: 2.9–3.2 % fewer instructions over the package's 23 941 files.
         let kind = entry.file_type().ok();
+        if found.allow_finder_metadata && name == ".DS_Store" && kind.is_some_and(|t| t.is_file()) {
+            continue;
+        }
         let is_link = kind.is_some_and(|t| t.is_symlink());
         if is_link {
             errors.push(format!(text!(PackageSymlink), path.display()));
@@ -815,6 +829,7 @@ mod tests {
             &root,
             MAX_DEPTH,
             &mut Found {
+                allow_finder_metadata: false,
                 inventory: crate::paths::OUTPUT_FILE_NAME,
                 files: &mut files,
                 pdfs: &mut Default::default(),
@@ -858,6 +873,7 @@ mod tests {
             &root,
             MAX_DEPTH,
             &mut Found {
+                allow_finder_metadata: false,
                 inventory: crate::paths::OUTPUT_FILE_NAME,
                 files: &mut files,
                 pdfs: &mut Default::default(),

@@ -19,7 +19,8 @@
 //! nameable — "a staging directory from an earlier run" is a state, where "a
 //! process killed at some point" is a lottery.
 //!
-//! One kill is real, in `cli_process.rs`: a staging directory is left by a
+//! The reader's process tests in `export::recovery::tests` stop a publisher
+//! at the rename boundaries. In `cli_process.rs` a staging directory is left by a
 //! `SIGKILL`, because whether its owner is alive is asked of the kernel and a
 //! planted directory cannot be made to have had an owner that died. Here a
 //! planted staging directory is either older than anything live, or carries a
@@ -213,14 +214,9 @@ fn a_staging_directory_whose_owner_is_gone_is_removed_by_the_next_build() {
 
 /// A package moved aside by a run that was killed before it could be put back.
 ///
-/// `Replaced::aside` moves the existing package to `.TLHdig.previous`
-/// so the swap is one rename wide, and `Drop` puts it back if the publish
-/// fails. A kill in that window leaves the aside copy with nothing to restore
-/// it — and the next build has to remove it before it can move the new package
-/// aside itself.
-///
-/// The reader has lost their package either way; what must not happen is that
-/// running again cannot give them one.
+/// A build can be retried before anyone opens the library. The saved copy
+/// remains available until the replacement passes read-back, then is retired.
+/// Recovery on opening the library is covered by `export::recovery::tests`.
 #[test]
 fn a_package_left_aside_by_a_killed_run_is_cleared_by_the_next_one() {
     let (_dir, zip, destination) = published();

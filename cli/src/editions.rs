@@ -225,6 +225,16 @@ impl Edition {
         }
     }
 
+    pub(crate) fn folder_rank(&self, name: &str) -> Option<u8> {
+        if name == self.package_name() {
+            Some(2)
+        } else if name == format!("TLHdig_Edition_{}_Zenodo_{}", self.index, self.record) {
+            Some(1)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn inventory_source(&self) -> String {
         format!("{} ({})", self.title, self.date)
     }
@@ -337,6 +347,16 @@ struct Source {
 
 /// Existing packages without an edition field can still be identified by their actual archive digest.
 pub(crate) fn installed(root: &Path) -> Result<Option<Edition>> {
+    installed_named(
+        root,
+        root.file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default(),
+    )
+}
+
+// A saved package is verified before its original directory name is restored.
+pub(crate) fn installed_named(root: &Path, package_name: &str) -> Result<Option<Edition>> {
     match fs::symlink_metadata(root) {
         Ok(m) if !m.is_dir() => return Err(EditionIssue::Installed.into()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -363,10 +383,7 @@ pub(crate) fn installed(root: &Path) -> Result<Option<Edition>> {
     else {
         // Early libraries can be read without source metadata. The neutral
         // destination is a sibling, so a manual upgrade can leave them intact.
-        return if root
-            .file_name()
-            .is_some_and(|n| n == crate::export::LEGACY_PACKAGE)
-        {
+        return if package_name == crate::export::LEGACY_PACKAGE {
             Ok(None)
         } else {
             Err(EditionIssue::Installed.into())
@@ -588,11 +605,7 @@ pub fn library_paths(parent: &Path) -> (PathBuf, PathBuf) {
             }
             if let Ok(Some(e)) = installed(&path) {
                 // Prefer the current spelling over an earlier index-based name for the same edition.
-                let spelling = if name == e.package_name() {
-                    2
-                } else if name == format!("TLHdig_Edition_{}_Zenodo_{}", e.index, e.record) {
-                    1
-                } else {
+                let Some(spelling) = e.folder_rank(name) else {
                     continue;
                 };
                 let key = (e.index, spelling, e.record);

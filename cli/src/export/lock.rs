@@ -79,7 +79,7 @@ fn read_token(path: &Path) -> Option<String> {
 /// itself during publication, and the package is meant to be a corpus and
 /// nothing else — a reader who opens it should find documents and an inventory,
 /// not this program's bookkeeping.
-fn lock_path(destination: &Path) -> PathBuf {
+pub(super) fn lock_path(destination: &Path) -> PathBuf {
     destination.join(format!(".{PACKAGE}.publish.lock"))
 }
 

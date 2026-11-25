@@ -34,6 +34,16 @@ impl Replaced {
             None
         } else if occupied {
             let slot = RecoverySlot::reserve(destination, name)?;
+            // Link to the *existing* backup manifest before displacing the current
+            // package. After an interruption this distinguishes the newer slot
+            // from a slot left over beside an unrelated .previous. Filesystems
+            // without hard links still publish; an ambiguous recovery is manual.
+            let manifest = previous.join(super::MANIFEST);
+            if fs::symlink_metadata(&previous).is_ok_and(|m| m.is_dir())
+                && fs::symlink_metadata(&manifest).is_ok_and(|m| m.is_file())
+            {
+                let _ = fs::hard_link(manifest, slot.0.join(PREDECESSOR));
+            }
             if let Err(error) = fs::rename(target, slot.package()) {
                 slot.remove_if_empty();
                 return Err(ArunaError::io(target)(error));
@@ -159,13 +169,14 @@ impl Drop for Replaced {
     }
 }
 
-/// A retry must vacate the working name without overwriting an earlier .previous.
-/// These marked slots are outside the abandoned-staging sweep.
-struct RecoverySlot(PathBuf, String);
+pub(super) const PREDECESSOR: &str = ".aruna-predecessor";
+pub(super) const ROLLBACK_MARKER: &str = ".aruna-rollback";
+
+/// A displaced working copy beside an older .previous. Its marker separates
+/// it from abandoned staging directories.
+pub(super) struct RecoverySlot(pub(super) PathBuf, pub(super) String);
 
 impl RecoverySlot {
-    const MARKER: &'static str = ".aruna-rollback";
-
     fn reserve(destination: &Path, name: &str) -> Result<Self> {
         loop {
             let path = destination.join(format!("{}.rollback", staging_name()));
@@ -174,7 +185,7 @@ impl RecoverySlot {
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(error) => return Err(ArunaError::io(&path)(error)),
             }
-            let marker = path.join(Self::MARKER);
+            let marker = path.join(ROLLBACK_MARKER);
             if let Err(error) = File::create_new(&marker) {
                 let _ = fs::remove_dir(&path);
                 return Err(ArunaError::io(marker)(error));
@@ -187,8 +198,23 @@ impl RecoverySlot {
         self.0.join(&self.1)
     }
 
-    fn remove_if_empty(&self) {
-        let _ = fs::remove_file(self.0.join(Self::MARKER));
+    pub(super) fn follows(&self, previous: &Path) -> bool {
+        let witness = self.0.join(PREDECESSOR);
+        fs::symlink_metadata(previous).is_ok_and(|m| m.is_dir())
+            && fs::symlink_metadata(&witness).is_ok_and(|m| m.is_file())
+            && File::open(witness)
+                .is_ok_and(|f| super::lock::same_file(&f, &previous.join(super::MANIFEST)))
+    }
+
+    pub(super) fn remove_if_empty(&self) {
+        if self
+            .0
+            .parent()
+            .is_some_and(|dir| self.follows(&dir.join(format!(".{}.previous", self.1))))
+        {
+            let _ = fs::remove_file(self.0.join(PREDECESSOR));
+        }
+        let _ = fs::remove_file(self.0.join(ROLLBACK_MARKER));
         let _ = fs::remove_dir(&self.0);
     }
 
@@ -228,7 +254,7 @@ impl RecoverySlot {
             if current.is_some_and(|own| own.0 == slot.0) {
                 continue;
             }
-            if !fs::symlink_metadata(slot.0.join(Self::MARKER))
+            if !fs::symlink_metadata(slot.0.join(ROLLBACK_MARKER))
                 .is_ok_and(|m| m.is_file() && m.len() == 0)
             {
                 continue;
