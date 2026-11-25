@@ -313,3 +313,17 @@ tr.group.folded .chevron {
     content: none;
   }
 }
+
+@media screen {
+  body:not(.filter-on) #inv > table ~ table > thead, .filter-on #inv > table:not([data-screen-columns]) > thead {
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    position: absolute;
+    overflow: hidden;
+  }
+
+  .filter-on #inv > table[data-screen-columns] > thead {
+    display: table-header-group !important;
+  }
+}

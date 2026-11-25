@@ -350,6 +350,24 @@ describe('folding', () => {
     expect(second).toBeVisible()
   })
 
+  it('places one screen heading above the list whenever any matching manuscript is open', () => {
+    const tables = [...document.querySelectorAll('#inv > table')]
+    const marked = () => [...document.querySelectorAll('#inv > table[data-screen-columns]')]
+    expect(marked()).toEqual([tables[0]])
+    headings()[0].querySelector('button')!.click()
+    expect(marked()).toEqual([tables[0]])
+    type('kub')
+    expect(marked()).toEqual([tables[1]])
+    foldAll().click()
+    expect(marked()).toEqual([])
+    foldAll().click()
+    expect(marked()).toEqual([tables[1]])
+    type('absent manuscript')
+    expect(marked()).toEqual([])
+    type('')
+    expect(marked()).toEqual([tables[0]])
+  })
+
   it('one press makes a mixture uniform', () => {
     ;(headings()[0].querySelector('.group-toggle') as HTMLButtonElement).click()
     expect(foldAll().textContent).toBe('Collapse fragments')

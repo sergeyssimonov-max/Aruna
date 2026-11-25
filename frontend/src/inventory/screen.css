@@ -340,3 +340,21 @@ tr.group.folded .chevron {
     content: none;
   }
 }
+
+/* A single heading above the list. Keep each table's own column labels
+ * available to assistive technology and to the separate print layout. */
+@media screen {
+  body:not(.filter-on) #inv > table ~ table > thead,
+  .filter-on #inv > table:not([data-screen-columns]) > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  /* The first visible group may be folded while another group is open. */
+  .filter-on #inv > table[data-screen-columns] > thead {
+    display: table-header-group !important;
+  }
+}
