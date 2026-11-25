@@ -278,6 +278,15 @@ fn after_an_update_the_manifest_inventory_and_pdf_agree_and_failed_updates_leave
         .into_iter()
         .find(|s| s.ends_with(".xml"))
         .unwrap();
+    // A hidden current edition must be found even while a different, older
+    // working edition is still visible in the same destination.
+    let backup = dir
+        .path()
+        .join(format!(".{}.previous", next.package_name()));
+    fs::rename(&next_root, &backup).unwrap();
+    let (restored, inventory) = crate::export::reader_paths(dir.path()).unwrap();
+    assert_eq!(restored, next_root);
+    assert_eq!(fs::read_to_string(inventory).unwrap(), inv);
     // The publisher reuses the label, withdraws the first document and repairs the second.
     write_archive(&[(second_path, &added)]);
     let mut final_edition = future(&fs::read(&zip).unwrap());

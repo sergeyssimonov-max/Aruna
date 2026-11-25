@@ -29,6 +29,8 @@ pub mod normalize;
 #[cfg(test)]
 mod package_ceiling_tests;
 pub mod pdf;
+mod recovery;
+pub use recovery::reader_paths;
 mod staging;
 #[cfg(test)]
 mod target_metadata_tests;

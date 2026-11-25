@@ -181,6 +181,19 @@ package, a retry leaves that backup in place. It moves the working package to
 a marked, run-specific recovery directory. A rejected retry restores only the
 package it moved. A successful read-back releases the backups. On a filesystem
 without a verified publication lock, a run only releases copies it moved itself.
+
+On opening the window, the shell passes the saved parent directory to
+`export::reader_paths` before considering Downloads. A reader that finds a
+publication lock or a backup checks again under the publisher's lock.
+It validates the manifest, XML digests, inventory links, PDF files and package
+layout on disk. A valid working package stays in place. A missing working name
+can be restored by an atomic no-replace rename. When a retry displaces a package
+into a recovery slot, a hard link to the older backup's manifest records their
+relationship on filesystems that support it. If the newest copy cannot be
+identified, the reader reports the saved paths and leaves the copies in place.
+This protocol addresses process termination. Power-loss durability is a separate
+filesystem property.
+
 If restoring the working name fails, the error carries both the publication
 failure and the rollback failure.
 

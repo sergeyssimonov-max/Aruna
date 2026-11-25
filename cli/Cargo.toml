@@ -52,6 +52,8 @@ skrifa = "=0.42.1"
 # Already in the tree through Typst (hayagriva, biblatex); this names it.
 # Nothing written to the package goes through it.
 unicode-normalization = "=0.1.26"
+# Atomic no-replace rename for crash recovery on macOS and Linux; already in Cargo.lock.
+rustix = { version = "=1.1.6", features = ["fs"] }
 
 [features]
 # Opens `parse::fields` for measurement. Off by default and never enabled by the

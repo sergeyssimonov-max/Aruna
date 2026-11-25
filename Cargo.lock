@@ -135,6 +135,7 @@ dependencies = [
  "lopdf",
  "memchr",
  "quick-xml 0.42.0",
+ "rustix",
  "serde",
  "serde_json",
  "skrifa",

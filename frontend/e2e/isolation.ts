@@ -186,7 +186,8 @@ export async function finish(
   try {
     await stop()
   } finally {
-    rmSync(run.root, { recursive: true, force: true })
+    // The system browser can finish creating its profile after it accepts the inventory.
+    rmSync(run.root, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
     if (!run.webkitTemporaryBefore) rmSync(run.webkitTemporary, { recursive: true, force: true })
   }
   const lines = changed(run.before, traces(library))

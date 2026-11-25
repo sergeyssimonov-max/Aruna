@@ -10,7 +10,7 @@ declare global {
 }
 
 /** Compare every file, including paths, without retaining the corpus in RAM. */
-function filesBelow(root: string): [string, string][] {
+export function filesBelow(root: string): [string, string][] {
   const files: [string, string][] = []
   const visit = (folder: string) => {
     for (const entry of readdirSync(folder, { withFileTypes: true }).sort((a, b) =>

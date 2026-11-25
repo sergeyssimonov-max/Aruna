@@ -44,6 +44,20 @@ synchronous `CheckingPublished` notification and checks every restored file.
 A unit test supplies a different staging validation count at the publication
 boundary and checks the resulting refusal and original manifest.
 
+Run the process-interruption checks with
+`INSTA_UPDATE=no cargo nextest run --locked -p aruna --lib -E 'test(/export::recovery::tests::/)'`.
+The parent waits for a child to reach the requested rename, kills that child
+and compares the reader-visible package with the original files. A fourth
+case waits for a second reader to report contention before releasing the publisher.
+
+For the native window, set `ARUNA_E2E_CRASH_STATE` to a directory containing
+the state left by an interrupted publication and `ARUNA_E2E_EXPECTED_LIBRARY`
+to the independently saved working package. Run `pnpm --dir frontend test:e2e`.
+The runner copies the state into an isolated home, preserving hard links within
+the copy, and records a destination outside Downloads. The scenario opens the
+restored inventory from the window, compares every file with the reference and
+opens a linked PDF with Apple's PDFKit. The fixture must contain at least one PDF.
+
 The Rust `window_seams` suite exercises actual failure
 codes against `frontend/src/failure-texts.json`. Vitest calls the explanation
 function used by the window. The shell tests check the messages returned by

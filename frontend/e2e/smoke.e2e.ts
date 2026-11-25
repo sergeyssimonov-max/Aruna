@@ -1,7 +1,10 @@
+import { execFileSync } from 'node:child_process'
+import { basename, join, resolve, sep } from 'node:path'
+import type { CorpusLocation } from '../src/bindings'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { editionUpgrade } from './edition-upgrade'
-import { corpusLifecycle } from './corpus.lifecycle'
+import { corpusLifecycle, filesBelow } from './corpus.lifecycle'
 
 /**
  * Версия, которую приложение обязано о себе сообщать.
@@ -122,3 +125,40 @@ describe('Aruna window', () => {
 
 if (upgrading) editionUpgrade()
 else if (process.env.ARUNA_E2E_CORPUS_CACHE) corpusLifecycle()
+
+if (process.env.ARUNA_E2E_CRASH_STATE) {
+  it('opens the recovered inventory from the saved folder without rebuilding', async () => {
+    const reference = process.env.ARUNA_E2E_EXPECTED_LIBRARY
+    const isolated = process.env.ARUNA_E2E_ROOT
+    if (!reference || !isolated) throw new Error('Missing reader recovery fixture')
+    const open = await $('button=Открыть опись')
+    await open.waitForDisplayed({ timeout: 300_000 })
+    const location = (await browser.tauri.execute(({ core }) =>
+      core.invoke('corpus_location'),
+    )) as CorpusLocation
+    expect(location.package).toBe(join(isolated, 'reader-library', basename(reference)))
+    expect(location.inventory_exists).toBe(true)
+    expect(filesBelow(location.package)).toEqual(filesBelow(reference))
+    await open.click()
+    const html = readFileSync(location.inventory, 'utf8')
+    const link = html.match(/href="(\.\/[^"]+\.pdf)"/)?.[1]
+    if (!link) throw new Error('Missing PDF link in restored inventory')
+    const pdf = resolve(location.package, decodeURIComponent(link))
+    if (!pdf.startsWith(location.package + sep)) throw new Error('PDF outside test package')
+    const pdfkit = fileURLToPath(
+      new URL('../../cli/examples/pdf_gate/pdfkit.swift', import.meta.url),
+    )
+    const reader = join(isolated, 'pdfkit-reader')
+    execFileSync('xcrun', ['swiftc', '-framework', 'PDFKit', pdfkit, '-o', reader])
+    const opened = execFileSync(reader, [pdf], { encoding: 'utf8' }).trim().split('\t')
+    expect(opened[0]).toBe('OPENED')
+    expect(Number(opened[2])).toBeGreaterThan(0)
+    // A versioned offline library can open while Zenodo's update check reports its absence.
+    const notice = await $('p.failure')
+    if (await notice.isExisting()) {
+      await expect(notice).toHaveText(
+        'Не удалось проверить новые издания на Zenodo. Сохраненная опись доступна.',
+      )
+    }
+  }).timeout(600_000)
+}
