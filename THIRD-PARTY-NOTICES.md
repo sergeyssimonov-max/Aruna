@@ -415,7 +415,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 692. Requires re
 | phf_macros | 0.14.0 | crate | MIT | T44 |
 | phf_shared | 0.13.1 | crate | MIT | T44 |
 | phf_shared | 0.14.0 | crate | MIT | T44 |
-| pic-scale | 0.7.12 | crate | BSD-3-Clause OR Apache-2.0 | T92, T75 |
+| pic-scale | 0.7.14 | crate | BSD-3-Clause OR Apache-2.0 | T92, T75 |
 | pico-args | 0.5.0 | crate | MIT | T662 |
 | pin-project-lite | 0.2.17 | crate | Apache-2.0 OR MIT | T10, T2 |
 | piper | 0.2.5 | crate | MIT OR Apache-2.0 | T1, T2 |
@@ -6728,7 +6728,7 @@ SOFTWARE.
 
 ### T75
 
-SHA-256 `2aa92cada6431e75615e3fe6cb1a9082c98f777d48ae1c087c0da0e37f7b8bff`. Used by: moxcms 0.8.1 (LICENSE.md), pic-scale 0.7.12 (LICENSE.md), pxfm 0.1.30 (LICENSE.md).
+SHA-256 `2aa92cada6431e75615e3fe6cb1a9082c98f777d48ae1c087c0da0e37f7b8bff`. Used by: moxcms 0.8.1 (LICENSE.md), pic-scale 0.7.14 (LICENSE.md), pxfm 0.1.30 (LICENSE.md).
 
 ```text
 Copyright (c) Radzivon Bartoshyk. All rights reserved.
@@ -7206,7 +7206,7 @@ SOFTWARE.
 
 ### T92
 
-SHA-256 `90bf2d659c43045111b65c733ab2a6d4cbcb422a098368c8c58a9ba3db4ed0c5`. Used by: moxcms 0.8.1 (LICENSE-APACHE.md), pic-scale 0.7.12 (LICENSE-APACHE.md), pxfm 0.1.30 (LICENSE-APACHE.md).
+SHA-256 `90bf2d659c43045111b65c733ab2a6d4cbcb422a098368c8c58a9ba3db4ed0c5`. Used by: moxcms 0.8.1 (LICENSE-APACHE.md), pic-scale 0.7.14 (LICENSE-APACHE.md), pxfm 0.1.30 (LICENSE-APACHE.md).
 
 ```text
                                  Apache License
