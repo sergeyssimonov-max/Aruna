@@ -767,7 +767,7 @@ Packages: 1443 – crates 751, npm 692. Distinct licence texts: 692. Requires re
 | zerovec | 0.11.8 | crate | Unicode-3.0 | T8 |
 | zerovec-derive | 0.11.6 | crate | Unicode-3.0 | T8 |
 | zip | 9.0.5 | crate | MIT | T366 |
-| zlib-rs | 0.6.8 | crate | Zlib | T632 |
+| zlib-rs | 0.6.9 | crate | Zlib | T632 |
 | zmij | 1.0.23 | crate | MIT | T2 |
 | zune-core | 0.5.3 | crate | MIT OR Apache-2.0 OR Zlib | T9, T176, T175 |
 | zune-jpeg | 0.5.15 | crate | MIT OR Apache-2.0 OR Zlib | T9, T176, T175 |
@@ -39625,7 +39625,7 @@ THE SOFTWARE.
 
 ### T632
 
-SHA-256 `e72111c52b7d96ebe25348dee19f0744f444d3c95ae6b1ecb6ccaecc5bce05ba`. Used by: zlib-rs 0.6.8 (LICENSE).
+SHA-256 `e72111c52b7d96ebe25348dee19f0744f444d3c95ae6b1ecb6ccaecc5bce05ba`. Used by: zlib-rs 0.6.9 (LICENSE).
 
 ```text
 (C) 2024 Trifecta Tech Foundation 
