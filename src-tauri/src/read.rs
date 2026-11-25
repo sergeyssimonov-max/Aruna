@@ -43,17 +43,16 @@ pub(crate) enum XmlSummaryError {
 ///
 /// Сестра [`named_inventory`]. Путь приходит от окна, и до 22.09.2026 команды
 /// читали `manifest.json` в любом каталоге, названном строкой, – приемочный
-/// аудит 21.09 записал это находкой. Пакет же всегда лежит под одним именем,
-/// `aruna::export::PACKAGE`, куда бы его ни собрали: ядро кладет его как
-/// `destination.join(PACKAGE)`. Каталог с другим именем пакетом не бывает.
+/// аудит 21.09 записал это находкой. Допустимые имена изданий и прежних пакетов задает ядро.
 ///
 /// Есть ли каталог на месте, здесь не спрашивается: на это у читателей свой
 /// отказ, `Missing`, и окно различает «не пакет» и «пакета нет».
 pub(crate) fn named_package(path: &std::path::Path) -> Result<(), CommandError> {
-    if !matches!(
-        path.file_name().and_then(|s| s.to_str()),
-        Some(aruna::export::PACKAGE | aruna::export::LEGACY_PACKAGE)
-    ) {
+    if !path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .is_some_and(aruna::editions::is_package_name)
+    {
         return Err(CommandError::NotPackage);
     }
     // И не ссылка под этим именем: она увела бы чтение манифеста куда угодно.

@@ -309,7 +309,7 @@ fn advice(err: &ArunaError) -> Option<String> {
                 .to_string()
         }
         ArunaError::ExportRollback { .. } => {
-            format!("Проверьте папку корпуса. Прежняя копия может находиться в .{}.previous.", aruna::export::PACKAGE)
+            "Проверьте папку сборки. Прежняя копия может находиться в скрытой папке с именем библиотеки и окончанием .previous.".to_owned()
         }
         ArunaError::PdfInvariant { .. } => {
             "Сборка PDF остановилась на ошибке сборщика, пакет не опубликован, а прежний не тронут.\n\

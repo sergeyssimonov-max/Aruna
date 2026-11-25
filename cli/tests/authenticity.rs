@@ -36,8 +36,8 @@
 
 mod support;
 
+use aruna::export;
 use aruna::export::verify::{self, DECLARATION};
-use aruna::export::{self, PACKAGE};
 use aruna::md5::md5_hex;
 use aruna::parse::{is_manuscript_xml, looks_like_manuscript, HEADER_READ_LIMIT};
 use std::collections::BTreeMap;
@@ -323,7 +323,7 @@ fn build(dir: &Path, archive: &Path) -> (export::Built, PathBuf) {
         &aruna::job::Job::unattended(),
     )
     .expect("the package builds");
-    (built, dir.join(PACKAGE))
+    (built, aruna::editions::library_paths(dir).0)
 }
 
 /// **Every admitted document is in the package once, and unchanged.**

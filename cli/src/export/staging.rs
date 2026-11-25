@@ -24,12 +24,16 @@ pub(super) struct Replaced {
 impl Replaced {
     pub(super) fn aside(target: &Path, destination: &Path) -> Result<Self> {
         let exists = super::target_metadata(target)?.is_some();
-        let previous = destination.join(format!(".{PACKAGE}.previous"));
+        let name = target
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(PACKAGE);
+        let previous = destination.join(format!(".{name}.previous"));
         let occupied = super::target_metadata(&previous)?.is_some();
         let aside = if !exists {
             None
         } else if occupied {
-            let slot = RecoverySlot::reserve(destination)?;
+            let slot = RecoverySlot::reserve(destination, name)?;
             if let Err(error) = fs::rename(target, slot.package()) {
                 slot.remove_if_empty();
                 return Err(ArunaError::io(target)(error));
@@ -120,7 +124,12 @@ impl Replaced {
         // On a disk that cannot serialize publication another run may still
         // need its recovery slot or the .previous we found on entry.
         if exclusive {
-            RecoverySlot::retire_abandoned(destination, slot, &mut left);
+            let name = self
+                .target
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(PACKAGE);
+            RecoverySlot::retire_abandoned(destination, name, slot, &mut left);
         }
         if let Some(previous) = &self.previous {
             // A recovery directory can be retired, a foreign file or symlink cannot.
@@ -152,12 +161,12 @@ impl Drop for Replaced {
 
 /// A retry must vacate the working name without overwriting an earlier .previous.
 /// These marked slots are outside the abandoned-staging sweep.
-struct RecoverySlot(PathBuf);
+struct RecoverySlot(PathBuf, String);
 
 impl RecoverySlot {
     const MARKER: &'static str = ".aruna-rollback";
 
-    fn reserve(destination: &Path) -> Result<Self> {
+    fn reserve(destination: &Path, name: &str) -> Result<Self> {
         loop {
             let path = destination.join(format!("{}.rollback", staging_name()));
             match fs::create_dir(&path) {
@@ -170,12 +179,12 @@ impl RecoverySlot {
                 let _ = fs::remove_dir(&path);
                 return Err(ArunaError::io(marker)(error));
             }
-            return Ok(Self(path));
+            return Ok(Self(path, name.to_owned()));
         }
     }
 
     fn package(&self) -> PathBuf {
-        self.0.join(PACKAGE)
+        self.0.join(&self.1)
     }
 
     fn remove_if_empty(&self) {
@@ -197,7 +206,12 @@ impl RecoverySlot {
         self.remove_if_empty();
     }
 
-    fn retire_abandoned(destination: &Path, current: Option<&Self>, left: &mut Vec<PathBuf>) {
+    fn retire_abandoned(
+        destination: &Path,
+        name_of_package: &str,
+        current: Option<&Self>,
+        left: &mut Vec<PathBuf>,
+    ) {
         let Ok(entries) = fs::read_dir(destination) else {
             return;
         };
@@ -210,7 +224,7 @@ impl RecoverySlot {
             if kind != Some(Leftover::Staging) || !entry.file_type().is_ok_and(|t| t.is_dir()) {
                 continue;
             }
-            let slot = Self(entry.path());
+            let slot = Self(entry.path(), name_of_package.to_owned());
             if current.is_some_and(|own| own.0 == slot.0) {
                 continue;
             }
@@ -222,6 +236,9 @@ impl RecoverySlot {
             // A slot left by a dead process only ever held a working package
             // that passed the destination check. Keep anything unrecognizable.
             let package = slot.package();
+            if !fs::symlink_metadata(&package).is_ok_and(|meta| meta.is_dir()) {
+                continue;
+            }
             if super::validate::check_destination(&package).is_err() {
                 left.push(package);
                 continue;
@@ -538,12 +555,36 @@ mod recovery_tests {
     use super::*;
 
     #[test]
+    fn publishing_an_edition_preserves_another_editions_recovery_copies() {
+        let dir = tempfile::tempdir().expect("destination");
+        let out = dir.path();
+        let target = out.join("TLHdig_Beta_0.4");
+        let previous = out.join(".TLHdig_Beta_0.3.previous");
+        let slot = RecoverySlot::reserve(out, "TLHdig_Beta_0.3").expect("slot");
+        for path in [&previous, &slot.package()] {
+            fs::create_dir(path).expect("recovery copy");
+            fs::write(path.join("TLHdig_Beta_0.3.html"), b"saved").expect("inventory");
+        }
+        let staging = Staging::fresh(out.join(staging_name())).expect("staging");
+        Replaced::aside(&target, out)
+            .expect("reserve")
+            .publish(staging, out, true, || Ok(()))
+            .expect("publish");
+        for path in [&previous, &slot.package()] {
+            assert_eq!(
+                fs::read(path.join("TLHdig_Beta_0.3.html")).expect("preserved"),
+                b"saved"
+            );
+        }
+    }
+
+    #[test]
     fn a_lockless_retry_retires_only_its_own_slot() {
         let dir = tempfile::tempdir().expect("destination");
         let out = dir.path();
         let target = out.join(PACKAGE);
         let previous = out.join(format!(".{PACKAGE}.previous"));
-        let other = RecoverySlot::reserve(out).expect("another publisher's slot");
+        let other = RecoverySlot::reserve(out, PACKAGE).expect("another publisher's slot");
         let unmarked = out.join(format!(".{PACKAGE}.build.99999.1.rollback"));
         for root in [
             &previous,

@@ -5,8 +5,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Stable name shared by the exporter, the reader and the standalone inventory.
-/// The inventory and manifest identify the edition, so bookmarks survive an update.
+/// Inventory of an unidentified local archive or a previously unversioned package.
 pub const OUTPUT_FILE_NAME: &str = "TLHdig.html";
 /// Historical inventory still opened in place during migration.
 pub const LEGACY_INVENTORY: &str = "TLHdig_Beta_0.3.html";

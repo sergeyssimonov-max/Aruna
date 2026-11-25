@@ -4,7 +4,7 @@
 //! cargo run --release --example export_beta -- <archive.zip> [destination]
 //! ```
 //!
-//! Produces `<destination>/TLHdig` — an inventory beside one directory
+//! Produces `the edition directory under <destination>` — an inventory beside one directory
 //! per CTH group, each holding the normalised documents of that group. It opens
 //! by double-clicking and needs no server: every link is relative, so moving the
 //! folder keeps them working.
@@ -41,10 +41,11 @@ fn main() -> ExitCode {
         }
     };
     eprintln!("Building {PACKAGE} from {}…", zip.display());
-    match export::build_local(&zip, &destination, &fonts, &aruna::job::Job::unattended()) {
-        Ok(built) => {
+    match export::build_local_with_path(&zip, &destination, &fonts, &aruna::job::Job::unattended())
+    {
+        Ok((built, root)) => {
             println!();
-            println!("package:          {}", destination.join(PACKAGE).display());
+            println!("package:          {}", root.display());
             println!("CTH groups:       {}", built.groups);
             println!("documents:        {}", built.documents);
             println!("document links:   {}", built.document_links);

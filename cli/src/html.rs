@@ -284,7 +284,12 @@ pub(crate) fn render(
         &[
             ("STYLE", &css),
             ("SCRIPT", INVENTORY_SCRIPT),
-            ("SOURCE", &escape_html(corpus.source)),
+            (
+                "SOURCE",
+                &escape_html(
+                    &edition.map_or_else(|| corpus.source.to_owned(), |e| e.inventory_source()),
+                ),
+            ),
             ("AUTHORS", &authors),
             // The credit the Mainz terms require for `UllikummiA`, which the
             // package now carries beside this page. It is on the page rather

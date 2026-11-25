@@ -182,6 +182,7 @@ export function attachInventoryFilter(doc: Document): void {
   /** Apply the current query and fold state to every row. */
   function render(): void {
     const q = fold((input!.value || '').trim())
+    let firstVisible: HTMLTableElement | undefined
     let matches = 0
     let onScreen = 0
 
@@ -199,6 +200,7 @@ export function attachInventoryFilter(doc: Document): void {
 
       const groupVisible = q === '' || anyHit
       group.table.hidden = !groupVisible
+      if (groupVisible && !firstVisible) firstVisible = group.table
 
       for (let j = 0; j < group.items.length; j++) {
         const show = groupVisible && hits[j]
@@ -211,6 +213,9 @@ export function attachInventoryFilter(doc: Document): void {
         }
       }
     }
+
+    inventory?.querySelector('[data-screen-columns]')?.removeAttribute('data-screen-columns')
+    if (onScreen > 0) firstVisible?.setAttribute('data-screen-columns', '')
 
     if (hint) {
       if (q === '') {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
-import { join, relative, isAbsolute } from 'node:path'
+import { basename, join, relative, isAbsolute } from 'node:path'
 import type { CorpusLocation } from '../src/bindings'
 
 function tree(root: string) {
@@ -55,7 +55,15 @@ export function editionUpgrade(): void {
       expect(manifest.source.archive_md5).toBe(manifest.source.zenodo.md5)
       expect(manifest.pdfs.built + manifest.pdfs.refused).toBe(manifest.counts.documents)
       const inventory = readFileSync(location.inventory, 'utf8')
-      expect(inventory).toContain('10.5281/zenodo.' + manifest.source.zenodo.record)
+      expect(manifest.package).not.toBe('TLHdig')
+      if (manifest.source.zenodo.record === 24373727)
+        expect(manifest.package).toBe('TLHdig_Beta_0.4')
+      expect(basename(location.package)).toBe(manifest.package)
+      expect(basename(location.inventory)).toBe(manifest.package + '.html')
+      expect(manifest.inventory).toBe(basename(location.inventory))
+      expect(inventory).toContain(manifest.source.zenodo.date)
+      expect(inventory).not.toContain('DOI 10.5281/zenodo.')
+      expect(inventory).not.toContain('CC BY 4.0')
       const summary = (await $('main').getText()).replace(/\s+/g, ' ')
       expect(summary).toContain(manifest.source.zenodo.date)
       expect(summary).toContain('Открыть опись')

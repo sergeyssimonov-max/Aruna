@@ -5,7 +5,7 @@
 //! that maps 23 936 documents to 23 936 PDFs has to place each one where the
 //! last run placed it, or every re-run rewrites the whole corpus and no
 //! incremental anything is possible.
-use aruna::export::{self, PACKAGE};
+use aruna::export;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -45,7 +45,7 @@ fn main() {
             built.groups,
             start.elapsed().as_secs_f64()
         );
-        digests.push(walk(&dest.join(PACKAGE)));
+        digests.push(walk(&aruna::editions::library_paths(dest).0));
     }
 
     let (first, second) = (&digests[0], &digests[1]);

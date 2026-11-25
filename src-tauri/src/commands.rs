@@ -84,10 +84,18 @@ fn open_inventory(app: tauri::AppHandle, path: String) -> Result<(), String> {
 /// папки или из отчета сборки – а нажимают на кнопку позже, и между тем и
 /// другим файл могли убрать.
 pub(super) fn named_inventory(path: &std::path::Path) -> Result<(), CommandError> {
-    if !matches!(
-        path.file_name().and_then(|s| s.to_str()),
-        Some(aruna::paths::OUTPUT_FILE_NAME | aruna::paths::LEGACY_INVENTORY)
-    ) || path.parent().is_some_and(is_link)
+    let stem = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.strip_suffix(".html"))
+        .filter(|name| aruna::editions::is_package_name(name))
+        .ok_or(CommandError::NotInventory)?;
+    let parent = path.parent();
+    // Previously supported standalone inventories may be anywhere. New edition
+    // files opened by the window always belong to their matching package.
+    if parent.is_some_and(is_link)
+        || (!matches!(stem, aruna::export::PACKAGE | aruna::export::LEGACY_PACKAGE)
+            && parent.and_then(|p| p.file_name()).and_then(|n| n.to_str()) != Some(stem))
     {
         return Err(CommandError::NotInventory);
     }

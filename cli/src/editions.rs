@@ -47,6 +47,8 @@ pub(crate) struct Edition {
     record: u64,
     index: u64,
     title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
     date: String,
     creators: Vec<Creator>,
     file: String,
@@ -134,6 +136,9 @@ impl Edition {
             record,
             index: version["index"].as_u64()?,
             title: field(m, "title")?.into(),
+            version: field(m, "version")
+                .filter(|s| text_ok(s))
+                .map(str::to_owned),
             date: field(m, "publication_date")?.into(),
             creators: m["creators"]
                 .as_array()?
@@ -156,6 +161,8 @@ impl Edition {
 
     fn valid(&self) -> bool {
         self.record > 0
+            && self.index > 0
+            && self.version.as_deref().is_none_or(text_ok)
             && text_ok(&self.title)
             && date_ok(&self.date)
             && !self.creators.is_empty()
@@ -186,6 +193,40 @@ impl Edition {
         self.title
             .strip_prefix("Thesaurus Linguarum Hethaeorum digitalis (TLHdig) ")
             .unwrap_or(&self.title)
+    }
+
+    pub(crate) fn package_name(&self) -> String {
+        match self.record {
+            20328284 => crate::export::LEGACY_PACKAGE.into(),
+            24373727 => BETA04_PACKAGE.into(),
+            // A publisher can reuse a title. The record keeps later editions distinct.
+            record => {
+                let title = self
+                    .version
+                    .as_deref()
+                    .unwrap_or_else(|| self.short_title());
+                let version = if let Some(v) = title
+                    .strip_prefix("Beta Version ")
+                    .filter(|v| numeric_version(v))
+                {
+                    format!("Beta_{v}")
+                } else if let Some(v) = title
+                    .strip_prefix("Version ")
+                    .filter(|v| numeric_version(v))
+                {
+                    format!("Version_{v}")
+                } else if let Some(label) = version_label(title, self.version.is_some()) {
+                    format!("Label_{label}")
+                } else {
+                    format!("Edition_{}", self.index)
+                };
+                format!("TLHdig_{version}_Zenodo_{record}")
+            }
+        }
+    }
+
+    pub(crate) fn inventory_source(&self) -> String {
+        format!("{} ({})", self.title, self.date)
     }
 
     pub(crate) fn citation(&self) -> String {
@@ -450,18 +491,126 @@ fn select(
     }
 }
 
-/// Existing readers keep their historical directory and bookmarks. All new publications use TLHdig.
+pub(crate) fn package_name(edition: Option<&Edition>) -> String {
+    edition.map_or_else(|| crate::export::PACKAGE.to_owned(), Edition::package_name)
+}
+
+pub(crate) fn edition_inventory(edition: Option<&Edition>) -> String {
+    format!("{}.html", package_name(edition))
+}
+
+const BETA04_PACKAGE: &str = "TLHdig_Beta_0.4";
+
+fn numeric_version(s: &str) -> bool {
+    s.len() <= 40
+        && s.split('.')
+            .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+}
+
+// An explicit edition label need not contain digits. A free-form publication
+// title only serves as a version label when it includes a number.
+fn version_label(title: &str, explicit: bool) -> Option<String> {
+    let label = title.split_whitespace().collect::<Vec<_>>().join("_");
+    (valid_label(&label) && (explicit || label.bytes().any(|c| c.is_ascii_digit())))
+        .then_some(label)
+}
+
+fn valid_label(label: &str) -> bool {
+    (1..=64).contains(&label.len())
+        && label.starts_with(char::is_alphanumeric)
+        && label.ends_with(char::is_alphanumeric)
+        && !label.contains("..")
+        && label
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '.' | '_' | '-'))
+}
+
+/// Restrict reader commands to the same single-component names the exporter emits.
+pub fn is_package_name(name: &str) -> bool {
+    if matches!(
+        name,
+        crate::export::PACKAGE | crate::export::LEGACY_PACKAGE | BETA04_PACKAGE
+    ) {
+        return true;
+    }
+    let Some((prefix, record)) = name.rsplit_once("_Zenodo_") else {
+        return false;
+    };
+    record
+        .parse::<u64>()
+        .is_ok_and(|id| id > 0 && id.to_string() == record)
+        && (["TLHdig_Beta_", "TLHdig_Version_"]
+            .iter()
+            .any(|lead| prefix.strip_prefix(lead).is_some_and(numeric_version))
+            || prefix
+                .strip_prefix("TLHdig_Label_")
+                .is_some_and(valid_label)
+            || prefix
+                .strip_prefix("TLHdig_Edition_")
+                .is_some_and(|n| n.parse::<u64>().is_ok_and(|i| i > 0 && i.to_string() == n)))
+}
+
+pub(crate) fn inventory_name(root: &Path) -> String {
+    let stem = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .filter(|s| is_package_name(s))
+        .unwrap_or(crate::export::PACKAGE);
+    format!("{stem}.html")
+}
+
+/// Prefer the latest verified edition; older layouts remain readable in place.
 pub fn library_paths(parent: &Path) -> (PathBuf, PathBuf) {
     let current = parent.join(crate::export::PACKAGE);
     let legacy = parent.join(crate::export::LEGACY_PACKAGE);
-    if !current.join(crate::paths::OUTPUT_FILE_NAME).is_file()
+    let fallback = if !current.join(crate::paths::OUTPUT_FILE_NAME).is_file()
         && legacy.join(crate::paths::LEGACY_INVENTORY).is_file()
     {
-        let inventory = legacy.join(crate::paths::LEGACY_INVENTORY);
-        return (legacy, inventory);
+        legacy
+    } else {
+        current
+    };
+    let mut best = fallback;
+    let mut rank = None;
+    if let Ok(entries) = fs::read_dir(parent) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else { continue };
+            if matches!(name, crate::export::PACKAGE | crate::export::LEGACY_PACKAGE)
+                || !is_package_name(name)
+                || !entry.file_type().is_ok_and(|t| t.is_dir())
+            {
+                continue;
+            }
+            let path = entry.path();
+            if !fs::symlink_metadata(path.join(inventory_name(&path))).is_ok_and(|m| m.is_file()) {
+                continue;
+            }
+            if let Ok(Some(e)) = installed(&path) {
+                // Prefer the current spelling over an earlier index-based name for the same edition.
+                let spelling = if name == e.package_name() {
+                    2
+                } else if name == format!("TLHdig_Edition_{}_Zenodo_{}", e.index, e.record) {
+                    1
+                } else {
+                    continue;
+                };
+                let key = (e.index, spelling, e.record);
+                let best_key = rank.get_or_insert_with(|| {
+                    installed(&best)
+                        .ok()
+                        .flatten()
+                        .map_or((0, 0, 0), |old| (old.index, 0, old.record))
+                });
+                if key > *best_key {
+                    *best_key = key;
+                    best = path;
+                }
+            }
+        }
     }
-    let inventory = current.join(crate::paths::OUTPUT_FILE_NAME);
-    (current, inventory)
+    let inventory = best.join(inventory_name(&best));
+    (best, inventory)
 }
 
 /// Only the core can create an update: its verified record and destination stay together

@@ -15,6 +15,23 @@ fn the_inventory_is_the_file_the_core_names_wherever_it_lies() {
     assert!(named_inventory(&inventory).is_ok());
 }
 
+#[test]
+fn edition_inventory_and_package_names_must_match() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = dir.path().join("TLHdig_Beta_0.4");
+    fs::create_dir(&package).unwrap();
+    let inventory = package.join("TLHdig_Beta_0.4.html");
+    fs::write(&inventory, b"ok").unwrap();
+    assert!(named_package(&package).is_ok());
+    assert!(named_inventory(&inventory).is_ok());
+    let wrong = dir.path().join("TLHdig_Beta_0.4.html");
+    fs::rename(inventory, &wrong).unwrap();
+    assert!(matches!(
+        named_inventory(&wrong),
+        Err(CommandError::NotInventory)
+    ));
+}
+
 /// **Ничего, кроме описи, эта команда не открывает.**
 ///
 /// Та граница, которую должна была дать область путей плагина и не дала:

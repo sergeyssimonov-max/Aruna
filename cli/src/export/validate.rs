@@ -96,11 +96,27 @@ pub fn validate(
     placed: &[Placed],
     pdfs: &[super::PdfState],
 ) -> Result<Validation> {
+    validate_named(
+        root,
+        records,
+        placed,
+        pdfs,
+        &crate::editions::inventory_name(root),
+    )
+}
+
+pub(super) fn validate_named(
+    root: &Path,
+    records: &[ManuscriptRecord],
+    placed: &[Placed],
+    pdfs: &[super::PdfState],
+    inventory: &str,
+) -> Result<Validation> {
     let expected_pdfs: HashSet<PathBuf> = pdfs
         .iter()
         .filter_map(|s| s.built().map(Path::to_path_buf))
         .collect();
-    let inventory_path = root.join(crate::paths::OUTPUT_FILE_NAME);
+    let inventory_path = root.join(inventory);
     let html = read_inventory(&inventory_path)?;
 
     let mut errors: Vec<String> = Vec::new();
@@ -119,6 +135,7 @@ pub fn validate(
         root,
         MAX_DEPTH,
         &mut Found {
+            inventory,
             files: &mut on_disk,
             pdfs: &mut pdfs_on_disk,
             at_the_root: &mut at_the_root,
@@ -140,7 +157,7 @@ pub fn validate(
     // вовсе. Читается уже опубликованное дерево, и прежняя копия читателя
     // снимается после этой проверки, так что пропущенный файл значил бы пакет
     // без шрифта под готовым именем и нечем вернуть прежний.
-    for required in super::ROOT_FILES {
+    for required in super::root_files(inventory) {
         if !at_the_root.contains(required) {
             errors.push(format!(text!(PackageMissingFile), required));
         }
@@ -483,6 +500,7 @@ fn check_manifest(
 /// gets noticed.
 /// What a walk collects.
 struct Found<'a> {
+    inventory: &'a str,
     files: &'a mut HashSet<PathBuf>,
     /// The PDFs beside the documents.
     pdfs: &'a mut HashSet<PathBuf>,
@@ -511,7 +529,7 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
         // XML: the `index.html` that used to open each folder is no longer
         // written, so one appearing here is either a leftover from an older
         // export or a regression, and both are worth failing on.
-        let belongs = at_root && super::is_root_file(&name);
+        let belongs = at_root && super::is_root_file(&name, found.inventory);
         // **`symlink_metadata`, not `is_dir`.** `is_dir` follows the link, so a
         // symlinked directory inside the package sent the walk out of the
         // package and validated whatever it pointed at as if the export had
@@ -580,11 +598,9 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
         return refuse(text!(DestinationFile).to_string());
     }
 
-    if !root.join(crate::paths::OUTPUT_FILE_NAME).is_file() {
-        return refuse(format!(
-            text!(DestinationMissingInventory),
-            crate::paths::OUTPUT_FILE_NAME
-        ));
+    let inventory = crate::editions::inventory_name(root);
+    if !root.join(&inventory).is_file() {
+        return refuse(format!(text!(DestinationMissingInventory), inventory));
     }
     // The name the writer gives the group of documents the corpus files under
     // no CTH number: `dir_component` of the missing-value dash. Taken from the
@@ -600,7 +616,7 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
         // Wider than the walk's rule on purpose: a group folder is ours, and a
         // `.DS_Store` is the Finder's business rather than a reason to refuse
         // to replace our own package.
-        let ours = super::is_root_file(&name)
+        let ours = super::is_root_file(&name, &inventory)
             || (entry.path().is_dir() && (name.starts_with("CTH") || name == ungrouped))
             || name == ".DS_Store";
         if !ours {
@@ -799,6 +815,7 @@ mod tests {
             &root,
             MAX_DEPTH,
             &mut Found {
+                inventory: crate::paths::OUTPUT_FILE_NAME,
                 files: &mut files,
                 pdfs: &mut Default::default(),
                 at_the_root: &mut at_the_root,
@@ -841,6 +858,7 @@ mod tests {
             &root,
             MAX_DEPTH,
             &mut Found {
+                inventory: crate::paths::OUTPUT_FILE_NAME,
                 files: &mut files,
                 pdfs: &mut Default::default(),
                 at_the_root: &mut at_the_root,

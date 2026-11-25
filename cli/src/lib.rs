@@ -104,7 +104,7 @@ pub fn run(local_zip: Option<&Path>, job: &Job<'_>) -> Result<PathBuf> {
         }
     };
 
-    let written = (|| -> Result<()> {
+    let written = (|| -> Result<PathBuf> {
         job.report(Event::ParsingArchive);
         let (records, edition) = archive::parse_identified(source.path(), job, edition.as_ref())?;
         job.report(Event::Indexed {
@@ -124,7 +124,9 @@ pub fn run(local_zip: Option<&Path>, job: &Job<'_>) -> Result<PathBuf> {
 
         // Atomic: a failure here must not destroy the inventory an earlier run
         // left in place — see `paths::write_atomic`.
-        paths::write_atomic(&out, html.as_bytes())
+        let out = out.with_file_name(editions::edition_inventory(edition.as_ref()));
+        paths::write_atomic(&out, html.as_bytes())?;
+        Ok(out)
     })();
 
     // Whatever the outcome, and that is a decision reversed on 2026-09-19. This
@@ -142,8 +144,7 @@ pub fn run(local_zip: Option<&Path>, job: &Job<'_>) -> Result<PathBuf> {
     // behind, by the same mechanism".
     cache::discard(&source);
 
-    written?;
-    Ok(out)
+    written
 }
 
 /// The archive: from the cache when it is there, otherwise downloaded.

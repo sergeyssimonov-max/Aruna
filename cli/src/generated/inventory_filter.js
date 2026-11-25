@@ -153,7 +153,9 @@
 		}
 		/** Apply the current query and fold state to every row. */
 		function render() {
+			var _inventory$querySelec;
 			const q = fold((input.value || "").trim());
+			let firstVisible;
 			let matches = 0;
 			let onScreen = 0;
 			for (const group of groups) {
@@ -167,6 +169,7 @@
 				}
 				const groupVisible = q === "" || anyHit;
 				group.table.hidden = !groupVisible;
+				if (groupVisible && !firstVisible) firstVisible = group.table;
 				for (let j = 0; j < group.items.length; j++) {
 					const show = groupVisible && hits[j];
 					group.items[j].hidden = !show || group.folded;
@@ -176,6 +179,8 @@
 					}
 				}
 			}
+			inventory === null || inventory === void 0 || (_inventory$querySelec = inventory.querySelector("[data-screen-columns]")) === null || _inventory$querySelec === void 0 || _inventory$querySelec.removeAttribute("data-screen-columns");
+			if (onScreen > 0) firstVisible === null || firstVisible === void 0 || firstVisible.setAttribute("data-screen-columns", "");
 			if (hint) {
 				if (q === "") hint.textContent = "";
 				else if (!matches) hint.textContent = "No matches";
