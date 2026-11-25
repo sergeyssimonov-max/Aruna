@@ -178,10 +178,7 @@ pub(super) fn last_library(config: &std::path::Path) -> Option<std::path::PathBu
     if !path.is_absolute() || !path.is_dir() {
         return None;
     }
-    let (root, inventory) = aruna::editions::library_paths(&path);
-    (crate::read::named_package(&root).is_ok()
-        && crate::commands::named_inventory(&inventory).is_ok())
-    .then_some(path)
+    Some(path)
 }
 
 pub(super) async fn start(

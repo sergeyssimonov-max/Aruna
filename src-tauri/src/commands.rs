@@ -18,7 +18,7 @@ pub(super) fn said(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 fn corpus_location(app: tauri::AppHandle) -> Result<CorpusLocation, String> {
     let downloads = aruna::paths::downloads_dir().map_err(|_| said(CommandError::Downloads))?;
@@ -28,12 +28,36 @@ fn corpus_location(app: tauri::AppHandle) -> Result<CorpusLocation, String> {
         .app_config_dir()
         .ok()
         .and_then(|dir| build::last_library(&dir));
-    let parent = chosen.as_deref().unwrap_or(&downloads);
-    let (package, inventory) = aruna::editions::library_paths(parent);
+    locate_reader(&downloads, chosen)
+}
+
+fn reader_paths(
+    parent: &std::path::Path,
+) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+    aruna::export::reader_paths(parent).map_err(|e| match e {
+        aruna::error::ArunaError::ExportInvalid { first, .. } => {
+            format!("Не удалось открыть библиотеку. {first}")
+        }
+        _ => format!(
+            "Не удалось проверить папку библиотеки {}. {e}",
+            parent.display()
+        ),
+    })
+}
+
+fn locate_reader(
+    downloads: &std::path::Path,
+    chosen: Option<std::path::PathBuf>,
+) -> Result<CorpusLocation, String> {
+    let mut chosen = chosen.filter(|p| p != downloads);
+    let (mut package, mut inventory) = reader_paths(chosen.as_deref().unwrap_or(downloads))?;
+    if chosen.is_some() && !(named_package(&package).is_ok() && named_inventory(&inventory).is_ok())
+    {
+        chosen = None;
+        (package, inventory) = reader_paths(downloads)?;
+    }
     Ok(CorpusLocation {
-        destination: chosen
-            .filter(|p| p != &downloads)
-            .map(|p| p.display().to_string()),
+        destination: chosen.map(|p| p.display().to_string()),
         downloads: downloads.display().to_string(),
         package: package.display().to_string(),
         inventory: inventory.display().to_string(),
@@ -72,7 +96,32 @@ fn corpus_location(app: tauri::AppHandle) -> Result<CorpusLocation, String> {
 #[tauri::command(async)]
 #[specta::specta]
 fn open_inventory(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    named_inventory(std::path::Path::new(&path)).map_err(said)?;
+    let inventory = std::path::Path::new(&path);
+    // Only inspect the configured library parent. IPC also accepts standalone
+    // inventories, whose location must not authorize recovery in another folder.
+    if let Some(package) = inventory.parent().filter(|p| {
+        p.file_name().is_some_and(|name| {
+            inventory.extension().is_some_and(|ext| ext == "html")
+                && name.to_str().is_some_and(aruna::editions::is_package_name)
+                && inventory.file_stem() == Some(name)
+        })
+    }) {
+        let parent = package
+            .parent()
+            .ok_or_else(|| said(CommandError::NotInventory))?;
+        use tauri::Manager as _;
+        let chosen = app
+            .path()
+            .app_config_dir()
+            .ok()
+            .and_then(|dir| build::last_library(&dir));
+        if chosen.as_deref() == Some(parent)
+            || aruna::paths::downloads_dir().is_ok_and(|p| p == parent)
+        {
+            reader_paths(parent)?;
+        }
+    }
+    named_inventory(inventory).map_err(said)?;
     tauri_plugin_opener::OpenerExt::opener(&app)
         .open_path(path, None::<&str>)
         .map_err(|_| said(CommandError::Opening))

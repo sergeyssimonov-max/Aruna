@@ -8,7 +8,7 @@ import {
 } from './e2e/isolation'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
-import { cpSync, lstatSync } from 'node:fs'
+import { cpSync, linkSync, lstatSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 // The full corpus scenario is explicit: it needs a prepared cache and several
@@ -29,6 +29,29 @@ function copyTree(source: string, destination: string): void {
       return true
     },
   })
+}
+
+// Copy a saved crash state without linking the test home to the fixture.
+function copyCrashState(
+  source: string,
+  destination: string,
+  links = new Map<string, string>(),
+): void {
+  const entry = lstatSync(source, { bigint: true })
+  if (entry.isDirectory()) {
+    mkdirSync(destination)
+    for (const name of readdirSync(source)) {
+      copyCrashState(join(source, name), join(destination, name), links)
+    }
+  } else if (entry.isFile()) {
+    const key = `${entry.dev}:${entry.ino}`
+    const copied = links.get(key)
+    if (copied) linkSync(copied, destination)
+    else {
+      cpSync(source, destination)
+      if (entry.nlink > 1n) links.set(key, destination)
+    }
+  } else throw new Error('Unexpected entry in the recovery fixture')
 }
 
 // Where the application under test keeps what it writes. macOS takes WebKit
@@ -116,7 +139,18 @@ export const config: WebdriverIO.Config = {
     if (previousLibrary) {
       copyTree(previousLibrary, join(appEnv.HOME, 'Downloads', 'TLHdig_Beta_0.3'))
     }
-    if (corpusCache || previousLibrary) process.env.ARUNA_E2E_ROOT = run.root
+    const crash = process.env.ARUNA_E2E_CRASH_STATE
+    if (crash) {
+      const chosen = join(run.root, 'reader-library')
+      copyCrashState(crash, chosen)
+      const config = join(appEnv.HOME, 'Library', 'Application Support', 'com.sergeyssimonov.aruna')
+      mkdirSync(config, { recursive: true })
+      writeFileSync(join(config, 'last-library.json'), JSON.stringify(chosen))
+      appEnv.HTTPS_PROXY = 'http://127.0.0.1:1'
+      appEnv.ALL_PROXY = appEnv.HTTPS_PROXY
+      appEnv.NO_PROXY = ''
+    }
+    if (corpusCache || previousLibrary || crash) process.env.ARUNA_E2E_ROOT = run.root
     // A port nothing holds, rather than the service's fixed one: a run that
     // starts while the last one's application is still going away would
     // otherwise meet its driver.
