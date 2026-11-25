@@ -47,6 +47,8 @@ pub(crate) struct Edition {
     record: u64,
     index: u64,
     title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
     date: String,
     creators: Vec<Creator>,
     file: String,
@@ -134,6 +136,9 @@ impl Edition {
             record,
             index: version["index"].as_u64()?,
             title: field(m, "title")?.into(),
+            version: field(m, "version")
+                .filter(|s| text_ok(s))
+                .map(str::to_owned),
             date: field(m, "publication_date")?.into(),
             creators: m["creators"]
                 .as_array()?
@@ -156,6 +161,8 @@ impl Edition {
 
     fn valid(&self) -> bool {
         self.record > 0
+            && self.index > 0
+            && self.version.as_deref().is_none_or(text_ok)
             && text_ok(&self.title)
             && date_ok(&self.date)
             && !self.creators.is_empty()
@@ -194,7 +201,10 @@ impl Edition {
             24373727 => BETA04_PACKAGE.into(),
             // A publisher can reuse a title. The record keeps later editions distinct.
             record => {
-                let title = self.short_title();
+                let title = self
+                    .version
+                    .as_deref()
+                    .unwrap_or_else(|| self.short_title());
                 let version = if let Some(v) = title
                     .strip_prefix("Beta Version ")
                     .filter(|v| numeric_version(v))
@@ -205,6 +215,8 @@ impl Edition {
                     .filter(|v| numeric_version(v))
                 {
                     format!("Version_{v}")
+                } else if let Some(label) = version_label(title, self.version.is_some()) {
+                    format!("Label_{label}")
                 } else {
                     format!("Edition_{}", self.index)
                 };
@@ -495,6 +507,24 @@ fn numeric_version(s: &str) -> bool {
             .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
 }
 
+// An explicit edition label need not contain digits. A free-form publication
+// title only serves as a version label when it includes a number.
+fn version_label(title: &str, explicit: bool) -> Option<String> {
+    let label = title.split_whitespace().collect::<Vec<_>>().join("_");
+    (valid_label(&label) && (explicit || label.bytes().any(|c| c.is_ascii_digit())))
+        .then_some(label)
+}
+
+fn valid_label(label: &str) -> bool {
+    (1..=64).contains(&label.len())
+        && label.starts_with(char::is_alphanumeric)
+        && label.ends_with(char::is_alphanumeric)
+        && !label.contains("..")
+        && label
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '.' | '_' | '-'))
+}
+
 /// Restrict reader commands to the same single-component names the exporter emits.
 pub fn is_package_name(name: &str) -> bool {
     if matches!(
@@ -512,6 +542,9 @@ pub fn is_package_name(name: &str) -> bool {
         && (["TLHdig_Beta_", "TLHdig_Version_"]
             .iter()
             .any(|lead| prefix.strip_prefix(lead).is_some_and(numeric_version))
+            || prefix
+                .strip_prefix("TLHdig_Label_")
+                .is_some_and(valid_label)
             || prefix
                 .strip_prefix("TLHdig_Edition_")
                 .is_some_and(|n| n.parse::<u64>().is_ok_and(|i| i > 0 && i.to_string() == n)))
@@ -554,14 +587,22 @@ pub fn library_paths(parent: &Path) -> (PathBuf, PathBuf) {
                 continue;
             }
             if let Ok(Some(e)) = installed(&path) {
-                let key = (e.index, true, e.record);
+                // Prefer the current spelling over an earlier index-based name for the same edition.
+                let spelling = if name == e.package_name() {
+                    2
+                } else if name == format!("TLHdig_Edition_{}_Zenodo_{}", e.index, e.record) {
+                    1
+                } else {
+                    continue;
+                };
+                let key = (e.index, spelling, e.record);
                 let best_key = rank.get_or_insert_with(|| {
                     installed(&best)
                         .ok()
                         .flatten()
-                        .map_or((0, false, 0), |old| (old.index, false, old.record))
+                        .map_or((0, 0, 0), |old| (old.index, 0, old.record))
                 });
-                if name == e.package_name() && key > *best_key {
+                if key > *best_key {
                     *best_key = key;
                     best = path;
                 }
