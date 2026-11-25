@@ -202,7 +202,7 @@ mod tests {
         assert!(html.contains("group-toggle"), "the fold control");
         assert!(html.contains("id=\"fold-all\""), "fold everything");
         assert!(html.contains("Corpus creators:"), "attribution");
-        assert!(html.contains("Manuscripts:"), "the counts");
+        assert!(html.contains("TLHdig documents:"), "the counts");
         assert!(html.contains("legend"), "the column legend");
         assert!(
             html.contains("filter-on"),
