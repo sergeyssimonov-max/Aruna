@@ -352,6 +352,8 @@ jobs:
   corpus:
     name: Full corpus parse
     runs-on: ubuntu-24.04
+    env:
+      BETA04_SHA256: 3ec8ca10fde9d73106310f346b1790bf11ce538bcf855721cd75fa92b2d0f798
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -461,6 +463,36 @@ jobs:
         run: |
           export ARUNA_FIXTURE_ZIP="$HOME/aruna-fixtures/corpus.zip"
           cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml --test integration --test corpus
+
+      # This fixture is a fixed Zenodo deposit. Verify the bytes even on a cache hit.
+      - name: Cache the Beta 0.4 archive
+        id: beta04-archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/aruna-beta04-fixture
+          key: tlhdig-beta04-${{ env.BETA04_SHA256 }}
+
+      - name: Download the Beta 0.4 archive
+        if: steps.beta04-archive.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$HOME/aruna-beta04-fixture"
+          curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 --retry-delay 5 \
+            --max-time 180 -o "$HOME/aruna-beta04-fixture/corpus.zip" \
+            'https://zenodo.org/records/24373727/files/TLHbasisONLINE25_1_ZENODO_Beta_04.zip?download=1'
+
+      - name: Verify the Beta 0.4 archive SHA-256
+        run: |
+          printf '%s  %s\n' "$BETA04_SHA256" "$HOME/aruna-beta04-fixture/corpus.zip" \
+            | sha256sum --check --strict
+
+      - name: Test standalone inventory with Beta 0.4
+        env:
+          INSTA_UPDATE: "no"
+        run: |
+          export ARUNA_BETA04_ZIP="$HOME/aruna-beta04-fixture/corpus.zip"
+          cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml --lib \
+            --run-ignored ignored-only --no-tests=fail \
+            -E 'test(=editions::tests::standalone::standalone_inventory_uses_the_real_beta_04_name)'
 
   # The desktop frontend. It replaced a React site that had its own job here,
   # and the shape of the check changed with it: no separate typecheck, because
