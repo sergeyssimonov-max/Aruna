@@ -1344,7 +1344,7 @@ Packages: 1433 – crates 751, npm 682. Distinct licence texts: 690. Requires re
 | signal-exit | 4.1.0 | npm | ISC | T542 |
 | slash | 3.0.0 | npm | MIT | T13 |
 | smol-toml | 1.9.0 | npm | BSD-3-Clause | T670 |
-| source-map-js | 1.2.2 | npm | BSD-3-Clause | T409 |
+| source-map-js | 1.2.4 | npm | BSD-3-Clause | T409 |
 | spacetrim | 0.11.59 | npm | Apache-2.0 | T510 |
 | spdx-correct | 3.2.0 | npm | Apache-2.0 | T20 |
 | spdx-exceptions | 2.5.0 | npm | CC-BY-3.0 | requires review |
@@ -23650,7 +23650,7 @@ Creator: Person: Daniel Thompson-Yvetot
 
 ### T409
 
-SHA-256 `6cb0631f71c7749763fd3dd1d5bee52dd1070ec17f2edc1710079ad070bd2fbd`. Used by: source-map-js 1.2.2 (LICENSE).
+SHA-256 `6cb0631f71c7749763fd3dd1d5bee52dd1070ec17f2edc1710079ad070bd2fbd`. Used by: source-map-js 1.2.4 (LICENSE).
 
 ```text
 
