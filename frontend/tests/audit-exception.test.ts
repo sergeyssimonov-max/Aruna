@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync, readdirSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -17,12 +17,12 @@ const M5MM = 'GHSA-m5mm-p8h7-m29v'
 const lockfile = () => readFileSync(join(FRONTEND, 'pnpm-lock.yaml'), 'utf8')
 
 describe('the audit exceptions', () => {
-  it('allows exactly the two reviewed WebdriverIO advisories in the effective pnpm policy', () => {
+  it('has no audit advisory exceptions in the effective pnpm policy', () => {
     const policy = execFileSync('pnpm', ['config', 'get', 'audit', '--json'], {
       cwd: FRONTEND,
       encoding: 'utf8',
     })
-    expect(JSON.parse(policy)).toEqual({ ignore: ['GHSA-3g3m-2fjr-6pw4', 'GHSA-g3hv-75wg-m249'] })
+    expect(JSON.parse(policy.trim() || '{}')).toEqual({})
     expect(readFileSync(join(FRONTEND, 'pnpm-workspace.yaml'), 'utf8')).not.toMatch(
       /auditConfig|ignoreGhsas|ignoreCves/,
     )
@@ -142,18 +142,6 @@ describe('the raised packages', () => {
   })
 })
 
-/**
- * Temporary development-only acceptance, not a patched dependency claim.
- * The code paths and upstream blockers are recorded in DEPENDENCY-REVIEW-3.1.0.md.
- * Any change to the affected versions, their callers or their runtime reach
- * requires another review even before the fixed expiry.
- */
-const TOOLING_DUE = '2026-11-30T00:00:00Z'
-const TOOLING_EDGES: [string, string[]][] = [
-  ['glob@10.5.0', ['@wdio/config@9.31.9', 'archiver-utils@5.0.2']],
-  ['minimatch@9.0.9', ['glob@10.5.0']],
-]
-const TOOLING_ROOTS = ['@wdio/cli', '@wdio/globals', '@wdio/local-runner', '@wdio/tauri-service']
 type Manifest = {
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
@@ -161,10 +149,6 @@ type Manifest = {
   peerDependencies?: Record<string, string>
 }
 const manifest = () => JSON.parse(readFileSync(join(FRONTEND, 'package.json'), 'utf8')) as Manifest
-
-function affectedTooling(pkg: string): boolean {
-  return TOOLING_EDGES.some(([target]) => pkg === target)
-}
 
 /** Walk all versions reachable from a declared dependency. */
 function reachesPackage(
@@ -184,53 +168,15 @@ function reachesPackage(
   return false
 }
 
-function toolingOutOfReason(now: Date, lock: string, pkg: Manifest): string | null {
-  if (now.getTime() >= Date.parse(TOOLING_DUE)) return 'tooling exceptions expired: ' + TOOLING_DUE
-  const glob = resolved(lock, 'glob')
-    .filter((v) => atOrPast(v, [9, 0, 0]) && !atOrPast(v, [14, 0, 2]))
-    .map((v) => v.join('.'))
-    .sort()
-  const minimatch = resolved(lock, 'minimatch')
-    .filter((v) => atOrPast(v, [7, 0, 0]) && !atOrPast(v, [11, 0, 1]))
-    .map((v) => v.join('.'))
-    .sort()
-  if (JSON.stringify(glob) !== JSON.stringify(['10.5.0'])) return 'glob version changed or removed'
-  if (minimatch.length !== 1 || minimatch[0] !== '9.0.9') {
-    return 'minimatch version changed or removed'
-  }
-  const graph = snapshots(lock)
-  for (const [target, expected] of TOOLING_EDGES) {
-    const parents = [...graph]
-      .filter(([, deps]) => deps.includes(target))
-      .map(([name]) => name)
-      .sort()
-    if (JSON.stringify(parents) !== JSON.stringify([...expected].sort())) {
-      return target + ' parent paths changed: ' + parents.join(', ')
-    }
-  }
-  for (const group of [
-    pkg.dependencies,
-    pkg.devDependencies,
-    pkg.optionalDependencies,
-    pkg.peerDependencies,
-  ]) {
-    if (group && ['glob', 'minimatch'].some((name) => name in group)) {
-      return 'glob/minimatch became a direct dependency'
-    }
-  }
-  for (const group of [pkg.dependencies, pkg.optionalDependencies, pkg.peerDependencies]) {
-    for (const root of Object.keys(group ?? {})) {
-      if (reachesPackage(graph, root, affectedTooling))
-        return 'production dependency reaches tooling: ' + root
-    }
-  }
-  const developmentRoots = Object.keys(pkg.devDependencies ?? {}).filter((root) =>
-    reachesPackage(graph, root, affectedTooling),
-  )
-  if (JSON.stringify(developmentRoots.sort()) !== JSON.stringify(TOOLING_ROOTS)) {
-    return 'tooling development roots changed: ' + developmentRoots.join(', ')
-  }
-  return null
+function vulnerableTooling(lock: string): string[] {
+  return [
+    ...resolved(lock, 'glob')
+      .filter((v) => atOrPast(v, [9, 0, 0]) && !atOrPast(v, [14, 0, 2]))
+      .map((v) => 'glob@' + v.join('.')),
+    ...resolved(lock, 'minimatch')
+      .filter((v) => atOrPast(v, [7, 0, 0]) && !atOrPast(v, [11, 0, 1]))
+      .map((v) => 'minimatch@' + v.join('.')),
+  ]
 }
 
 /** Include peer-qualified pnpm directories when inspecting installed files. */
@@ -250,10 +196,10 @@ function callerSources(name: string, version: string, file: string): string[] {
 }
 
 const TOOLING_MARKERS = [
-  { pkg: 'glob', version: '10.5.0', file: 'dist/esm/glob.js', marker: 'windowsPathsNoEscape' },
+  { pkg: 'glob', version: '14.0.6', file: 'dist/esm/glob.js', marker: 'windowsPathsNoEscape' },
   {
     pkg: 'minimatch',
-    version: '9.0.9',
+    version: '11.0.8',
     file: 'dist/commonjs/index.js',
     marker: 'firstPhasePreProcess',
   },
@@ -362,46 +308,150 @@ describe('braces and deepmerge stay in development tooling', () => {
   })
 })
 
-describe('the temporary glob and minimatch development exceptions', () => {
-  it('remain in date, at the reviewed versions and paths, with no runtime root', () => {
-    expect(toolingOutOfReason(new Date(), lockfile(), manifest())).toBeNull()
+describe('the fixed glob and minimatch tooling', () => {
+  it('rejects every affected version in the lockfile without an expiry', () => {
+    expect(vulnerableTooling(lockfile())).toEqual([])
+    for (const [name, versions] of [
+      ['glob', ['9.0.0', '10.5.0', '13.0.6', '14.0.1']],
+      ['minimatch', ['7.0.0', '9.0.9', '10.2.6', '11.0.0']],
+    ] as const) {
+      for (const version of versions) {
+        const changed = lockfile().replace('packages:\n', `packages:\n  ${name}@${version}:\n`)
+        expect(vulnerableTooling(changed)).toContain(`${name}@${version}`)
+      }
+    }
+    expect(vulnerableTooling('packages:\n  glob@14.0.2:\n  minimatch@11.0.1:\n')).toEqual([])
   })
 
-  it('fails on expiry, version or parent drift, direct use and production reach', () => {
-    const lock = lockfile()
+  it('resolves the fixed chain from both exact installed parents', () => {
+    for (const [name, version] of [
+      ['@wdio/config', '9.31.9'],
+      ['archiver-utils', '5.0.2'],
+    ]) {
+      for (const dir of packageCopies(name, version)) {
+        const caller = createRequire(join(dir, 'package.json'))
+        const glob = createRequire(caller.resolve('glob'))
+        expect(caller('glob/package.json').version).toBe('14.0.6')
+        expect(glob('minimatch/package.json').version).toBe('11.0.8')
+      }
+    }
+  })
+
+  it('keeps glob and minimatch out of every production dependency chain', () => {
     const pkg = manifest()
-    const before = new Date('2026-11-29T23:59:59Z')
-    expect(toolingOutOfReason(before, lock, pkg)).toBeNull()
-    expect(toolingOutOfReason(new Date(TOOLING_DUE), lock, pkg)).toMatch(/expired/)
-    expect(toolingOutOfReason(before, lock.replaceAll('glob@10.5.0', 'glob@10.5.1'), pkg)).toMatch(
-      /version changed/,
-    )
-    expect(
-      toolingOutOfReason(before, lock.replaceAll('minimatch@9.0.9', 'minimatch@11.0.1'), pkg),
-    ).toMatch(/version changed or removed/)
-    const oldLintCopy = lock.replace('packages:\n', 'packages:\n  minimatch@10.2.6:\n')
-    expect(toolingOutOfReason(before, oldLintCopy, pkg)).toMatch(/version changed or removed/)
-    const extra =
-      lock +
-      '\n  unexpected@1.0.0(peer@1):\n    dependencies:\n      glob-alias: glob@10.5.0\n' +
-      '  unexpected@1.0.0(peer@2):\n    dependencies:\n      peer: 2.0.0\n'
-    expect(toolingOutOfReason(before, extra, pkg)).toMatch(/parent paths changed/)
-    expect(
-      toolingOutOfReason(before, lock, {
-        ...pkg,
-        devDependencies: { ...pkg.devDependencies, 'archiver-utils': '5.0.2' },
-      }),
-    ).toMatch(/development roots changed/)
-    expect(
-      toolingOutOfReason(before, lock, { ...pkg, devDependencies: { glob: '10.5.0' } }),
-    ).toMatch(/direct dependency/)
-    for (const group of ['dependencies', 'optionalDependencies', 'peerDependencies'] as const) {
-      expect(
-        toolingOutOfReason(before, lock, {
-          ...pkg,
-          [group]: { ...pkg[group], '@wdio/cli': '9.31.9' },
-        }),
-      ).toMatch(/production dependency reaches tooling/)
+    for (const group of [pkg.dependencies, pkg.optionalDependencies, pkg.peerDependencies]) {
+      for (const root of Object.keys(group ?? {})) {
+        expect(
+          reachesPackage(snapshots(lockfile()), root, (name) => /^(glob|minimatch)@/.test(name)),
+          root,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('preserves archiver expansion, exclusions, dotfiles and Unicode paths', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'aruna glob [совместимость] '))
+    try {
+      mkdirSync(join(directory, 'nested'))
+      writeFileSync(join(directory, 'one.xml'), 'one')
+      writeFileSync(join(directory, 'skip.xml'), 'skip')
+      writeFileSync(join(directory, '.hidden.xml'), 'hidden')
+      writeFileSync(join(directory, 'nested', 'Çorum.xml'), 'nested')
+      for (const dir of packageCopies('archiver-utils', '5.0.2')) {
+        const caller = createRequire(join(dir, 'package.json'))
+        const { expand } = caller('./file.js') as {
+          expand(options: { cwd: string; dot?: boolean }, patterns: string[]): string[]
+        }
+        expect(expand({ cwd: directory }, ['**/*.xml', '!skip.xml']).sort()).toEqual([
+          'nested/Çorum.xml',
+          'one.xml',
+        ])
+        expect(expand({ cwd: directory, dot: true }, ['*.xml']).sort()).toEqual([
+          '.hidden.xml',
+          'one.xml',
+          'skip.xml',
+        ])
+        expect(expand({ cwd: directory }, ['missing/*.xml'])).toEqual([])
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('stops directory reads after an asynchronous glob is aborted', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'aruna glob abort '))
+    try {
+      for (let index = 0; index < 4; index++) {
+        mkdirSync(join(directory, String(index), 'nested'), { recursive: true })
+        writeFileSync(join(directory, String(index), 'nested', 'file.xml'), 'data')
+      }
+      for (const dir of packageCopies('@wdio/config', '9.31.9')) {
+        const caller = createRequire(join(dir, 'package.json'))
+        const output = execFileSync(
+          process.execPath,
+          [
+            '-e',
+            `
+              const fs = require('node:fs')
+              const { glob } = require(process.argv[1])
+              const controller = new AbortController()
+              let reads = 0
+              const io = {
+                ...fs,
+                readdir(...args) {
+                  reads++
+                  const callback = args.pop()
+                  fs.readdir(...args, (...result) => {
+                    controller.abort(new Error('test-abort'))
+                    callback(...result)
+                  })
+                },
+              }
+              ;(async () => {
+                let refused = false
+                try {
+                  await glob('**/*', { cwd: process.argv[2], fs: io, signal: controller.signal })
+                } catch (error) {
+                  if (error.message !== 'test-abort') throw error
+                  refused = true
+                }
+                const atReject = reads
+                await new Promise(resolve => setTimeout(resolve, 50))
+                console.log(JSON.stringify({ refused, atReject, after: reads }))
+              })().catch(error => { console.error(error); process.exitCode = 1 })
+            `,
+            caller.resolve('glob'),
+            directory,
+          ],
+          { encoding: 'utf8', timeout: 5000 },
+        )
+        expect(JSON.parse(output)).toEqual({ refused: true, atReject: 1, after: 1 })
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('bounds globstar parent traversal patterns in the installed minimatch', () => {
+    for (const dir of packageCopies('@wdio/config', '9.31.9')) {
+      const glob = createRequire(createRequire(join(dir, 'package.json')).resolve('glob'))
+      const result = execFileSync(
+        process.execPath,
+        [
+          '-e',
+          `
+            const { Minimatch } = require(process.argv[1])
+            for (const suffix of ['target', '{one,two}']) {
+              const parsed = new Minimatch('**/../'.repeat(28) + suffix, { optimizationLevel: 2 })
+              if (parsed.set.length > 64) throw new Error('unbounded pattern expansion')
+            }
+            console.log('bounded')
+          `,
+          glob.resolve('minimatch'),
+        ],
+        { encoding: 'utf8', timeout: 5000 },
+      )
+      expect(result.trim()).toBe('bounded')
     }
   })
 

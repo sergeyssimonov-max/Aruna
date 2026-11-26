@@ -7,26 +7,10 @@ overrides:
   '@puppeteer/browsers': '3.2.1'
   deepmerge-ts: '8.0.2'
   serialize-javascript: '7.1.4'
-
-# GHSA-3g3m-2fjr-6pw4 (glob 10.5.0) and GHSA-g3hv-75wg-m249 (minimatch
-# 9.0.9): temporary window-test exceptions, reviewed 2026-11-18,
-# expiring 2026-11-30T00:00Z.
-# These versions are NOT patched. @wdio/config uses synchronous glob without
-# an AbortSignal, on the fixed specs in wdio.conf.ts. archiver-utils also uses
-# synchronous glob; webdriverio's uploadFile uses append, and our tests do not
-# call it. Only repository-controlled test patterns reach glob at level 2. Neither
-# package ships in the window or the exported inventory, and corpus/user input
-# does not enter these Node tools. The lint consumers resolve fixed minimatch 11.
-# The stable Tauri service requires WDIO 9, whose config still uses glob 10.
-# Forcing minimatch 11 under glob 10 prevents discovery of e2e/smoke.e2e.ts.
-# Guards in tests/audit-exception.test.ts hold the expiry, exact affected
-# versions and parents, development-only roots, call sites and shipped bundles.
-# Remove or reassess on any drift, or when supported fixes become available.
-# Evidence and follow-up: ../docs/DEPENDENCY-REVIEW-3.1.0.md.
-audit:
-  ignore:
-    - GHSA-3g3m-2fjr-6pw4
-    - GHSA-g3hv-75wg-m249
+  # Both callers use glob's retained synchronous API. See the compatibility
+  # and security regression checks in tests/audit-exception.test.ts.
+  '@wdio/config@9.31.9>glob': '14.0.6'
+  'archiver-utils@5.0.2>glob': '14.0.6'
 
 patchedDependencies:
   picomatch@2.3.2: patches/picomatch@2.3.2.patch
