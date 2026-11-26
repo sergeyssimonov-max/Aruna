@@ -172,7 +172,7 @@ fn the_same_run_without_a_press_builds_the_whole_package() {
         return;
     };
     // Тот же приемник, но стадии, которой он ждет, в сборке не бывает.
-    let (outcome, presses, left, _keep) = run_pressing_at(zip, "НетТакойСтадии");
+    let (outcome, presses, left, keep) = run_pressing_at(zip, "НетТакойСтадии");
     let report = outcome.expect("без нажатия сборка обязана дойти до конца");
 
     assert_eq!(presses, 0, "никто не нажимал");
@@ -180,8 +180,14 @@ fn the_same_run_without_a_press_builds_the_whole_package() {
     assert_eq!(report.groups, 663);
     assert_eq!(
         left,
-        vec!["TLHdig".to_string()],
+        vec![aruna::export::LEGACY_PACKAGE.to_string()],
         "пакет не встал под окончательным именем"
+    );
+    let package = keep.path().join(aruna::export::LEGACY_PACKAGE);
+    assert_eq!(std::path::Path::new(&report.package), package);
+    assert_eq!(
+        std::path::Path::new(&report.inventory),
+        package.join(format!("{}.html", aruna::export::LEGACY_PACKAGE))
     );
 }
 
@@ -229,11 +235,22 @@ fn the_window_builds(
         progress,
     )
     .expect("окно собирает пакет");
-    let package = into.join(aruna::export::PACKAGE);
+    let package = std::path::Path::new(&report.package);
+    assert_eq!(package.parent(), Some(into));
+    let name = package
+        .file_name()
+        .expect("имя пакета")
+        .to_str()
+        .expect("UTF-8");
+    assert!(aruna::editions::is_package_name(name), "имя пакета: {name}");
+    assert_eq!(
+        std::path::Path::new(&report.inventory),
+        package.join(format!("{name}.html"))
+    );
     let manifest =
         std::fs::read_to_string(package.join(aruna::export::MANIFEST)).expect("манифест");
     let inventory = std::fs::read_to_string(&report.inventory).expect("опись");
-    assert_eq!(pdfs_under(&package).len(), report.pdfs.built as usize);
+    assert_eq!(pdfs_under(package).len(), report.pdfs.built as usize);
     assert!(manifest.contains("\"pdf"), "манифест не называет PDF");
     assert!(inventory.contains(".pdf"), "опись не ссылается на PDF");
     report
@@ -485,6 +502,12 @@ fn the_window_builds_the_corpus_with_pdfs() {
     let watch = PdfStopwatch::default();
     let report = the_window_builds(zip, into.as_deref().unwrap_or(temporary.path()), &watch);
     assert_eq!((report.documents, report.groups), (23936, 663));
+    assert_eq!(
+        std::path::Path::new(&report.package),
+        into.as_deref()
+            .unwrap_or(temporary.path())
+            .join(aruna::export::LEGACY_PACKAGE)
+    );
     let pdfs = report.pdfs;
     assert_eq!(pdfs.built + pdfs.refused, 23936);
     let (Some(start), Some(end)) = *watch.0.lock().expect("не отравлен") else {
