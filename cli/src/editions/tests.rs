@@ -2,6 +2,8 @@ use super::*;
 use crate::job::Job;
 use serde_json::json;
 
+mod standalone;
+
 fn future(bytes: &[u8]) -> Edition {
     let mut v: Value = serde_json::from_str(BETA04).unwrap();
     // The order is the publisher's version index, not the record id or a Beta suffix.
