@@ -547,8 +547,7 @@ fn walk(root: &Path, dir: &Path, depth: u32, found: &mut Found<'_>, errors: &mut
         // written it. The export never creates a link, so anything the walk
         // meets is either a leftover or someone else's doing; either way it is
         // not a directory this validator descends into. `check_destination`
-        // above already reads the root this way — the walk had been left
-        // behind.
+        // also checks the type of the entry itself before allowing replacement.
         //
         // The type comes from the directory entry, not from a second `lstat`:
         // `DirEntry::file_type` does not follow a link either, and on macOS it
@@ -597,6 +596,12 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
             reason,
         })
     };
+    let foreign = |name: &str| {
+        refuse(format!(
+            text!(DestinationForeignFile),
+            format_args!("{name:?}")
+        ))
+    };
 
     // `symlink_metadata`, not `exists`: `exists` follows links, so it answers
     // about the target and says "nothing there" for a link that dangles. Either
@@ -613,8 +618,10 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
     }
 
     let inventory = crate::editions::inventory_name(root);
-    if !root.join(&inventory).is_file() {
-        return refuse(format!(text!(DestinationMissingInventory), inventory));
+    match super::target_metadata(&root.join(&inventory))? {
+        Some(meta) if meta.is_file() => {}
+        Some(meta) if meta.file_type().is_symlink() => return foreign(&inventory),
+        _ => return refuse(format!(text!(DestinationMissingInventory), inventory)),
     }
     // The name the writer gives the group of documents the corpus files under
     // no CTH number: `dir_component` of the missing-value dash. Taken from the
@@ -625,19 +632,19 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
     let ungrouped = dir_component(crate::parse::MISSING);
 
     let entries = fs::read_dir(root).map_err(ArunaError::io(root))?;
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry = entry.map_err(ArunaError::io(root))?;
         let name = entry.file_name().to_string_lossy().to_string();
-        // Wider than the walk's rule on purpose: a group folder is ours, and a
-        // `.DS_Store` is the Finder's business rather than a reason to refuse
-        // to replace our own package.
-        let ours = super::is_root_file(&name, &inventory)
-            || (entry.path().is_dir() && (name.starts_with("CTH") || name == ungrouped))
-            || name == ".DS_Store";
+        // A name only identifies a package entry if its type also matches.
+        // Finder metadata is allowed as a regular file.
+        let kind = entry
+            .file_type()
+            .map_err(|err| ArunaError::io(entry.path())(err))?;
+        let ours = (kind.is_file()
+            && (super::is_root_file(&name, &inventory) || name == ".DS_Store"))
+            || (kind.is_dir() && (name.starts_with("CTH") || name == ungrouped));
         if !ours {
-            return refuse(format!(
-                text!(DestinationForeignFile),
-                format_args!("{name:?}")
-            ));
+            return foreign(&name);
         }
     }
     Ok(())
@@ -1634,7 +1641,47 @@ mod tests {
         let ours = dir.path().join("ours").join(PACKAGE);
         fs::create_dir_all(ours.join("CTH 1")).expect("mkdir");
         fs::write(ours.join(format!("{PACKAGE}.html")), b"<html>").expect("write");
+        fs::write(ours.join(".DS_Store"), b"Finder metadata").expect("write");
         check_destination(&ours).expect("our own build may be replaced");
+    }
+
+    #[test]
+    fn symbolic_links_with_package_names_are_foreign_at_the_destination() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path().join(PACKAGE);
+        fs::create_dir(&root).expect("package");
+        let inventory = crate::editions::inventory_name(&root);
+        fs::write(root.join(&inventory), b"<html>").expect("inventory");
+
+        let folder = dir.path().join("directory");
+        fs::create_dir(&folder).expect("directory");
+        let file = dir.path().join("file");
+        fs::write(&file, b"reader's file").expect("file");
+        let missing = dir.path().join("missing");
+        let ungrouped = dir_component(crate::parse::MISSING);
+
+        for (name, target) in [
+            ("CTH 1", &folder),
+            (ungrouped.as_str(), &folder),
+            (MANIFEST, &file),
+            (".DS_Store", &file),
+            (inventory.as_str(), &missing),
+        ] {
+            let link = root.join(name);
+            if name == inventory {
+                fs::remove_file(&link).expect("remove the regular test inventory");
+            }
+            std::os::unix::fs::symlink(target, &link).expect("test link");
+            let err = check_destination(&root).expect_err("a link belongs to the reader");
+            let ArunaError::ExportDestination { path, reason } = err else {
+                panic!("wrong error: {err}");
+            };
+            assert_eq!(path, root);
+            assert!(reason.contains(&format!("{name:?}")), "{reason}");
+            assert_eq!(fs::read_link(&link).expect("link preserved"), *target);
+            fs::remove_file(link).expect("remove the test link");
+        }
+        assert_eq!(fs::read(file).expect("file preserved"), b"reader's file");
     }
 
     #[test]
