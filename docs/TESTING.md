@@ -227,6 +227,13 @@ shasum -a 256 fixtures/TLHbasisONLINE25_1_ZENODO_Beta_03.zip
 
 Use `ARUNA_ZIP=/path/to.zip` to point at an archive elsewhere.
 
+The **Full corpus parse** CI job verifies the pinned SHA-256 of the Beta 0.4
+ZIP before running the `aruna::run` standalone inventory regression. The
+verification runs again on a cache hit. A mismatch fails the job at the
+checksum step and skips the regression.
+[Successful cache-hit run](https://github.com/sergeyssimonov-max/Aruna/actions/runs/45902907236/attempts/2) ·
+[Isolated checksum-mismatch run](https://github.com/sergeyssimonov-max/Aruna/actions/runs/45939242482).
+
 ### Stress — about 20 s
 
 Documents built to break the reader rather than to be read: 50 000 levels of
