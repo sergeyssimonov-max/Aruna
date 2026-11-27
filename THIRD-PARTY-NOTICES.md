@@ -556,7 +556,7 @@ Packages: 1433 – crates 751, npm 682. Distinct licence texts: 690. Requires re
 | syntect | 5.3.0 | crate | MIT | T574 |
 | system-deps | 6.2.2 | crate | MIT OR Apache-2.0 | T1, T2 |
 | system-deps | 7.0.8 | crate | MIT OR Apache-2.0 | T1, T2 |
-| tao | 0.37.2 | crate | Apache-2.0 | T142, T208 |
+| tao | 0.37.3 | crate | Apache-2.0 | T142, T208 |
 | tao-macros | 0.1.4 | crate | MIT OR Apache-2.0 | T1, T583, T475 |
 | target-lexicon | 0.12.16 | crate | Apache-2.0 WITH LLVM-exception | T37 |
 | target-lexicon | 0.13.5 | crate | Apache-2.0 WITH LLVM-exception | T37 |
@@ -10334,7 +10334,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### T142
 
-SHA-256 `6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a`. Used by: dpi 0.1.2 (LICENSE), tao 0.37.2 (LICENSE).
+SHA-256 `6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a`. Used by: dpi 0.1.2 (LICENSE), tao 0.37.3 (LICENSE).
 
 ```text
 Apache License
@@ -13660,7 +13660,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### T208
 
-SHA-256 `02b6448337b757772d90e5f31caaa0f9e6afaad2221c01771d0a3deaa4d4196c`. Used by: tao 0.37.2 (LICENSE.spdx).
+SHA-256 `02b6448337b757772d90e5f31caaa0f9e6afaad2221c01771d0a3deaa4d4196c`. Used by: tao 0.37.3 (LICENSE.spdx).
 
 ```text
 SPDXVersion: SPDX-2.1
