@@ -645,8 +645,11 @@ directory at the moment of the build and hands the core
 choice: the fonts are `resource_dir/fonts`. With no resource directory the
 fonts are `None` and the core refuses `font_missing` before any work, so the
 window never looks for fonts anywhere else. The fonts are checked once, by the
-core, in `app::load_fonts`: the check the shell makes at start-up is a line for
-the log and the build does not read it. `font_missing` and `font_altered` get
+core, in `app::load_fonts`. The shell checks the installed resources at
+startup and logs the exact cause. The first screen shows a reinstall notice
+if that check failed, while the existing inventory remains available.
+The build checks the current files and returns its own error. `font_missing`
+and `font_altered` get
 their own sentence and the usual actions of a refusal, like any other code.
 
 The number the window compares refused PDFs with, `objected_to`, does not

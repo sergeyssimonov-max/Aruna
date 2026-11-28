@@ -26,6 +26,7 @@ type Screen =
 export class WindowState {
   screen: Screen = $state({ kind: 'reading' })
   destination: string | null = $state(null)
+  startupFontCheckFailed = $state(false)
   trouble: string | null = $state(null)
   edition: string | null = $state(null)
   stopping = $state(false)

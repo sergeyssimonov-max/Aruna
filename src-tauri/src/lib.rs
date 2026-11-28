@@ -45,27 +45,17 @@ fn wdio_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
 /// им нельзя.
 pub(crate) const FONT_RESOURCES: &str = "fonts";
 
-/// Итог проверки шрифтов при запуске: каталог, который прошел сверку, либо
-/// причина отказа.
-///
-/// Хранится, а не печатается и забывается – с расчетом на то, что контур PDF
-/// откажет со ссылкой на эту причину, а не будет искать шрифт заново. Контур
-/// пришел 30.09.2026 и этого итога не читает: запрос окна (`window_request`)
-/// берет каталог ресурсов у Tauri в момент сборки, и файлы проверяет ядро,
-/// при сборке. Сборке на этот итог не переходить –
-/// решение владельца 18.10.2026, 4.3: проверка одна. Метод чтения, которого
-/// никто не звал, снят 01.10.2026. Итог остается записью для журнала.
+/// Признак отказа при запуске для первого экрана. Сборка проверяет файлы заново.
 #[derive(Default)]
-pub(crate) struct FontResources(
-    std::sync::Mutex<Option<std::result::Result<std::path::PathBuf, String>>>,
-);
+pub(crate) struct FontResources(std::sync::atomic::AtomicBool);
 
 impl FontResources {
-    /// Записать итог. Один раз, при запуске.
-    fn set(&self, outcome: std::result::Result<std::path::PathBuf, String>) {
-        if let Ok(mut slot) = self.0.lock() {
-            *slot = Some(outcome);
-        }
+    fn set_failed(&self, failed: bool) {
+        self.0.store(failed, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub(crate) fn failed(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
@@ -131,11 +121,11 @@ pub fn run() {
                 )?;
             }
 
-            // Шрифты проверяются здесь при запуске – для журнала.
+            // Шрифты проверяются здесь при запуске – для окна и журнала.
             //
             // Путь сборки этот итог не читает: сборка берет каталог ресурсов у
             // Tauri заново, и файлы проверяет ядро (`app::load_fonts`, решение
-            // владельца 18.10.2026, 4.3). Отказ здесь окно не меняет: сборка
+            // владельца 18.10.2026, 4.3). Первый экран предупреждает об отказе, а сборка
             // откажет `font_missing` или `font_altered` сама.
             //
             // **Почему при запуске, а не при сборке.** Сборочная проверка
@@ -172,7 +162,9 @@ pub fn run() {
                     eprintln!("Aruna: {message}");
                 }
             }
-            app.handle().state::<FontResources>().set(outcome);
+            app.handle()
+                .state::<FontResources>()
+                .set_failed(outcome.is_err());
 
             #[cfg(feature = "e2e")]
             app.handle()
