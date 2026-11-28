@@ -245,7 +245,7 @@ pub(crate) fn build_selected(
             crate::export::Origin::Local,
         ),
         None => {
-            let (root, _) = crate::editions::library_paths(destination);
+            let (root, _) = crate::editions::library_paths(destination)?;
             let installed = crate::editions::installed(&root)?;
             let (archive, selected) = crate::editions::obtain(installed.as_ref(), job, selected)?;
             edition = selected;

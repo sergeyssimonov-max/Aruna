@@ -792,7 +792,7 @@ fn publish(
     validate::check_destination(&final_root)?;
 
     if let Some(candidate) = edition {
-        let (latest, _) = crate::editions::library_paths(destination);
+        let (latest, _) = crate::editions::library_paths(destination)?;
         if latest != final_root {
             if let Some(other) = crate::editions::installed(&latest)? {
                 candidate.follows(&other)?;

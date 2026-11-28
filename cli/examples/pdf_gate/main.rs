@@ -131,7 +131,11 @@ fn build(zip: &Path, fonts: &Path, destination: &Path) -> bool {
         }
     };
     let phase = clock.phase.lock().expect("unpoisoned").unwrap_or(0.0);
-    let (files, sum) = package_sum(&aruna::editions::library_paths(destination).0);
+    let (files, sum) = package_sum(
+        &aruna::editions::library_paths(destination)
+            .expect("read library paths")
+            .0,
+    );
     println!("phase_seconds {phase:.1}");
     println!("build_seconds {whole:.1}");
     println!("documents {}", built.documents);
