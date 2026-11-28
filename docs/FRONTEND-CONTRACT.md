@@ -635,6 +635,10 @@ refused }` from the core's `PackageReport::pdfs`, never `null`. The shell test
 `the_pdf_phase_reaches_the_window` builds a small archive and holds what the
 wire carries.
 
+A successful build returns `BuildReport.warnings` (empty on an ordinary run).
+The completion screen shows each warning beside the package path if saving
+the edition receipt or the last library folder failed. The inventory remains available.
+
 **The fonts.** `build_corpus` asks Tauri for the application's resource
 directory at the moment of the build and hands the core
 `window_request(resource_dir)`, its one argument being that directory, not a

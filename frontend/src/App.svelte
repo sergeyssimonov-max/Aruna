@@ -134,7 +134,10 @@
 </script>
 
 <main>
-  <div class="ready">
+  <div
+    class="ready"
+    class:with-warnings={screen.kind === 'built' && screen.report.warnings.length > 0}
+  >
     <h1>{heading}</h1>
 
     {#if screen.kind === 'reading'}
@@ -255,6 +258,9 @@
           </p>
         {/if}
         <p class="where">Папка библиотеки – {screen.report.package}</p>
+        {#each screen.report.warnings as warning (warning)}
+          <p class="where">{warning}</p>
+        {/each}
       {/if}
     {:else if screen.kind === 'building'}
       <p class="stage">{stage}</p>
@@ -530,6 +536,11 @@
   Цвета и размеры взяты токенами и ступенями `app.css`, своих здесь нет.
 -->
 <style>
+  /* Leave room for the PDF explanation and write warnings above the controls. */
+  .ready.with-warnings {
+    gap: 12px;
+  }
+
   /* Строки одного сообщения – в своей колонке с промежутком: 28 пикселей
    * `.ready` отделяют сообщения друг от друга, а не строки внутри одного.
    *

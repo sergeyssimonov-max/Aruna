@@ -194,9 +194,13 @@ pub struct CorpusRequest {
     pub fonts: Option<PathBuf>,
 }
 
+const RECEIPT_WARNING: &str = "Не удалось сохранить сведения об издании. При следующей сборке без сети Aruna может не найти архив этого издания.";
+
 /// What building the corpus came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CorpusReport {
+    /// Advisory after publication if the cached edition could not be recorded.
+    pub receipt_warning: Option<&'static str>,
     pub job: JobId,
     /// The package, and what is in it.
     pub package: PackageReport,
@@ -261,16 +265,24 @@ pub(crate) fn build_selected(
     crate::cache::discard(&source);
 
     let package = package?;
-    if let (crate::export::Origin::Zenodo(edition), crate::cache::Archive::Cached(_), Some(dir)) =
-        (origin, &source, crate::cache::cache_dir())
+    let receipt_warning = if let (
+        crate::export::Origin::Zenodo(edition),
+        crate::cache::Archive::Cached(_),
+        Some(dir),
+    ) = (origin, &source, crate::cache::cache_dir())
     {
-        crate::editions::remember(&dir, edition);
-    }
+        crate::editions::remember(&dir, edition)
+            .err()
+            .map(|_| RECEIPT_WARNING)
+    } else {
+        None
+    };
     let inventory = package
         .root
         .join(crate::editions::inventory_name(&package.root));
 
     Ok(CorpusReport {
+        receipt_warning,
         job: job.id(),
         inventory,
         package,
