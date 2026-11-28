@@ -31,7 +31,7 @@ fn standalone_inventory_uses_the_cached_next_edition() {
                 bytes,
             )
             .unwrap();
-            remember(cache, &edition);
+            remember(cache, &edition).unwrap();
         },
     );
 }

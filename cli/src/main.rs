@@ -61,6 +61,9 @@ fn main() -> ExitCode {
                 report.package.documents,
                 report.package.groups
             ));
+            if let Some(warning) = report.receipt_warning {
+                complain(&format!("{warning}\n"));
+            }
             ExitCode::SUCCESS
         }
         Err(err) => {

@@ -121,7 +121,7 @@ fn an_old_cache_hit_cannot_hide_a_new_edition_and_offline_uses_only_verified_byt
     )
     .unwrap();
     assert_eq!(got.path(), archive);
-    remember(dir.path(), &chosen);
+    remember(dir.path(), &chosen).unwrap();
     for installed in [Some(&chosen), None] {
         let (got, e) = select(
             installed,
@@ -436,6 +436,15 @@ fn historical_paths_are_readable_and_a_working_current_inventory_takes_precedenc
 }
 
 #[test]
+fn a_blocked_receipt_directory_reports_the_write_failure() {
+    let dir = tempfile::tempdir().unwrap();
+    let blocked = dir.path().join(RECEIPTS);
+    fs::write(&blocked, b"keep").unwrap();
+    assert!(remember(dir.path(), &future(b"archive")).is_err());
+    assert_eq!(fs::read(blocked).unwrap(), b"keep");
+}
+
+#[test]
 fn unusable_latest_metadata_uses_only_a_verified_cached_edition() {
     let dir = tempfile::tempdir().unwrap();
     let bytes = b"verified archive";
@@ -443,7 +452,7 @@ fn unusable_latest_metadata_uses_only_a_verified_cached_edition() {
     let archive = dir
         .path()
         .join(crate::cache::archive_name(&edition.url(), &edition.md5));
-    remember(dir.path(), &edition);
+    remember(dir.path(), &edition).unwrap();
     let mut not_latest: Value = serde_json::from_str(BETA04).unwrap();
     not_latest["metadata"]["relations"]["version"][0]["is_last"] = json!(false);
     for body in [

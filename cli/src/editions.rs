@@ -428,16 +428,18 @@ const MAX_RECEIPT: u64 = 128 * 1024;
 
 /// One receipt per successfully published edition. Separate immutable names
 /// avoid an older concurrent build replacing a newer cache pointer.
-pub(crate) fn remember(dir: &Path, edition: &Edition) {
+pub(crate) fn remember(dir: &Path, edition: &Edition) -> Result<()> {
     let folder = dir.join(RECEIPTS);
-    if fs::create_dir(&folder).is_err() && !fs::symlink_metadata(&folder).is_ok_and(|m| m.is_dir())
-    {
-        return;
+    match fs::create_dir(&folder) {
+        Ok(()) => {}
+        Err(e)
+            if e.kind() == std::io::ErrorKind::AlreadyExists
+                && fs::symlink_metadata(&folder).is_ok_and(|m| m.is_dir()) => {}
+        Err(e) => return Err(ArunaError::io(&folder)(e)),
     }
-    if let Ok(bytes) = serde_json::to_vec(edition) {
-        let path = folder.join(format!("{}.json", edition.record));
-        let _ = crate::paths::write_atomic(&path, &bytes);
-    }
+    let path = folder.join(format!("{}.json", edition.record));
+    let bytes = serde_json::to_vec(edition).map_err(|e| ArunaError::io(&path)(e.into()))?;
+    crate::paths::write_atomic(&path, &bytes)
 }
 
 fn offline_editions(cache: Option<&Path>) -> Vec<Edition> {
