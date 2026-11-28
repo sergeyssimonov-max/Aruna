@@ -70,6 +70,7 @@ pub(super) fn counted<T: TryInto<u32>>(value: T) -> u32 {
 /// и есть работа этого окна.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub(crate) struct BuildReport {
+    pub warnings: Vec<String>,
     /// Идентификатор прогона. Им же помечены события прогресса, так что окно
     /// может отличить отчет своей сборки от чужой.
     pub job: u32,

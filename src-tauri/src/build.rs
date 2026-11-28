@@ -168,6 +168,24 @@ pub(super) fn chosen_destination(
 
 // Remember only the parent of a successfully published library. A disconnected
 // external volume must never be created or populated automatically.
+fn remember_location(report: &mut BuildReport, config: Option<&std::path::Path>) {
+    let parent = std::path::Path::new(&report.package).parent();
+    if !config
+        .zip(parent)
+        .is_some_and(|(dir, parent)| save_library(dir, parent).is_ok())
+    {
+        report.warnings.push("Не удалось запомнить папку библиотеки. При следующем запуске может понадобиться выбрать ее снова.".into());
+    }
+}
+
+fn save_library(config: &std::path::Path, parent: &std::path::Path) -> aruna::error::Result<()> {
+    let file = config.join("last-library.json");
+    let bytes =
+        serde_json::to_vec(parent).map_err(|e| aruna::error::ArunaError::io(&file)(e.into()))?;
+    aruna::paths::ensure_output_parent(&file)?;
+    aruna::paths::write_atomic(&file, &bytes)
+}
+
 pub(super) fn last_library(config: &std::path::Path) -> Option<std::path::PathBuf> {
     let file = config.join("last-library.json");
     let metadata = std::fs::symlink_metadata(&file).ok()?;
@@ -208,22 +226,13 @@ pub(super) async fn start(
             job: counted(id.get()),
             built: std::sync::Mutex::new(None),
         };
-        let report = if let Some(update) = update {
+        let mut report = if let Some(update) = update {
             let job = aruna::job::Job::with_id(id, &sink, &flag);
             build_report(update.build(&request, &job))
         } else {
             build_once(id, &request, chosen.as_deref(), &flag, &sink)
         }?;
-        if let (Ok(dir), Some(parent)) = (
-            handle.path().app_config_dir(),
-            std::path::Path::new(&report.package).parent(),
-        ) {
-            if let Ok(bytes) = serde_json::to_vec(parent) {
-                let file = dir.join("last-library.json");
-                let _ = aruna::paths::ensure_output_parent(&file)
-                    .and_then(|()| aruna::paths::write_atomic(&file, &bytes));
-            }
-        }
+        remember_location(&mut report, handle.path().app_config_dir().ok().as_deref());
         Ok(report)
     })
     .await
@@ -281,6 +290,11 @@ fn build_report(
 ) -> Result<BuildReport, BuildFailure> {
     result
         .map(|report| BuildReport {
+            warnings: report
+                .receipt_warning
+                .into_iter()
+                .map(String::from)
+                .collect(),
             job: counted(report.job.get()),
             package: report.package.root.display().to_string(),
             inventory: report.inventory.display().to_string(),
@@ -299,6 +313,17 @@ fn build_report(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn location_write_failure_preserves_the_previous_setting() {
+        let tmp = tempfile::tempdir().unwrap();
+        let blocked = tmp.path().join("config");
+        std::fs::write(&blocked, b"keep").unwrap();
+        assert!(save_library(&blocked, tmp.path()).is_err());
+        assert_eq!(std::fs::read(blocked).unwrap(), b"keep");
+        save_library(tmp.path(), tmp.path()).unwrap();
+        assert_eq!(last_library(tmp.path()).as_deref(), Some(tmp.path()));
+    }
 
     /// **Отравленный мьютекс места не держит.**
     ///

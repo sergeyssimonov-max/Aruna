@@ -135,6 +135,7 @@ function report(over: Partial<BuildReport> = {}): BuildReport {
     groups: 663,
     disambiguated: 0,
     stylesheet_dropped: 0,
+    warnings: [],
     pdfs: { built: 23936, refused: 0 },
     ...over,
   }
@@ -986,6 +987,13 @@ describe('кончилось', () => {
     expect(screen.queryByText(/Рукописей/)).toBeNull()
     // Оболочка читает разбивку этого пакета, но главные итоги дает сам прогон.
     expect(corpusStats).toHaveBeenLastCalledWith(PACKAGE)
+  })
+
+  it('показывает предупреждения успешной сборки и позволяет открыть опись', async () => {
+    const warnings = ['Не удалось сохранить сведения об издании.', 'Не удалось запомнить папку.']
+    await ran(ok(report({ warnings })))
+    for (const warning of warnings) expect(await screen.findByText(warning)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Открыть опись' })).toBeEnabled()
   })
 
   /**
