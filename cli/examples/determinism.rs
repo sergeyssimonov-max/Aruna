@@ -45,7 +45,11 @@ fn main() {
             built.groups,
             start.elapsed().as_secs_f64()
         );
-        digests.push(walk(&aruna::editions::library_paths(dest).0));
+        digests.push(walk(
+            &aruna::editions::library_paths(dest)
+                .expect("read library paths")
+                .0,
+        ));
     }
 
     let (first, second) = (&digests[0], &digests[1]);

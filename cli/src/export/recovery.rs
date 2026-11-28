@@ -30,7 +30,7 @@ pub fn reader_paths(parent: &Path) -> Result<(PathBuf, PathBuf)> {
 fn reader_paths_with(parent: &Path, job: &Job<'_>) -> Result<(PathBuf, PathBuf)> {
     let entries = match fs::read_dir(parent) {
         Ok(entries) => entries,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(library_paths(parent)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return library_paths(parent),
         Err(e) => return Err(ArunaError::io(parent)(e)),
     };
     let lock = super::lock::lock_path(parent);
@@ -75,10 +75,10 @@ fn reader_paths_with(parent: &Path, job: &Job<'_>) -> Result<(PathBuf, PathBuf)>
                     )
                 })?;
             }
-            return Ok(library_paths(parent));
+            return library_paths(parent);
         }
     }
-    Ok(library_paths(parent))
+    library_paths(parent)
 }
 
 fn backups(parent: &Path) -> Result<BTreeMap<String, Vec<PathBuf>>> {

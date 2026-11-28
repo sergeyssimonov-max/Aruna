@@ -320,9 +320,36 @@ pub(crate) fn known_digest(hash: &str) -> Option<Edition> {
         .find(|e| e.md5 == hash)
 }
 
-fn latest() -> Result<Edition> {
-    let body = crate::download::fetch_text(LATEST, std::time::Duration::from_secs(10))?;
-    current_record(&body)
+fn latest(job: &Job<'_>) -> Result<Edition> {
+    latest_with(job, || {
+        crate::download::fetch_text(LATEST, std::time::Duration::from_secs(10))
+    })
+}
+
+// Only failures of the metadata question permit retry/offline selection.
+// A successfully parsed conflicting or older edition remains a hard refusal.
+fn metadata_unavailable(error: &ArunaError) -> bool {
+    matches!(
+        error,
+        ArunaError::Network { .. }
+            | ArunaError::Http { .. }
+            | ArunaError::Oversized { .. }
+            | ArunaError::Edition(EditionIssue::Record)
+    )
+}
+
+fn latest_with(job: &Job<'_>, mut fetch: impl FnMut() -> Result<String>) -> Result<Edition> {
+    job.check(Phase::Obtaining)?;
+    let first = fetch().and_then(|body| current_record(&body));
+    job.check(Phase::Obtaining)?;
+    match first {
+        Err(ref error) if metadata_unavailable(error) => {
+            let second = fetch().and_then(|body| current_record(&body));
+            job.check(Phase::Obtaining)?;
+            second
+        }
+        other => other,
+    }
 }
 
 fn current_record(body: &str) -> Result<Edition> {
@@ -457,7 +484,7 @@ pub(crate) fn obtain(
     select(
         old,
         job,
-        || selected.map_or_else(latest, |e| Ok(e.clone())),
+        || selected.map_or_else(|| latest(job), |e| Ok(e.clone())),
         crate::cache::cache_dir().as_deref(),
         |e, job| crate::cached_download(&e.url(), &e.md5, job, None),
     )
@@ -486,7 +513,7 @@ fn select(
             let a = download(&e, job)?;
             Ok((a, e))
         }
-        Err(ArunaError::Network { .. } | ArunaError::Http { .. }) => {
+        Err(e) if metadata_unavailable(&e) => {
             let editions = match old {
                 Some(e) => vec![e.clone()],
                 None => offline_editions(cache),
@@ -577,7 +604,7 @@ pub(crate) fn inventory_name(root: &Path) -> String {
 }
 
 /// Prefer the latest verified edition; older layouts remain readable in place.
-pub fn library_paths(parent: &Path) -> (PathBuf, PathBuf) {
+pub fn library_paths(parent: &Path) -> Result<(PathBuf, PathBuf)> {
     let current = parent.join(crate::export::PACKAGE);
     let legacy = parent.join(crate::export::LEGACY_PACKAGE);
     let fallback = if !current.join(crate::paths::OUTPUT_FILE_NAME).is_file()
@@ -588,9 +615,15 @@ pub fn library_paths(parent: &Path) -> (PathBuf, PathBuf) {
         current
     };
     let mut best = fallback;
-    let mut rank = None;
-    if let Ok(entries) = fs::read_dir(parent) {
-        for entry in entries.flatten() {
+    let mut rank = installed(&best)?.map_or((0, 0, 0), |old| (old.index, 0, old.record));
+    let entries = match fs::read_dir(parent) {
+        Ok(entries) => Some(entries),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(ArunaError::io(parent)(e)),
+    };
+    if let Some(entries) = entries {
+        for entry in entries {
+            let entry = entry.map_err(ArunaError::io(parent))?;
             let name = entry.file_name();
             let Some(name) = name.to_str() else { continue };
             if matches!(name, crate::export::PACKAGE | crate::export::LEGACY_PACKAGE)
@@ -603,27 +636,21 @@ pub fn library_paths(parent: &Path) -> (PathBuf, PathBuf) {
             if !fs::symlink_metadata(path.join(inventory_name(&path))).is_ok_and(|m| m.is_file()) {
                 continue;
             }
-            if let Ok(Some(e)) = installed(&path) {
+            if let Some(e) = installed(&path)? {
                 // Prefer the current spelling over an earlier index-based name for the same edition.
                 let Some(spelling) = e.folder_rank(name) else {
                     continue;
                 };
                 let key = (e.index, spelling, e.record);
-                let best_key = rank.get_or_insert_with(|| {
-                    installed(&best)
-                        .ok()
-                        .flatten()
-                        .map_or((0, 0, 0), |old| (old.index, 0, old.record))
-                });
-                if key > *best_key {
-                    *best_key = key;
+                if key > rank {
+                    rank = key;
                     best = path;
                 }
             }
         }
     }
     let inventory = best.join(inventory_name(&best));
-    (best, inventory)
+    Ok((best, inventory))
 }
 
 /// Only the core can create an update: its verified record and destination stay together
@@ -639,7 +666,7 @@ pub fn check_update(root: &Path) -> Result<Option<Update>> {
     let Some(old) = installed(root)? else {
         return Ok(None);
     };
-    let new = latest()?;
+    let new = latest(&Job::unattended())?;
     new.follows(&old)?;
     Ok((new.index > old.index).then(|| Update {
         root: root.to_owned(),
@@ -655,7 +682,7 @@ impl Update {
         job: &Job<'_>,
     ) -> Result<crate::app::CorpusReport> {
         let destination = self.root.parent().ok_or(EditionIssue::Installed)?;
-        if library_paths(destination).0 != self.root
+        if library_paths(destination)?.0 != self.root
             || installed(&self.root)?.as_ref() != Some(&self.previous)
         {
             return Err(EditionIssue::Conflict.into());

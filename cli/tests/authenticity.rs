@@ -323,7 +323,7 @@ fn build(dir: &Path, archive: &Path) -> (export::Built, PathBuf) {
         &aruna::job::Job::unattended(),
     )
     .expect("the package builds");
-    (built, aruna::editions::library_paths(dir).0)
+    (built, aruna::editions::library_paths(dir).unwrap().0)
 }
 
 /// **Every admitted document is in the package once, and unchanged.**

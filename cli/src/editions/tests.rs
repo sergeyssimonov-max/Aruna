@@ -211,7 +211,7 @@ fn after_an_update_the_manifest_inventory_and_pdf_agree_and_failed_updates_leave
         dir.path().join("TLHdig_Edition_3_Zenodo_19000000")
     );
     assert_eq!((report.documents, report.pdfs.built), (1, 1));
-    let (root, inventory) = library_paths(dir.path());
+    let (root, inventory) = library_paths(dir.path()).unwrap();
     assert_eq!(root, published);
     assert_eq!(installed(&root).unwrap(), Some(e.clone()));
     let html = fs::read_to_string(&inventory).unwrap();
@@ -269,7 +269,7 @@ fn after_an_update_the_manifest_inventory_and_pdf_agree_and_failed_updates_leave
         fs::read(next_root.join(old_pdf.with_extension("xml"))).unwrap(),
         crate::export::normalize_document(revised.as_bytes())
     );
-    assert_eq!(library_paths(dir.path()).0, next_root);
+    assert_eq!(library_paths(dir.path()).unwrap().0, next_root);
     let manifest: Value =
         serde_json::from_slice(&fs::read(next_root.join("manifest.json")).unwrap()).unwrap();
     assert_eq!(manifest["package"], next.package_name());
@@ -297,7 +297,7 @@ fn after_an_update_the_manifest_inventory_and_pdf_agree_and_failed_updates_leave
     final_edition.index = next.index + 1;
     let (corrected, corrected_root) = build(&final_edition).unwrap();
     assert_ne!(corrected_root, next_root);
-    assert_eq!(library_paths(dir.path()).0, corrected_root);
+    assert_eq!(library_paths(dir.path()).unwrap().0, corrected_root);
     assert_eq!(
         (
             corrected.documents,
@@ -403,7 +403,7 @@ fn a_versioned_copy_takes_precedence_over_the_same_edition_in_the_neutral_folder
             json!({"source":{"archive_md5": edition.md5, "zenodo":edition}}).to_string(),
         )
         .unwrap();
-        assert_eq!(library_paths(dir.path()).0, root);
+        assert_eq!(library_paths(dir.path()).unwrap().0, root);
     }
     assert!(dir.path().join("TLHdig/TLHdig.html").is_file());
 }
@@ -422,12 +422,236 @@ fn historical_paths_are_readable_and_a_working_current_inventory_takes_precedenc
         json!({"source":{"archive_md5":crate::download::ZENODO_ZIP_MD5}}).to_string(),
     )
     .unwrap();
-    assert_eq!(library_paths(dir.path()), (old.clone(), inv.clone()));
+    assert_eq!(
+        library_paths(dir.path()).unwrap(),
+        (old.clone(), inv.clone())
+    );
     assert_eq!(installed(&old).unwrap().unwrap().record, 20328284);
     let current = dir.path().join(crate::export::PACKAGE);
     fs::create_dir(&current).unwrap();
-    assert_eq!(library_paths(dir.path()).0, old);
+    assert_eq!(library_paths(dir.path()).unwrap().0, old);
     fs::write(current.join(crate::paths::OUTPUT_FILE_NAME), b"new").unwrap();
-    assert_eq!(library_paths(dir.path()).0, current);
+    assert_eq!(library_paths(dir.path()).unwrap().0, current);
     assert_eq!(fs::read(inv).unwrap(), b"original");
+}
+
+#[test]
+fn unusable_latest_metadata_uses_only_a_verified_cached_edition() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = b"verified archive";
+    let edition = future(bytes);
+    let archive = dir
+        .path()
+        .join(crate::cache::archive_name(&edition.url(), &edition.md5));
+    remember(dir.path(), &edition);
+    let mut not_latest: Value = serde_json::from_str(BETA04).unwrap();
+    not_latest["metadata"]["relations"]["version"][0]["is_last"] = json!(false);
+    for body in [
+        "<html>portal</html>".to_string(),
+        "{\"id\":".into(),
+        not_latest.to_string(),
+    ] {
+        for old in [Some(&edition), None] {
+            fs::write(&archive, bytes).unwrap();
+            let (got, chosen) = select(
+                old,
+                &Job::unattended(),
+                || current_record(&body),
+                Some(dir.path()),
+                |_, _| panic!("must not download unverified metadata"),
+            )
+            .unwrap();
+            assert_eq!(chosen, edition);
+            assert_eq!(fs::read(got.path()).unwrap(), bytes);
+            fs::write(&archive, b"damaged").unwrap();
+            assert!(matches!(
+                select(
+                    old,
+                    &Job::unattended(),
+                    || current_record(&body),
+                    Some(dir.path()),
+                    |_, _| panic!()
+                ),
+                Err(ArunaError::Edition(EditionIssue::Offline))
+            ));
+        }
+    }
+    fs::write(&archive, bytes).unwrap();
+    let (got, chosen) = select(
+        Some(&edition),
+        &Job::unattended(),
+        || {
+            Err(ArunaError::Oversized {
+                url: LATEST.into(),
+                limit: 4,
+                got: 5,
+            })
+        },
+        Some(dir.path()),
+        |_, _| panic!(),
+    )
+    .unwrap();
+    assert_eq!(chosen, edition);
+    assert_eq!(fs::read(got.path()).unwrap(), bytes);
+}
+
+#[test]
+fn verified_cache_does_not_hide_conflicting_or_older_editions() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = b"verified archive";
+    let old = future(bytes);
+    fs::write(
+        dir.path()
+            .join(crate::cache::archive_name(&old.url(), &old.md5)),
+        bytes,
+    )
+    .unwrap();
+    for issue in [EditionIssue::Conflict, EditionIssue::Older] {
+        let result = select(
+            Some(&old),
+            &Job::unattended(),
+            || Err(issue.into()),
+            Some(dir.path()),
+            |_, _| panic!(),
+        );
+        assert!(matches!(result, Err(ArunaError::Edition(got)) if got == issue));
+    }
+}
+
+#[test]
+fn reader_reports_a_damaged_newer_manifest_instead_of_opening_an_older_edition() {
+    let dir = tempfile::tempdir().unwrap();
+    let old = reference().unwrap();
+    let new = future(b"new");
+    for e in [&old, &new] {
+        let root = dir.path().join(e.package_name());
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join(inventory_name(&root)), b"inventory").unwrap();
+        fs::write(
+            root.join(crate::export::MANIFEST),
+            json!({"source":{"archive_md5":e.md5,"zenodo":e}}).to_string(),
+        )
+        .unwrap();
+    }
+    assert_eq!(
+        crate::export::reader_paths(dir.path()).unwrap().0,
+        dir.path().join(new.package_name())
+    );
+    let bad = dir
+        .path()
+        .join(new.package_name())
+        .join(crate::export::MANIFEST);
+    fs::write(&bad, b"{broken").unwrap();
+    assert!(matches!(
+        crate::export::reader_paths(dir.path()),
+        Err(ArunaError::Edition(EditionIssue::Installed))
+    ));
+    assert_eq!(fs::read(bad).unwrap(), b"{broken");
+    assert_eq!(
+        fs::read(
+            dir.path()
+                .join(old.package_name())
+                .join(inventory_name(&dir.path().join(old.package_name())))
+        )
+        .unwrap(),
+        b"inventory"
+    );
+}
+
+#[test]
+fn latest_retries_metadata_failures_once_and_accepts_a_valid_second_answer() {
+    for first in [
+        Ok("<html>portal</html>".to_string()),
+        Ok("{\"id\":".into()),
+        Err(ArunaError::Network {
+            url: LATEST.into(),
+            source: std::io::Error::other("offline").into(),
+        }),
+        Err(ArunaError::Http {
+            url: LATEST.into(),
+            status: 503,
+            retry_after: None,
+        }),
+        Err(ArunaError::Oversized {
+            url: LATEST.into(),
+            limit: 4,
+            got: 5,
+        }),
+    ] {
+        let mut answers = [first, Ok(BETA04.to_string())].into_iter();
+        let mut calls = 0;
+        let chosen = latest_with(&Job::unattended(), || {
+            calls += 1;
+            answers.next().expect("at most one retry")
+        })
+        .unwrap();
+        assert_eq!(calls, 2);
+        assert_eq!(chosen, reference().unwrap());
+    }
+    let mut calls = 0;
+    let err = latest_with(&Job::unattended(), || {
+        calls += 1;
+        Ok("<html>still unavailable</html>".into())
+    });
+    assert_eq!(calls, 2);
+    assert!(matches!(
+        err,
+        Err(ArunaError::Edition(EditionIssue::Record))
+    ));
+}
+
+#[test]
+fn latest_does_not_retry_valid_conflicts_or_a_cancelled_request() {
+    let mut conflict: Value = serde_json::from_str(BETA04).unwrap();
+    conflict["files"][0]["checksum"] = json!(format!("md5:{}", "0".repeat(32)));
+    let mut older: Value = serde_json::from_str(BETA03).unwrap();
+    older["metadata"]["relations"]["version"][0]["is_last"] = json!(true);
+    for (body, expected) in [
+        (conflict.to_string(), EditionIssue::Conflict),
+        (older.to_string(), EditionIssue::Older),
+    ] {
+        let mut calls = 0;
+        let err = latest_with(&Job::unattended(), || {
+            calls += 1;
+            Ok(body.clone())
+        });
+        assert_eq!(calls, 1);
+        assert!(matches!(err, Err(ArunaError::Edition(issue)) if issue == expected));
+    }
+    let cancel = crate::job::Cancel::new();
+    let job = Job::new(&crate::progress::Silent, &cancel);
+    let mut calls = 0;
+    let err = latest_with(&job, || {
+        calls += 1;
+        cancel.cancel();
+        Ok("<html>portal</html>".into())
+    });
+    assert_eq!(calls, 1);
+    assert!(matches!(
+        err,
+        Err(ArunaError::Cancelled {
+            phase: Phase::Obtaining
+        })
+    ));
+}
+
+#[test]
+fn archive_download_failures_do_not_fall_back_to_an_older_cache() {
+    let dir = tempfile::tempdir().unwrap();
+    let old = reference().unwrap();
+    let next = future(b"new archive");
+    let result = select(
+        Some(&old),
+        &Job::unattended(),
+        || Ok(next),
+        Some(dir.path()),
+        |e, _| {
+            Err(ArunaError::Oversized {
+                url: e.url(),
+                limit: 1,
+                got: 2,
+            })
+        },
+    );
+    assert!(matches!(result, Err(ArunaError::Oversized { .. })));
 }
