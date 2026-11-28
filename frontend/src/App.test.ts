@@ -38,8 +38,10 @@ const {
   unlisten,
   open,
   openInventory,
+  startupFontCheckFailed,
 } = vi.hoisted(() => ({
   corpusLocation: vi.fn(),
+  startupFontCheckFailed: vi.fn(),
   corpusEdition: vi.fn(),
   corpusUpdate: vi.fn(),
   buildUpdate: vi.fn(),
@@ -55,6 +57,7 @@ const {
 
 vi.mock('./bindings', () => ({
   commands: {
+    startupFontCheckFailed,
     corpusEdition,
     corpusUpdate,
     buildUpdate,
@@ -277,6 +280,7 @@ async function primary(): Promise<HTMLElement> {
 }
 
 beforeEach(() => {
+  startupFontCheckFailed.mockResolvedValue(false)
   vi.clearAllMocks()
   corpusEdition.mockReset().mockResolvedValue(ok(null))
   corpusUpdate.mockReset().mockResolvedValue(ok(false))
@@ -291,6 +295,34 @@ beforeEach(() => {
 })
 
 afterEach(cleanup)
+
+describe('проверка шрифтов при запуске', () => {
+  it('показывает предупреждение до начала сборки', async () => {
+    startupFontCheckFailed.mockResolvedValue(true)
+    corpusLocation.mockResolvedValue(location(false))
+    render(App)
+
+    expect(await screen.findByText(/Не удалось проверить шрифты для PDF/)).toHaveTextContent(
+      'Переустановите Aruna из установочного образа.',
+    )
+    expect(buildCorpus).not.toHaveBeenCalled()
+  })
+
+  it('сохраняет доступ к готовой описи', async () => {
+    startupFontCheckFailed.mockResolvedValue(true)
+    await overPackage()
+    await fireEvent.click(screen.getByRole('button', { name: 'Открыть опись' }))
+
+    expect(openInventory).toHaveBeenCalledWith(INVENTORY)
+    expect(screen.getByText(/Не удалось проверить шрифты для PDF/)).toBeInTheDocument()
+  })
+
+  it('при исправных шрифтах не показывает предупреждение', async () => {
+    await overPackage()
+
+    expect(screen.queryByText(/Не удалось проверить шрифты для PDF/)).toBeNull()
+  })
+})
 
 describe('пакет есть', () => {
   /**

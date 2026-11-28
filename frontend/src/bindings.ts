@@ -5,6 +5,7 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
+	startupFontCheckFailed: () => __TAURI_INVOKE<boolean>("startup_font_check_failed"),
 	corpusLocation: () => typedError<CorpusLocation, string>(__TAURI_INVOKE("corpus_location")),
 	/**
 	 *  Числа о пакете, который лежит по этому пути.

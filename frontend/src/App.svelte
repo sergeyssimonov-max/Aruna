@@ -10,6 +10,13 @@
   onDestroy(subscribe())
   void load()
   const screen = $derived(state.screen)
+  const showFontWarning = $derived(
+    state.startupFontCheckFailed &&
+      (screen.kind === 'reading' ||
+        screen.kind === 'absent' ||
+        screen.kind === 'present' ||
+        screen.kind === 'unreadable'),
+  )
   const progress = $derived(screen.kind === 'building' ? screen.progress : null)
 
   const CORPUS = 'Thesaurus Linguarum Hethaeorum Digitalis'
@@ -136,9 +143,16 @@
 <main>
   <div
     class="ready"
-    class:with-warnings={screen.kind === 'built' && screen.report.warnings.length > 0}
+    class:with-warnings={showFontWarning ||
+      (screen.kind === 'built' && screen.report.warnings.length > 0)}
   >
     <h1>{heading}</h1>
+    {#if showFontWarning}
+      <p class="note" role="status">
+        Не удалось проверить шрифты для PDF. Переустановите Aruna из установочного образа. Уже
+        собранную библиотеку можно открыть.
+      </p>
+    {/if}
 
     {#if screen.kind === 'reading'}
       <p class="about">Читаю сведения о сохраненной описи…</p>

@@ -35,6 +35,14 @@ export function windowActions(state: WindowState) {
 
   async function load(): Promise<void> {
     const reading = ++revision
+    void commands
+      .startupFontCheckFailed()
+      .then((failed) => {
+        if (reading === revision) state.startupFontCheckFailed = failed
+      })
+      .catch(() => {
+        // Прерванный вызов ничего не говорит о самих шрифтах.
+      })
     try {
       const located = await commands.corpusLocation()
       if (located.status === 'error') {

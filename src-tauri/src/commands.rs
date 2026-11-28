@@ -18,6 +18,12 @@ pub(super) fn said(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 
+#[tauri::command]
+#[specta::specta]
+fn startup_font_check_failed(fonts: tauri::State<crate::FontResources>) -> bool {
+    fonts.failed()
+}
+
 #[tauri::command(async)]
 #[specta::specta]
 fn corpus_location(app: tauri::AppHandle) -> Result<CorpusLocation, String> {
@@ -300,6 +306,7 @@ fn cancel_build(state: tauri::State<'_, Building>) {
 pub(super) fn contract() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
+            startup_font_check_failed,
             corpus_location,
             corpus_stats,
             corpus_edition,
