@@ -185,6 +185,18 @@ CI jobs install them explicitly. Historical timings below retain the settings
 of their original runs. Never hide a failure by changing a timeout or adding
 automatic retries.
 
+### Core tests on macOS CI
+
+The `desktop` job also runs the ordinary core suite with
+`INSTA_UPDATE=no cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml`.
+It requires `xmllint` and `xsltproc`, uses the existing pinned nextest, and does
+not enable `--all-features` or ignored tests. No corpus archive is downloaded
+in this job: archive-dependent checks remain in the Ubuntu `corpus` job,
+including its checksum-verified Beta 0.4 regression. Tests that require a missing
+archive retain their existing behavior; this is not a full-corpus acceptance run.
+The hosted macOS 15 runner adds platform coverage for core filesystem and process
+tests, but does not replace release acceptance on macOS 13 or under Rosetta.
+
 ### Fast — about 12 s
 
 Formatting, compilation, and everything that does not touch the corpus archive.
