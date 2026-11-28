@@ -1105,7 +1105,7 @@ Packages: 1433 – crates 751, npm 682. Distinct licence texts: 690. Requires re
 | espree | 10.4.0 | npm | BSD-2-Clause | T119 |
 | espree | 11.2.0 | npm | BSD-2-Clause | T119 |
 | esquery | 1.7.0 | npm | BSD-3-Clause | T534 |
-| esrap | 2.3.6 | npm | MIT | T474 |
+| esrap | 2.4.2 | npm | MIT | T474 |
 | esrecurse | 4.3.0 | npm | BSD-2-Clause | requires review |
 | estraverse | 5.3.0 | npm | BSD-2-Clause | T109 |
 | estree-walker | 3.0.3 | npm | MIT | T464 |
@@ -30154,7 +30154,7 @@ SOFTWARE.
 
 ### T474
 
-SHA-256 `8f8f0696ab4041a885d28bddf82e2ad673a6522cb644d6f972237f4f6e172a1d`. Used by: esrap 2.3.6 (LICENSE).
+SHA-256 `8f8f0696ab4041a885d28bddf82e2ad673a6522cb644d6f972237f4f6e172a1d`. Used by: esrap 2.4.2 (LICENSE).
 
 ```text
 Copyright (c) 2023-2025 [these people](https://github.com/sveltejs/esrap/graphs/contributors)
