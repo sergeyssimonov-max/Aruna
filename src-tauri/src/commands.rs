@@ -38,6 +38,11 @@ fn reader_paths(
         aruna::error::ArunaError::ExportInvalid { first, .. } => {
             format!("Не удалось открыть библиотеку. {first}")
         }
+        aruna::error::ArunaError::Edition(issue) => format!(
+            "Не удалось проверить папку библиотеки {}. {}",
+            parent.display(),
+            issue.russian()
+        ),
         _ => format!(
             "Не удалось проверить папку библиотеки {}. {e}",
             parent.display()
