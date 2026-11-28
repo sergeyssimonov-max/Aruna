@@ -949,6 +949,10 @@ mod tests {
                             let _ = stream.write_all(bytes);
                         }
                         Some(Reply::Dribble) => {
+                            // The deadline test needs individual bytes to arrive between reads.
+                            stream
+                                .set_nodelay(true)
+                                .expect("disable Nagle for the dribble");
                             let _ = stream
                                 .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1048576\r\n\r\n");
                             let _ = stream.flush();
