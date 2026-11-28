@@ -324,6 +324,19 @@ jobs:
           tool: cargo-nextest@0.9.152
           fallback: none
 
+      # Exercise the core's filesystem and process tests on macOS as well as
+      # Linux. No corpus archive is downloaded here; the corpus job owns that
+      # check. Ignored whole-corpus builds remain outside this ordinary suite.
+      - name: Verify XML test oracle (macOS)
+        run: |
+          command -v xmllint
+          command -v xsltproc
+
+      - name: Test (CLI, macOS)
+        env:
+          INSTA_UPDATE: "no"
+        run: cargo nextest run --locked --profile ci --manifest-path cli/Cargo.toml
+
       # Without `--all-features`, and that is the condition of the test running
       # at all: the one test in this crate asserts what a build *without* `e2e`
       # registers, and it is compiled out under the feature. `--no-tests=pass`
