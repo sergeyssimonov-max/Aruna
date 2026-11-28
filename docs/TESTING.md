@@ -774,3 +774,17 @@ first table is this; one that is not is a finding.
   three are for examples and tests; nothing on the working path calls any of
   them. The first two run on the same libxml2 2.9.13, so together they are one
   opinion, not two (`docs/PDF-ACCEPTANCE.md`, measured 2026-09-22).
+
+## Edition metadata failures
+
+`editions::tests` checks unusable latest-record responses (HTML, truncated JSON,
+missing current-edition marker and oversized metadata), a single retry, cancellation
+between attempts, verified-cache reuse and rejection of damaged cached bytes.
+Conflict and Older remain hard errors; failures while downloading the archive
+do not enter the metadata fallback. Reader discovery also refuses a corrupted
+newer manifest rather than opening an older sibling.
+
+Run `INSTA_UPDATE=no cargo nextest run --locked -p aruna --lib -E 'test(editions::tests)'`.
+The desktop test `location_reports_a_broken_edition_without_falling_back_to_downloads`
+checks the Russian error returned to the window for a selected library, without
+substituting the Downloads destination. No live Zenodo service is required.
